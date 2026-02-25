@@ -7,6 +7,11 @@ let directoryCache = {
   expiresAtMs: 0,
   inFlight: null,
 };
+let carersCache = {
+  data: null,
+  expiresAtMs: 0,
+  inFlight: null,
+};
 
 function normalizeString(value) {
   return String(value || "").trim();
@@ -24,6 +29,37 @@ function sortByNameThenId(a, b) {
   return String(a.id || "").localeCompare(String(b.id || ""), undefined, {
     sensitivity: "base",
   });
+}
+
+function withTimeout(promise, ms, label) {
+  let timer = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  });
+}
+
+async function timed(label, task) {
+  const start = Date.now();
+  try {
+    const result = await task();
+    console.info("[OneTouch] Load step complete", { step: label, elapsedMs: Date.now() - start });
+    return result;
+  } catch (error) {
+    console.warn("[OneTouch] Load step failed", {
+      step: label,
+      elapsedMs: Date.now() - start,
+      error: error?.message || String(error),
+    });
+    throw error;
+  }
 }
 
 async function readLocalClients() {
@@ -151,7 +187,57 @@ function attachRelationships(clients, carers, visits) {
   };
 }
 
+function attachCarerRelationshipsFromVisits(carers, visits) {
+  const carerMap = new Map(carers.map((carer) => [carer.id, carer]));
+  const carerLinks = new Map();
+
+  function ensureCarerLink(carerId) {
+    if (!carerLinks.has(carerId)) {
+      carerLinks.set(carerId, {
+        clientIds: new Set(),
+        visitCount: 0,
+        lastVisitAt: "",
+      });
+    }
+    return carerLinks.get(carerId);
+  }
+
+  for (const visit of visits) {
+    if (!carerMap.has(visit.carerId)) {
+      continue;
+    }
+    const link = ensureCarerLink(visit.carerId);
+    if (visit.clientId) {
+      link.clientIds.add(visit.clientId);
+    }
+    link.visitCount += 1;
+    if (visit.startAt && (!link.lastVisitAt || visit.startAt > link.lastVisitAt)) {
+      link.lastVisitAt = visit.startAt;
+    }
+  }
+
+  return carers.map((carer) => {
+    const related = carerLinks.get(carer.id);
+    const clients = related
+      ? Array.from(related.clientIds)
+          .map((clientId) => ({ id: clientId, name: clientId }))
+          .sort(sortByNameThenId)
+      : [];
+
+    return {
+      ...carer,
+      relationships: {
+        clientCount: clients.length,
+        visitCount: related?.visitCount || 0,
+        lastVisitAt: related?.lastVisitAt || "",
+        clients,
+      },
+    };
+  });
+}
+
 async function loadDirectoryData() {
+  const loadStartedAt = Date.now();
   if (process.env.USE_LOCAL_CLIENTS_FALLBACK === "1") {
     const localClients = (await readLocalClients()).sort(sortByNameThenId);
     const withRelationships = localClients.map((client) => ({
@@ -172,10 +258,14 @@ async function loadDirectoryData() {
     };
   }
 
+  const clientsTimeoutMs = Number(process.env.ONETOUCH_CLIENTS_TIMEOUT_MS || "12000");
+  const carersTimeoutMs = Number(process.env.ONETOUCH_CARERS_TIMEOUT_MS || "12000");
+  const visitsTimeoutMs = Number(process.env.ONETOUCH_VISITS_TIMEOUT_MS || "6000");
+
   const [clients, carers, visitsResult] = await Promise.all([
-    listClients(),
-    listCarers(),
-    listVisits().then(
+    timed("clients/all", () => withTimeout(listClients(), clientsTimeoutMs, "clients/all")),
+    timed("carers/all", () => withTimeout(listCarers(), carersTimeoutMs, "carers/all")),
+    timed("visits", () => withTimeout(listVisits(), visitsTimeoutMs, "visits")).then(
       (visits) => ({ visits, error: "" }),
       (error) => ({ visits: [], error: error?.message || String(error) })
     ),
@@ -190,10 +280,61 @@ async function loadDirectoryData() {
     warnings.push(`Visits endpoint unavailable: ${visitsResult.error}`);
   }
 
+  console.info("[OneTouch] Directory load complete", {
+    elapsedMs: Date.now() - loadStartedAt,
+    clients: sortedClients.length,
+    carers: sortedCarers.length,
+    visits: visitsResult.visits.length,
+    warnings: warnings.length,
+  });
+
   return {
     source: "onetouch",
     clients: relationshipData.clients,
     carers: relationshipData.carers,
+    warnings,
+  };
+}
+
+async function loadCarersDirectoryData() {
+  const loadStartedAt = Date.now();
+
+  if (process.env.USE_LOCAL_CLIENTS_FALLBACK === "1") {
+    return {
+      source: "local-fallback",
+      carers: [],
+      warnings: ["Using local client fallback data. OneTouch carers are unavailable."],
+    };
+  }
+
+  const carersTimeoutMs = Number(process.env.ONETOUCH_CARERS_TIMEOUT_MS || "12000");
+  const visitsTimeoutMs = Number(process.env.ONETOUCH_VISITS_TIMEOUT_MS || "6000");
+
+  const [carers, visitsResult] = await Promise.all([
+    timed("carers/all", () => withTimeout(listCarers(), carersTimeoutMs, "carers/all")),
+    timed("visits", () => withTimeout(listVisits(), visitsTimeoutMs, "visits")).then(
+      (visits) => ({ visits, error: "" }),
+      (error) => ({ visits: [], error: error?.message || String(error) })
+    ),
+  ]);
+
+  const sortedCarers = carers.sort(sortByNameThenId);
+  const carersWithRelationships = attachCarerRelationshipsFromVisits(sortedCarers, visitsResult.visits);
+  const warnings = [];
+  if (visitsResult.error) {
+    warnings.push(`Visits endpoint unavailable: ${visitsResult.error}`);
+  }
+
+  console.info("[OneTouch] Carers load complete", {
+    elapsedMs: Date.now() - loadStartedAt,
+    carers: sortedCarers.length,
+    visits: visitsResult.visits.length,
+    warnings: warnings.length,
+  });
+
+  return {
+    source: "onetouch",
+    carers: carersWithRelationships,
     warnings,
   };
 }
@@ -223,5 +364,28 @@ async function readDirectoryData() {
 }
 
 module.exports = {
+  readCarersDirectoryData: async function readCarersDirectoryData() {
+    const now = Date.now();
+
+    if (carersCache.data && carersCache.expiresAtMs > now) {
+      return carersCache.data;
+    }
+
+    if (carersCache.inFlight) {
+      return carersCache.inFlight;
+    }
+
+    carersCache.inFlight = loadCarersDirectoryData()
+      .then((data) => {
+        carersCache.data = data;
+        carersCache.expiresAtMs = Date.now() + 45_000;
+        return data;
+      })
+      .finally(() => {
+        carersCache.inFlight = null;
+      });
+
+    return carersCache.inFlight;
+  },
   readDirectoryData,
 };

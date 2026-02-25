@@ -49,6 +49,9 @@ Set values in `frontend-config.js`:
 - `AZURE_REQUIRED_SCOPE` (default `client.read`)
 - `ONETOUCH_USERNAME`
 - `ONETOUCH_PASSWORD`
+- `ONETOUCH_CLIENTS_TIMEOUT_MS` (optional; default `12000`)
+- `ONETOUCH_CARERS_TIMEOUT_MS` (optional; default `12000`)
+- `ONETOUCH_VISITS_TIMEOUT_MS` (optional; default `6000`)
 
 Optional fallback toggles:
 

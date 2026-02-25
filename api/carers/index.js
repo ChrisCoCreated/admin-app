@@ -1,4 +1,4 @@
-const { readDirectoryData } = require("../_lib/directory-source");
+const { readCarersDirectoryData } = require("../_lib/directory-source");
 const { requireApiAuth } = require("../_lib/require-api-auth");
 
 module.exports = async (req, res) => {
@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const directory = await readDirectoryData();
+    const directory = await readCarersDirectoryData();
     const q = String(req.query.q || "").trim().toLowerCase();
     const limitRaw = Number(req.query.limit || "250");
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 1000)) : 250;

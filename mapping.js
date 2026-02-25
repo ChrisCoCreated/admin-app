@@ -1,9 +1,9 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
+import { renderTopNavigation } from "./navigation.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
-const marketingNavLink = document.getElementById("marketingNavLink");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
 const clientPostcodeInput = document.getElementById("clientPostcodeInput");
 const clientSearchInput = document.getElementById("clientSearchInput");
@@ -949,9 +949,7 @@ async function init() {
       window.location.href = "./marketing.html";
       return;
     }
-    if (role === "admin" && marketingNavLink) {
-      marketingNavLink.hidden = false;
-    }
+    renderTopNavigation({ role });
 
     if (runDateInput && !runDateInput.value) {
       runDateInput.value = toDateInputValue(getNextMondayDate());

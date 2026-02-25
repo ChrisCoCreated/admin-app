@@ -1,6 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
+import { renderTopNavigation } from "./navigation.js";
 
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
@@ -174,6 +175,7 @@ async function init() {
       window.location.href = "./marketing.html";
       return;
     }
+    renderTopNavigation({ role });
 
     setStatus("Loading carers...");
     const payload = await directoryApi.listCarers({ limit: 500 });

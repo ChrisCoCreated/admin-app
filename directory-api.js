@@ -78,5 +78,13 @@ export function createDirectoryApi(authController) {
       }
       return response.json();
     },
+
+    async listMarketingPhotos(query = {}) {
+      const response = await authFetch(buildUrl("/api/marketing/photos", query));
+      if (!response.ok) {
+        await parseError(response, "Marketing photos request failed");
+      }
+      return response.json();
+    },
   };
 }
