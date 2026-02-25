@@ -6,6 +6,10 @@ function normalizeClient(client) {
     id: String(client.id || "").trim(),
     name: String(client.name || "").trim(),
     location: String(client.location || "").trim(),
+    address: String(client.address || "").trim(),
+    town: String(client.town || "").trim(),
+    county: String(client.county || "").trim(),
+    postcode: String(client.postcode || "").trim(),
     email: String(client.email || "").trim(),
   };
 }
@@ -135,14 +139,22 @@ function mapGraphItemToClient(item) {
   const fields = item?.fields || {};
   const graphId = fields.ID || item?.id;
   const name = fields.Title || fields.Client || fields.ClientName || "";
+  const address = fields.Address || fields.AddressLine1 || fields.StreetAddress || "";
+  const town = fields.Town || fields.City || fields.Suburb || "";
+  const county = fields.County || fields.Region || "";
+  const postcode = fields.PostCode || fields.Postcode || fields.PostalCode || "";
   const location =
-    fields.Location || fields.Suburb || fields.City || fields.Town || fields.Address || "";
+    fields.Location || town || address || "";
   const email = fields.Email || fields.EmailAddress || fields.ClientEmail || "";
 
   return normalizeClient({
     id: graphId,
     name,
     location,
+    address,
+    town,
+    county,
+    postcode,
     email,
   });
 }
