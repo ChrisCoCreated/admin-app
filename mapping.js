@@ -19,6 +19,7 @@ const runNameInput = document.getElementById("runNameInput");
 const saveRunBtn = document.getElementById("saveRunBtn");
 const exportRunsBtn = document.getElementById("exportRunsBtn");
 const savedRunsStatus = document.getElementById("savedRunsStatus");
+const savedRunsBody = document.getElementById("savedRunsBody");
 const mappingStatus = document.getElementById("mappingStatus");
 const clientPostcodesList = document.getElementById("clientPostcodesList");
 const noClientsMessage = document.getElementById("noClientsMessage");
@@ -96,6 +97,7 @@ function updateSavedRunsStatus() {
   const count = savedRuns.length;
   savedRunsStatus.textContent = count === 0 ? "No saved runs yet." : `${count} saved run(s) ready for export.`;
   exportRunsBtn.disabled = count === 0;
+  renderSavedRunsTable();
 }
 
 function loadSavedRuns() {
@@ -115,6 +117,34 @@ function persistSavedRuns() {
     updateSavedRunsStatus();
   } catch {
     setStatus("Could not persist saved runs locally.", true);
+  }
+}
+
+function renderSavedRunsTable() {
+  if (!savedRunsBody) {
+    return;
+  }
+
+  savedRunsBody.innerHTML = "";
+  if (!savedRuns.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="5" class="muted">No saved runs.</td>`;
+    savedRunsBody.appendChild(tr);
+    return;
+  }
+
+  for (const run of savedRuns) {
+    const saved = new Date(run.savedAt);
+    const savedText = Number.isNaN(saved.getTime()) ? String(run.savedAt || "") : saved.toLocaleString();
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(savedText)}</td>
+      <td>${escapeHtml(String(run.name || ""))}</td>
+      <td>${escapeHtml(String(run.runStartTime || ""))}</td>
+      <td>${escapeHtml(String(run.clientStopCount || ""))}</td>
+      <td>£${escapeHtml(String(run.grandTotal || "0.00"))}</td>
+    `;
+    savedRunsBody.appendChild(tr);
   }
 }
 
