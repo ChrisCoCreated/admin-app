@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Time Mapping</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg" />
+    <link rel="alternate icon" href="./favicon.ico" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./clients.html" aria-label="Clients page">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav class="topnav" aria-label="Primary">
+            <a class="topnav-link" href="./clients.html">Clients</a>
+            <a class="topnav-link active" href="./mapping.html">Time Mapping</a>
+          </nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container mapping-main">
+      <section class="hero compact">
+        <h1>Time Mapping</h1>
+        <p>Build a driving run from a staff postcode through clients and back to the start.</p>
+      </section>
+
+      <section class="panel">
+        <div class="mapping-form-grid">
+          <label class="field" for="staffPostcodeInput">
+            Staff postcode
+            <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA" autocomplete="postal-code" />
+          </label>
+          <label class="field" for="clientPostcodeInput">
+            Add client postcode
+            <div class="postcode-entry-row">
+              <input id="clientPostcodeInput" type="text" placeholder="e.g. M1 1AE" autocomplete="postal-code" />
+              <button id="addClientBtn" class="secondary" type="button">Add</button>
+            </div>
+          </label>
+        </div>
+
+        <div class="row">
+          <button id="calculateRunBtn" type="button">Calculate run</button>
+          <button id="clearRunBtn" class="secondary" type="button">Clear</button>
+        </div>
+
+        <p id="mappingStatus" class="muted">Enter a staff postcode and at least one client postcode.</p>
+
+        <section class="client-postcodes-block" aria-labelledby="clientPostcodesHeading">
+          <h2 id="clientPostcodesHeading">Client postcodes</h2>
+          <ul id="clientPostcodesList" class="postcode-pill-list"></ul>
+          <p id="noClientsMessage" class="muted">No client postcodes added.</p>
+        </section>
+      </section>
+
+      <section id="runResults" class="panel" hidden>
+        <h2>Run Summary</h2>
+        <p id="runTotals" class="muted"></p>
+        <p>
+          <a id="mapsDirectionsLink" href="#" target="_blank" rel="noopener noreferrer">Open run in Google Maps</a>
+        </p>
+
+        <h2>Run Order</h2>
+        <ol id="runOrderList" class="run-order-list"></ol>
+
+        <h2>Legs</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Leg</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Distance</th>
+                <th>Duration</th>
+              </tr>
+            </thead>
+            <tbody id="runLegsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./mapping.js"></script>
+  </body>
+</html>

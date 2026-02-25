@@ -6,9 +6,11 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 
 - Entra ID sign-in/sign-out (MSAL popup with redirect fallback)
 - Authenticated Clients page (`clients.html`)
+- Authenticated Time Mapping page (`mapping.html`) for run planning
 - Secure backend APIs:
   - `GET /api/clients`
   - `GET /api/clients/:id`
+  - `POST /api/routes/run`
 - SharePoint clients source via Graph app-only token
 - Optional local fallback client data (`data/clients.json`)
 
@@ -25,6 +27,7 @@ npm start
 
 - `http://127.0.0.1:8081/index.html`
 - `http://127.0.0.1:8081/clients.html`
+- `http://127.0.0.1:8081/mapping.html`
 
 ## Frontend config
 
@@ -49,6 +52,11 @@ Optional fallback toggles:
 - `USE_LOCAL_CLIENTS_FALLBACK=1`
 - `ALLOW_LOCAL_CLIENTS_ON_GRAPH_ERROR=1`
 - `CLIENTS_DATA_FILE=./data/clients.json`
+
+Google Maps Platform vars (for Time Mapping):
+
+- `GOOGLE_MAPS_API_KEY`
+- `GOOGLE_MAPS_REGION` (default `gb`)
 
 ## Redirect URI notes
 

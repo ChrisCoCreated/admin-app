@@ -360,7 +360,6 @@ async function persistClientLocationFields(clientId, locationFields) {
     postcode: pickFieldName(columns, ["PostCode", "Postcode", "PostalCode", "ZipCode", "ZIP Code"], {
       writableOnly: true,
     }),
-    location: pickFieldName(columns, ["Location"], { writableOnly: true }),
   };
 
   const updates = {};
@@ -381,13 +380,6 @@ async function persistClientLocationFields(clientId, locationFields) {
   if (fieldMap.postcode && postcode) {
     updates[fieldMap.postcode] = postcode;
   }
-  if (fieldMap.location) {
-    const combinedLocation = [town, county, postcode].filter(Boolean).join(", ");
-    if (combinedLocation) {
-      updates[fieldMap.location] = combinedLocation;
-    }
-  }
-
   if (!Object.keys(updates).length) {
     throw createError("No matching writable location columns were found in SharePoint.", 400);
   }
@@ -396,8 +388,25 @@ async function persistClientLocationFields(clientId, locationFields) {
     String(clientId || "").trim()
   )}/fields`;
 
-  const pendingUpdates = { ...updates };
-  while (Object.keys(pendingUpdates).length) {
+  const payloadKeys = Object.keys(updates);
+  const updatedFields = [];
+  let lastError = null;
+
+  try {
+    await fetchJson(url, {
+      method: "PATCH",
+      headers: {
+        ...graphHeaders(token),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updates),
+    });
+    return { updatedFields: payloadKeys };
+  } catch (error) {
+    lastError = error;
+  }
+
+  for (const key of payloadKeys) {
     try {
       await fetchJson(url, {
         method: "PATCH",
@@ -405,31 +414,19 @@ async function persistClientLocationFields(clientId, locationFields) {
           ...graphHeaders(token),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(pendingUpdates),
+        body: JSON.stringify({ [key]: updates[key] }),
       });
-      break;
+      updatedFields.push(key);
     } catch (error) {
-      const message = String(error?.message || error);
-      const match = /Field '([^']+)' is read-only/i.exec(message);
-      if (!match) {
-        throw error;
-      }
-
-      const readOnlyField = String(match[1] || "").trim();
-      if (!readOnlyField || !(readOnlyField in pendingUpdates)) {
-        throw error;
-      }
-
-      delete pendingUpdates[readOnlyField];
-      if (!Object.keys(pendingUpdates).length) {
-        throw createError("All matched location columns are read-only.", 409);
-      }
+      lastError = error;
     }
   }
 
-  return {
-    updatedFields: Object.keys(pendingUpdates),
-  };
+  if (!updatedFields.length) {
+    throw lastError || createError("Could not update any location fields.", 500);
+  }
+
+  return { updatedFields };
 }
 
 module.exports = {
