@@ -58,6 +58,13 @@ Google Maps Platform vars (for Time Mapping):
 - `GOOGLE_MAPS_API_KEY`
 - `GOOGLE_MAPS_REGION` (default `gb`)
 
+Run costing vars (for Time Mapping):
+
+- `MAX_DISTANCE` (miles; applies to home legs only)
+- `MAX_TIME` (minutes; used only if `MAX_DISTANCE` is empty)
+- `TRAVEL_PAY` (hourly rate for paid travel time)
+- `PER_MILE` (rate per paid mile)
+
 ## Redirect URI notes
 
 For local sign-in, add your SPA redirect in Entra app registration, for example:

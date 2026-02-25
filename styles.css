@@ -339,8 +339,9 @@ dd {
   padding: 0;
   border: 1px solid #d8e0ee;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-y: auto;
   background: #fbfcff;
+  max-height: 320px;
 }
 
 .client-result-row {
@@ -398,6 +399,23 @@ dd {
 .run-order-list {
   margin: 12px 0;
   padding-left: 22px;
+}
+
+.cost-panel {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #dbe2f0;
+  border-radius: 12px;
+  background: #f8faff;
+}
+
+.cost-breakdown-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.cost-breakdown-list li {
+  margin: 2px 0;
 }
 
 @media (max-width: 900px) {

@@ -43,6 +43,25 @@ function metersToMiles(distanceMeters) {
   return Number.isFinite(miles) ? miles : 0;
 }
 
+function parseDurationSeconds(durationValue) {
+  const seconds = Number.parseInt(String(durationValue || "").replace("s", ""), 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
+
+function parseRate(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function parseThreshold(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) {
+    return null;
+  }
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 async function geocodeLocation(query, apiKey, region) {
   const url = new URL(GOOGLE_GEOCODE_URL);
   url.searchParams.set("address", query);
@@ -155,6 +174,7 @@ function buildResponse(staff, clients, route) {
     const from = stopNames[index] || "";
     const to = stopNames[index + 1] || "";
     const distanceMeters = Number(leg.distanceMeters || 0);
+    const durationSeconds = parseDurationSeconds(leg.duration);
     const miles = metersToMiles(distanceMeters);
 
     return {
@@ -164,12 +184,63 @@ function buildResponse(staff, clients, route) {
       distanceMeters,
       distanceMiles: Number(miles.toFixed(2)),
       duration: String(leg.duration || "0s"),
+      durationSeconds,
       durationText: formatDuration(leg.duration),
     };
   });
 
   const totalDistanceMeters = Number(route.distanceMeters || legs.reduce((sum, leg) => sum + leg.distanceMeters, 0));
   const totalMiles = metersToMiles(totalDistanceMeters);
+  const totalDurationSeconds = parseDurationSeconds(route.duration);
+  const maxDistanceMiles = parseThreshold(process.env.MAX_DISTANCE);
+  const maxTimeMinutes = parseThreshold(process.env.MAX_TIME);
+  const travelPayRate = parseRate(process.env.TRAVEL_PAY);
+  const perMileRate = parseRate(process.env.PER_MILE);
+  const costMode = maxDistanceMiles !== null ? "distance" : maxTimeMinutes !== null ? "time" : "distance";
+  const distanceThresholdMiles = maxDistanceMiles ?? 0;
+  const timeThresholdSeconds = Math.round((maxTimeMinutes ?? 0) * 60);
+
+  const homeLegIndexes = [0, legs.length - 1].filter((index, idx, arr) => index >= 0 && arr.indexOf(index) === idx);
+  const payableLegs = [];
+  let paidDistanceMeters = 0;
+  let paidDurationSeconds = 0;
+
+  for (const index of homeLegIndexes) {
+    const leg = legs[index];
+    if (!leg) {
+      continue;
+    }
+
+    let legPaidDistanceMeters = 0;
+    let legPaidDurationSeconds = 0;
+
+    if (costMode === "distance") {
+      const thresholdMeters = distanceThresholdMiles / 0.000621371;
+      legPaidDistanceMeters = Math.max(0, leg.distanceMeters - thresholdMeters);
+      if (leg.distanceMeters > 0) {
+        legPaidDurationSeconds = leg.durationSeconds * (legPaidDistanceMeters / leg.distanceMeters);
+      }
+    } else {
+      legPaidDurationSeconds = Math.max(0, leg.durationSeconds - timeThresholdSeconds);
+      if (leg.durationSeconds > 0) {
+        legPaidDistanceMeters = leg.distanceMeters * (legPaidDurationSeconds / leg.durationSeconds);
+      }
+    }
+
+    paidDistanceMeters += legPaidDistanceMeters;
+    paidDurationSeconds += legPaidDurationSeconds;
+    payableLegs.push({
+      legNumber: leg.legNumber,
+      paidDistanceMiles: Number(metersToMiles(legPaidDistanceMeters).toFixed(2)),
+      paidDurationMinutes: Number((legPaidDurationSeconds / 60).toFixed(1)),
+    });
+  }
+
+  const paidDistanceMiles = metersToMiles(paidDistanceMeters);
+  const paidDurationHours = paidDurationSeconds / 3600;
+  const timeCost = paidDurationHours * travelPayRate;
+  const mileageCost = paidDistanceMiles * perMileRate;
+  const totalCost = timeCost + mileageCost;
 
   return {
     run: {
@@ -191,6 +262,28 @@ function buildResponse(staff, clients, route) {
       totalDistanceMiles: Number(totalMiles.toFixed(2)),
       totalDuration: String(route.duration || "0s"),
       totalDurationText: formatDuration(route.duration),
+      totalDurationSeconds,
+      cost: {
+        mode: costMode,
+        thresholds: {
+          maxDistanceMiles,
+          maxTimeMinutes,
+        },
+        rates: {
+          travelPayPerHour: travelPayRate,
+          perMile: perMileRate,
+        },
+        homeTravel: {
+          paidDistanceMiles: Number(paidDistanceMiles.toFixed(2)),
+          paidDurationHours: Number(paidDurationHours.toFixed(2)),
+        },
+        components: {
+          timeCost: Number(timeCost.toFixed(2)),
+          mileageCost: Number(mileageCost.toFixed(2)),
+        },
+        payableLegs,
+        totalCost: Number(totalCost.toFixed(2)),
+      },
     },
   };
 }

@@ -16,6 +16,8 @@ const clientPostcodesList = document.getElementById("clientPostcodesList");
 const noClientsMessage = document.getElementById("noClientsMessage");
 const runResults = document.getElementById("runResults");
 const runTotals = document.getElementById("runTotals");
+const runCostSummary = document.getElementById("runCostSummary");
+const runCostBreakdown = document.getElementById("runCostBreakdown");
 const runOrderList = document.getElementById("runOrderList");
 const runLegsBody = document.getElementById("runLegsBody");
 const mapsDirectionsLink = document.getElementById("mapsDirectionsLink");
@@ -27,6 +29,7 @@ const CLIENTS_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/clients` : "/api/cl
 const clientPostcodes = [];
 let allClients = [];
 let selectedArea = "ALL";
+const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -72,6 +75,12 @@ function hideRun() {
   runResults.hidden = true;
   runOrderList.innerHTML = "";
   runLegsBody.innerHTML = "";
+  if (runCostSummary) {
+    runCostSummary.textContent = "";
+  }
+  if (runCostBreakdown) {
+    runCostBreakdown.innerHTML = "";
+  }
 }
 
 function renderClientPostcodes() {
@@ -181,12 +190,19 @@ function buildClientAddress(client) {
 }
 
 function getAreaOptions() {
-  const set = new Set();
+  const normalizedKnown = new Map(FIXED_AREAS.map((area) => [area.toLowerCase(), area]));
+  const found = new Set();
+
   for (const client of allClients) {
-    const area = getClientArea(client) || "Unassigned";
-    set.add(area);
+    const area = getClientArea(client);
+    const known = normalizedKnown.get(area.toLowerCase());
+    if (known) {
+      found.add(known);
+    }
   }
-  return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))];
+
+  const ordered = FIXED_AREAS.filter((area) => found.has(area));
+  return ["ALL", ...ordered];
 }
 
 function renderAreaFilters() {
@@ -244,7 +260,7 @@ function renderClientSearchResults() {
     info.className = "client-result-info";
     info.innerHTML = `
       <strong>${escapeHtml(String(client.name || "Unnamed client"))}</strong>
-      <span>Route address: ${escapeHtml(routeAddress || "Not available")}</span>
+      <span>${escapeHtml(routeAddress || "Not available")}</span>
     `;
 
     const addBtn = document.createElement("button");
@@ -279,6 +295,7 @@ function renderRun(run) {
   const legs = Array.isArray(run.legs) ? run.legs : [];
 
   runTotals.textContent = `Total distance: ${run.totalDistanceMiles || 0} mi (${run.totalDistanceMeters || 0} m) | Total time: ${run.totalDurationText || "0 min"}`;
+  renderCost(run.cost || null);
 
   runOrderList.innerHTML = "";
   const startItem = document.createElement("li");
@@ -313,6 +330,36 @@ function renderRun(run) {
     orderedClients.map((item) => item.query || item.formattedAddress).filter(Boolean)
   );
   runResults.hidden = false;
+}
+
+function renderCost(cost) {
+  if (!runCostSummary || !runCostBreakdown) {
+    return;
+  }
+
+  if (!cost) {
+    runCostSummary.textContent = "Costing unavailable.";
+    runCostBreakdown.innerHTML = "";
+    return;
+  }
+
+  const modeText = cost.mode === "time" ? "time threshold" : "distance threshold";
+  runCostSummary.textContent = `Run cost total: £${Number(cost.totalCost || 0).toFixed(2)} (${modeText}).`;
+  runCostBreakdown.innerHTML = "";
+
+  const lines = [
+    `Paid home travel distance: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi`,
+    `Paid home travel time: ${Number(cost.homeTravel?.paidDurationHours || 0).toFixed(2)} h`,
+    `Time cost (${Number(cost.rates?.travelPayPerHour || 0).toFixed(2)}/h): £${Number(cost.components?.timeCost || 0).toFixed(2)}`,
+    `Mileage cost (${Number(cost.rates?.perMile || 0).toFixed(2)}/mi): £${Number(cost.components?.mileageCost || 0).toFixed(2)}`,
+    `Total: £${Number(cost.totalCost || 0).toFixed(2)}`,
+  ];
+
+  for (const line of lines) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    runCostBreakdown.appendChild(li);
+  }
 }
 
 function escapeHtml(value) {
