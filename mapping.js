@@ -348,7 +348,7 @@ function renderCost(cost) {
     cost.mode === "time"
       ? `${Number(cost.thresholds?.maxTimeMinutes || 0).toFixed(0)} mins`
       : `${Number(cost.thresholds?.maxDistanceMiles || 0).toFixed(2)} miles`;
-  runCostSummary.textContent = `Calculation based on ${basedOnText} (${modeText}).`;
+  runCostSummary.textContent = `Calculation based on ${basedOnText} (${modeText}, home legs only).`;
   runCostBreakdown.innerHTML = "";
 
   const homeSeconds = Number(cost.homeTravel?.paidDurationSeconds || 0);

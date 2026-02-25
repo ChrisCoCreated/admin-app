@@ -258,8 +258,8 @@ function buildResponse(staff, clients, route) {
 
   const runDistanceMiles = metersToMiles(runDistanceMeters);
   const runDurationHours = runDurationSeconds / 3600;
-  const runTimeCost = runDurationHours * travelPayRate;
-  const runMileageCost = runDistanceMiles * perMileRate;
+  const runTimeCost = 0;
+  const runMileageCost = 0;
   const runTravelTotal = runTimeCost + runMileageCost;
   const grandTotal = exceptionalHomeTotal + runTravelTotal;
 
