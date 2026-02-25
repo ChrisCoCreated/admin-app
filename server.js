@@ -6,6 +6,7 @@ const { URL } = require("url");
 
 const clientsIndexHandler = require("./api/clients/index");
 const clientsByIdHandler = require("./api/clients/[id]");
+const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
 
 function loadEnvFile(envPath) {
@@ -169,6 +170,11 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/clients") {
     await clientsIndexHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/auth/me") {
+    await authMeHandler(apiReq, apiRes);
     return true;
   }
 

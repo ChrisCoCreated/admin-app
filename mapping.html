@@ -71,6 +71,11 @@
           <p id="noClientsMessage" class="muted">No client stops added.</p>
         </section>
 
+        <label class="field" for="runStartTimeInput">
+          Run start time
+          <input id="runStartTimeInput" type="time" step="600" value="09:00" />
+        </label>
+
         <div class="row">
           <button id="calculateRunBtn" type="button">Calculate run</button>
           <button id="clearRunBtn" class="secondary" type="button">Clear</button>
@@ -86,6 +91,10 @@
           <p id="runCostSummary" class="muted"></p>
           <div id="runCostBreakdown" class="cost-breakdown-sections"></div>
         </div>
+
+        <h2>Run Schedule</h2>
+        <p class="muted">Assumes 1 hour per client visit. Edit any time to shift all following times.</p>
+        <div id="runSchedule" class="schedule-list"></div>
         <p>
           <a id="mapsDirectionsLink" href="#" target="_blank" rel="noopener noreferrer">Open run in Google Maps</a>
         </p>

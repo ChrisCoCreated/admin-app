@@ -11,6 +11,7 @@ const clientSearchStatus = document.getElementById("clientSearchStatus");
 const addClientBtn = document.getElementById("addClientBtn");
 const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
+const runStartTimeInput = document.getElementById("runStartTimeInput");
 const mappingStatus = document.getElementById("mappingStatus");
 const clientPostcodesList = document.getElementById("clientPostcodesList");
 const noClientsMessage = document.getElementById("noClientsMessage");
@@ -18,6 +19,7 @@ const runResults = document.getElementById("runResults");
 const runTotals = document.getElementById("runTotals");
 const runCostSummary = document.getElementById("runCostSummary");
 const runCostBreakdown = document.getElementById("runCostBreakdown");
+const runSchedule = document.getElementById("runSchedule");
 const runOrderList = document.getElementById("runOrderList");
 const runLegsBody = document.getElementById("runLegsBody");
 const mapsDirectionsLink = document.getElementById("mapsDirectionsLink");
@@ -31,6 +33,10 @@ const selectedClientStops = [];
 let allClients = [];
 let selectedArea = "ALL";
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
+const VISIT_DURATION_MINUTES = 60;
+let scheduleRows = [];
+let scheduleGapMinutes = [];
+let lastRun = null;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -73,9 +79,15 @@ function setClientSearchStatus(message, isError = false) {
 }
 
 function hideRun() {
+  lastRun = null;
+  scheduleRows = [];
+  scheduleGapMinutes = [];
   runResults.hidden = true;
   runOrderList.innerHTML = "";
   runLegsBody.innerHTML = "";
+  if (runSchedule) {
+    runSchedule.innerHTML = "";
+  }
   if (runCostSummary) {
     runCostSummary.textContent = "";
   }
@@ -319,7 +331,143 @@ function buildMapsDirectionsUrl(staffPostcode, orderedClients) {
   return url.toString();
 }
 
+function getDurationMinutes(durationSeconds) {
+  const seconds = Number(durationSeconds || 0);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return 0;
+  }
+  return Math.max(1, Math.round(seconds / 60));
+}
+
+function parseTimeInputToMinutes(value) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(value || "").trim());
+  if (!match) {
+    return null;
+  }
+  const hours = Number(match[1]);
+  const mins = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(mins)) {
+    return null;
+  }
+  return hours * 60 + mins;
+}
+
+function formatMinutesForTimeInput(totalMinutes) {
+  let mins = Number(totalMinutes || 0);
+  if (!Number.isFinite(mins)) {
+    mins = 0;
+  }
+  mins = ((mins % 1440) + 1440) % 1440;
+  const hours = Math.floor(mins / 60);
+  const remainder = mins % 60;
+  return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+function roundToNearestTenMinutes(totalMinutes) {
+  const mins = Number(totalMinutes || 0);
+  if (!Number.isFinite(mins)) {
+    return 540;
+  }
+  return Math.round(mins / 10) * 10;
+}
+
+function resolveStartMinutes() {
+  const parsed = parseTimeInputToMinutes(runStartTimeInput?.value);
+  if (parsed === null) {
+    return 540;
+  }
+  return roundToNearestTenMinutes(parsed);
+}
+
+function buildScheduleRows(run) {
+  const clients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
+  const legs = Array.isArray(run.legs) ? run.legs : [];
+  const staffPostcode = run.staffStart?.postcode || "Staff home";
+
+  const labels = [`Start - ${staffPostcode}`];
+  for (const client of clients) {
+    labels.push(client.stopLabel || client.formattedAddress || client.query || "Client");
+  }
+  labels.push(`Return - ${staffPostcode}`);
+
+  scheduleGapMinutes = [];
+  for (let i = 0; i < labels.length - 1; i += 1) {
+    const legMinutes = getDurationMinutes(legs[i]?.durationSeconds);
+    if (i === 0) {
+      scheduleGapMinutes.push(legMinutes);
+    } else {
+      scheduleGapMinutes.push(VISIT_DURATION_MINUTES + legMinutes);
+    }
+  }
+
+  const startMinutes = resolveStartMinutes();
+  scheduleRows = labels.map((label, index) => ({
+    label,
+    minutes: index === 0 ? startMinutes : 0,
+  }));
+
+  for (let i = 1; i < scheduleRows.length; i += 1) {
+    scheduleRows[i].minutes = scheduleRows[i - 1].minutes + scheduleGapMinutes[i - 1];
+  }
+}
+
+function closestDelta(oldMinutes, newClockMinutes) {
+  const candidates = [newClockMinutes, newClockMinutes + 1440, newClockMinutes - 1440];
+  let best = candidates[0] - oldMinutes;
+  for (const candidate of candidates.slice(1)) {
+    const delta = candidate - oldMinutes;
+    if (Math.abs(delta) < Math.abs(best)) {
+      best = delta;
+    }
+  }
+  return best;
+}
+
+function renderSchedule() {
+  if (!runSchedule) {
+    return;
+  }
+
+  runSchedule.innerHTML = "";
+  for (let i = 0; i < scheduleRows.length; i += 1) {
+    const row = scheduleRows[i];
+    const wrap = document.createElement("div");
+    wrap.className = "schedule-row";
+
+    const label = document.createElement("span");
+    label.className = "schedule-label";
+    label.textContent = row.label;
+
+    const timeInput = document.createElement("input");
+    timeInput.type = "time";
+    timeInput.step = "60";
+    timeInput.value = formatMinutesForTimeInput(row.minutes);
+    timeInput.addEventListener("change", () => {
+      const parsed = parseTimeInputToMinutes(timeInput.value);
+      if (parsed === null) {
+        timeInput.value = formatMinutesForTimeInput(scheduleRows[i].minutes);
+        return;
+      }
+
+      const delta = closestDelta(scheduleRows[i].minutes, parsed);
+      for (let rowIndex = i; rowIndex < scheduleRows.length; rowIndex += 1) {
+        scheduleRows[rowIndex].minutes += delta;
+      }
+
+      if (i === 0 && runStartTimeInput) {
+        runStartTimeInput.value = formatMinutesForTimeInput(scheduleRows[0].minutes);
+      }
+
+      renderSchedule();
+    });
+
+    wrap.append(label, timeInput);
+    runSchedule.appendChild(wrap);
+  }
+}
+
 function renderRun(run) {
+  lastRun = run;
   const staffPostcode = run.staffStart?.postcode || "";
   const orderedClients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
   const legs = Array.isArray(run.legs) ? run.legs : [];
@@ -359,6 +507,8 @@ function renderRun(run) {
     staffPostcode,
     orderedClients.map((item) => item.query || item.formattedAddress).filter(Boolean)
   );
+  buildScheduleRows(run);
+  renderSchedule();
   runResults.hidden = false;
 }
 
@@ -579,6 +729,19 @@ clearRunBtn?.addEventListener("click", () => {
   renderClientSearchResults();
   hideRun();
   setStatus("Cleared.");
+});
+
+runStartTimeInput?.addEventListener("change", () => {
+  const parsed = parseTimeInputToMinutes(runStartTimeInput.value);
+  if (parsed === null) {
+    runStartTimeInput.value = "09:00";
+    return;
+  }
+  runStartTimeInput.value = formatMinutesForTimeInput(roundToNearestTenMinutes(parsed));
+  if (lastRun) {
+    buildScheduleRows(lastRun);
+    renderSchedule();
+  }
 });
 
 signOutBtn?.addEventListener("click", async () => {

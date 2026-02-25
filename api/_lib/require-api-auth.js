@@ -178,7 +178,6 @@ function resolveUserEmail(claims) {
     .toLowerCase();
 }
 
-async function requireApiAuth(req, res) {
 async function requireApiAuth(req, res, options = {}) {
   const allowedRoles = Array.isArray(options.allowedRoles)
     ? options.allowedRoles.map((role) => String(role).trim().toLowerCase()).filter(Boolean)

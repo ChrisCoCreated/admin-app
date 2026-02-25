@@ -448,6 +448,34 @@ dd {
   font-weight: 800;
 }
 
+.schedule-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #dbe2f0;
+  border-radius: 10px;
+  background: #fbfcff;
+  padding: 8px 10px;
+}
+
+.schedule-label {
+  font-weight: 700;
+  color: #1d2c47;
+}
+
+.schedule-row input[type="time"] {
+  width: 112px;
+  height: 36px;
+  border-radius: 8px;
+}
+
 @media (max-width: 900px) {
   .clients-grid {
     grid-template-columns: 1fr;
@@ -458,6 +486,10 @@ dd {
   }
 
   .mapping-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-row {
     grid-template-columns: 1fr;
   }
 }
