@@ -297,10 +297,12 @@ function buildResponse(staff, clients, route) {
         homeTravel: {
           paidDistanceMiles: Number(paidDistanceMiles.toFixed(2)),
           paidDurationHours: Number(paidDurationHours.toFixed(2)),
+          paidDurationSeconds: Math.round(paidDurationSeconds),
         },
         runTravel: {
           distanceMiles: Number(runDistanceMiles.toFixed(2)),
           durationHours: Number(runDurationHours.toFixed(2)),
+          durationSeconds: Math.round(runDurationSeconds),
         },
         components: {
           homeTimeCost: Number(homeTimeCost.toFixed(2)),

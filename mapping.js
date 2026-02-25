@@ -344,15 +344,21 @@ function renderCost(cost) {
   }
 
   const modeText = cost.mode === "time" ? "time threshold" : "distance threshold";
-  runCostSummary.textContent = `Costing mode: ${modeText}.`;
+  const basedOnText =
+    cost.mode === "time"
+      ? `${Number(cost.thresholds?.maxTimeMinutes || 0).toFixed(0)} mins`
+      : `${Number(cost.thresholds?.maxDistanceMiles || 0).toFixed(2)} miles`;
+  runCostSummary.textContent = `Calculation based on ${basedOnText} (${modeText}).`;
   runCostBreakdown.innerHTML = "";
 
+  const homeSeconds = Number(cost.homeTravel?.paidDurationSeconds || 0);
+  const runSeconds = Number(cost.runTravel?.durationSeconds || 0);
   const lines = [
     `Exceptional Travel Costs from Home: £${Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2)}`,
     `Run Travel: £${Number(cost.totals?.runTravelTotal || 0).toFixed(2)}`,
     `Grand Total: £${Number(cost.totals?.grandTotal || 0).toFixed(2)}`,
-    `Home paid distance/time: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi, ${Number(cost.homeTravel?.paidDurationHours || 0).toFixed(2)} h`,
-    `Run travel distance/time: ${Number(cost.runTravel?.distanceMiles || 0).toFixed(2)} mi, ${Number(cost.runTravel?.durationHours || 0).toFixed(2)} h`,
+    `Home paid distance/time: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(homeSeconds)}`,
+    `Run travel distance/time: ${Number(cost.runTravel?.distanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(runSeconds)}`,
     `Home time cost: £${Number(cost.components?.homeTimeCost || 0).toFixed(2)}`,
     `Home mileage cost: £${Number(cost.components?.homeMileageCost || 0).toFixed(2)}`,
     `Run time cost: £${Number(cost.components?.runTimeCost || 0).toFixed(2)}`,
@@ -364,6 +370,25 @@ function renderCost(cost) {
     li.textContent = line;
     runCostBreakdown.appendChild(li);
   }
+}
+
+function formatSecondsAsTime(totalSeconds) {
+  const safeSeconds = Number(totalSeconds || 0);
+  if (!Number.isFinite(safeSeconds) || safeSeconds <= 0) {
+    return "0 mins";
+  }
+
+  const totalMinutes = Math.round(safeSeconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes} mins`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
 }
 
 function escapeHtml(value) {
