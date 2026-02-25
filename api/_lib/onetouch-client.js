@@ -4,6 +4,18 @@ let tokenCache = {
   accessToken: "",
   expiresAtMs: 0,
 };
+let tokenInFlight = null;
+
+function maskValue(value) {
+  const raw = String(value || "");
+  if (!raw) {
+    return "";
+  }
+  if (raw.length <= 2) {
+    return `${raw[0] || ""}*`;
+  }
+  return `${raw.slice(0, 2)}***${raw.slice(-1)}`;
+}
 
 function getRequiredEnv() {
   const baseUrl = String(process.env.ONETOUCH_BASE_URL || DEFAULT_BASE_URL).trim().replace(/\/+$/, "");
@@ -92,46 +104,86 @@ async function getAccessToken() {
     return tokenCache.accessToken;
   }
 
-  const { baseUrl, username, password } = getRequiredEnv();
+  if (tokenInFlight) {
+    return tokenInFlight;
+  }
 
-  const loginUrl = `${baseUrl}/auth`;
-  const response = await fetch(loginUrl, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      username,
-      password,
-    }),
+  tokenInFlight = (async () => {
+    const { baseUrl, username, password } = getRequiredEnv();
+    const loginUrl = `${baseUrl}/auth`;
+    const account = getOneTouchAccount();
+
+    console.info("[OneTouch] Auth request", {
+      url: loginUrl,
+      usernameMasked: maskValue(username),
+      hasPassword: Boolean(password),
+      account,
+    });
+
+    async function requestToken() {
+      const response = await fetch(loginUrl, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
+      });
+
+      const text = await response.text();
+      let payload = null;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        const detail = payload?.error || payload?.message || text || `HTTP ${response.status}`;
+        console.warn("[OneTouch] Auth failed", {
+          status: response.status,
+          detail,
+          usernameMasked: maskValue(username),
+          account,
+        });
+        throw new Error(`OneTouch auth failed (${response.status}): ${detail}`);
+      }
+
+      const accessToken = resolveToken(payload);
+      if (!accessToken) {
+        throw new Error("OneTouch login succeeded but no access token was returned.");
+      }
+
+      const ttlMs = resolveTokenTtlSeconds(payload) * 1000;
+      tokenCache = {
+        accessToken,
+        expiresAtMs: Date.now() + ttlMs,
+      };
+
+      return accessToken;
+    }
+
+    try {
+      return await requestToken();
+    } catch (firstError) {
+      console.warn("[OneTouch] Auth retrying once after failure", {
+        reason: firstError?.message || String(firstError),
+        usernameMasked: maskValue(username),
+        account,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return requestToken().catch(() => {
+        throw firstError;
+      });
+    }
+  })().finally(() => {
+    tokenInFlight = null;
   });
 
-  const text = await response.text();
-  let payload = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = null;
-  }
-
-  if (!response.ok) {
-    const detail = payload?.error || payload?.message || text || `HTTP ${response.status}`;
-    throw new Error(`OneTouch auth failed: ${detail}`);
-  }
-  const accessToken = resolveToken(payload);
-
-  if (!accessToken) {
-    throw new Error("OneTouch login succeeded but no access token was returned.");
-  }
-
-  const ttlMs = resolveTokenTtlSeconds(payload) * 1000;
-  tokenCache = {
-    accessToken,
-    expiresAtMs: Date.now() + ttlMs,
-  };
-
-  return accessToken;
+  return tokenInFlight;
 }
 
 async function callOneTouch(endpointPath, query = {}) {
