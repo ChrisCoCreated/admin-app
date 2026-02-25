@@ -13,19 +13,26 @@ module.exports = async (req, res) => {
 
   try {
     const directory = await readDirectoryData();
-    const targetId = String(req.query.id || "").trim();
-    const client = directory.clients.find((item) => item.id === targetId);
+    const q = String(req.query.q || "").trim().toLowerCase();
+    const limitRaw = Number(req.query.limit || "250");
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 1000)) : 250;
+
+    const filtered = q
+      ? directory.carers.filter((carer) => {
+          return (
+            String(carer.name || "").toLowerCase().includes(q) ||
+            String(carer.id || "").toLowerCase().includes(q) ||
+            String(carer.postcode || "").toLowerCase().includes(q)
+          );
+        })
+      : directory.carers;
 
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("X-Client-Source", directory.source);
 
-    if (!client) {
-      res.status(404).json({ error: "Client not found" });
-      return;
-    }
-
     res.status(200).json({
-      client,
+      carers: filtered.slice(0, limit),
+      total: filtered.length,
       warnings: directory.warnings,
     });
   } catch (error) {

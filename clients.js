@@ -4,6 +4,7 @@ import { FRONTEND_CONFIG } from "./frontend-config.js";
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
+const marketingNavLink = document.getElementById("marketingNavLink");
 const clientsTableBody = document.getElementById("clientsTableBody");
 const emptyState = document.getElementById("emptyState");
 const detailRoot = document.getElementById("clientDetail");
@@ -195,6 +196,9 @@ async function init() {
     if (role === "marketing") {
       window.location.href = "./marketing.html";
       return;
+    }
+    if (role === "admin" && marketingNavLink) {
+      marketingNavLink.hidden = false;
     }
 
     setStatus("Loading clients...");

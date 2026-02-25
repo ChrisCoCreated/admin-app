@@ -3,6 +3,8 @@ import { FRONTEND_CONFIG } from "./frontend-config.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
+const clientsNavLink = document.getElementById("clientsNavLink");
+const mappingNavLink = document.getElementById("mappingNavLink");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const ME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/auth/me` : "/api/auth/me";
@@ -45,9 +47,17 @@ async function init() {
     const profile = await fetchCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
 
-    if (role !== "marketing") {
+    if (role !== "marketing" && role !== "admin") {
       window.location.href = "./clients.html";
       return;
+    }
+    if (role === "admin") {
+      if (clientsNavLink) {
+        clientsNavLink.hidden = false;
+      }
+      if (mappingNavLink) {
+        mappingNavLink.hidden = false;
+      }
     }
 
     const email = String(profile?.email || "").trim();

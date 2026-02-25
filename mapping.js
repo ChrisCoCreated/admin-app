@@ -2,6 +2,7 @@ import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
+const marketingNavLink = document.getElementById("marketingNavLink");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
 const clientPostcodeInput = document.getElementById("clientPostcodeInput");
 const clientSearchInput = document.getElementById("clientSearchInput");
@@ -847,6 +848,9 @@ async function init() {
     if (role === "marketing") {
       window.location.href = "./marketing.html";
       return;
+    }
+    if (role === "admin" && marketingNavLink) {
+      marketingNavLink.hidden = false;
     }
 
     loadSavedRuns();
