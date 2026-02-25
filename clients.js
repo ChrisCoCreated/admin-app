@@ -127,6 +127,34 @@ function parseLocationFields(addressInput) {
   };
 }
 
+async function persistLocationFields(clientId, fields) {
+  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
+  const response = await fetch(
+    `${CLIENTS_ENDPOINT}/${encodeURIComponent(clientId)}/populate-location`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(fields),
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    let detail = text;
+    try {
+      const parsed = text ? JSON.parse(text) : {};
+      detail = parsed?.detail || parsed?.error || text;
+    } catch {
+      detail = text;
+    }
+    throw new Error(detail || `Persist failed (${response.status}).`);
+  }
+}
+
 function getFilteredClients() {
   const query = String(searchInput.value || "").trim().toLowerCase();
   if (!query) {
@@ -264,7 +292,7 @@ signOutBtn?.addEventListener("click", async () => {
   }
 });
 
-populateLocationBtn?.addEventListener("click", () => {
+populateLocationBtn?.addEventListener("click", async () => {
   if (!selectedClient) {
     return;
   }
@@ -276,12 +304,25 @@ populateLocationBtn?.addEventListener("click", () => {
     return;
   }
 
-  selectedClient.address = selectedClient.address || parsed.address;
-  selectedClient.town = parsed.town;
-  selectedClient.county = parsed.county;
-  selectedClient.postcode = parsed.postcode;
-  setDetail(selectedClient);
-  setStatus("Location fields populated from address.");
+  try {
+    if (populateLocationBtn) {
+      populateLocationBtn.disabled = true;
+    }
+    setStatus("Saving parsed location fields to SharePoint...");
+    await persistLocationFields(selectedClient.id, parsed);
+    selectedClient.address = selectedClient.address || parsed.address;
+    selectedClient.town = parsed.town;
+    selectedClient.county = parsed.county;
+    selectedClient.postcode = parsed.postcode;
+    setDetail(selectedClient);
+    setStatus("Location fields populated and saved to SharePoint.");
+  } catch (error) {
+    setStatus(error?.message || "Could not save location fields.", true);
+  } finally {
+    if (populateLocationBtn) {
+      populateLocationBtn.disabled = false;
+    }
+  }
 });
 
 void init();

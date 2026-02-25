@@ -135,6 +135,63 @@ async function resolveListId(token, siteId, listName) {
   return list.id;
 }
 
+async function readListColumns(token, siteId, listId) {
+  const columns = [];
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName&$top=200`;
+
+  while (nextUrl) {
+    const data = await fetchJson(nextUrl, { headers: graphHeaders(token) });
+    const page = Array.isArray(data?.value) ? data.value : [];
+    for (const item of page) {
+      columns.push(item);
+    }
+    nextUrl = data?.["@odata.nextLink"] || "";
+  }
+
+  return columns;
+}
+
+function normalizeToken(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function pickFieldName(columns, candidates) {
+  const columnByToken = new Map();
+  for (const column of columns) {
+    const internalName = String(column?.name || "").trim();
+    if (!internalName) {
+      continue;
+    }
+
+    const nameToken = normalizeToken(internalName);
+    if (nameToken && !columnByToken.has(nameToken)) {
+      columnByToken.set(nameToken, internalName);
+    }
+
+    const displayToken = normalizeToken(column?.displayName);
+    if (displayToken && !columnByToken.has(displayToken)) {
+      columnByToken.set(displayToken, internalName);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const token = normalizeToken(candidate);
+    if (columnByToken.has(token)) {
+      return columnByToken.get(token);
+    }
+  }
+
+  return "";
+}
+
+function createError(message, statusCode) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
 function mapGraphItemToClient(item) {
   const fields = item?.fields || {};
   const graphId = fields.ID || item?.id;
@@ -209,6 +266,79 @@ async function readClients() {
   }
 }
 
+async function persistClientLocationFields(clientId, locationFields) {
+  if (process.env.USE_LOCAL_CLIENTS_FALLBACK === "1") {
+    throw createError("Cannot persist changes while local fallback mode is enabled.", 409);
+  }
+
+  const token = await getGraphAccessToken();
+  const { hostName, sitePath, clientsListName } = requireSharePointConfig();
+  const siteId = await resolveSiteId(token, hostName, sitePath);
+  const listId = await resolveListId(token, siteId, clientsListName);
+  const columns = await readListColumns(token, siteId, listId);
+
+  const fieldMap = {
+    address: pickFieldName(columns, [
+      "Address",
+      "AddressLine1",
+      "StreetAddress",
+      "Address1",
+      "Address Line 1",
+    ]),
+    town: pickFieldName(columns, ["Town", "City", "Suburb", "Town / City"]),
+    county: pickFieldName(columns, ["County", "Region", "State"]),
+    postcode: pickFieldName(columns, ["PostCode", "Postcode", "PostalCode", "ZipCode", "ZIP Code"]),
+    location: pickFieldName(columns, ["Location"]),
+  };
+
+  const updates = {};
+  const address = String(locationFields?.address || "").trim();
+  const town = String(locationFields?.town || "").trim();
+  const county = String(locationFields?.county || "").trim();
+  const postcode = String(locationFields?.postcode || "").trim();
+
+  if (fieldMap.address && address) {
+    updates[fieldMap.address] = address;
+  }
+  if (fieldMap.town && town) {
+    updates[fieldMap.town] = town;
+  }
+  if (fieldMap.county && county) {
+    updates[fieldMap.county] = county;
+  }
+  if (fieldMap.postcode && postcode) {
+    updates[fieldMap.postcode] = postcode;
+  }
+  if (fieldMap.location) {
+    const combinedLocation = [town, county, postcode].filter(Boolean).join(", ");
+    if (combinedLocation) {
+      updates[fieldMap.location] = combinedLocation;
+    }
+  }
+
+  if (!Object.keys(updates).length) {
+    throw createError("No matching writable location columns were found in SharePoint.", 400);
+  }
+
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
+    String(clientId || "").trim()
+  )}/fields`;
+
+  await fetchJson(url, {
+    method: "PATCH",
+    headers: {
+      ...graphHeaders(token),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(updates),
+  });
+
+  return {
+    updatedFields: Object.keys(updates),
+  };
+}
+
 module.exports = {
   readClients,
+  persistClientLocationFields,
 };

@@ -6,6 +6,7 @@ const { URL } = require("url");
 
 const clientsIndexHandler = require("./api/clients/index");
 const clientsByIdHandler = require("./api/clients/[id]");
+const clientsPopulateLocationHandler = require("./api/clients/populate-location");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -131,17 +132,53 @@ function createApiResponseAdapter(nodeRes) {
   };
 }
 
+async function readJsonBody(req) {
+  const chunks = [];
+  let totalBytes = 0;
+  const maxBytes = 1024 * 1024;
+
+  for await (const chunk of req) {
+    totalBytes += chunk.length;
+    if (totalBytes > maxBytes) {
+      throw new Error("Request body too large.");
+    }
+    chunks.push(chunk);
+  }
+
+  if (!chunks.length) {
+    return {};
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  if (!raw) {
+    return {};
+  }
+
+  return JSON.parse(raw);
+}
+
 async function handleApi(req, res, reqUrl) {
   const query = Object.fromEntries(reqUrl.searchParams.entries());
   const apiReq = {
     method: req.method,
     headers: req.headers,
     query,
+    body: {},
   };
   const apiRes = createApiResponseAdapter(res);
 
   if (reqUrl.pathname === "/api/clients") {
     await clientsIndexHandler(apiReq, apiRes);
+    return true;
+  }
+
+  const populateMatch = /^\/api\/clients\/([^/]+)\/populate-location$/.exec(reqUrl.pathname);
+  if (populateMatch) {
+    apiReq.query.id = decodeURIComponent(populateMatch[1]);
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await clientsPopulateLocationHandler(apiReq, apiRes);
     return true;
   }
 
