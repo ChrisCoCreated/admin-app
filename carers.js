@@ -5,11 +5,11 @@ import { createDirectoryApi } from "./directory-api.js";
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
-const clientsTableBody = document.getElementById("clientsTableBody");
+const carersTableBody = document.getElementById("carersTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
-const detailRoot = document.getElementById("clientDetail");
-const linkedCarersList = document.getElementById("linkedCarersList");
+const detailRoot = document.getElementById("carerDetail");
+const linkedClientsList = document.getElementById("linkedClientsList");
 
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
@@ -18,12 +18,12 @@ const detailFields = {
   email: detailRoot?.querySelector('[data-field="email"]'),
   phone: detailRoot?.querySelector('[data-field="phone"]'),
   visitCount: detailRoot?.querySelector('[data-field="visitCount"]'),
-  carerCount: detailRoot?.querySelector('[data-field="carerCount"]'),
+  clientCount: detailRoot?.querySelector('[data-field="clientCount"]'),
   lastVisitAt: detailRoot?.querySelector('[data-field="lastVisitAt"]'),
 };
 
-let allClients = [];
-let selectedClientId = "";
+let allCarers = [];
+let selectedCarerId = "";
 let account = null;
 
 const authController = createAuthController({
@@ -57,56 +57,56 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
-function setDetail(client) {
-  if (!client) {
+function setDetail(carer) {
+  if (!carer) {
     detailFields.id.textContent = "-";
-    detailFields.name.textContent = "Select a client";
+    detailFields.name.textContent = "Select a carer";
     detailFields.postcode.textContent = "-";
     detailFields.email.textContent = "-";
     detailFields.phone.textContent = "-";
     detailFields.visitCount.textContent = "-";
-    detailFields.carerCount.textContent = "-";
+    detailFields.clientCount.textContent = "-";
     detailFields.lastVisitAt.textContent = "-";
-    linkedCarersList.innerHTML = "";
+    linkedClientsList.innerHTML = "";
     return;
   }
 
-  detailFields.id.textContent = client.id || "-";
-  detailFields.name.textContent = client.name || "-";
-  detailFields.postcode.textContent = client.postcode || "-";
-  detailFields.email.textContent = client.email || "-";
-  detailFields.phone.textContent = client.phone || "-";
-  detailFields.visitCount.textContent = String(client.relationships?.visitCount || 0);
-  detailFields.carerCount.textContent = String(client.relationships?.carerCount || 0);
-  detailFields.lastVisitAt.textContent = formatDateTime(client.relationships?.lastVisitAt);
+  detailFields.id.textContent = carer.id || "-";
+  detailFields.name.textContent = carer.name || "-";
+  detailFields.postcode.textContent = carer.postcode || "-";
+  detailFields.email.textContent = carer.email || "-";
+  detailFields.phone.textContent = carer.phone || "-";
+  detailFields.visitCount.textContent = String(carer.relationships?.visitCount || 0);
+  detailFields.clientCount.textContent = String(carer.relationships?.clientCount || 0);
+  detailFields.lastVisitAt.textContent = formatDateTime(carer.relationships?.lastVisitAt);
 
-  linkedCarersList.innerHTML = "";
-  const carers = Array.isArray(client.relationships?.carers) ? client.relationships.carers : [];
-  if (!carers.length) {
+  linkedClientsList.innerHTML = "";
+  const clients = Array.isArray(carer.relationships?.clients) ? carer.relationships.clients : [];
+  if (!clients.length) {
     const li = document.createElement("li");
-    li.textContent = "No linked carers found.";
-    linkedCarersList.appendChild(li);
+    li.textContent = "No linked clients found.";
+    linkedClientsList.appendChild(li);
     return;
   }
 
-  for (const carer of carers) {
+  for (const client of clients) {
     const li = document.createElement("li");
-    li.textContent = `${carer.name || "Unknown"} (${carer.id || "-"})`;
-    linkedCarersList.appendChild(li);
+    li.textContent = `${client.name || "Unknown"} (${client.id || "-"})`;
+    linkedClientsList.appendChild(li);
   }
 }
 
-function getFilteredClients() {
+function getFilteredCarers() {
   const query = String(searchInput.value || "").trim().toLowerCase();
   if (!query) {
-    return allClients;
+    return allCarers;
   }
 
-  return allClients.filter((client) => {
+  return allCarers.filter((carer) => {
     return (
-      String(client.id || "").toLowerCase().includes(query) ||
-      String(client.name || "").toLowerCase().includes(query) ||
-      String(client.postcode || "").toLowerCase().includes(query)
+      String(carer.id || "").toLowerCase().includes(query) ||
+      String(carer.name || "").toLowerCase().includes(query) ||
+      String(carer.postcode || "").toLowerCase().includes(query)
     );
   });
 }
@@ -120,9 +120,9 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function renderClients() {
-  const filtered = getFilteredClients();
-  clientsTableBody.innerHTML = "";
+function renderCarers() {
+  const filtered = getFilteredCarers();
+  carersTableBody.innerHTML = "";
 
   if (!filtered.length) {
     emptyState.hidden = false;
@@ -132,28 +132,28 @@ function renderClients() {
 
   emptyState.hidden = true;
 
-  const selected = filtered.find((client) => client.id === selectedClientId) || filtered[0];
-  selectedClientId = selected.id;
+  const selected = filtered.find((carer) => carer.id === selectedCarerId) || filtered[0];
+  selectedCarerId = selected.id;
 
-  for (const client of filtered) {
+  for (const carer of filtered) {
     const tr = document.createElement("tr");
-    tr.classList.toggle("selected", client.id === selectedClientId);
+    tr.classList.toggle("selected", carer.id === selectedCarerId);
 
     tr.innerHTML = `
-      <td>${escapeHtml(client.id)}</td>
-      <td>${escapeHtml(client.name)}</td>
-      <td>${escapeHtml(client.postcode || "-")}</td>
-      <td>${escapeHtml(String(client.relationships?.carerCount || 0))}</td>
-      <td>${escapeHtml(String(client.relationships?.visitCount || 0))}</td>
+      <td>${escapeHtml(carer.id)}</td>
+      <td>${escapeHtml(carer.name)}</td>
+      <td>${escapeHtml(carer.postcode || "-")}</td>
+      <td>${escapeHtml(String(carer.relationships?.clientCount || 0))}</td>
+      <td>${escapeHtml(String(carer.relationships?.visitCount || 0))}</td>
     `;
 
     tr.addEventListener("click", () => {
-      selectedClientId = client.id;
-      setDetail(client);
-      renderClients();
+      selectedCarerId = carer.id;
+      setDetail(carer);
+      renderCarers();
     });
 
-    clientsTableBody.appendChild(tr);
+    carersTableBody.appendChild(tr);
   }
 
   setDetail(selected);
@@ -175,19 +175,19 @@ async function init() {
       return;
     }
 
-    setStatus("Loading clients...");
-    const payload = await directoryApi.listOneTouchClients({ limit: 500 });
-    allClients = Array.isArray(payload?.clients) ? payload.clients : [];
+    setStatus("Loading carers...");
+    const payload = await directoryApi.listCarers({ limit: 500 });
+    allCarers = Array.isArray(payload?.carers) ? payload.carers : [];
 
     const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
     warningState.hidden = warnings.length === 0;
     warningState.textContent = warnings.join(" ");
 
-    setStatus(`Loaded ${allClients.length} client(s).`);
-    renderClients();
+    setStatus(`Loaded ${allCarers.length} carer(s).`);
+    renderCarers();
   } catch (error) {
     console.error(error);
-    setStatus(error?.message || "Could not load clients.", true);
+    setStatus(error?.message || "Could not load carers.", true);
     emptyState.hidden = false;
   } finally {
     document.body.classList.remove("auth-pending");
@@ -195,7 +195,7 @@ async function init() {
 }
 
 searchInput?.addEventListener("input", () => {
-  renderClients();
+  renderCarers();
 });
 
 signOutBtn?.addEventListener("click", async () => {

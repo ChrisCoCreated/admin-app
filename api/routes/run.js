@@ -98,7 +98,7 @@ async function geocodeLocation(query, apiKey, region) {
   };
 }
 
-async function computeRun(staff, clients, apiKey) {
+async function computeRun(staff, clients, apiKey, departureTime) {
   const requestBody = {
     origin: {
       location: {
@@ -125,11 +125,14 @@ async function computeRun(staff, clients, apiKey) {
       },
     })),
     travelMode: "DRIVE",
-    routingPreference: "TRAFFIC_UNAWARE",
+    routingPreference: "TRAFFIC_AWARE",
     optimizeWaypointOrder: false,
     units: "METRIC",
     languageCode: "en-GB",
   };
+  if (departureTime) {
+    requestBody.departureTime = departureTime;
+  }
 
   const response = await fetch(GOOGLE_ROUTES_URL, {
     method: "POST",
@@ -340,6 +343,7 @@ module.exports = async (req, res) => {
 
   const region = String(process.env.GOOGLE_MAPS_REGION || "gb").trim().toLowerCase() || "gb";
   const staffPostcode = normalizePostcode(req.body?.staffPostcode);
+  const departureTime = String(req.body?.departureTime || "").trim();
   const rawClientLocations = Array.isArray(req.body?.clientLocations)
     ? req.body.clientLocations
     : Array.isArray(req.body?.clientPostcodes)
@@ -391,7 +395,7 @@ module.exports = async (req, res) => {
       ),
     ]);
 
-    const route = await computeRun(staff, clients, apiKey);
+    const route = await computeRun(staff, clients, apiKey, departureTime);
     const payload = buildResponse(staff, clients, route);
 
     res.setHeader("Cache-Control", "no-store");

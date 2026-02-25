@@ -6,12 +6,15 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 
 - Entra ID sign-in/sign-out (MSAL popup with redirect fallback)
 - Authenticated Clients page (`clients.html`)
+- Authenticated Carers page (`carers.html`)
 - Authenticated Time Mapping page (`mapping.html`) for run planning
 - Secure backend APIs:
-  - `GET /api/clients`
+  - `GET /api/clients` (original SharePoint/local clients list; used by Time Mapping)
   - `GET /api/clients/:id`
+  - `GET /api/onetouch/clients` (OneTouch list with relationship metadata)
+  - `GET /api/carers`
   - `POST /api/routes/run`
-- SharePoint clients source via Graph app-only token
+- OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
 
 ## Run locally
@@ -27,6 +30,7 @@ npm start
 
 - `http://127.0.0.1:8081/index.html`
 - `http://127.0.0.1:8081/clients.html`
+- `http://127.0.0.1:8081/carers.html`
 - `http://127.0.0.1:8081/mapping.html`
 
 ## Frontend config
@@ -43,9 +47,9 @@ Set values in `frontend-config.js`:
 - `AZURE_TENANT_ID`
 - `AZURE_API_AUDIENCE` or `AZURE_API_CLIENT_ID`
 - `AZURE_REQUIRED_SCOPE` (default `client.read`)
-- `AZURE_API_CLIENT_SECRET`
-- `SHAREPOINT_SITE_URL`
-- `SHAREPOINT_CLIENTS_LIST_NAME`
+- `ONETOUCH_ACCOUNT` (or `ONETOUCH_ACCOUNT_CODE`)
+- `ONETOUCH_USERNAME`
+- `ONETOUCH_PASSWORD`
 
 Optional fallback toggles:
 

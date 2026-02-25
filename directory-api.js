@@ -63,6 +63,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listOneTouchClients(query = {}) {
+      const response = await authFetch(buildUrl("/api/onetouch/clients", query));
+      if (!response.ok) {
+        await parseError(response, "OneTouch clients request failed");
+      }
+      return response.json();
+    },
+
     async listCarers(query = {}) {
       const response = await authFetch(buildUrl("/api/carers", query));
       if (!response.ok) {

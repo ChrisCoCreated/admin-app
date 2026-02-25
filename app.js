@@ -1,13 +1,11 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { createDirectoryApi } from "./directory-api.js";
 
 const signInBtn = document.getElementById("signInBtn");
 const authState = document.getElementById("authState");
 const authCard = document.querySelector(".auth-card");
 const mainContainer = document.querySelector("main.container");
-const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
-const ME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/auth/me` : "/api/auth/me";
-
 if (authCard) {
   authCard.hidden = true;
 }
@@ -30,22 +28,10 @@ const authController = createAuthController({
     setStatus("Signed out.");
   },
 });
+const directoryApi = createDirectoryApi(authController);
 
 async function fetchCurrentUser() {
-  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
-  const response = await fetch(ME_ENDPOINT, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Profile request failed (${response.status}): ${text || "Unknown error"}`);
-  }
-
-  return response.json();
+  return directoryApi.getCurrentUser();
 }
 
 async function routeToRoleHome() {

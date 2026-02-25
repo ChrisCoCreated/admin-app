@@ -1,5 +1,6 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { createDirectoryApi } from "./directory-api.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const marketingNavLink = document.getElementById("marketingNavLink");
@@ -12,6 +13,7 @@ const clientSearchStatus = document.getElementById("clientSearchStatus");
 const addClientBtn = document.getElementById("addClientBtn");
 const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
+const runDateInput = document.getElementById("runDateInput");
 const runStartTimeInput = document.getElementById("runStartTimeInput");
 const runNameInput = document.getElementById("runNameInput");
 const saveRunBtn = document.getElementById("saveRunBtn");
@@ -31,8 +33,6 @@ const mapsDirectionsLink = document.getElementById("mapsDirectionsLink");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const RUN_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/routes/run` : "/api/routes/run";
-const CLIENTS_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/clients` : "/api/clients";
-const ME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/auth/me` : "/api/auth/me";
 
 const selectedClientStops = [];
 let allClients = [];
@@ -49,6 +49,7 @@ const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
 });
+const directoryApi = createDirectoryApi(authController);
 
 function normalizePostcode(value) {
   return String(value || "")
@@ -394,6 +395,43 @@ function parseTimeInputToMinutes(value) {
   return hours * 60 + mins;
 }
 
+function toDateInputValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getNextMondayDate() {
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = date.getDay(); // 0=Sun ... 1=Mon
+  let daysUntilMonday = (8 - day) % 7;
+  if (daysUntilMonday === 0) {
+    daysUntilMonday = 7;
+  }
+  date.setDate(date.getDate() + daysUntilMonday);
+  return date;
+}
+
+function parseDateInputValue(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim());
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  const date = new Date(year, month, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
+    return null;
+  }
+  return date;
+}
+
 function formatMinutesForTimeInput(totalMinutes) {
   let mins = Number(totalMinutes || 0);
   if (!Number.isFinite(mins)) {
@@ -419,6 +457,21 @@ function resolveStartMinutes() {
     return 540;
   }
   return roundToNearestTenMinutes(parsed);
+}
+
+function buildDepartureTimeIso() {
+  const startMinutes = resolveStartMinutes();
+  const selectedDate = parseDateInputValue(runDateInput?.value) || getNextMondayDate();
+  const local = new Date(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth(),
+    selectedDate.getDate(),
+    Math.floor(startMinutes / 60),
+    startMinutes % 60,
+    0,
+    0
+  );
+  return local.toISOString();
 }
 
 function buildScheduleRows(run) {
@@ -778,6 +831,7 @@ async function calculateRun() {
       },
       body: JSON.stringify({
         staffPostcode,
+        departureTime: buildDepartureTimeIso(),
         clientLocations: selectedClientStops.map((stop) => ({
           query: stop.address,
           label: stop.label || stop.address,
@@ -800,41 +854,6 @@ async function calculateRun() {
   }
 }
 
-async function fetchClients() {
-  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
-  const response = await fetch(CLIENTS_ENDPOINT, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Clients request failed (${response.status}): ${text || "Unknown error"}`);
-  }
-
-  const data = await response.json();
-  return Array.isArray(data?.clients) ? data.clients : [];
-}
-
-async function fetchCurrentUser() {
-  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
-  const response = await fetch(ME_ENDPOINT, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Profile request failed (${response.status}): ${text || "Unknown error"}`);
-  }
-
-  return response.json();
-}
-
 async function init() {
   try {
     const account = await authController.restoreSession();
@@ -843,7 +862,7 @@ async function init() {
       return;
     }
 
-    const profile = await fetchCurrentUser();
+    const profile = await directoryApi.getCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
     if (role === "marketing") {
       window.location.href = "./marketing.html";
@@ -853,10 +872,14 @@ async function init() {
       marketingNavLink.hidden = false;
     }
 
+    if (runDateInput && !runDateInput.value) {
+      runDateInput.value = toDateInputValue(getNextMondayDate());
+    }
     loadSavedRuns();
     renderClientPostcodes();
     setClientSearchStatus("Loading clients...");
-    allClients = await fetchClients();
+    const clientsPayload = await directoryApi.listClients({ limit: 1000 });
+    allClients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
     renderAreaFilters();
     renderClientSearchResults();
   } catch (error) {
@@ -903,6 +926,9 @@ exportRunsBtn?.addEventListener("click", () => {
 });
 
 clearRunBtn?.addEventListener("click", () => {
+  if (runDateInput) {
+    runDateInput.value = toDateInputValue(getNextMondayDate());
+  }
   staffPostcodeInput.value = "";
   clientPostcodeInput.value = "";
   if (clientSearchInput) {
@@ -927,6 +953,13 @@ runStartTimeInput?.addEventListener("change", () => {
   if (lastRun) {
     buildScheduleRows(lastRun);
     renderSchedule();
+  }
+});
+
+runDateInput?.addEventListener("change", () => {
+  const parsed = parseDateInputValue(runDateInput.value);
+  if (!parsed) {
+    runDateInput.value = toDateInputValue(getNextMondayDate());
   }
 });
 

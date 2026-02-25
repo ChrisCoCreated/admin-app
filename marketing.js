@@ -1,18 +1,17 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { createDirectoryApi } from "./directory-api.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientsNavLink = document.getElementById("clientsNavLink");
 const mappingNavLink = document.getElementById("mappingNavLink");
 
-const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
-const ME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/auth/me` : "/api/auth/me";
-
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
 });
+const directoryApi = createDirectoryApi(authController);
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -20,20 +19,7 @@ function setStatus(message, isError = false) {
 }
 
 async function fetchCurrentUser() {
-  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
-  const response = await fetch(ME_ENDPOINT, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Profile request failed (${response.status}): ${text || "Unknown error"}`);
-  }
-
-  return response.json();
+  return directoryApi.getCurrentUser();
 }
 
 async function init() {

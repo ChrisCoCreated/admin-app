@@ -7,6 +7,7 @@ const { URL } = require("url");
 const clientsIndexHandler = require("./api/clients/index");
 const clientsByIdHandler = require("./api/clients/[id]");
 const carersIndexHandler = require("./api/carers/index");
+const oneTouchClientsHandler = require("./api/onetouch/clients");
 const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
 
@@ -176,6 +177,11 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/carers") {
     await carersIndexHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/onetouch/clients") {
+    await oneTouchClientsHandler(apiReq, apiRes);
     return true;
   }
 

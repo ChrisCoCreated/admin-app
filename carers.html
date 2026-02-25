@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Thrive Admin - Clients</title>
+    <title>Thrive Admin - Carers</title>
     <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg" />
     <link rel="alternate icon" href="./favicon.ico" sizes="any" />
     <link rel="manifest" href="./site.webmanifest" />
@@ -15,14 +15,14 @@
   <body class="auth-pending">
     <header class="topbar">
       <div class="container topbar-inner">
-        <a class="brand" href="./clients.html" aria-label="Clients page">
+        <a class="brand" href="./carers.html" aria-label="Carers page">
           <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
           <span class="brand-text">Thrive Admin</span>
         </a>
         <div class="topbar-actions">
           <nav class="topnav" aria-label="Primary">
-            <a class="topnav-link active" href="./clients.html">Clients</a>
-            <a class="topnav-link" href="./carers.html">Carers</a>
+            <a class="topnav-link" href="./clients.html">Clients</a>
+            <a class="topnav-link active" href="./carers.html">Carers</a>
             <a class="topnav-link" href="./mapping.html">Time Mapping</a>
           </nav>
           <button id="signOutBtn" class="secondary" type="button">Sign out</button>
@@ -32,8 +32,8 @@
 
     <main class="container clients-main">
       <section class="hero compact">
-        <h1>Clients</h1>
-        <p>Browse clients and view their linked carers from OneTouch visits data.</p>
+        <h1>Carers</h1>
+        <p>Browse carers and view the clients they support from OneTouch visits data.</p>
       </section>
 
       <section class="panel">
@@ -41,13 +41,13 @@
           Search
           <input id="searchInput" type="search" placeholder="Search by name, id or postcode" autocomplete="off" />
         </label>
-        <p id="statusMessage" class="muted">Loading clients...</p>
+        <p id="statusMessage" class="muted">Loading carers...</p>
         <p id="warningState" class="muted" hidden></p>
       </section>
 
       <section class="clients-grid">
         <article class="panel list-panel">
-          <h2>Client List</h2>
+          <h2>Carer List</h2>
           <div class="table-wrap">
             <table>
               <thead>
@@ -55,26 +55,26 @@
                   <th>ID</th>
                   <th>Name</th>
                   <th>Postcode</th>
-                  <th>Carers</th>
+                  <th>Clients</th>
                   <th>Visits</th>
                 </tr>
               </thead>
-              <tbody id="clientsTableBody"></tbody>
+              <tbody id="carersTableBody"></tbody>
             </table>
           </div>
-          <p id="emptyState" class="muted" hidden>No clients found.</p>
+          <p id="emptyState" class="muted" hidden>No carers found.</p>
         </article>
 
         <article class="panel detail-panel">
-          <h2>Client Detail</h2>
-          <dl id="clientDetail" class="detail-list">
+          <h2>Carer Detail</h2>
+          <dl id="carerDetail" class="detail-list">
             <div>
               <dt>ID</dt>
               <dd data-field="id">-</dd>
             </div>
             <div>
               <dt>Name</dt>
-              <dd data-field="name">Select a client</dd>
+              <dd data-field="name">Select a carer</dd>
             </div>
             <div>
               <dt>Postcode</dt>
@@ -93,8 +93,8 @@
               <dd data-field="visitCount">-</dd>
             </div>
             <div>
-              <dt>Linked Carers</dt>
-              <dd data-field="carerCount">-</dd>
+              <dt>Linked Clients</dt>
+              <dd data-field="clientCount">-</dd>
             </div>
             <div>
               <dt>Last Visit</dt>
@@ -102,12 +102,12 @@
             </div>
           </dl>
 
-          <h2 class="subheading">Linked Carers</h2>
-          <ul id="linkedCarersList" class="linked-list"></ul>
+          <h2 class="subheading">Linked Clients</h2>
+          <ul id="linkedClientsList" class="linked-list"></ul>
         </article>
       </section>
     </main>
 
-    <script type="module" src="./clients.js"></script>
+    <script type="module" src="./carers.js"></script>
   </body>
 </html>
