@@ -264,8 +264,7 @@ function mapGraphItemToClient(item) {
     "ZipCode",
     "Post_x0020_Code",
   ]);
-  const location =
-    pickFieldValue(["Location", "Locality"]) || town || address || "";
+  const location = pickFieldValue(["Location", "Locality"]);
   const email = fields.Email || fields.EmailAddress || fields.ClientEmail || "";
 
   return normalizeClient({

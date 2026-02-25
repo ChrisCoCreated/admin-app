@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const targetId = String(req.query.id || "").trim();
+  const targetId = String(req.query.id || req.body?.id || "").trim();
   if (!targetId) {
     res.status(400).json({ error: "Missing client id." });
     return;

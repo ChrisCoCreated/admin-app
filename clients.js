@@ -129,18 +129,18 @@ function parseLocationFields(addressInput) {
 
 async function persistLocationFields(clientId, fields) {
   const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
-  const response = await fetch(
-    `${CLIENTS_ENDPOINT}/${encodeURIComponent(clientId)}/populate-location`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(fields),
-    }
-  );
+  const response = await fetch(`${CLIENTS_ENDPOINT}/populate-location`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: clientId,
+      ...fields,
+    }),
+  });
 
   if (!response.ok) {
     const text = await response.text();
@@ -297,7 +297,7 @@ populateLocationBtn?.addEventListener("click", async () => {
     return;
   }
 
-  const sourceAddress = selectedClient.address || selectedClient.location || "";
+  const sourceAddress = selectedClient.address || "";
   const parsed = parseLocationFields(sourceAddress);
   if (!parsed) {
     setStatus("No address found to parse.", true);

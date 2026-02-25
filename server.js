@@ -172,6 +172,14 @@ async function handleApi(req, res, reqUrl) {
     return true;
   }
 
+  if (reqUrl.pathname === "/api/clients/populate-location") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await clientsPopulateLocationHandler(apiReq, apiRes);
+    return true;
+  }
+
   const populateMatch = /^\/api\/clients\/([^/]+)\/populate-location$/.exec(reqUrl.pathname);
   if (populateMatch) {
     apiReq.query.id = decodeURIComponent(populateMatch[1]);
