@@ -184,7 +184,6 @@ async function callOneTouch(endpointPath, query = {}) {
 
   const endpoint = String(endpointPath || "").replace(/^\/+/, "");
   const url = new URL(`${baseUrl}/${endpoint}`);
-  url.searchParams.set("access_token", accessToken);
 
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null || value === "") {
@@ -193,14 +192,49 @@ async function callOneTouch(endpointPath, query = {}) {
     url.searchParams.set(key, String(value));
   }
 
-  return fetchJson(url);
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const detail = payload?.error || payload?.message || text || `HTTP ${response.status}`;
+    throw new Error(`OneTouch request failed (${response.status}): ${detail}`);
+  }
+
+  return payload;
 }
 
 function resolveRecords(payload, explicitKeys = []) {
-  const keyList = [...explicitKeys, "data", "results", "items", "list", "value"];
+  const dottedKeyList = [
+    ...explicitKeys,
+    "data",
+    "results",
+    "items",
+    "list",
+    "value",
+    "data.visits",
+    "data.timesheets",
+    "data.clients",
+    "data.carers",
+  ];
 
-  for (const key of keyList) {
-    const list = payload?.[key];
+  for (const keyPath of dottedKeyList) {
+    const segments = String(keyPath).split(".");
+    let list = payload;
+    for (const segment of segments) {
+      list = list?.[segment];
+    }
     if (Array.isArray(list)) {
       return list;
     }
