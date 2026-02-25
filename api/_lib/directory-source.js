@@ -308,21 +308,18 @@ async function loadCarersDirectoryData() {
   }
 
   const carersTimeoutMs = Number(process.env.ONETOUCH_CARERS_TIMEOUT_MS || "12000");
-  const visitsTimeoutMs = Number(process.env.ONETOUCH_VISITS_TIMEOUT_MS || "6000");
-
-  const [carers, visitsResult] = await Promise.all([
-    timed("carers/all", () => withTimeout(listCarers(), carersTimeoutMs, "carers/all")),
-    timed("visits", () => withTimeout(listVisits(), visitsTimeoutMs, "visits")).then(
-      (visits) => ({ visits, error: "" }),
-      (error) => ({ visits: [], error: error?.message || String(error) })
-    ),
-  ]);
+  const visitsTimeoutMs = Number(process.env.ONETOUCH_CARERS_VISITS_TIMEOUT_MS || "1200");
+  const carers = await timed("carers/all", () => withTimeout(listCarers(), carersTimeoutMs, "carers/all"));
+  const visitsResult = await timed("visits", () => withTimeout(listVisits(), visitsTimeoutMs, "visits")).then(
+    (visits) => ({ visits, error: "" }),
+    (error) => ({ visits: [], error: error?.message || String(error) })
+  );
 
   const sortedCarers = carers.sort(sortByNameThenId);
   const carersWithRelationships = attachCarerRelationshipsFromVisits(sortedCarers, visitsResult.visits);
   const warnings = [];
   if (visitsResult.error) {
-    warnings.push(`Visits endpoint unavailable: ${visitsResult.error}`);
+    warnings.push(`Relationships unavailable in fast mode: ${visitsResult.error}`);
   }
 
   console.info("[OneTouch] Carers load complete", {

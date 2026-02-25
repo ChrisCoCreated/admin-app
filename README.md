@@ -52,6 +52,7 @@ Set values in `frontend-config.js`:
 - `ONETOUCH_CLIENTS_TIMEOUT_MS` (optional; default `12000`)
 - `ONETOUCH_CARERS_TIMEOUT_MS` (optional; default `12000`)
 - `ONETOUCH_VISITS_TIMEOUT_MS` (optional; default `6000`)
+- `ONETOUCH_CARERS_VISITS_TIMEOUT_MS` (optional; default `1200`, fast-mode relationship budget for carers page)
 
 Optional fallback toggles:
 
