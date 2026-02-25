@@ -134,61 +134,80 @@ function parseMaybeJson(value) {
   }
 }
 
-function asTruthy(value) {
-  if (typeof value === "boolean") {
-    return value;
+function extractLookupText(value) {
+  if (value === null || value === undefined) {
+    return "";
   }
-  if (typeof value === "number") {
-    return value > 0;
+  if (typeof value === "string") {
+    const parsed = parseMaybeJson(value);
+    if (parsed && typeof parsed === "object") {
+      return (
+        String(parsed.lookupValue || parsed.LookupValue || parsed.value || parsed.Value || "").trim()
+      );
+    }
+    return value.trim();
   }
-
-  const normalized = String(value || "")
-    .trim()
-    .toLowerCase();
-  if (!normalized) {
-    return false;
+  if (typeof value === "object") {
+    return String(value.lookupValue || value.LookupValue || value.value || value.Value || "").trim();
   }
-
-  return ["1", "true", "yes", "y", "agreed", "approved", "consented"].includes(normalized);
+  return String(value).trim();
 }
 
 function pickClientConsent(fields) {
   const entries = Object.entries(fields || {});
   if (!entries.length) {
-    return false;
+    return {
+      consentValue: "",
+      consented: false,
+    };
   }
 
-  const tokenMap = new Map();
+  const tokenPairs = [];
   for (const [key, value] of entries) {
     const token = normalizeToken(key);
-    if (token && !tokenMap.has(token)) {
-      tokenMap.set(token, value);
+    if (token) {
+      tokenPairs.push([token, value]);
     }
   }
 
-  const directCandidates = [
-    "clientconsent",
-    "clientconsentgiven",
-    "clientconsentobtained",
-    "consentfromclient",
-    "consentclient",
-    "photoconsent",
-    "consent",
+  const preferredTokens = [
+    "clientconsentformarketing",
+    "clientx003aconsentx0020forx0020marketing",
+    "clientconsentformarketinglookup",
+    "clientconsentformarketingvalue",
   ];
-  for (const token of directCandidates) {
-    if (tokenMap.has(token)) {
-      return asTruthy(tokenMap.get(token));
+  for (const preferred of preferredTokens) {
+    const found = tokenPairs.find(([token]) => token === preferred);
+    if (found) {
+      const consentValue = extractLookupText(found[1]);
+      const consentToken = normalizeToken(consentValue);
+      return {
+        consentValue,
+        consented: consentToken === "given" || consentToken.startsWith("given"),
+      };
     }
   }
 
-  for (const [key, value] of entries) {
-    const token = normalizeToken(key);
-    if (token.includes("consent") && token.includes("client")) {
-      return asTruthy(value);
+  for (const [token, value] of tokenPairs) {
+    const isMarketingConsentLookup =
+      token.includes("client") &&
+      token.includes("consent") &&
+      token.includes("marketing") &&
+      !token.endsWith("lookupid");
+    if (isMarketingConsentLookup) {
+      const consentValue = extractLookupText(value);
+      const consentToken = normalizeToken(consentValue);
+      return {
+        consentValue,
+        consented: consentToken === "given" || consentToken.startsWith("given"),
+      };
     }
   }
 
-  return false;
+  return {
+    consentValue: "",
+    consented: false,
+  };
 }
 
 function pickImageUrl(fields, hostName) {
@@ -235,9 +254,6 @@ function pickImageUrl(fields, hostName) {
 function mapGraphItemToPhoto(item, hostName) {
   const fields = item?.fields || {};
   const consent = pickClientConsent(fields);
-  if (!consent) {
-    return null;
-  }
 
   const imageUrl = pickImageUrl(fields, hostName);
   if (!imageUrl) {
@@ -257,6 +273,8 @@ function mapGraphItemToPhoto(item, hostName) {
     title,
     client,
     imageUrl,
+    consentValue: consent.consentValue,
+    consented: consent.consented,
   };
 }
 

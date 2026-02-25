@@ -35,7 +35,7 @@
       <section class="panel">
         <h2>Photos and Lists</h2>
         <p class="muted">
-          Showing photos from SharePoint where client consent is confirmed.
+          Showing all photos from SharePoint. Use the consent filter for only approved images.
         </p>
         <p class="row wrap-row">
           <a
@@ -45,8 +45,9 @@
             rel="noopener noreferrer"
             >Open SharePoint list</a
           >
+          <button id="consentFilterBtn" class="secondary consent-filter-btn" type="button">Show consented only</button>
         </p>
-        <p id="photosStatus" class="muted row-note">Loading consented photos...</p>
+        <p id="photosStatus" class="muted row-note">Loading photos...</p>
         <div id="photosGrid" class="marketing-photo-grid" aria-live="polite"></div>
       </section>
     </main>

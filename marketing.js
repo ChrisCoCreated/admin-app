@@ -7,6 +7,7 @@ const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const photosStatus = document.getElementById("photosStatus");
 const photosGrid = document.getElementById("photosGrid");
+const consentFilterBtn = document.getElementById("consentFilterBtn");
 const lightboxEl = document.getElementById("photoLightbox");
 const lightboxImage = document.getElementById("lightboxImage");
 const lightboxCaption = document.getElementById("lightboxCaption");
@@ -19,7 +20,9 @@ const authController = createAuthController({
   clientId: FRONTEND_CONFIG.spaClientId,
 });
 const directoryApi = createDirectoryApi(authController);
-let marketingPhotos = [];
+let allMarketingPhotos = [];
+let visibleMarketingPhotos = [];
+let consentFilterOn = false;
 let activePhotoIndex = -1;
 
 function setStatus(message, isError = false) {
@@ -39,7 +42,7 @@ function renderLightboxPhoto() {
   if (!lightboxImage || !lightboxCaption || !lightboxPrevBtn || !lightboxNextBtn) {
     return;
   }
-  const photo = marketingPhotos[activePhotoIndex];
+  const photo = visibleMarketingPhotos[activePhotoIndex];
   if (!photo) {
     return;
   }
@@ -47,13 +50,13 @@ function renderLightboxPhoto() {
   lightboxImage.src = photo.imageUrl;
   lightboxImage.alt = photo.title || photo.client || "Client photo";
   lightboxCaption.textContent = `${photo.client || photo.title}${photo.title && photo.client !== photo.title ? ` - ${photo.title}` : ""}`;
-  const canNavigate = marketingPhotos.length > 1;
+  const canNavigate = visibleMarketingPhotos.length > 1;
   lightboxPrevBtn.disabled = !canNavigate;
   lightboxNextBtn.disabled = !canNavigate;
 }
 
 function openLightbox(index) {
-  if (!lightboxEl || index < 0 || index >= marketingPhotos.length) {
+  if (!lightboxEl || index < 0 || index >= visibleMarketingPhotos.length) {
     return;
   }
   activePhotoIndex = index;
@@ -74,10 +77,11 @@ function closeLightbox() {
 }
 
 function stepLightbox(direction) {
-  if (!marketingPhotos.length || activePhotoIndex < 0) {
+  if (!visibleMarketingPhotos.length || activePhotoIndex < 0) {
     return;
   }
-  const nextIndex = (activePhotoIndex + direction + marketingPhotos.length) % marketingPhotos.length;
+  const nextIndex =
+    (activePhotoIndex + direction + visibleMarketingPhotos.length) % visibleMarketingPhotos.length;
   activePhotoIndex = nextIndex;
   renderLightboxPhoto();
 }
@@ -89,7 +93,7 @@ function renderPhotoGrid(photos) {
 
   photosGrid.innerHTML = "";
   if (!photos.length) {
-    setPhotosStatus("No photos with client consent were found.");
+    setPhotosStatus(consentFilterOn ? "No consented photos were found." : "No photos were found.");
     return;
   }
 
@@ -116,7 +120,29 @@ function renderPhotoGrid(photos) {
   }
 
   photosGrid.append(fragment);
-  setPhotosStatus(`${photos.length} consented photo${photos.length === 1 ? "" : "s"} loaded.`);
+  const consentedCount = allMarketingPhotos.filter((photo) => photo.consented).length;
+  if (consentFilterOn) {
+    setPhotosStatus(`${photos.length} consented photo${photos.length === 1 ? "" : "s"} shown.`);
+  } else {
+    setPhotosStatus(
+      `${photos.length} photo${photos.length === 1 ? "" : "s"} shown (${consentedCount} consented).`
+    );
+  }
+}
+
+function applyPhotoFilter() {
+  visibleMarketingPhotos = consentFilterOn
+    ? allMarketingPhotos.filter((photo) => photo.consented)
+    : allMarketingPhotos.slice();
+  renderPhotoGrid(visibleMarketingPhotos);
+}
+
+function updateConsentFilterButton() {
+  if (!consentFilterBtn) {
+    return;
+  }
+  consentFilterBtn.textContent = consentFilterOn ? "Show all photos" : "Show consented only";
+  consentFilterBtn.classList.toggle("active", consentFilterOn);
 }
 
 async function fetchCurrentUser() {
@@ -124,11 +150,12 @@ async function fetchCurrentUser() {
 }
 
 async function loadPhotos() {
-  setPhotosStatus("Loading consented photos...");
+  setPhotosStatus("Loading photos...");
   const payload = await directoryApi.listMarketingPhotos();
   const photos = Array.isArray(payload?.photos) ? payload.photos : [];
-  marketingPhotos = photos;
-  renderPhotoGrid(photos);
+  allMarketingPhotos = photos;
+  updateConsentFilterButton();
+  applyPhotoFilter();
 }
 
 async function init() {
@@ -172,6 +199,12 @@ signOutBtn?.addEventListener("click", async () => {
 lightboxCloseBtn?.addEventListener("click", closeLightbox);
 lightboxPrevBtn?.addEventListener("click", () => stepLightbox(-1));
 lightboxNextBtn?.addEventListener("click", () => stepLightbox(1));
+consentFilterBtn?.addEventListener("click", () => {
+  consentFilterOn = !consentFilterOn;
+  closeLightbox();
+  updateConsentFilterButton();
+  applyPhotoFilter();
+});
 lightboxEl?.addEventListener("click", (event) => {
   if (event.target === lightboxEl) {
     closeLightbox();

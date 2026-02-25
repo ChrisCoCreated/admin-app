@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
     res.status(200).json({
       photos,
       total: photos.length,
-      filter: "client-consent",
+      defaultView: "all",
     });
   } catch (error) {
     res.status(500).json({

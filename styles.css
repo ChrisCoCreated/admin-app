@@ -310,6 +310,11 @@ dd {
   margin-top: 12px;
 }
 
+.consent-filter-btn.active {
+  background: #1f3c88;
+  color: #fff;
+}
+
 .marketing-photo-grid {
   margin-top: 12px;
   display: grid;
