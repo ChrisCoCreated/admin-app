@@ -196,12 +196,76 @@ function mapGraphItemToClient(item) {
   const fields = item?.fields || {};
   const graphId = fields.ID || item?.id;
   const name = fields.Title || fields.Client || fields.ClientName || "";
-  const address = fields.Address || fields.AddressLine1 || fields.StreetAddress || "";
-  const town = fields.Town || fields.City || fields.Suburb || "";
-  const county = fields.County || fields.Region || "";
-  const postcode = fields.PostCode || fields.Postcode || fields.PostalCode || "";
+  const entries = Object.entries(fields)
+    .map(([key, value]) => [String(key || ""), String(value || "").trim()])
+    .filter(([, value]) => Boolean(value));
+
+  const byToken = new Map();
+  for (const [key, value] of entries) {
+    const token = normalizeToken(key);
+    if (token && !byToken.has(token)) {
+      byToken.set(token, value);
+    }
+  }
+
+  function pickFieldValue(candidates) {
+    for (const candidate of candidates) {
+      const match = byToken.get(normalizeToken(candidate));
+      if (match) {
+        return match;
+      }
+    }
+    return "";
+  }
+
+  function inferAddressLikeValue() {
+    const postcodePattern = /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
+    for (const [key, value] of entries) {
+      const keyToken = normalizeToken(key);
+      if (!value || value.length < 10) {
+        continue;
+      }
+      if (!postcodePattern.test(value)) {
+        continue;
+      }
+      if (
+        keyToken.includes("address") ||
+        keyToken.includes("location") ||
+        keyToken.includes("street")
+      ) {
+        return value;
+      }
+    }
+
+    for (const [, value] of entries) {
+      if (postcodePattern.test(value) && value.length >= 10) {
+        return value;
+      }
+    }
+
+    return "";
+  }
+
+  const address =
+    pickFieldValue([
+      "Address",
+      "AddressLine1",
+      "Address1",
+      "StreetAddress",
+      "Line1",
+      "Address_x0020_Line_x0020_1",
+    ]) || inferAddressLikeValue();
+  const town = pickFieldValue(["Town", "City", "Suburb", "Town_x0020_City"]);
+  const county = pickFieldValue(["County", "Region", "State"]);
+  const postcode = pickFieldValue([
+    "PostCode",
+    "Postcode",
+    "PostalCode",
+    "ZipCode",
+    "Post_x0020_Code",
+  ]);
   const location =
-    fields.Location || town || address || "";
+    pickFieldValue(["Location", "Locality"]) || town || address || "";
   const email = fields.Email || fields.EmailAddress || fields.ClientEmail || "";
 
   return normalizeClient({
