@@ -1,0 +1,12 @@
+{
+  "users": [
+    {
+      "email": "chris@planwithcare.co.uk",
+      "role": "admin"
+    },
+    {
+      "email": "peter@planwithcare.co.uk",
+      "role": "admin"
+    }
+  ]
+}

@@ -1,7 +1,24 @@
 const crypto = require("crypto");
+const authorizedUsersConfig = require("../../data/authorized-users.json");
 
 const openIdConfigCache = new Map();
 const jwksCache = new Map();
+const authorizedUsers = new Map(
+  (Array.isArray(authorizedUsersConfig?.users) ? authorizedUsersConfig.users : [])
+    .map((entry) => {
+      const email = String(entry?.email || "")
+        .trim()
+        .toLowerCase();
+      const role = String(entry?.role || "")
+        .trim()
+        .toLowerCase();
+      if (!email || !role) {
+        return null;
+      }
+      return [email, role];
+    })
+    .filter(Boolean)
+);
 
 function base64UrlDecode(input) {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -155,6 +172,12 @@ async function validateBearerToken(token) {
   return payload;
 }
 
+function resolveUserEmail(claims) {
+  return String(claims?.preferred_username || claims?.email || claims?.upn || "")
+    .trim()
+    .toLowerCase();
+}
+
 async function requireApiAuth(req, res) {
   const authHeader = String(req.headers.authorization || "");
   const match = /^Bearer\s+(.+)$/i.exec(authHeader);
@@ -166,6 +189,17 @@ async function requireApiAuth(req, res) {
 
   try {
     const claims = await validateBearerToken(match[1]);
+    const email = resolveUserEmail(claims);
+    const role = authorizedUsers.get(email);
+    if (!email || !role) {
+      res.status(403).json({ error: "Forbidden." });
+      return null;
+    }
+    req.authUser = {
+      email,
+      role,
+      claims,
+    };
     return claims;
   } catch {
     res.status(401).json({ error: "Unauthorized." });

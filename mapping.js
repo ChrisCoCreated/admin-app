@@ -377,17 +377,8 @@ function renderCost(cost) {
     cost.mode === "time"
       ? `${Number(cost.thresholds?.maxTimeMinutes || 0).toFixed(0)} mins`
       : `${Number(cost.thresholds?.maxDistanceMiles || 0).toFixed(2)} miles`;
-  const distanceBasis = Number(cost.thresholds?.maxDistanceMiles);
-  const timeBasis = Number(cost.thresholds?.maxTimeMinutes);
-  const basisParts = [];
-  if (Number.isFinite(distanceBasis) && distanceBasis > 0) {
-    basisParts.push(`${distanceBasis.toFixed(2)} miles`);
-  }
-  if (Number.isFinite(timeBasis) && timeBasis > 0) {
-    basisParts.push(`${timeBasis.toFixed(0)} mins`);
-  }
-  const basisText = basisParts.length ? basisParts.join(", ") : "None";
-  runCostSummary.textContent = `Costing mode: ${modeText}. Home exceptional travel uses ${basedOnText}. Run travel is fully costed (all distance/time). Basis: ${basisText}.`;
+  const modeLabel = modeText.charAt(0).toUpperCase() + modeText.slice(1);
+  runCostSummary.textContent = `Costing mode: ${modeLabel} ${basedOnText}.`;
   runCostBreakdown.innerHTML = "";
 
   const homeSeconds = Number(cost.homeTravel?.paidDurationSeconds || 0);
