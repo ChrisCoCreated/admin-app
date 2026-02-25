@@ -396,49 +396,74 @@ async function persistClientLocationFields(clientId, locationFields) {
     throw createError("Invalid client id for SharePoint item update.", 400);
   }
 
-  const spToken = await getSharePointAccessToken(hostName);
-  const restUrl = `https://${hostName}${sitePath}/_api/web/lists(guid'${listId}')/items(${itemId})/ValidateUpdateListItem()`;
-  const response = await fetch(restUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${spToken}`,
-      Accept: "application/json;odata=nometadata",
-      "Content-Type": "application/json;odata=nometadata",
-    },
-    body: JSON.stringify({
-      formValues: [
-        {
-          FieldName: locationFieldName,
-          FieldValue: location,
-        },
-      ],
-      bNewDocumentUpdate: false,
-    }),
-  });
-
-  const text = await response.text();
-  let payload = {};
+  const graphUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/fields`;
   try {
-    payload = text ? JSON.parse(text) : {};
-  } catch {
-    payload = {};
-  }
-  if (!response.ok) {
-    const detail = payload?.error?.message?.value || payload?.error?.message || text || "SharePoint update failed.";
-    throw createError(detail, response.status);
-  }
+    await fetchJson(graphUrl, {
+      method: "PATCH",
+      headers: {
+        ...graphHeaders(graphToken),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        [locationFieldName]: location,
+      }),
+    });
+    return { updatedFields: [locationFieldName] };
+  } catch (graphError) {
+    let spError = null;
+    try {
+      const spToken = await getSharePointAccessToken(hostName);
+      const restUrl = `https://${hostName}${sitePath}/_api/web/lists(guid'${listId}')/items(${itemId})/ValidateUpdateListItem()`;
+      const response = await fetch(restUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${spToken}`,
+          Accept: "application/json;odata=nometadata",
+          "Content-Type": "application/json;odata=nometadata",
+        },
+        body: JSON.stringify({
+          formValues: [
+            {
+              FieldName: locationFieldName,
+              FieldValue: location,
+            },
+          ],
+          bNewDocumentUpdate: false,
+        }),
+      });
 
-  const results = Array.isArray(payload?.value)
-    ? payload.value
-    : Array.isArray(payload?.d?.ValidateUpdateListItem?.results)
-      ? payload.d.ValidateUpdateListItem.results
-      : [];
-  const firstError = results.find((entry) => entry?.HasException || entry?.ErrorMessage);
-  if (firstError?.ErrorMessage) {
-    throw createError(firstError.ErrorMessage, 400);
-  }
+      const text = await response.text();
+      let payload = {};
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch {
+        payload = {};
+      }
+      if (!response.ok) {
+        const detail =
+          payload?.error?.message?.value || payload?.error?.message || text || "SharePoint update failed.";
+        throw createError(detail, response.status);
+      }
 
-  return { updatedFields: [locationFieldName] };
+      const results = Array.isArray(payload?.value)
+        ? payload.value
+        : Array.isArray(payload?.d?.ValidateUpdateListItem?.results)
+          ? payload.d.ValidateUpdateListItem.results
+          : [];
+      const firstError = results.find((entry) => entry?.HasException || entry?.ErrorMessage);
+      if (firstError?.ErrorMessage) {
+        throw createError(firstError.ErrorMessage, 400);
+      }
+
+      return { updatedFields: [locationFieldName] };
+    } catch (error) {
+      spError = error;
+    }
+
+    const graphMessage = graphError?.message ? String(graphError.message) : "Graph update failed.";
+    const spMessage = spError?.message ? String(spError.message) : "SharePoint REST update failed.";
+    throw createError(`${graphMessage} | Fallback: ${spMessage}`, Number(spError?.statusCode) || 500);
+  }
 }
 
 module.exports = {
