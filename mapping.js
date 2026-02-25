@@ -4,6 +4,9 @@ import { FRONTEND_CONFIG } from "./frontend-config.js";
 const signOutBtn = document.getElementById("signOutBtn");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
 const clientPostcodeInput = document.getElementById("clientPostcodeInput");
+const clientSearchInput = document.getElementById("clientSearchInput");
+const clientSearchResults = document.getElementById("clientSearchResults");
+const clientSearchStatus = document.getElementById("clientSearchStatus");
 const addClientBtn = document.getElementById("addClientBtn");
 const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
@@ -18,8 +21,10 @@ const mapsDirectionsLink = document.getElementById("mapsDirectionsLink");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const RUN_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/routes/run` : "/api/routes/run";
+const CLIENTS_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/clients` : "/api/clients";
 
 const clientPostcodes = [];
+let allClients = [];
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -37,6 +42,10 @@ function compactPostcode(value) {
   return normalizePostcode(value).replace(/\s+/g, "");
 }
 
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function setStatus(message, isError = false) {
   mappingStatus.textContent = message;
   mappingStatus.classList.toggle("error", isError);
@@ -46,6 +55,11 @@ function setBusy(isBusy) {
   calculateRunBtn.disabled = isBusy;
   addClientBtn.disabled = isBusy;
   clearRunBtn.disabled = isBusy;
+}
+
+function setClientSearchStatus(message, isError = false) {
+  clientSearchStatus.textContent = message;
+  clientSearchStatus.classList.toggle("error", isError);
 }
 
 function hideRun() {
@@ -85,25 +99,99 @@ function renderClientPostcodes() {
   noClientsMessage.hidden = clientPostcodes.length > 0;
 }
 
-function addClientPostcodeFromInput() {
-  const input = normalizePostcode(clientPostcodeInput.value);
-  if (!input) {
+function addClientPostcode(postcode, sourceLabel = "") {
+  const input = normalizePostcode(postcode);
+  if (!input || !compactPostcode(input)) {
     setStatus("Enter a client postcode before adding.", true);
-    return;
+    return false;
   }
 
   const key = compactPostcode(input);
   const exists = clientPostcodes.some((postcode) => compactPostcode(postcode) === key);
   if (exists) {
     setStatus("Client postcode already added.", true);
-    return;
+    return false;
   }
 
   clientPostcodes.push(input);
-  clientPostcodeInput.value = "";
   renderClientPostcodes();
   hideRun();
-  setStatus(`Added ${input}.`);
+  setStatus(sourceLabel ? `Added ${input} from ${sourceLabel}.` : `Added ${input}.`);
+  return true;
+}
+
+function addClientPostcodeFromInput() {
+  if (addClientPostcode(clientPostcodeInput.value)) {
+    clientPostcodeInput.value = "";
+  }
+}
+
+function getClientLabel(client) {
+  const name = String(client.name || "Unnamed");
+  const id = String(client.id || "").trim();
+  const location = String(client.location || "").trim();
+  return [name, id && `#${id}`, location].filter(Boolean).join(" - ");
+}
+
+function getFilteredClients() {
+  const query = normalizeText(clientSearchInput?.value);
+  if (!query) {
+    return allClients.slice(0, 8);
+  }
+
+  return allClients
+    .filter((client) => {
+      return (
+        normalizeText(client.name).includes(query) ||
+        normalizeText(client.id).includes(query) ||
+        normalizeText(client.location).includes(query) ||
+        normalizeText(client.postcode).includes(query)
+      );
+    })
+    .slice(0, 10);
+}
+
+function renderClientSearchResults() {
+  clientSearchResults.innerHTML = "";
+  const filtered = getFilteredClients();
+
+  if (!allClients.length) {
+    setClientSearchStatus("No clients loaded.", true);
+    return;
+  }
+
+  if (!filtered.length) {
+    setClientSearchStatus("No matching clients.");
+    return;
+  }
+
+  setClientSearchStatus(`Showing ${filtered.length} client(s).`);
+
+  for (const client of filtered) {
+    const li = document.createElement("li");
+    li.className = "client-result-row";
+
+    const postcode = normalizePostcode(client.postcode);
+    const info = document.createElement("div");
+    info.className = "client-result-info";
+    info.innerHTML = `
+      <strong>${escapeHtml(String(client.name || "Unnamed client"))}</strong>
+      <span>${escapeHtml(String(client.id || "-"))} | ${escapeHtml(String(client.location || "-"))}</span>
+      <span>Postcode: ${escapeHtml(postcode || "Not available")}</span>
+    `;
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "secondary";
+    addBtn.textContent = "Add postcode";
+    addBtn.disabled = !postcode;
+    addBtn.addEventListener("click", () => {
+      addClientPostcode(postcode, getClientLabel(client));
+    });
+
+    li.append(info, addBtn);
+    clientSearchResults.appendChild(li);
+  }
 }
 
 function buildMapsDirectionsUrl(staffPostcode, orderedClients) {
@@ -212,6 +300,24 @@ async function calculateRun() {
   }
 }
 
+async function fetchClients() {
+  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
+  const response = await fetch(CLIENTS_ENDPOINT, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Clients request failed (${response.status}): ${text || "Unknown error"}`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data?.clients) ? data.clients : [];
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
@@ -221,9 +327,13 @@ async function init() {
     }
 
     renderClientPostcodes();
+    setClientSearchStatus("Loading clients...");
+    allClients = await fetchClients();
+    renderClientSearchResults();
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not initialize authentication.", true);
+    setClientSearchStatus(error?.message || "Could not load clients.", true);
   } finally {
     document.body.classList.remove("auth-pending");
   }
@@ -240,6 +350,10 @@ clientPostcodeInput?.addEventListener("keydown", (event) => {
   }
 });
 
+clientSearchInput?.addEventListener("input", () => {
+  renderClientSearchResults();
+});
+
 calculateRunBtn?.addEventListener("click", () => {
   void calculateRun();
 });
@@ -247,8 +361,12 @@ calculateRunBtn?.addEventListener("click", () => {
 clearRunBtn?.addEventListener("click", () => {
   staffPostcodeInput.value = "";
   clientPostcodeInput.value = "";
+  if (clientSearchInput) {
+    clientSearchInput.value = "";
+  }
   clientPostcodes.length = 0;
   renderClientPostcodes();
+  renderClientSearchResults();
   hideRun();
   setStatus("Cleared.");
 });

@@ -286,6 +286,19 @@ dd {
   padding-bottom: 40px;
 }
 
+.mapping-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.staff-panel {
+  border: 1px solid #bcd2ff;
+  background:
+    linear-gradient(180deg, rgba(229, 239, 255, 0.9), rgba(255, 255, 255, 0.95)),
+    #fff;
+}
+
 .mapping-form-grid {
   display: grid;
   gap: 12px;
@@ -300,6 +313,39 @@ dd {
 
 .client-postcodes-block {
   margin-top: 14px;
+}
+
+.client-search-results {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  border: 1px solid #d8e0ee;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fbfcff;
+}
+
+.client-result-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5eaf5;
+}
+
+.client-result-row:last-child {
+  border-bottom: 0;
+}
+
+.client-result-info {
+  display: grid;
+  gap: 3px;
+}
+
+.client-result-info span {
+  color: #53607a;
+  font-size: 0.86rem;
 }
 
 .postcode-pill-list {
@@ -342,6 +388,10 @@ dd {
   }
 
   .mapping-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mapping-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -35,33 +35,47 @@
         <p>Build a driving run from a staff postcode through clients and back to the start.</p>
       </section>
 
-      <section class="panel">
-        <div class="mapping-form-grid">
+      <section class="mapping-grid">
+        <article class="panel staff-panel">
+          <h2>Staff Start Point</h2>
           <label class="field" for="staffPostcodeInput">
             Staff postcode
             <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA" autocomplete="postal-code" />
           </label>
+        </article>
+
+        <article class="panel">
+          <h2>Client Stops</h2>
+          <label class="field" for="clientSearchInput">
+            Search client (name, id, location, postcode)
+            <input id="clientSearchInput" type="search" placeholder="Type to search clients" autocomplete="off" />
+          </label>
+          <ul id="clientSearchResults" class="client-search-results"></ul>
+          <p id="clientSearchStatus" class="muted">Loading clients...</p>
+
           <label class="field" for="clientPostcodeInput">
-            Add client postcode
+            Add client postcode manually
             <div class="postcode-entry-row">
               <input id="clientPostcodeInput" type="text" placeholder="e.g. M1 1AE" autocomplete="postal-code" />
               <button id="addClientBtn" class="secondary" type="button">Add</button>
             </div>
           </label>
-        </div>
 
+          <section class="client-postcodes-block" aria-labelledby="clientPostcodesHeading">
+            <h2 id="clientPostcodesHeading">Selected client postcodes</h2>
+            <ul id="clientPostcodesList" class="postcode-pill-list"></ul>
+            <p id="noClientsMessage" class="muted">No client postcodes added.</p>
+          </section>
+        </article>
+      </section>
+
+      <section class="panel">
         <div class="row">
           <button id="calculateRunBtn" type="button">Calculate run</button>
           <button id="clearRunBtn" class="secondary" type="button">Clear</button>
         </div>
 
         <p id="mappingStatus" class="muted">Enter a staff postcode and at least one client postcode.</p>
-
-        <section class="client-postcodes-block" aria-labelledby="clientPostcodesHeading">
-          <h2 id="clientPostcodesHeading">Client postcodes</h2>
-          <ul id="clientPostcodesList" class="postcode-pill-list"></ul>
-          <p id="noClientsMessage" class="muted">No client postcodes added.</p>
-        </section>
       </section>
 
       <section id="runResults" class="panel" hidden>
