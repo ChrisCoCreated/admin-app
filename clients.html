@@ -38,7 +38,7 @@
       <section class="panel">
         <label class="field" for="searchInput">
           Search
-          <input id="searchInput" type="search" placeholder="Search by name, id, or location" autocomplete="off" />
+          <input id="searchInput" type="search" placeholder="Search by name or id" autocomplete="off" />
         </label>
         <p id="statusMessage" class="muted">Loading clients...</p>
       </section>
@@ -52,7 +52,6 @@
                 <tr>
                   <th>ID</th>
                   <th>Name</th>
-                  <th>Location</th>
                 </tr>
               </thead>
               <tbody id="clientsTableBody"></tbody>
@@ -63,9 +62,6 @@
 
         <article class="panel detail-panel">
           <h2>Client Detail</h2>
-          <div class="detail-actions">
-            <button id="populateLocationBtn" class="secondary" type="button">Populate location fields from address</button>
-          </div>
           <dl id="clientDetail" class="detail-list">
             <div>
               <dt>ID</dt>
@@ -74,10 +70,6 @@
             <div>
               <dt>Name</dt>
               <dd data-field="name">Select a client</dd>
-            </div>
-            <div>
-              <dt>Location</dt>
-              <dd data-field="location">-</dd>
             </div>
             <div>
               <dt>Address</dt>

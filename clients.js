@@ -3,7 +3,6 @@ import { FRONTEND_CONFIG } from "./frontend-config.js";
 
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
-const populateLocationBtn = document.getElementById("populateLocationBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientsTableBody = document.getElementById("clientsTableBody");
 const emptyState = document.getElementById("emptyState");
@@ -11,7 +10,6 @@ const detailRoot = document.getElementById("clientDetail");
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
   name: detailRoot?.querySelector('[data-field="name"]'),
-  location: detailRoot?.querySelector('[data-field="location"]'),
   address: detailRoot?.querySelector('[data-field="address"]'),
   town: detailRoot?.querySelector('[data-field="town"]'),
   county: detailRoot?.querySelector('[data-field="county"]'),
@@ -48,111 +46,21 @@ function setDetail(client) {
   if (!client) {
     detailFields.id.textContent = "-";
     detailFields.name.textContent = "Select a client";
-    detailFields.location.textContent = "-";
     detailFields.address.textContent = "-";
     detailFields.town.textContent = "-";
     detailFields.county.textContent = "-";
     detailFields.postcode.textContent = "-";
     detailFields.email.textContent = "-";
-    if (populateLocationBtn) {
-      populateLocationBtn.disabled = true;
-    }
     return;
   }
 
   detailFields.id.textContent = client.id || "-";
   detailFields.name.textContent = client.name || "-";
-  detailFields.location.textContent = client.location || "-";
   detailFields.address.textContent = client.address || "-";
   detailFields.town.textContent = client.town || "-";
   detailFields.county.textContent = client.county || "-";
   detailFields.postcode.textContent = client.postcode || "-";
   detailFields.email.textContent = client.email || "-";
-  if (populateLocationBtn) {
-    populateLocationBtn.disabled = false;
-  }
-}
-
-function normalizeWhitespace(value) {
-  return String(value || "").replace(/\s+/g, " ").trim();
-}
-
-function normalizeUkPostcode(value) {
-  const compact = String(value || "").replace(/\s+/g, "").toUpperCase();
-  if (!compact || compact.length < 5) {
-    return "";
-  }
-  return `${compact.slice(0, -3)} ${compact.slice(-3)}`;
-}
-
-function parseLocationFields(addressInput) {
-  const address = normalizeWhitespace(addressInput);
-  if (!address) {
-    return null;
-  }
-
-  const postcodeMatch = address.match(/([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})$/i);
-  const postcode = postcodeMatch ? normalizeUkPostcode(postcodeMatch[1]) : "";
-  let remaining = postcodeMatch ? address.slice(0, postcodeMatch.index).replace(/[,\s]+$/, "") : address;
-
-  const parts = remaining
-    .split(",")
-    .map((part) => normalizeWhitespace(part))
-    .filter(Boolean);
-
-  const addressLine = parts[0] || remaining;
-  let town = "";
-  let county = "";
-
-  if (parts.length >= 3) {
-    town = parts[parts.length - 2];
-    county = parts[parts.length - 1];
-  } else if (parts.length === 2) {
-    town = parts[1];
-  }
-
-  if (!town || !county) {
-    const loose = normalizeWhitespace(remaining.replace(/,/g, " "));
-    const words = loose.split(" ").filter(Boolean);
-    if (words.length >= 2 && !town) {
-      town = words.slice(-1).join(" ");
-    }
-  }
-
-  return {
-    address: addressLine || "",
-    town: town || "",
-    county: county || "",
-    postcode: postcode || "",
-  };
-}
-
-async function persistLocationFields(clientId, payload) {
-  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
-  const response = await fetch(`${CLIENTS_ENDPOINT}/populate-location`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      id: clientId,
-      ...payload,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    let detail = text;
-    try {
-      const parsed = text ? JSON.parse(text) : {};
-      detail = parsed?.detail || parsed?.error || text;
-    } catch {
-      detail = text;
-    }
-    throw new Error(detail || `Persist failed (${response.status}).`);
-  }
 }
 
 function getFilteredClients() {
@@ -164,8 +72,7 @@ function getFilteredClients() {
   return allClients.filter((client) => {
     return (
       String(client.id || "").toLowerCase().includes(query) ||
-      String(client.name || "").toLowerCase().includes(query) ||
-      String(client.location || "").toLowerCase().includes(query)
+      String(client.name || "").toLowerCase().includes(query)
     );
   });
 }
@@ -191,7 +98,6 @@ function renderClients() {
     tr.innerHTML = `
       <td>${escapeHtml(client.id)}</td>
       <td>${escapeHtml(client.name)}</td>
-      <td>${escapeHtml(client.location)}</td>
     `;
 
     tr.addEventListener("click", () => {
@@ -289,43 +195,6 @@ signOutBtn?.addEventListener("click", async () => {
     await authController.signOut();
   } finally {
     window.location.href = "./index.html";
-  }
-});
-
-populateLocationBtn?.addEventListener("click", async () => {
-  if (!selectedClient) {
-    return;
-  }
-
-  const sourceAddress = selectedClient.address || "";
-  const locationValue = normalizeWhitespace(sourceAddress);
-  if (!locationValue) {
-    setStatus("No address found to copy.", true);
-    return;
-  }
-
-  try {
-    if (populateLocationBtn) {
-      populateLocationBtn.disabled = true;
-    }
-    setStatus("Saving full location to SharePoint...");
-    const parsed = parseLocationFields(locationValue) || {};
-    await persistLocationFields(selectedClient.id, {
-      location: locationValue,
-      address: parsed.address || "",
-      town: parsed.town || "",
-      county: parsed.county || "",
-      postcode: parsed.postcode || "",
-    });
-    selectedClient.location = locationValue;
-    setDetail(selectedClient);
-    setStatus("Location saved to SharePoint.");
-  } catch (error) {
-    setStatus(error?.message || "Could not save location fields.", true);
-  } finally {
-    if (populateLocationBtn) {
-      populateLocationBtn.disabled = false;
-    }
   }
 });
 

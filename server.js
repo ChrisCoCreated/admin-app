@@ -6,7 +6,6 @@ const { URL } = require("url");
 
 const clientsIndexHandler = require("./api/clients/index");
 const clientsByIdHandler = require("./api/clients/[id]");
-const clientsPopulateLocationHandler = require("./api/clients/populate-location");
 const routesRunHandler = require("./api/routes/run");
 
 function loadEnvFile(envPath) {
@@ -173,29 +172,11 @@ async function handleApi(req, res, reqUrl) {
     return true;
   }
 
-  if (reqUrl.pathname === "/api/clients/populate-location") {
-    if (req.method === "POST") {
-      apiReq.body = await readJsonBody(req);
-    }
-    await clientsPopulateLocationHandler(apiReq, apiRes);
-    return true;
-  }
-
   if (reqUrl.pathname === "/api/routes/run") {
     if (req.method === "POST") {
       apiReq.body = await readJsonBody(req);
     }
     await routesRunHandler(apiReq, apiRes);
-    return true;
-  }
-
-  const populateMatch = /^\/api\/clients\/([^/]+)\/populate-location$/.exec(reqUrl.pathname);
-  if (populateMatch) {
-    apiReq.query.id = decodeURIComponent(populateMatch[1]);
-    if (req.method === "POST") {
-      apiReq.body = await readJsonBody(req);
-    }
-    await clientsPopulateLocationHandler(apiReq, apiRes);
     return true;
   }
 

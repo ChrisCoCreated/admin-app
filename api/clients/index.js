@@ -19,11 +19,7 @@ module.exports = async (req, res) => {
 
     const filtered = q
       ? clients.filter((client) => {
-          return (
-            client.name.toLowerCase().includes(q) ||
-            client.id.toLowerCase().includes(q) ||
-            client.location.toLowerCase().includes(q)
-          );
+          return client.name.toLowerCase().includes(q) || client.id.toLowerCase().includes(q);
         })
       : clients;
 
