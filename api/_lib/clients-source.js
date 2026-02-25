@@ -233,6 +233,66 @@ function createError(message, statusCode) {
   return error;
 }
 
+function parseLocationFromText(location, locationFields = {}) {
+  const normalized = String(location || "").replace(/\s+/g, " ").trim();
+  const address = String(locationFields.address || "").trim();
+  const town = String(locationFields.town || "").trim();
+  const county = String(locationFields.county || "").trim();
+  const postcode = String(locationFields.postcode || "").trim();
+
+  if (address || town || county || postcode) {
+    return {
+      displayName: normalized,
+      street: address || normalized,
+      city: town,
+      state: county,
+      postalCode: postcode,
+    };
+  }
+
+  const postcodeMatch = normalized.match(/([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})$/i);
+  const parsedPostcode = postcodeMatch ? postcodeMatch[1].toUpperCase() : "";
+  const remaining = postcodeMatch ? normalized.slice(0, postcodeMatch.index).replace(/[,\s]+$/, "") : normalized;
+  const parts = remaining
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return {
+    displayName: normalized,
+    street: parts[0] || remaining || normalized,
+    city: parts.length >= 2 ? parts[parts.length - 2] : "",
+    state: parts.length >= 1 ? parts[parts.length - 1] : "",
+    postalCode: parsedPostcode,
+  };
+}
+
+function buildLocationObjectPayload(location, locationFields, existing) {
+  const parsed = parseLocationFromText(location, locationFields);
+  const existingAddress = existing && typeof existing.address === "object" ? existing.address : {};
+
+  return {
+    displayName: parsed.displayName,
+    address: {
+      street: parsed.street || existingAddress.street || "",
+      city: parsed.city || existingAddress.city || "",
+      state: parsed.state || existingAddress.state || "",
+      countryOrRegion: existingAddress.countryOrRegion || "United Kingdom",
+      postalCode: parsed.postalCode || existingAddress.postalCode || "",
+    },
+    coordinates: existing?.coordinates || null,
+    locationUri: existing?.locationUri || "",
+  };
+}
+
+function getGraphErrorDetail(error) {
+  const message = String(error?.message || "").trim();
+  if (!message) {
+    return "Unknown Graph error";
+  }
+  return message;
+}
+
 function mapGraphItemToClient(item) {
   const fields = item?.fields || {};
   const graphId = fields.ID || item?.id;
@@ -397,70 +457,87 @@ async function persistClientLocationFields(clientId, locationFields) {
   }
 
   const graphUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/fields`;
-  try {
-    await fetchJson(graphUrl, {
-      method: "PATCH",
-      headers: {
-        ...graphHeaders(graphToken),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        [locationFieldName]: location,
-      }),
-    });
-    return { updatedFields: [locationFieldName] };
-  } catch (graphError) {
-    let spError = null;
+  const currentFields = await fetchJson(graphUrl, {
+    headers: graphHeaders(graphToken),
+  });
+  const existingLocation = currentFields?.[locationFieldName];
+
+  const candidates = [];
+  candidates.push(location);
+  candidates.push(buildLocationObjectPayload(location, locationFields, existingLocation));
+  if (existingLocation && typeof existingLocation === "object") {
+    candidates.unshift(buildLocationObjectPayload(location, locationFields, existingLocation));
+  }
+
+  const graphErrors = [];
+  for (const candidate of candidates) {
     try {
-      const spToken = await getSharePointAccessToken(hostName);
-      const restUrl = `https://${hostName}${sitePath}/_api/web/lists(guid'${listId}')/items(${itemId})/ValidateUpdateListItem()`;
-      const response = await fetch(restUrl, {
-        method: "POST",
+      await fetchJson(graphUrl, {
+        method: "PATCH",
         headers: {
-          Authorization: `Bearer ${spToken}`,
-          Accept: "application/json;odata=nometadata",
-          "Content-Type": "application/json;odata=nometadata",
+          ...graphHeaders(graphToken),
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          formValues: [
-            {
-              FieldName: locationFieldName,
-              FieldValue: location,
-            },
-          ],
-          bNewDocumentUpdate: false,
+          [locationFieldName]: candidate,
         }),
       });
-
-      const text = await response.text();
-      let payload = {};
-      try {
-        payload = text ? JSON.parse(text) : {};
-      } catch {
-        payload = {};
-      }
-      if (!response.ok) {
-        const detail =
-          payload?.error?.message?.value || payload?.error?.message || text || "SharePoint update failed.";
-        throw createError(detail, response.status);
-      }
-
-      const results = Array.isArray(payload?.value)
-        ? payload.value
-        : Array.isArray(payload?.d?.ValidateUpdateListItem?.results)
-          ? payload.d.ValidateUpdateListItem.results
-          : [];
-      const firstError = results.find((entry) => entry?.HasException || entry?.ErrorMessage);
-      if (firstError?.ErrorMessage) {
-        throw createError(firstError.ErrorMessage, 400);
-      }
-
       return { updatedFields: [locationFieldName] };
-    } catch (error) {
-      spError = error;
+    } catch (graphError) {
+      graphErrors.push(getGraphErrorDetail(graphError));
+    }
+  }
+
+  try {
+    const spToken = await getSharePointAccessToken(hostName);
+    const restUrl = `https://${hostName}${sitePath}/_api/web/lists(guid'${listId}')/items(${itemId})/ValidateUpdateListItem()`;
+    const response = await fetch(restUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${spToken}`,
+        Accept: "application/json;odata=nometadata",
+        "Content-Type": "application/json;odata=nometadata",
+      },
+      body: JSON.stringify({
+        formValues: [
+          {
+            FieldName: locationFieldName,
+            FieldValue: location,
+          },
+        ],
+        bNewDocumentUpdate: false,
+      }),
+    });
+
+    const text = await response.text();
+    let payload = {};
+    try {
+      payload = text ? JSON.parse(text) : {};
+    } catch {
+      payload = {};
+    }
+    if (!response.ok) {
+      const detail =
+        payload?.error?.message?.value ||
+        payload?.error?.message ||
+        text ||
+        `SharePoint update failed (${response.status})`;
+      throw createError(detail, response.status);
     }
 
-    const graphMessage = graphError?.message ? String(graphError.message) : "Graph update failed.";
+    const results = Array.isArray(payload?.value)
+      ? payload.value
+      : Array.isArray(payload?.d?.ValidateUpdateListItem?.results)
+        ? payload.d.ValidateUpdateListItem.results
+        : [];
+    const firstError = results.find((entry) => entry?.HasException || entry?.ErrorMessage);
+    if (firstError?.ErrorMessage) {
+      throw createError(firstError.ErrorMessage, 400);
+    }
+
+    return { updatedFields: [locationFieldName] };
+  } catch (spError) {
+    const graphMessage = graphErrors.length ? graphErrors.join(" || ") : "Graph update failed.";
     const spMessage = spError?.message ? String(spError.message) : "SharePoint REST update failed.";
     throw createError(`${graphMessage} | Fallback: ${spMessage}`, Number(spError?.statusCode) || 500);
   }

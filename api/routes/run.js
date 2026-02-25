@@ -14,6 +14,10 @@ function compactPostcode(value) {
   return normalizePostcode(value).replace(/\s+/g, "");
 }
 
+function normalizeLocationQuery(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
 function formatDuration(durationValue) {
   const seconds = Number.parseInt(String(durationValue || "").replace("s", ""), 10);
   if (!Number.isFinite(seconds) || seconds <= 0) {
@@ -39,9 +43,9 @@ function metersToMiles(distanceMeters) {
   return Number.isFinite(miles) ? miles : 0;
 }
 
-async function geocodePostcode(postcode, apiKey, region) {
+async function geocodeLocation(query, apiKey, region) {
   const url = new URL(GOOGLE_GEOCODE_URL);
-  url.searchParams.set("address", postcode);
+  url.searchParams.set("address", query);
   url.searchParams.set("region", region);
   url.searchParams.set("key", apiKey);
 
@@ -57,18 +61,18 @@ async function geocodePostcode(postcode, apiKey, region) {
 
   const data = await response.json();
   if (data.status !== "OK" || !Array.isArray(data.results) || !data.results.length) {
-    throw new Error(`Could not geocode postcode: ${postcode}`);
+    throw new Error(`Could not geocode location: ${query}`);
   }
 
   const result = data.results[0];
   const location = result.geometry?.location;
   if (!location || typeof location.lat !== "number" || typeof location.lng !== "number") {
-    throw new Error(`Missing coordinates for postcode: ${postcode}`);
+    throw new Error(`Missing coordinates for location: ${query}`);
   }
 
   return {
-    postcode,
-    normalizedPostcode: normalizePostcode(postcode),
+    query,
+    stopLabel: query,
     formattedAddress: String(result.formatted_address || ""),
     latitude: location.lat,
     longitude: location.lng,
@@ -145,7 +149,7 @@ function buildResponse(staff, clients, route) {
     : clients.map((_, index) => index);
 
   const orderedClients = optimizedIndex.map((index) => clients[index]).filter(Boolean);
-  const stopNames = [staff.normalizedPostcode, ...orderedClients.map((client) => client.normalizedPostcode), staff.normalizedPostcode];
+  const stopNames = [staff.normalizedPostcode, ...orderedClients.map((client) => client.stopLabel), staff.normalizedPostcode];
 
   const legs = route.legs.map((leg, index) => {
     const from = stopNames[index] || "";
@@ -176,7 +180,8 @@ function buildResponse(staff, clients, route) {
         longitude: staff.longitude,
       },
       orderedClients: orderedClients.map((client) => ({
-        postcode: client.normalizedPostcode,
+        query: client.query,
+        stopLabel: client.stopLabel,
         formattedAddress: client.formattedAddress,
         latitude: client.latitude,
         longitude: client.longitude,
@@ -208,7 +213,11 @@ module.exports = async (req, res) => {
 
   const region = String(process.env.GOOGLE_MAPS_REGION || "gb").trim().toLowerCase() || "gb";
   const staffPostcode = normalizePostcode(req.body?.staffPostcode);
-  const rawClientPostcodes = Array.isArray(req.body?.clientPostcodes) ? req.body.clientPostcodes : [];
+  const rawClientLocations = Array.isArray(req.body?.clientLocations)
+    ? req.body.clientLocations
+    : Array.isArray(req.body?.clientPostcodes)
+      ? req.body.clientPostcodes
+      : [];
 
   if (!staffPostcode) {
     res.status(400).json({ error: "Staff postcode is required." });
@@ -217,18 +226,22 @@ module.exports = async (req, res) => {
 
   const dedupedClients = [];
   const seen = new Set();
-  for (const input of rawClientPostcodes) {
-    const normalized = normalizePostcode(input);
-    const key = compactPostcode(normalized);
+  for (const input of rawClientLocations) {
+    const query = normalizeLocationQuery(typeof input === "string" ? input : input?.query);
+    const stopLabel = normalizeLocationQuery(typeof input === "string" ? input : input?.label || input?.query);
+    const key = query.toLowerCase();
     if (!key || seen.has(key)) {
       continue;
     }
     seen.add(key);
-    dedupedClients.push(normalized);
+    dedupedClients.push({
+      query,
+      stopLabel: stopLabel || query,
+    });
   }
 
   if (!dedupedClients.length) {
-    res.status(400).json({ error: "Add at least one client postcode." });
+    res.status(400).json({ error: "Add at least one client stop." });
     return;
   }
 
@@ -239,8 +252,16 @@ module.exports = async (req, res) => {
 
   try {
     const [staff, ...clients] = await Promise.all([
-      geocodePostcode(staffPostcode, apiKey, region),
-      ...dedupedClients.map((postcode) => geocodePostcode(postcode, apiKey, region)),
+      geocodeLocation(staffPostcode, apiKey, region).then((item) => ({
+        ...item,
+        normalizedPostcode: normalizePostcode(staffPostcode),
+      })),
+      ...dedupedClients.map((client) =>
+        geocodeLocation(client.query, apiKey, region).then((item) => ({
+          ...item,
+          stopLabel: client.stopLabel,
+        }))
+      ),
     ]);
 
     const route = await computeRun(staff, clients, apiKey);

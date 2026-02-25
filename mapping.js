@@ -38,8 +38,12 @@ function normalizePostcode(value) {
     .replace(/\s+/g, " ");
 }
 
-function compactPostcode(value) {
-  return normalizePostcode(value).replace(/\s+/g, "");
+function normalizeLocationQuery(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function compactLocationQuery(value) {
+  return normalizeLocationQuery(value).toLowerCase();
 }
 
 function normalizeText(value) {
@@ -89,7 +93,7 @@ function renderClientPostcodes() {
       }
       renderClientPostcodes();
       hideRun();
-      setStatus("Client postcode removed.");
+      setStatus("Client stop removed.");
     });
 
     li.append(text, remove);
@@ -100,16 +104,16 @@ function renderClientPostcodes() {
 }
 
 function addClientPostcode(postcode, sourceLabel = "") {
-  const input = normalizePostcode(postcode);
-  if (!input || !compactPostcode(input)) {
-    setStatus("Enter a client postcode before adding.", true);
+  const input = normalizeLocationQuery(postcode);
+  if (!input || !compactLocationQuery(input)) {
+    setStatus("Enter a client stop before adding.", true);
     return false;
   }
 
-  const key = compactPostcode(input);
-  const exists = clientPostcodes.some((postcode) => compactPostcode(postcode) === key);
+  const key = compactLocationQuery(input);
+  const exists = clientPostcodes.some((postcode) => compactLocationQuery(postcode) === key);
   if (exists) {
-    setStatus("Client postcode already added.", true);
+    setStatus("Client stop already added.", true);
     return false;
   }
 
@@ -145,10 +149,25 @@ function getFilteredClients() {
         normalizeText(client.name).includes(query) ||
         normalizeText(client.id).includes(query) ||
         normalizeText(client.location).includes(query) ||
-        normalizeText(client.postcode).includes(query)
+        normalizeText(client.postcode).includes(query) ||
+        normalizeText(client.address).includes(query) ||
+        normalizeText(client.town).includes(query) ||
+        normalizeText(client.county).includes(query)
       );
     })
     .slice(0, 10);
+}
+
+function buildClientAddress(client) {
+  const parts = [client.address, client.town, client.county, client.postcode]
+    .map((value) => normalizeLocationQuery(value))
+    .filter(Boolean);
+
+  if (parts.length) {
+    return parts.join(", ");
+  }
+
+  return normalizeLocationQuery(client.postcode || client.location || "");
 }
 
 function renderClientSearchResults() {
@@ -172,21 +191,23 @@ function renderClientSearchResults() {
     li.className = "client-result-row";
 
     const postcode = normalizePostcode(client.postcode);
+    const routeAddress = buildClientAddress(client);
     const info = document.createElement("div");
     info.className = "client-result-info";
     info.innerHTML = `
       <strong>${escapeHtml(String(client.name || "Unnamed client"))}</strong>
       <span>${escapeHtml(String(client.id || "-"))} | ${escapeHtml(String(client.location || "-"))}</span>
       <span>Postcode: ${escapeHtml(postcode || "Not available")}</span>
+      <span>Route address: ${escapeHtml(routeAddress || "Not available")}</span>
     `;
 
     const addBtn = document.createElement("button");
     addBtn.type = "button";
     addBtn.className = "secondary";
-    addBtn.textContent = "Add postcode";
-    addBtn.disabled = !postcode;
+    addBtn.textContent = "Add client";
+    addBtn.disabled = !routeAddress;
     addBtn.addEventListener("click", () => {
-      addClientPostcode(postcode, getClientLabel(client));
+      addClientPostcode(routeAddress, getClientLabel(client));
     });
 
     li.append(info, addBtn);
@@ -220,7 +241,7 @@ function renderRun(run) {
 
   for (const client of orderedClients) {
     const li = document.createElement("li");
-    li.textContent = client.postcode || "";
+    li.textContent = client.stopLabel || client.formattedAddress || client.query || "";
     runOrderList.appendChild(li);
   }
 
@@ -241,7 +262,10 @@ function renderRun(run) {
     runLegsBody.appendChild(tr);
   }
 
-  mapsDirectionsLink.href = buildMapsDirectionsUrl(staffPostcode, orderedClients.map((item) => item.postcode).filter(Boolean));
+  mapsDirectionsLink.href = buildMapsDirectionsUrl(
+    staffPostcode,
+    orderedClients.map((item) => item.query || item.formattedAddress).filter(Boolean)
+  );
   runResults.hidden = false;
 }
 
@@ -262,7 +286,7 @@ async function calculateRun() {
   }
 
   if (!clientPostcodes.length) {
-    setStatus("Add at least one client postcode.", true);
+    setStatus("Add at least one client stop.", true);
     return;
   }
 
@@ -281,7 +305,7 @@ async function calculateRun() {
       },
       body: JSON.stringify({
         staffPostcode,
-        clientPostcodes,
+        clientLocations: clientPostcodes,
       }),
     });
 

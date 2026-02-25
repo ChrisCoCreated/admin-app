@@ -54,7 +54,7 @@
           <p id="clientSearchStatus" class="muted">Loading clients...</p>
 
           <label class="field" for="clientPostcodeInput">
-            Add client postcode manually
+            Add client stop manually (postcode or address)
             <div class="postcode-entry-row">
               <input id="clientPostcodeInput" type="text" placeholder="e.g. M1 1AE" autocomplete="postal-code" />
               <button id="addClientBtn" class="secondary" type="button">Add</button>
@@ -62,9 +62,9 @@
           </label>
 
           <section class="client-postcodes-block" aria-labelledby="clientPostcodesHeading">
-            <h2 id="clientPostcodesHeading">Selected client postcodes</h2>
+            <h2 id="clientPostcodesHeading">Selected client stops</h2>
             <ul id="clientPostcodesList" class="postcode-pill-list"></ul>
-            <p id="noClientsMessage" class="muted">No client postcodes added.</p>
+            <p id="noClientsMessage" class="muted">No client stops added.</p>
           </section>
         </article>
       </section>
@@ -75,7 +75,7 @@
           <button id="clearRunBtn" class="secondary" type="button">Clear</button>
         </div>
 
-        <p id="mappingStatus" class="muted">Enter a staff postcode and at least one client postcode.</p>
+        <p id="mappingStatus" class="muted">Enter a staff postcode and at least one client stop.</p>
       </section>
 
       <section id="runResults" class="panel" hidden>
