@@ -137,7 +137,7 @@ async function resolveListId(token, siteId, listName) {
 
 async function readListColumns(token, siteId, listId) {
   const columns = [];
-  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName&$top=200`;
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName,readOnly,hidden&$top=200`;
 
   while (nextUrl) {
     const data = await fetchJson(nextUrl, { headers: graphHeaders(token) });
@@ -157,11 +157,18 @@ function normalizeToken(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
-function pickFieldName(columns, candidates) {
+function pickFieldName(columns, candidates, options = {}) {
+  const { writableOnly = false } = options;
   const columnByToken = new Map();
   for (const column of columns) {
     const internalName = String(column?.name || "").trim();
     if (!internalName) {
+      continue;
+    }
+
+    const isReadOnly = Boolean(column?.readOnly);
+    const isHidden = Boolean(column?.hidden);
+    if (writableOnly && (isReadOnly || isHidden)) {
       continue;
     }
 
@@ -347,11 +354,13 @@ async function persistClientLocationFields(clientId, locationFields) {
       "StreetAddress",
       "Address1",
       "Address Line 1",
-    ]),
-    town: pickFieldName(columns, ["Town", "City", "Suburb", "Town / City"]),
-    county: pickFieldName(columns, ["County", "Region", "State"]),
-    postcode: pickFieldName(columns, ["PostCode", "Postcode", "PostalCode", "ZipCode", "ZIP Code"]),
-    location: pickFieldName(columns, ["Location"]),
+    ], { writableOnly: true }),
+    town: pickFieldName(columns, ["Town", "Town / City", "Suburb", "City"], { writableOnly: true }),
+    county: pickFieldName(columns, ["County", "Region", "State"], { writableOnly: true }),
+    postcode: pickFieldName(columns, ["PostCode", "Postcode", "PostalCode", "ZipCode", "ZIP Code"], {
+      writableOnly: true,
+    }),
+    location: pickFieldName(columns, ["Location"], { writableOnly: true }),
   };
 
   const updates = {};
@@ -387,17 +396,39 @@ async function persistClientLocationFields(clientId, locationFields) {
     String(clientId || "").trim()
   )}/fields`;
 
-  await fetchJson(url, {
-    method: "PATCH",
-    headers: {
-      ...graphHeaders(token),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(updates),
-  });
+  const pendingUpdates = { ...updates };
+  while (Object.keys(pendingUpdates).length) {
+    try {
+      await fetchJson(url, {
+        method: "PATCH",
+        headers: {
+          ...graphHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(pendingUpdates),
+      });
+      break;
+    } catch (error) {
+      const message = String(error?.message || error);
+      const match = /Field '([^']+)' is read-only/i.exec(message);
+      if (!match) {
+        throw error;
+      }
+
+      const readOnlyField = String(match[1] || "").trim();
+      if (!readOnlyField || !(readOnlyField in pendingUpdates)) {
+        throw error;
+      }
+
+      delete pendingUpdates[readOnlyField];
+      if (!Object.keys(pendingUpdates).length) {
+        throw createError("All matched location columns are read-only.", 409);
+      }
+    }
+  }
 
   return {
-    updatedFields: Object.keys(updates),
+    updatedFields: Object.keys(pendingUpdates),
   };
 }
 
