@@ -201,6 +201,9 @@ function buildResponse(staff, clients, route) {
   const timeThresholdSeconds = Math.round((maxTimeMinutes ?? 0) * 60);
 
   const homeLegIndexes = [0, legs.length - 1].filter((index, idx, arr) => index >= 0 && arr.indexOf(index) === idx);
+  const runLegIndexes = legs
+    .map((_, index) => index)
+    .filter((index) => !homeLegIndexes.includes(index));
   const payableLegs = [];
   let paidDistanceMeters = 0;
   let paidDurationSeconds = 0;
@@ -238,9 +241,27 @@ function buildResponse(staff, clients, route) {
 
   const paidDistanceMiles = metersToMiles(paidDistanceMeters);
   const paidDurationHours = paidDurationSeconds / 3600;
-  const timeCost = paidDurationHours * travelPayRate;
-  const mileageCost = paidDistanceMiles * perMileRate;
-  const totalCost = timeCost + mileageCost;
+  const homeTimeCost = paidDurationHours * travelPayRate;
+  const homeMileageCost = paidDistanceMiles * perMileRate;
+  const exceptionalHomeTotal = homeTimeCost + homeMileageCost;
+
+  let runDistanceMeters = 0;
+  let runDurationSeconds = 0;
+  for (const index of runLegIndexes) {
+    const leg = legs[index];
+    if (!leg) {
+      continue;
+    }
+    runDistanceMeters += leg.distanceMeters;
+    runDurationSeconds += leg.durationSeconds;
+  }
+
+  const runDistanceMiles = metersToMiles(runDistanceMeters);
+  const runDurationHours = runDurationSeconds / 3600;
+  const runTimeCost = runDurationHours * travelPayRate;
+  const runMileageCost = runDistanceMiles * perMileRate;
+  const runTravelTotal = runTimeCost + runMileageCost;
+  const grandTotal = exceptionalHomeTotal + runTravelTotal;
 
   return {
     run: {
@@ -277,12 +298,23 @@ function buildResponse(staff, clients, route) {
           paidDistanceMiles: Number(paidDistanceMiles.toFixed(2)),
           paidDurationHours: Number(paidDurationHours.toFixed(2)),
         },
+        runTravel: {
+          distanceMiles: Number(runDistanceMiles.toFixed(2)),
+          durationHours: Number(runDurationHours.toFixed(2)),
+        },
         components: {
-          timeCost: Number(timeCost.toFixed(2)),
-          mileageCost: Number(mileageCost.toFixed(2)),
+          homeTimeCost: Number(homeTimeCost.toFixed(2)),
+          homeMileageCost: Number(homeMileageCost.toFixed(2)),
+          runTimeCost: Number(runTimeCost.toFixed(2)),
+          runMileageCost: Number(runMileageCost.toFixed(2)),
+        },
+        totals: {
+          exceptionalHomeTotal: Number(exceptionalHomeTotal.toFixed(2)),
+          runTravelTotal: Number(runTravelTotal.toFixed(2)),
+          grandTotal: Number(grandTotal.toFixed(2)),
         },
         payableLegs,
-        totalCost: Number(totalCost.toFixed(2)),
+        totalCost: Number(grandTotal.toFixed(2)),
       },
     },
   };

@@ -248,10 +248,10 @@ function renderClientSearchResults() {
     return;
   }
 
-  const visible = filtered.slice(0, 3);
-  setClientSearchStatus(`Showing ${visible.length} of ${filtered.length} client(s).`);
+  const visibleCount = Math.min(filtered.length, 3);
+  setClientSearchStatus(`Showing ${visibleCount} of ${filtered.length} client(s). Scroll for more.`);
 
-  for (const client of visible) {
+  for (const client of filtered) {
     const li = document.createElement("li");
     li.className = "client-result-row";
 
@@ -344,15 +344,19 @@ function renderCost(cost) {
   }
 
   const modeText = cost.mode === "time" ? "time threshold" : "distance threshold";
-  runCostSummary.textContent = `Run cost total: £${Number(cost.totalCost || 0).toFixed(2)} (${modeText}).`;
+  runCostSummary.textContent = `Costing mode: ${modeText}.`;
   runCostBreakdown.innerHTML = "";
 
   const lines = [
-    `Paid home travel distance: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi`,
-    `Paid home travel time: ${Number(cost.homeTravel?.paidDurationHours || 0).toFixed(2)} h`,
-    `Time cost (${Number(cost.rates?.travelPayPerHour || 0).toFixed(2)}/h): £${Number(cost.components?.timeCost || 0).toFixed(2)}`,
-    `Mileage cost (${Number(cost.rates?.perMile || 0).toFixed(2)}/mi): £${Number(cost.components?.mileageCost || 0).toFixed(2)}`,
-    `Total: £${Number(cost.totalCost || 0).toFixed(2)}`,
+    `Exceptional Travel Costs from Home: £${Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2)}`,
+    `Run Travel: £${Number(cost.totals?.runTravelTotal || 0).toFixed(2)}`,
+    `Grand Total: £${Number(cost.totals?.grandTotal || 0).toFixed(2)}`,
+    `Home paid distance/time: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi, ${Number(cost.homeTravel?.paidDurationHours || 0).toFixed(2)} h`,
+    `Run travel distance/time: ${Number(cost.runTravel?.distanceMiles || 0).toFixed(2)} mi, ${Number(cost.runTravel?.durationHours || 0).toFixed(2)} h`,
+    `Home time cost: £${Number(cost.components?.homeTimeCost || 0).toFixed(2)}`,
+    `Home mileage cost: £${Number(cost.components?.homeMileageCost || 0).toFixed(2)}`,
+    `Run time cost: £${Number(cost.components?.runTimeCost || 0).toFixed(2)}`,
+    `Run mileage cost: £${Number(cost.components?.runMileageCost || 0).toFixed(2)}`,
   ];
 
   for (const line of lines) {

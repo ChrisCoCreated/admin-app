@@ -341,7 +341,7 @@ dd {
   border-radius: 12px;
   overflow-y: auto;
   background: #fbfcff;
-  max-height: 320px;
+  max-height: 240px;
 }
 
 .client-result-row {
