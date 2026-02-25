@@ -22,10 +22,8 @@ module.exports = async (req, res) => {
   }
 
   const locationFields = {
+    location: toValue(req.body?.location),
     address: toValue(req.body?.address),
-    town: toValue(req.body?.town),
-    county: toValue(req.body?.county),
-    postcode: toValue(req.body?.postcode),
   };
 
   if (!Object.values(locationFields).some(Boolean)) {

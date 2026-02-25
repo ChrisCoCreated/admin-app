@@ -127,7 +127,7 @@ function parseLocationFields(addressInput) {
   };
 }
 
-async function persistLocationFields(clientId, fields) {
+async function persistLocationFields(clientId, location) {
   const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
   const response = await fetch(`${CLIENTS_ENDPOINT}/populate-location`, {
     method: "POST",
@@ -138,7 +138,7 @@ async function persistLocationFields(clientId, fields) {
     },
     body: JSON.stringify({
       id: clientId,
-      ...fields,
+      location,
     }),
   });
 
@@ -298,9 +298,9 @@ populateLocationBtn?.addEventListener("click", async () => {
   }
 
   const sourceAddress = selectedClient.address || "";
-  const parsed = parseLocationFields(sourceAddress);
-  if (!parsed) {
-    setStatus("No address found to parse.", true);
+  const locationValue = normalizeWhitespace(sourceAddress);
+  if (!locationValue) {
+    setStatus("No address found to copy.", true);
     return;
   }
 
@@ -308,14 +308,11 @@ populateLocationBtn?.addEventListener("click", async () => {
     if (populateLocationBtn) {
       populateLocationBtn.disabled = true;
     }
-    setStatus("Saving parsed location fields to SharePoint...");
-    await persistLocationFields(selectedClient.id, parsed);
-    selectedClient.address = selectedClient.address || parsed.address;
-    selectedClient.town = parsed.town;
-    selectedClient.county = parsed.county;
-    selectedClient.postcode = parsed.postcode;
+    setStatus("Saving full location to SharePoint...");
+    await persistLocationFields(selectedClient.id, locationValue);
+    selectedClient.location = locationValue;
     setDetail(selectedClient);
-    setStatus("Location fields populated and saved to SharePoint.");
+    setStatus("Location saved to SharePoint.");
   } catch (error) {
     setStatus(error?.message || "Could not save location fields.", true);
   } finally {

@@ -76,6 +76,40 @@ async function getGraphAccessToken() {
   return payload.access_token;
 }
 
+async function getSharePointAccessToken(hostName) {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_API_CLIENT_ID;
+  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: `https://${hostName}/.default`,
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload?.access_token) {
+    const errorText = payload?.error_description || payload?.error || "Could not get SharePoint token.";
+    throw new Error(errorText);
+  }
+
+  return payload.access_token;
+}
+
 function requireSharePointConfig() {
   const siteUrlValue = process.env.SHAREPOINT_SITE_URL;
   const clientsListName = process.env.SHAREPOINT_CLIENTS_LIST_NAME;
@@ -341,92 +375,70 @@ async function persistClientLocationFields(clientId, locationFields) {
     throw createError("Cannot persist changes while local fallback mode is enabled.", 409);
   }
 
-  const token = await getGraphAccessToken();
+  const graphToken = await getGraphAccessToken();
   const { hostName, sitePath, clientsListName } = requireSharePointConfig();
-  const siteId = await resolveSiteId(token, hostName, sitePath);
-  const listId = await resolveListId(token, siteId, clientsListName);
-  const columns = await readListColumns(token, siteId, listId);
+  const siteId = await resolveSiteId(graphToken, hostName, sitePath);
+  const listId = await resolveListId(graphToken, siteId, clientsListName);
+  const columns = await readListColumns(graphToken, siteId, listId);
+  const locationFieldName = pickFieldName(columns, ["Location"], { writableOnly: true });
 
-  const fieldMap = {
-    address: pickFieldName(columns, [
-      "Address",
-      "AddressLine1",
-      "StreetAddress",
-      "Address1",
-      "Address Line 1",
-    ], { writableOnly: true }),
-    town: pickFieldName(columns, ["Town", "Town / City", "Suburb", "City"], { writableOnly: true }),
-    county: pickFieldName(columns, ["County", "Region", "State"], { writableOnly: true }),
-    postcode: pickFieldName(columns, ["PostCode", "Postcode", "PostalCode", "ZipCode", "ZIP Code"], {
-      writableOnly: true,
-    }),
-  };
-
-  const updates = {};
-  const address = String(locationFields?.address || "").trim();
-  const town = String(locationFields?.town || "").trim();
-  const county = String(locationFields?.county || "").trim();
-  const postcode = String(locationFields?.postcode || "").trim();
-
-  if (fieldMap.address && address) {
-    updates[fieldMap.address] = address;
+  const location =
+    String(locationFields?.location || "").trim() || String(locationFields?.address || "").trim();
+  if (!location) {
+    throw createError("No location value supplied.", 400);
   }
-  if (fieldMap.town && town) {
-    updates[fieldMap.town] = town;
-  }
-  if (fieldMap.county && county) {
-    updates[fieldMap.county] = county;
-  }
-  if (fieldMap.postcode && postcode) {
-    updates[fieldMap.postcode] = postcode;
-  }
-  if (!Object.keys(updates).length) {
-    throw createError("No matching writable location columns were found in SharePoint.", 400);
+  if (!locationFieldName) {
+    throw createError("No writable Location column was found in SharePoint.", 400);
   }
 
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
-    String(clientId || "").trim()
-  )}/fields`;
-
-  const payloadKeys = Object.keys(updates);
-  const updatedFields = [];
-  let lastError = null;
-
-  try {
-    await fetchJson(url, {
-      method: "PATCH",
-      headers: {
-        ...graphHeaders(token),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updates),
-    });
-    return { updatedFields: payloadKeys };
-  } catch (error) {
-    lastError = error;
+  const itemId = Number(String(clientId || "").trim());
+  if (!Number.isFinite(itemId) || itemId <= 0) {
+    throw createError("Invalid client id for SharePoint item update.", 400);
   }
 
-  for (const key of payloadKeys) {
-    try {
-      await fetchJson(url, {
-        method: "PATCH",
-        headers: {
-          ...graphHeaders(token),
-          "Content-Type": "application/json",
+  const spToken = await getSharePointAccessToken(hostName);
+  const restUrl = `https://${hostName}${sitePath}/_api/web/lists(guid'${listId}')/items(${itemId})/ValidateUpdateListItem()`;
+  const response = await fetch(restUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${spToken}`,
+      Accept: "application/json;odata=nometadata",
+      "Content-Type": "application/json;odata=nometadata",
+    },
+    body: JSON.stringify({
+      formValues: [
+        {
+          FieldName: locationFieldName,
+          FieldValue: location,
         },
-        body: JSON.stringify({ [key]: updates[key] }),
-      });
-      updatedFields.push(key);
-    } catch (error) {
-      lastError = error;
-    }
+      ],
+      bNewDocumentUpdate: false,
+    }),
+  });
+
+  const text = await response.text();
+  let payload = {};
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = {};
+  }
+  if (!response.ok) {
+    const detail = payload?.error?.message?.value || payload?.error?.message || text || "SharePoint update failed.";
+    throw createError(detail, response.status);
   }
 
-  if (!updatedFields.length) {
-    throw lastError || createError("Could not update any location fields.", 500);
+  const results = Array.isArray(payload?.value)
+    ? payload.value
+    : Array.isArray(payload?.d?.ValidateUpdateListItem?.results)
+      ? payload.d.ValidateUpdateListItem.results
+      : [];
+  const firstError = results.find((entry) => entry?.HasException || entry?.ErrorMessage);
+  if (firstError?.ErrorMessage) {
+    throw createError(firstError.ErrorMessage, 400);
   }
 
-  return { updatedFields };
+  return { updatedFields: [locationFieldName] };
 }
 
 module.exports = {
