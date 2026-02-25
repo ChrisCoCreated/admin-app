@@ -225,6 +225,10 @@ tbody tr.selected {
   gap: 12px;
 }
 
+.detail-actions {
+  margin-top: 10px;
+}
+
 .detail-list div {
   border: 1px solid #dbe1ec;
   border-radius: 12px;
