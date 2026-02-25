@@ -15,6 +15,7 @@ const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
 const runDateInput = document.getElementById("runDateInput");
 const runStartTimeInput = document.getElementById("runStartTimeInput");
+const visitDurationInput = document.getElementById("visitDurationInput");
 const runNameInput = document.getElementById("runNameInput");
 const saveRunBtn = document.getElementById("saveRunBtn");
 const exportRunsBtn = document.getElementById("exportRunsBtn");
@@ -39,7 +40,7 @@ const selectedClientStops = [];
 let allClients = [];
 let selectedArea = "ALL";
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
-const VISIT_DURATION_MINUTES = 60;
+const DEFAULT_VISIT_DURATION_MINUTES = 60;
 const SAVED_RUNS_KEY = "thrive.mapping.savedRuns.v1";
 let scheduleRows = [];
 let scheduleGapMinutes = [];
@@ -413,7 +414,7 @@ function getDurationMinutes(durationSeconds) {
 }
 
 function parseTimeInputToMinutes(value) {
-  const match = /^(\d{2}):(\d{2})$/.exec(String(value || "").trim());
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(String(value || "").trim());
   if (!match) {
     return null;
   }
@@ -423,6 +424,14 @@ function parseTimeInputToMinutes(value) {
     return null;
   }
   return hours * 60 + mins;
+}
+
+function getVisitDurationMinutes() {
+  const parsed = Number(visitDurationInput?.value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_VISIT_DURATION_MINUTES;
+  }
+  return roundUpToNearestTenMinutes(parsed);
 }
 
 function toDateInputValue(date) {
@@ -473,12 +482,12 @@ function formatMinutesForTimeInput(totalMinutes) {
   return `${String(hours).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
-function roundToNearestTenMinutes(totalMinutes) {
+function roundUpToNearestTenMinutes(totalMinutes) {
   const mins = Number(totalMinutes || 0);
   if (!Number.isFinite(mins)) {
     return 540;
   }
-  return Math.round(mins / 10) * 10;
+  return Math.ceil(mins / 10) * 10;
 }
 
 function resolveStartMinutes() {
@@ -486,7 +495,7 @@ function resolveStartMinutes() {
   if (parsed === null) {
     return 540;
   }
-  return roundToNearestTenMinutes(parsed);
+  return roundUpToNearestTenMinutes(parsed);
 }
 
 function buildDepartureTimeIso() {
@@ -515,13 +524,14 @@ function buildScheduleRows(run) {
   }
   labels.push(`Return - ${staffPostcode}`);
 
+  const visitDuration = getVisitDurationMinutes();
   scheduleGapMinutes = [];
   for (let i = 0; i < labels.length - 1; i += 1) {
     const legMinutes = getDurationMinutes(legs[i]?.durationSeconds);
     if (i === 0) {
       scheduleGapMinutes.push(legMinutes);
     } else {
-      scheduleGapMinutes.push(VISIT_DURATION_MINUTES + legMinutes);
+      scheduleGapMinutes.push(visitDuration + legMinutes);
     }
   }
 
@@ -532,7 +542,7 @@ function buildScheduleRows(run) {
   }));
 
   for (let i = 1; i < scheduleRows.length; i += 1) {
-    scheduleRows[i].minutes = scheduleRows[i - 1].minutes + scheduleGapMinutes[i - 1];
+    scheduleRows[i].minutes = roundUpToNearestTenMinutes(scheduleRows[i - 1].minutes + scheduleGapMinutes[i - 1]);
   }
 }
 
@@ -565,7 +575,7 @@ function renderSchedule() {
 
     const timeInput = document.createElement("input");
     timeInput.type = "time";
-    timeInput.step = "60";
+    timeInput.step = "600";
     timeInput.value = formatMinutesForTimeInput(row.minutes);
     timeInput.addEventListener("change", () => {
       const parsed = parseTimeInputToMinutes(timeInput.value);
@@ -575,8 +585,11 @@ function renderSchedule() {
       }
 
       const delta = closestDelta(scheduleRows[i].minutes, parsed);
-      for (let rowIndex = i; rowIndex < scheduleRows.length; rowIndex += 1) {
-        scheduleRows[rowIndex].minutes += delta;
+      scheduleRows[i].minutes = roundUpToNearestTenMinutes(scheduleRows[i].minutes + delta);
+      for (let rowIndex = i + 1; rowIndex < scheduleRows.length; rowIndex += 1) {
+        scheduleRows[rowIndex].minutes = roundUpToNearestTenMinutes(
+          scheduleRows[rowIndex - 1].minutes + scheduleGapMinutes[rowIndex - 1]
+        );
       }
 
       if (i === 0 && runStartTimeInput) {
@@ -959,6 +972,9 @@ clearRunBtn?.addEventListener("click", () => {
   if (runDateInput) {
     runDateInput.value = toDateInputValue(getNextMondayDate());
   }
+  if (visitDurationInput) {
+    visitDurationInput.value = String(DEFAULT_VISIT_DURATION_MINUTES);
+  }
   staffPostcodeInput.value = "";
   clientPostcodeInput.value = "";
   if (clientSearchInput) {
@@ -979,7 +995,18 @@ runStartTimeInput?.addEventListener("change", () => {
     runStartTimeInput.value = "09:00";
     return;
   }
-  runStartTimeInput.value = formatMinutesForTimeInput(roundToNearestTenMinutes(parsed));
+  runStartTimeInput.value = formatMinutesForTimeInput(roundUpToNearestTenMinutes(parsed));
+  if (lastRun) {
+    buildScheduleRows(lastRun);
+    renderSchedule();
+  }
+});
+
+visitDurationInput?.addEventListener("change", () => {
+  const rounded = getVisitDurationMinutes();
+  if (visitDurationInput) {
+    visitDurationInput.value = String(rounded);
+  }
   if (lastRun) {
     buildScheduleRows(lastRun);
     renderSchedule();
