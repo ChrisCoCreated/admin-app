@@ -126,7 +126,7 @@ async function computeRun(staff, clients, apiKey) {
     })),
     travelMode: "DRIVE",
     routingPreference: "TRAFFIC_UNAWARE",
-    optimizeWaypointOrder: true,
+    optimizeWaypointOrder: false,
     units: "METRIC",
     languageCode: "en-GB",
   };
@@ -258,8 +258,8 @@ function buildResponse(staff, clients, route) {
 
   const runDistanceMiles = metersToMiles(runDistanceMeters);
   const runDurationHours = runDurationSeconds / 3600;
-  const runTimeCost = 0;
-  const runMileageCost = 0;
+  const runTimeCost = runDurationHours * travelPayRate;
+  const runMileageCost = runDistanceMiles * perMileRate;
   const runTravelTotal = runTimeCost + runMileageCost;
   const grandTotal = exceptionalHomeTotal + runTravelTotal;
 

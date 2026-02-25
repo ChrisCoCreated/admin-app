@@ -371,22 +371,23 @@ dd {
   list-style: none;
   margin: 10px 0 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
 }
 
 .postcode-pill {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: 8px;
   border: 1px solid #d8e0ee;
-  border-radius: 999px;
+  border-radius: 12px;
   padding: 6px 10px;
   background: #f7faff;
   font-weight: 700;
 }
 
+.pill-action-btn,
 .pill-remove-btn {
   border: 0;
   border-radius: 999px;
@@ -394,6 +395,11 @@ dd {
   background: #e4eaf7;
   color: #1f2a3d;
   font-size: 0.82rem;
+}
+
+.pill-remove-btn {
+  background: #f5dfe6;
+  color: #6e1f32;
 }
 
 .run-order-list {

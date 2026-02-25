@@ -104,11 +104,43 @@ function renderClientPostcodes() {
       setStatus("Client stop removed.");
     });
 
-    li.append(text, remove);
+    const moveUp = document.createElement("button");
+    moveUp.type = "button";
+    moveUp.className = "pill-action-btn";
+    moveUp.textContent = "Up";
+    moveUp.disabled = index === 0;
+    moveUp.addEventListener("click", () => {
+      moveStop(index, index - 1);
+    });
+
+    const moveDown = document.createElement("button");
+    moveDown.type = "button";
+    moveDown.className = "pill-action-btn";
+    moveDown.textContent = "Down";
+    moveDown.disabled = index === selectedClientStops.length - 1;
+    moveDown.addEventListener("click", () => {
+      moveStop(index, index + 1);
+    });
+
+    li.append(text, moveUp, moveDown, remove);
     clientPostcodesList.appendChild(li);
   });
 
   noClientsMessage.hidden = selectedClientStops.length > 0;
+}
+
+function moveStop(fromIndex, toIndex) {
+  if (fromIndex < 0 || fromIndex >= selectedClientStops.length) {
+    return;
+  }
+  if (toIndex < 0 || toIndex >= selectedClientStops.length) {
+    return;
+  }
+  const [moved] = selectedClientStops.splice(fromIndex, 1);
+  selectedClientStops.splice(toIndex, 0, moved);
+  renderClientPostcodes();
+  hideRun();
+  setStatus("Client stop order updated.");
 }
 
 function addClientStop(address, label = "") {
@@ -347,9 +379,15 @@ function renderCost(cost) {
       : `${Number(cost.thresholds?.maxDistanceMiles || 0).toFixed(2)} miles`;
   const distanceBasis = Number(cost.thresholds?.maxDistanceMiles);
   const timeBasis = Number(cost.thresholds?.maxTimeMinutes);
-  const distanceText = Number.isFinite(distanceBasis) ? `${distanceBasis.toFixed(2)} miles` : "not set";
-  const timeText = Number.isFinite(timeBasis) ? `${timeBasis.toFixed(0)} mins` : "not set";
-  runCostSummary.textContent = `Costing mode: ${modeText}. Calculation based on ${basedOnText}. Basis: MAX_DISTANCE ${distanceText}, MAX_TIME ${timeText}.`;
+  const basisParts = [];
+  if (Number.isFinite(distanceBasis) && distanceBasis > 0) {
+    basisParts.push(`${distanceBasis.toFixed(2)} miles`);
+  }
+  if (Number.isFinite(timeBasis) && timeBasis > 0) {
+    basisParts.push(`${timeBasis.toFixed(0)} mins`);
+  }
+  const basisText = basisParts.length ? basisParts.join(", ") : "None";
+  runCostSummary.textContent = `Costing mode: ${modeText}. Home exceptional travel uses ${basedOnText}. Run travel is fully costed (all distance/time). Basis: ${basisText}.`;
   runCostBreakdown.innerHTML = "";
 
   const homeSeconds = Number(cost.homeTravel?.paidDurationSeconds || 0);
