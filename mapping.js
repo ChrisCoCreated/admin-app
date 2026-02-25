@@ -26,7 +26,7 @@ const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const RUN_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/routes/run` : "/api/routes/run";
 const CLIENTS_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/clients` : "/api/clients";
 
-const clientPostcodes = [];
+const selectedClientStops = [];
 let allClients = [];
 let selectedArea = "ALL";
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
@@ -86,22 +86,19 @@ function hideRun() {
 function renderClientPostcodes() {
   clientPostcodesList.innerHTML = "";
 
-  for (const postcode of clientPostcodes) {
+  selectedClientStops.forEach((stop, index) => {
     const li = document.createElement("li");
     li.className = "postcode-pill";
 
     const text = document.createElement("span");
-    text.textContent = postcode;
+    text.textContent = stop.label ? `${stop.label} - ${stop.address}` : stop.address;
 
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "pill-remove-btn";
     remove.textContent = "Remove";
     remove.addEventListener("click", () => {
-      const idx = clientPostcodes.indexOf(postcode);
-      if (idx >= 0) {
-        clientPostcodes.splice(idx, 1);
-      }
+      selectedClientStops.splice(index, 1);
       renderClientPostcodes();
       hideRun();
       setStatus("Client stop removed.");
@@ -109,43 +106,43 @@ function renderClientPostcodes() {
 
     li.append(text, remove);
     clientPostcodesList.appendChild(li);
-  }
+  });
 
-  noClientsMessage.hidden = clientPostcodes.length > 0;
+  noClientsMessage.hidden = selectedClientStops.length > 0;
 }
 
-function addClientPostcode(postcode, sourceLabel = "") {
-  const input = normalizeLocationQuery(postcode);
+function addClientStop(address, label = "") {
+  const input = normalizeLocationQuery(address);
   if (!input || !compactLocationQuery(input)) {
     setStatus("Enter a client stop before adding.", true);
     return false;
   }
 
   const key = compactLocationQuery(input);
-  const exists = clientPostcodes.some((postcode) => compactLocationQuery(postcode) === key);
+  const exists = selectedClientStops.some((stop) => compactLocationQuery(stop.address) === key);
   if (exists) {
     setStatus("Client stop already added.", true);
     return false;
   }
 
-  clientPostcodes.push(input);
+  selectedClientStops.push({
+    label: normalizeLocationQuery(label),
+    address: input,
+  });
   renderClientPostcodes();
   hideRun();
-  setStatus(sourceLabel ? `Added ${input} from ${sourceLabel}.` : `Added ${input}.`);
+  setStatus(label ? `Added ${label}.` : `Added ${input}.`);
   return true;
 }
 
 function addClientPostcodeFromInput() {
-  if (addClientPostcode(clientPostcodeInput.value)) {
+  if (addClientStop(clientPostcodeInput.value, "Manual")) {
     clientPostcodeInput.value = "";
   }
 }
 
 function getClientLabel(client) {
-  const name = String(client.name || "Unnamed");
-  const id = String(client.id || "").trim();
-  const area = getClientArea(client);
-  return [name, id && `#${id}`, area].filter(Boolean).join(" - ");
+  return String(client.name || "Unnamed client").trim();
 }
 
 function getClientArea(client) {
@@ -269,7 +266,7 @@ function renderClientSearchResults() {
     addBtn.textContent = "Add client";
     addBtn.disabled = !routeAddress;
     addBtn.addEventListener("click", () => {
-      addClientPostcode(routeAddress, getClientLabel(client));
+      addClientStop(routeAddress, getClientLabel(client));
     });
 
     li.append(info, addBtn);
@@ -294,7 +291,7 @@ function renderRun(run) {
   const orderedClients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
   const legs = Array.isArray(run.legs) ? run.legs : [];
 
-  runTotals.textContent = `Total distance: ${run.totalDistanceMiles || 0} mi (${run.totalDistanceMeters || 0} m) | Total time: ${run.totalDurationText || "0 min"}`;
+  runTotals.textContent = `Total distance: ${run.totalDistanceMiles || 0} mi | Total time: ${run.totalDurationText || "0 min"}`;
   renderCost(run.cost || null);
 
   runOrderList.innerHTML = "";
@@ -348,28 +345,35 @@ function renderCost(cost) {
     cost.mode === "time"
       ? `${Number(cost.thresholds?.maxTimeMinutes || 0).toFixed(0)} mins`
       : `${Number(cost.thresholds?.maxDistanceMiles || 0).toFixed(2)} miles`;
-  runCostSummary.textContent = `Calculation based on ${basedOnText} (${modeText}, home legs only).`;
+  const distanceBasis = Number(cost.thresholds?.maxDistanceMiles);
+  const timeBasis = Number(cost.thresholds?.maxTimeMinutes);
+  const distanceText = Number.isFinite(distanceBasis) ? `${distanceBasis.toFixed(2)} miles` : "not set";
+  const timeText = Number.isFinite(timeBasis) ? `${timeBasis.toFixed(0)} mins` : "not set";
+  runCostSummary.textContent = `Costing mode: ${modeText}. Calculation based on ${basedOnText}. Basis: MAX_DISTANCE ${distanceText}, MAX_TIME ${timeText}.`;
   runCostBreakdown.innerHTML = "";
 
   const homeSeconds = Number(cost.homeTravel?.paidDurationSeconds || 0);
   const runSeconds = Number(cost.runTravel?.durationSeconds || 0);
-  const lines = [
-    `Exceptional Travel Costs from Home: £${Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2)}`,
-    `Run Travel: £${Number(cost.totals?.runTravelTotal || 0).toFixed(2)}`,
-    `Grand Total: £${Number(cost.totals?.grandTotal || 0).toFixed(2)}`,
-    `Home paid distance/time: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(homeSeconds)}`,
-    `Run travel distance/time: ${Number(cost.runTravel?.distanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(runSeconds)}`,
-    `Home time cost: £${Number(cost.components?.homeTimeCost || 0).toFixed(2)}`,
-    `Home mileage cost: £${Number(cost.components?.homeMileageCost || 0).toFixed(2)}`,
-    `Run time cost: £${Number(cost.components?.runTimeCost || 0).toFixed(2)}`,
-    `Run mileage cost: £${Number(cost.components?.runMileageCost || 0).toFixed(2)}`,
-  ];
-
-  for (const line of lines) {
-    const li = document.createElement("li");
-    li.textContent = line;
-    runCostBreakdown.appendChild(li);
-  }
+  runCostBreakdown.innerHTML = `
+    <section class="cost-section">
+      <h3>Exceptional Travel Costs from Home</h3>
+      <p>Paid distance/time: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(homeSeconds)}</p>
+      <p>Time cost: £${Number(cost.components?.homeTimeCost || 0).toFixed(2)}</p>
+      <p>Mileage cost: £${Number(cost.components?.homeMileageCost || 0).toFixed(2)}</p>
+      <p class="cost-total">Section total: £${Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2)}</p>
+    </section>
+    <section class="cost-section">
+      <h3>Run Travel</h3>
+      <p>Distance/time: ${Number(cost.runTravel?.distanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(runSeconds)}</p>
+      <p>Time cost: £${Number(cost.components?.runTimeCost || 0).toFixed(2)}</p>
+      <p>Mileage cost: £${Number(cost.components?.runMileageCost || 0).toFixed(2)}</p>
+      <p class="cost-total">Section total: £${Number(cost.totals?.runTravelTotal || 0).toFixed(2)}</p>
+    </section>
+    <section class="cost-section grand">
+      <h3>Grand Total</h3>
+      <p class="cost-total">£${Number(cost.totals?.grandTotal || 0).toFixed(2)}</p>
+    </section>
+  `;
 }
 
 function formatSecondsAsTime(totalSeconds) {
@@ -407,7 +411,7 @@ async function calculateRun() {
     return;
   }
 
-  if (!clientPostcodes.length) {
+  if (!selectedClientStops.length) {
     setStatus("Add at least one client stop.", true);
     return;
   }
@@ -427,7 +431,10 @@ async function calculateRun() {
       },
       body: JSON.stringify({
         staffPostcode,
-        clientLocations: clientPostcodes,
+        clientLocations: selectedClientStops.map((stop) => ({
+          query: stop.address,
+          label: stop.label || stop.address,
+        })),
       }),
     });
 
@@ -437,7 +444,7 @@ async function calculateRun() {
     }
 
     renderRun(data.run || {});
-    setStatus(`Run calculated with ${clientPostcodes.length} client stop(s).`);
+    setStatus(`Run calculated with ${selectedClientStops.length} client stop(s).`);
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not calculate run.", true);
@@ -512,7 +519,7 @@ clearRunBtn?.addEventListener("click", () => {
     clientSearchInput.value = "";
   }
   selectedArea = "ALL";
-  clientPostcodes.length = 0;
+  selectedClientStops.length = 0;
   renderClientPostcodes();
   renderAreaFilters();
   renderClientSearchResults();

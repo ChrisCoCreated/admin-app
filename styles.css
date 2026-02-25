@@ -409,13 +409,37 @@ dd {
   background: #f8faff;
 }
 
-.cost-breakdown-list {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.cost-breakdown-sections {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
 }
 
-.cost-breakdown-list li {
-  margin: 2px 0;
+.cost-section {
+  border: 1px solid #d6e0f4;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.cost-section h3 {
+  margin: 0 0 6px;
+  font-size: 0.98rem;
+}
+
+.cost-section p {
+  margin: 3px 0;
+}
+
+.cost-section.grand {
+  border-color: #9cb7f3;
+  background: #eef4ff;
+}
+
+.cost-total {
+  margin-top: 7px;
+  font-size: 1.06rem;
+  font-weight: 800;
 }
 
 @media (max-width: 900px) {
