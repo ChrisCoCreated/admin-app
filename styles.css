@@ -1,0 +1,278 @@
+:root {
+  --bg: #efefef;
+  --surface: #ffffff;
+  --ink: #11141a;
+  --muted: #576073;
+  --line: #d8dce5;
+  --brand-cyan: #31b7c8;
+  --brand-pink: #c9439b;
+  --brand-purple: #6c3ed1;
+  --brand-mint: #49cfbf;
+  --brand-dark: #030303;
+  --danger: #b4232c;
+  --radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(1000px 500px at 100% -10%, rgba(49, 183, 200, 0.18), transparent 60%),
+    radial-gradient(720px 420px at -10% 100%, rgba(201, 67, 155, 0.12), transparent 56%),
+    var(--bg);
+  font-family: "Manrope", "Segoe UI", Arial, sans-serif;
+}
+
+.container {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 0 20px 28px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid #ced4e2;
+  background: rgba(239, 239, 239, 0.92);
+  backdrop-filter: blur(8px);
+}
+
+.topbar-inner {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
+.brand-text {
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 0.01em;
+}
+
+.hero {
+  margin-top: 22px;
+  border: 1px solid #ced4e2;
+  background: #f7f8fb;
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.hero.compact {
+  margin-bottom: 14px;
+}
+
+h1,
+h2 {
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 4vw, 2.4rem);
+}
+
+h2 {
+  font-size: 1.24rem;
+}
+
+p {
+  margin: 0;
+}
+
+.panel {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(17, 20, 26, 0.08);
+  padding: 20px;
+}
+
+.auth-card {
+  max-width: 560px;
+}
+
+body.auth-pending .auth-card {
+  display: none;
+}
+
+.row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+input[type="search"] {
+  width: 100%;
+  height: 44px;
+  border-radius: 11px;
+  border: 1px solid #c9d1e1;
+  padding: 0 12px;
+  background: #fdfefe;
+}
+
+button {
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(120deg, var(--brand-cyan), var(--brand-pink));
+  color: #fff;
+  font-weight: 700;
+  padding: 11px 16px;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #e7ebf4;
+  color: #1c2433;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.clients-main {
+  padding-bottom: 40px;
+}
+
+.clients-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+}
+
+.table-wrap {
+  margin-top: 12px;
+  overflow: auto;
+  border: 1px solid #d7deea;
+  border-radius: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 420px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #e7ebf4;
+}
+
+thead th {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #4a566d;
+  letter-spacing: 0.04em;
+  background: #f7f9fc;
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover {
+  background: #f4f8ff;
+}
+
+tbody tr.selected {
+  background: #eaf5ff;
+}
+
+.detail-list {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 12px;
+}
+
+.detail-list div {
+  border: 1px solid #dbe1ec;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fbfcff;
+}
+
+dt {
+  margin: 0;
+  color: #4b5569;
+  font-size: 0.85rem;
+}
+
+dd {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--danger);
+}
+
+@media (max-width: 900px) {
+  .clients-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding-inline: 14px;
+  }
+
+  .panel,
+  .hero {
+    padding: 16px;
+  }
+
+  .topbar-inner {
+    min-height: 64px;
+  }
+
+  .brand-text {
+    font-size: 1rem;
+  }
+}

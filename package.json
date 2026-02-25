@@ -1,0 +1,13 @@
+{
+  "name": "thrive-admin-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Admin app with Entra sign-in and secure clients lookup",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

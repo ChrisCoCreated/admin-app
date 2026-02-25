@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Clients</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/toucan-mark.svg" />
+    <link rel="alternate icon" href="./favicon.ico" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./clients.html" aria-label="Clients page">
+          <img class="brand-mark" src="./assets/toucan-mark.svg" alt="Toucan mark" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="container clients-main">
+      <section class="hero compact">
+        <h1>Clients</h1>
+        <p>Search and review core client details.</p>
+      </section>
+
+      <section class="panel">
+        <label class="field" for="searchInput">
+          Search
+          <input id="searchInput" type="search" placeholder="Search by name, id, or location" autocomplete="off" />
+        </label>
+        <p id="statusMessage" class="muted">Loading clients...</p>
+      </section>
+
+      <section class="clients-grid">
+        <article class="panel list-panel">
+          <h2>Client List</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Location</th>
+                </tr>
+              </thead>
+              <tbody id="clientsTableBody"></tbody>
+            </table>
+          </div>
+          <p id="emptyState" class="muted" hidden>No clients found.</p>
+        </article>
+
+        <article class="panel detail-panel">
+          <h2>Client Detail</h2>
+          <dl id="clientDetail" class="detail-list">
+            <div>
+              <dt>ID</dt>
+              <dd data-field="id">-</dd>
+            </div>
+            <div>
+              <dt>Name</dt>
+              <dd data-field="name">Select a client</dd>
+            </div>
+            <div>
+              <dt>Location</dt>
+              <dd data-field="location">-</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd data-field="email">-</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./clients.js"></script>
+  </body>
+</html>

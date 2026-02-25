@@ -1,0 +1,15 @@
+{
+  "name": "Thrive Admin App",
+  "short_name": "Admin",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#efefef",
+  "theme_color": "#31b7c8",
+  "icons": [
+    {
+      "src": "/assets/toucan-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

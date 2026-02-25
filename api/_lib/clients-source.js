@@ -1,0 +1,202 @@
+const fs = require("fs/promises");
+const path = require("path");
+
+function normalizeClient(client) {
+  return {
+    id: String(client.id || "").trim(),
+    name: String(client.name || "").trim(),
+    location: String(client.location || "").trim(),
+    email: String(client.email || "").trim(),
+  };
+}
+
+async function readLocalClients() {
+  const filePath = process.env.CLIENTS_DATA_FILE
+    ? path.resolve(process.cwd(), process.env.CLIENTS_DATA_FILE)
+    : path.join(process.cwd(), "data", "clients.json");
+
+  const raw = await fs.readFile(filePath, "utf8");
+  const parsed = JSON.parse(raw);
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Client data must be an array.");
+  }
+
+  return parsed.map(normalizeClient).filter((client) => client.id);
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!response.ok) {
+    const detail = data?.error?.message || text || `HTTP ${response.status}`;
+    throw new Error(detail);
+  }
+
+  return data;
+}
+
+async function getGraphAccessToken() {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_API_CLIENT_ID;
+  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: "https://graph.microsoft.com/.default",
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload?.access_token) {
+    const errorText = payload?.error_description || payload?.error || "Could not get Graph token.";
+    throw new Error(errorText);
+  }
+
+  return payload.access_token;
+}
+
+function requireSharePointConfig() {
+  const siteUrlValue = process.env.SHAREPOINT_SITE_URL;
+  const clientsListName = process.env.SHAREPOINT_CLIENTS_LIST_NAME;
+
+  if (!siteUrlValue || !clientsListName) {
+    throw new Error("Missing SHAREPOINT_SITE_URL or SHAREPOINT_CLIENTS_LIST_NAME.");
+  }
+
+  const siteUrl = new URL(siteUrlValue);
+  const sitePath = siteUrl.pathname.replace(/\/$/, "");
+  if (!sitePath) {
+    throw new Error("SHAREPOINT_SITE_URL must include a site path, e.g. /sites/SupportTeam.");
+  }
+
+  return {
+    hostName: siteUrl.hostname,
+    sitePath,
+    clientsListName,
+  };
+}
+
+function graphHeaders(token) {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  };
+}
+
+function quoteODataString(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+async function resolveSiteId(token, hostName, sitePath) {
+  const url = `https://graph.microsoft.com/v1.0/sites/${hostName}:${sitePath}?$select=id`;
+  const data = await fetchJson(url, { headers: graphHeaders(token) });
+  if (!data?.id) {
+    throw new Error("Could not resolve SharePoint site id.");
+  }
+  return data.id;
+}
+
+async function resolveListId(token, siteId, listName) {
+  const params = new URLSearchParams({
+    $select: "id,displayName",
+    $filter: `displayName eq ${quoteODataString(listName)}`,
+    $top: "1",
+  });
+
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?${params.toString()}`;
+  const data = await fetchJson(url, { headers: graphHeaders(token) });
+  const list = Array.isArray(data?.value) ? data.value[0] : null;
+
+  if (!list?.id) {
+    throw new Error(`Could not find SharePoint list '${listName}'.`);
+  }
+
+  return list.id;
+}
+
+function mapGraphItemToClient(item) {
+  const fields = item?.fields || {};
+  const graphId = fields.ID || item?.id;
+  const name = fields.Title || fields.Client || fields.ClientName || "";
+  const location =
+    fields.Location || fields.Suburb || fields.City || fields.Town || fields.Address || "";
+  const email = fields.Email || fields.EmailAddress || fields.ClientEmail || "";
+
+  return normalizeClient({
+    id: graphId,
+    name,
+    location,
+    email,
+  });
+}
+
+async function loadClientsFromGraph() {
+  const token = await getGraphAccessToken();
+  const { hostName, sitePath, clientsListName } = requireSharePointConfig();
+  const siteId = await resolveSiteId(token, hostName, sitePath);
+  const listId = await resolveListId(token, siteId, clientsListName);
+
+  const clients = [];
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?$expand=fields&$top=200`;
+
+  while (nextUrl) {
+    const data = await fetchJson(nextUrl, { headers: graphHeaders(token) });
+    const items = Array.isArray(data?.value) ? data.value : [];
+
+    for (const item of items) {
+      const client = mapGraphItemToClient(item);
+      if (client.id && client.name) {
+        clients.push(client);
+      }
+    }
+
+    nextUrl = data?.["@odata.nextLink"] || "";
+  }
+
+  clients.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return clients;
+}
+
+async function readClients() {
+  const useFallback = process.env.USE_LOCAL_CLIENTS_FALLBACK === "1";
+
+  if (useFallback) {
+    return { clients: await readLocalClients(), source: "local-fallback" };
+  }
+
+  try {
+    return { clients: await loadClientsFromGraph(), source: "graph" };
+  } catch (error) {
+    if (process.env.ALLOW_LOCAL_CLIENTS_ON_GRAPH_ERROR === "1") {
+      const clients = await readLocalClients();
+      return {
+        clients,
+        source: "local-on-error",
+        graphError: error && error.message ? error.message : String(error),
+      };
+    }
+
+    throw error;
+  }
+}
+
+module.exports = {
+  readClients,
+};

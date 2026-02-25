@@ -1,0 +1,178 @@
+const crypto = require("crypto");
+
+const openIdConfigCache = new Map();
+const jwksCache = new Map();
+
+function base64UrlDecode(input) {
+  const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  return Buffer.from(padded, "base64");
+}
+
+function parseJwt(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) {
+    throw new Error("Invalid token format.");
+  }
+
+  const [headerB64, payloadB64, signatureB64] = parts;
+  const header = JSON.parse(base64UrlDecode(headerB64).toString("utf8"));
+  const payload = JSON.parse(base64UrlDecode(payloadB64).toString("utf8"));
+  const signature = base64UrlDecode(signatureB64);
+
+  return {
+    signingInput: `${headerB64}.${payloadB64}`,
+    header,
+    payload,
+    signature,
+  };
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (!response.ok) {
+    const detail = data?.error_description || data?.error || `HTTP ${response.status}`;
+    throw new Error(detail);
+  }
+
+  return data;
+}
+
+async function getOpenIdConfig(tenantId) {
+  if (openIdConfigCache.has(tenantId)) {
+    return openIdConfigCache.get(tenantId);
+  }
+
+  const promise = fetchJson(
+    `https://login.microsoftonline.com/${tenantId}/v2.0/.well-known/openid-configuration`
+  );
+  openIdConfigCache.set(tenantId, promise);
+  return promise;
+}
+
+async function getJwks(jwksUri) {
+  if (jwksCache.has(jwksUri)) {
+    return jwksCache.get(jwksUri);
+  }
+
+  const promise = fetchJson(jwksUri);
+  jwksCache.set(jwksUri, promise);
+  return promise;
+}
+
+function ensureClaimWindow(payload) {
+  const now = Math.floor(Date.now() / 1000);
+
+  if (typeof payload.exp === "number" && now >= payload.exp) {
+    throw new Error("Token expired.");
+  }
+
+  if (typeof payload.nbf === "number" && now < payload.nbf) {
+    throw new Error("Token not yet valid.");
+  }
+}
+
+function ensureAudience(payload) {
+  const configuredAudience = process.env.AZURE_API_AUDIENCE;
+  const fallbackAudience = process.env.AZURE_API_CLIENT_ID;
+  const accepted = new Set([configuredAudience, fallbackAudience].filter(Boolean));
+
+  if (!accepted.size) {
+    throw new Error("Server missing AZURE_API_AUDIENCE or AZURE_API_CLIENT_ID.");
+  }
+
+  if (!accepted.has(payload.aud)) {
+    throw new Error("Token audience mismatch.");
+  }
+}
+
+function ensureIssuer(payload, tenantId) {
+  const validIssuers = new Set([
+    `https://login.microsoftonline.com/${tenantId}/v2.0`,
+    `https://sts.windows.net/${tenantId}/`,
+  ]);
+
+  if (!validIssuers.has(payload.iss)) {
+    throw new Error("Token issuer mismatch.");
+  }
+}
+
+function ensureScope(payload) {
+  const required = (process.env.AZURE_REQUIRED_SCOPE || "client.read").trim();
+  if (!required) {
+    return;
+  }
+
+  const scopes = String(payload.scp || "").split(/\s+/).filter(Boolean);
+  if (!scopes.includes(required)) {
+    throw new Error("Required scope missing.");
+  }
+}
+
+function verifySignature(signingInput, signature, jwk) {
+  if (!jwk || jwk.kty !== "RSA") {
+    throw new Error("No suitable signing key.");
+  }
+
+  const keyObject = crypto.createPublicKey({
+    key: jwk,
+    format: "jwk",
+  });
+
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(signingInput);
+  verifier.end();
+
+  if (!verifier.verify(keyObject, signature)) {
+    throw new Error("Invalid token signature.");
+  }
+}
+
+async function validateBearerToken(token) {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  if (!tenantId) {
+    throw new Error("Server missing AZURE_TENANT_ID.");
+  }
+
+  const { signingInput, header, payload, signature } = parseJwt(token);
+  if (header.alg !== "RS256") {
+    throw new Error("Unsupported token algorithm.");
+  }
+
+  const openIdConfig = await getOpenIdConfig(tenantId);
+  const jwks = await getJwks(openIdConfig.jwks_uri);
+  const keys = Array.isArray(jwks?.keys) ? jwks.keys : [];
+  const jwk = keys.find((key) => key.kid === header.kid);
+
+  verifySignature(signingInput, signature, jwk);
+  ensureIssuer(payload, tenantId);
+  ensureAudience(payload);
+  ensureClaimWindow(payload);
+  ensureScope(payload);
+
+  return payload;
+}
+
+async function requireApiAuth(req, res) {
+  const authHeader = String(req.headers.authorization || "");
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader);
+
+  if (!match) {
+    res.status(401).json({ error: "Missing bearer token." });
+    return null;
+  }
+
+  try {
+    const claims = await validateBearerToken(match[1]);
+    return claims;
+  } catch {
+    res.status(401).json({ error: "Unauthorized." });
+    return null;
+  }
+}
+
+module.exports = {
+  requireApiAuth,
+};

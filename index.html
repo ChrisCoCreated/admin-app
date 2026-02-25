@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin App</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/toucan-mark.svg" />
+    <link rel="alternate icon" href="./favicon.ico" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/toucan-mark.svg" alt="Toucan mark" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero">
+        <h1>Admin Console</h1>
+        <p>Sign in with your work account to access the clients directory.</p>
+      </section>
+
+      <section class="panel auth-card">
+        <h2>Sign in</h2>
+        <p class="muted">Use Microsoft Entra (your normal work login).</p>
+        <div class="row">
+          <button id="signInBtn" type="button">Sign in</button>
+          <span id="authState" class="muted">Please sign in</span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

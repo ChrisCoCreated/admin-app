@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Toucan logo</title>
+  <desc id="desc">Minimal geometric toucan icon</desc>
+  <rect width="512" height="512" fill="#efefef"/>
+  <path d="M122 130c77 0 139 62 139 139v190H122z" fill="#000"/>
+  <path d="M188 130a122 122 0 0 1 122 122v6h-68c-30 0-54-24-54-54z" fill="#f8f8f8"/>
+  <path d="M262 130h120a82 82 0 0 1 0 164H262z" fill="#31b7c8"/>
+  <path d="M323 130h59a82 82 0 0 1 82 82v0h-82a59 59 0 0 1-59-59z" fill="#c9439b"/>
+  <path d="M155 244h90v90a90 90 0 0 1-90-90z" fill="#6c3ed1"/>
+  <path d="M230 231h24v24a24 24 0 0 1-24-24z" fill="#000"/>
+  <circle cx="226" cy="176" r="20" fill="#ffce3d"/>
+  <circle cx="226" cy="176" r="10" fill="#000"/>
+  <path d="M204 450h86a43 43 0 0 1-86 0z" fill="#49cfbf"/>
+</svg>
