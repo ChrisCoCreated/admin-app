@@ -118,6 +118,22 @@
           </table>
         </div>
       </section>
+
+      <section class="panel">
+        <h2>Export Runs</h2>
+        <p class="muted">Name a calculated run, add it to local export storage, then download all as CSV.</p>
+        <div class="mapping-form-grid">
+          <label class="field" for="runNameInput">
+            Run name
+            <input id="runNameInput" type="text" placeholder="e.g. Tuesday Central AM" />
+          </label>
+        </div>
+        <div class="row">
+          <button id="saveRunBtn" type="button" disabled>Add run for export</button>
+          <button id="exportRunsBtn" class="secondary" type="button" disabled>Download CSV</button>
+        </div>
+        <p id="savedRunsStatus" class="muted">No saved runs yet.</p>
+      </section>
     </main>
 
     <script type="module" src="./mapping.js"></script>

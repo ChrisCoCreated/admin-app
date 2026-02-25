@@ -12,6 +12,10 @@ const addClientBtn = document.getElementById("addClientBtn");
 const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
 const runStartTimeInput = document.getElementById("runStartTimeInput");
+const runNameInput = document.getElementById("runNameInput");
+const saveRunBtn = document.getElementById("saveRunBtn");
+const exportRunsBtn = document.getElementById("exportRunsBtn");
+const savedRunsStatus = document.getElementById("savedRunsStatus");
 const mappingStatus = document.getElementById("mappingStatus");
 const clientPostcodesList = document.getElementById("clientPostcodesList");
 const noClientsMessage = document.getElementById("noClientsMessage");
@@ -34,9 +38,11 @@ let allClients = [];
 let selectedArea = "ALL";
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
 const VISIT_DURATION_MINUTES = 60;
+const SAVED_RUNS_KEY = "thrive.mapping.savedRuns.v1";
 let scheduleRows = [];
 let scheduleGapMinutes = [];
 let lastRun = null;
+let savedRuns = [];
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -71,11 +77,43 @@ function setBusy(isBusy) {
   calculateRunBtn.disabled = isBusy;
   addClientBtn.disabled = isBusy;
   clearRunBtn.disabled = isBusy;
+  if (saveRunBtn) {
+    saveRunBtn.disabled = isBusy || !lastRun;
+  }
 }
 
 function setClientSearchStatus(message, isError = false) {
   clientSearchStatus.textContent = message;
   clientSearchStatus.classList.toggle("error", isError);
+}
+
+function updateSavedRunsStatus() {
+  if (!savedRunsStatus || !exportRunsBtn) {
+    return;
+  }
+  const count = savedRuns.length;
+  savedRunsStatus.textContent = count === 0 ? "No saved runs yet." : `${count} saved run(s) ready for export.`;
+  exportRunsBtn.disabled = count === 0;
+}
+
+function loadSavedRuns() {
+  try {
+    const raw = localStorage.getItem(SAVED_RUNS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    savedRuns = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    savedRuns = [];
+  }
+  updateSavedRunsStatus();
+}
+
+function persistSavedRuns() {
+  try {
+    localStorage.setItem(SAVED_RUNS_KEY, JSON.stringify(savedRuns));
+    updateSavedRunsStatus();
+  } catch {
+    setStatus("Could not persist saved runs locally.", true);
+  }
 }
 
 function hideRun() {
@@ -93,6 +131,9 @@ function hideRun() {
   }
   if (runCostBreakdown) {
     runCostBreakdown.innerHTML = "";
+  }
+  if (saveRunBtn) {
+    saveRunBtn.disabled = true;
   }
 }
 
@@ -509,6 +550,9 @@ function renderRun(run) {
   );
   buildScheduleRows(run);
   renderSchedule();
+  if (saveRunBtn) {
+    saveRunBtn.disabled = false;
+  }
   runResults.hidden = false;
 }
 
@@ -573,6 +617,128 @@ function formatSecondsAsTime(totalSeconds) {
     return `${hours}h`;
   }
   return `${hours}h ${minutes}m`;
+}
+
+function collectRunExportRecord(name) {
+  const run = lastRun || {};
+  const cost = run.cost || {};
+  const clients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
+  const legCount = Array.isArray(run.legs) ? run.legs.length : 0;
+  const startTime = scheduleRows.length ? formatMinutesForTimeInput(scheduleRows[0].minutes) : (runStartTimeInput?.value || "09:00");
+  const scheduleText = scheduleRows
+    .map((row) => `${row.label} @ ${formatMinutesForTimeInput(row.minutes)}`)
+    .join(" | ");
+  const stopsText = clients
+    .map((client) => client.stopLabel || client.formattedAddress || client.query || "")
+    .filter(Boolean)
+    .join(" | ");
+
+  return {
+    savedAt: new Date().toISOString(),
+    name,
+    runStartTime: startTime,
+    staffStart: String(run.staffStart?.postcode || ""),
+    clientStopCount: clients.length,
+    clientStops: stopsText,
+    legCount,
+    totalDistanceMiles: Number(run.totalDistanceMiles || 0).toFixed(2),
+    totalDuration: String(run.totalDurationText || ""),
+    costingMode: String(runCostSummary?.textContent || ""),
+    exceptionalTravelTotal: Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2),
+    runTravelTotal: Number(cost.totals?.runTravelTotal || 0).toFixed(2),
+    grandTotal: Number(cost.totals?.grandTotal || 0).toFixed(2),
+    schedule: scheduleText,
+  };
+}
+
+function escapeCsvValue(value) {
+  const text = String(value ?? "");
+  if (!/[",\n]/.test(text)) {
+    return text;
+  }
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function downloadCsv(filename, csvText) {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportSavedRunsAsCsv() {
+  if (!savedRuns.length) {
+    setStatus("No saved runs to export.", true);
+    return;
+  }
+
+  const headers = [
+    "Saved At",
+    "Run Name",
+    "Run Start Time",
+    "Staff Start",
+    "Client Stop Count",
+    "Client Stops",
+    "Leg Count",
+    "Total Distance (mi)",
+    "Total Duration",
+    "Costing Mode",
+    "Exceptional Travel Total",
+    "Run Travel Total",
+    "Grand Total",
+    "Schedule",
+  ];
+
+  const lines = [headers.join(",")];
+  for (const row of savedRuns) {
+    const values = [
+      row.savedAt,
+      row.name,
+      row.runStartTime,
+      row.staffStart,
+      row.clientStopCount,
+      row.clientStops,
+      row.legCount,
+      row.totalDistanceMiles,
+      row.totalDuration,
+      row.costingMode,
+      row.exceptionalTravelTotal,
+      row.runTravelTotal,
+      row.grandTotal,
+      row.schedule,
+    ];
+    lines.push(values.map(escapeCsvValue).join(","));
+  }
+
+  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  downloadCsv(`runs-export-${stamp}.csv`, lines.join("\n"));
+  setStatus(`Exported ${savedRuns.length} run(s).`);
+}
+
+function saveCurrentRunForExport() {
+  if (!lastRun) {
+    setStatus("Calculate a run before saving.", true);
+    return;
+  }
+
+  const runName = normalizeLocationQuery(runNameInput?.value);
+  if (!runName) {
+    setStatus("Enter a run name before saving.", true);
+    return;
+  }
+
+  const record = collectRunExportRecord(runName);
+  savedRuns.push(record);
+  persistSavedRuns();
+  if (runNameInput) {
+    runNameInput.value = "";
+  }
+  setStatus(`Saved run '${runName}' for export.`);
 }
 
 function escapeHtml(value) {
@@ -683,6 +849,7 @@ async function init() {
       return;
     }
 
+    loadSavedRuns();
     renderClientPostcodes();
     setClientSearchStatus("Loading clients...");
     allClients = await fetchClients();
@@ -712,8 +879,23 @@ clientSearchInput?.addEventListener("input", () => {
   renderClientSearchResults();
 });
 
+runNameInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    saveCurrentRunForExport();
+  }
+});
+
 calculateRunBtn?.addEventListener("click", () => {
   void calculateRun();
+});
+
+saveRunBtn?.addEventListener("click", () => {
+  saveCurrentRunForExport();
+});
+
+exportRunsBtn?.addEventListener("click", () => {
+  exportSavedRunsAsCsv();
 });
 
 clearRunBtn?.addEventListener("click", () => {
