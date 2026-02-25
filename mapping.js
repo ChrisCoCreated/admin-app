@@ -25,6 +25,7 @@ const mapsDirectionsLink = document.getElementById("mapsDirectionsLink");
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const RUN_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/routes/run` : "/api/routes/run";
 const CLIENTS_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/clients` : "/api/clients";
+const ME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/auth/me` : "/api/auth/me";
 
 const selectedClientStops = [];
 let allClients = [];
@@ -389,14 +390,14 @@ function renderCost(cost) {
       <p>Paid distance/time: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(homeSeconds)}</p>
       <p>Time cost: £${Number(cost.components?.homeTimeCost || 0).toFixed(2)}</p>
       <p>Mileage cost: £${Number(cost.components?.homeMileageCost || 0).toFixed(2)}</p>
-      <p class="cost-total">Section total: £${Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2)}</p>
+      <p class="cost-total">Exceptional Travel Total: £${Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2)}</p>
     </section>
     <section class="cost-section">
       <h3>Run Travel</h3>
       <p>Distance/time: ${Number(cost.runTravel?.distanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(runSeconds)}</p>
       <p>Time cost: £${Number(cost.components?.runTimeCost || 0).toFixed(2)}</p>
       <p>Mileage cost: £${Number(cost.components?.runMileageCost || 0).toFixed(2)}</p>
-      <p class="cost-total">Section total: £${Number(cost.totals?.runTravelTotal || 0).toFixed(2)}</p>
+      <p class="cost-total">Run Total: £${Number(cost.totals?.runTravelTotal || 0).toFixed(2)}</p>
     </section>
     <section class="cost-section grand">
       <h3>Grand Total</h3>
@@ -500,11 +501,35 @@ async function fetchClients() {
   return Array.isArray(data?.clients) ? data.clients : [];
 }
 
+async function fetchCurrentUser() {
+  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
+  const response = await fetch(ME_ENDPOINT, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Profile request failed (${response.status}): ${text || "Unknown error"}`);
+  }
+
+  return response.json();
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
     if (!account) {
       window.location.href = "./index.html";
+      return;
+    }
+
+    const profile = await fetchCurrentUser();
+    const role = String(profile?.role || "").trim().toLowerCase();
+    if (role === "marketing") {
+      window.location.href = "./marketing.html";
       return;
     }
 

@@ -19,6 +19,7 @@ const detailFields = {
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const CLIENTS_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/clients` : "/api/clients";
+const ME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/auth/me` : "/api/auth/me";
 
 let allClients = [];
 let selectedClientId = "";
@@ -145,6 +146,23 @@ async function fetchClients() {
   return Array.isArray(data?.clients) ? data.clients : [];
 }
 
+async function fetchCurrentUser() {
+  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
+  const response = await fetch(ME_ENDPOINT, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Profile request failed (${response.status}): ${text || "Unknown error"}`);
+  }
+
+  return response.json();
+}
+
 async function loadClientsWithRetry() {
   const maxAttempts = 2;
   let lastError = null;
@@ -169,6 +187,13 @@ async function init() {
     account = restored;
     if (!account) {
       window.location.href = "./index.html";
+      return;
+    }
+
+    const profile = await fetchCurrentUser();
+    const role = String(profile?.role || "").trim().toLowerCase();
+    if (role === "marketing") {
+      window.location.href = "./marketing.html";
       return;
     }
 

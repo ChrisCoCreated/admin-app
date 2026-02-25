@@ -179,6 +179,10 @@ function resolveUserEmail(claims) {
 }
 
 async function requireApiAuth(req, res) {
+async function requireApiAuth(req, res, options = {}) {
+  const allowedRoles = Array.isArray(options.allowedRoles)
+    ? options.allowedRoles.map((role) => String(role).trim().toLowerCase()).filter(Boolean)
+    : null;
   const authHeader = String(req.headers.authorization || "");
   const match = /^Bearer\s+(.+)$/i.exec(authHeader);
 
@@ -192,6 +196,10 @@ async function requireApiAuth(req, res) {
     const email = resolveUserEmail(claims);
     const role = authorizedUsers.get(email);
     if (!email || !role) {
+      res.status(403).json({ error: "Forbidden." });
+      return null;
+    }
+    if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
       res.status(403).json({ error: "Forbidden." });
       return null;
     }
