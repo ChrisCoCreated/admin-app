@@ -5,6 +5,7 @@ function normalizeClient(client) {
   return {
     id: String(client.id || "").trim(),
     name: String(client.name || "").trim(),
+    area: String(client.area || "").trim(),
     address: String(client.address || "").trim(),
     town: String(client.town || "").trim(),
     county: String(client.county || "").trim(),
@@ -202,6 +203,7 @@ function mapGraphItemToClient(item) {
       "Line1",
       "Address_x0020_Line_x0020_1",
     ]) || inferAddressLikeValue();
+  const area = pickFieldValue(["Area", "Location", "Patch", "Zone"]);
   const town = pickFieldValue(["Town", "City", "Suburb", "Town_x0020_City"]);
   const county = pickFieldValue(["County", "Region", "State"]);
   const postcode = pickFieldValue([
@@ -216,6 +218,7 @@ function mapGraphItemToClient(item) {
   return normalizeClient({
     id: graphId,
     name,
+    area,
     address,
     town,
     county,

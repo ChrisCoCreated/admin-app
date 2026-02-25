@@ -311,6 +311,28 @@ dd {
   margin-top: 14px;
 }
 
+.area-filter-row {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.area-filter-btn {
+  border: 1px solid #cad5ea;
+  background: #f4f7fe;
+  color: #24314a;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-weight: 700;
+}
+
+.area-filter-btn.active {
+  background: #1f3c88;
+  color: #fff;
+  border-color: #1f3c88;
+}
+
 .client-search-results {
   list-style: none;
   margin: 10px 0 0;
@@ -336,7 +358,7 @@ dd {
 
 .client-result-info {
   display: grid;
-  gap: 3px;
+  gap: 5px;
 }
 
 .client-result-info span {

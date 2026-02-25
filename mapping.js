@@ -5,6 +5,7 @@ const signOutBtn = document.getElementById("signOutBtn");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
 const clientPostcodeInput = document.getElementById("clientPostcodeInput");
 const clientSearchInput = document.getElementById("clientSearchInput");
+const areaFilters = document.getElementById("areaFilters");
 const clientSearchResults = document.getElementById("clientSearchResults");
 const clientSearchStatus = document.getElementById("clientSearchStatus");
 const addClientBtn = document.getElementById("addClientBtn");
@@ -25,6 +26,7 @@ const CLIENTS_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/clients` : "/api/cl
 
 const clientPostcodes = [];
 let allClients = [];
+let selectedArea = "ALL";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -133,29 +135,37 @@ function addClientPostcodeFromInput() {
 function getClientLabel(client) {
   const name = String(client.name || "Unnamed");
   const id = String(client.id || "").trim();
-  const location = String(client.location || "").trim();
-  return [name, id && `#${id}`, location].filter(Boolean).join(" - ");
+  const area = getClientArea(client);
+  return [name, id && `#${id}`, area].filter(Boolean).join(" - ");
+}
+
+function getClientArea(client) {
+  return normalizeLocationQuery(client.area || client.location || "");
 }
 
 function getFilteredClients() {
   const query = normalizeText(clientSearchInput?.value);
-  if (!query) {
-    return allClients.slice(0, 8);
-  }
+  return allClients.filter((client) => {
+    const area = getClientArea(client) || "Unassigned";
+    const matchesArea = selectedArea === "ALL" || area === selectedArea;
+    if (!matchesArea) {
+      return false;
+    }
 
-  return allClients
-    .filter((client) => {
-      return (
-        normalizeText(client.name).includes(query) ||
-        normalizeText(client.id).includes(query) ||
-        normalizeText(client.location).includes(query) ||
-        normalizeText(client.postcode).includes(query) ||
-        normalizeText(client.address).includes(query) ||
-        normalizeText(client.town).includes(query) ||
-        normalizeText(client.county).includes(query)
-      );
-    })
-    .slice(0, 10);
+    if (!query) {
+      return true;
+    }
+
+    return (
+      normalizeText(client.name).includes(query) ||
+      normalizeText(client.id).includes(query) ||
+      normalizeText(getClientArea(client)).includes(query) ||
+      normalizeText(client.postcode).includes(query) ||
+      normalizeText(client.address).includes(query) ||
+      normalizeText(client.town).includes(query) ||
+      normalizeText(client.county).includes(query)
+    );
+  });
 }
 
 function buildClientAddress(client) {
@@ -168,6 +178,44 @@ function buildClientAddress(client) {
   }
 
   return normalizeLocationQuery(client.postcode || client.location || "");
+}
+
+function getAreaOptions() {
+  const set = new Set();
+  for (const client of allClients) {
+    const area = getClientArea(client) || "Unassigned";
+    set.add(area);
+  }
+  return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))];
+}
+
+function renderAreaFilters() {
+  if (!areaFilters) {
+    return;
+  }
+
+  areaFilters.innerHTML = "";
+  const options = getAreaOptions();
+  if (!options.length) {
+    return;
+  }
+
+  if (!options.includes(selectedArea)) {
+    selectedArea = "ALL";
+  }
+
+  for (const area of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `area-filter-btn${selectedArea === area ? " active" : ""}`;
+    btn.textContent = area === "ALL" ? "All Areas" : area;
+    btn.addEventListener("click", () => {
+      selectedArea = area;
+      renderAreaFilters();
+      renderClientSearchResults();
+    });
+    areaFilters.appendChild(btn);
+  }
 }
 
 function renderClientSearchResults() {
@@ -184,20 +232,18 @@ function renderClientSearchResults() {
     return;
   }
 
-  setClientSearchStatus(`Showing ${filtered.length} client(s).`);
+  const visible = filtered.slice(0, 3);
+  setClientSearchStatus(`Showing ${visible.length} of ${filtered.length} client(s).`);
 
-  for (const client of filtered) {
+  for (const client of visible) {
     const li = document.createElement("li");
     li.className = "client-result-row";
 
-    const postcode = normalizePostcode(client.postcode);
     const routeAddress = buildClientAddress(client);
     const info = document.createElement("div");
     info.className = "client-result-info";
     info.innerHTML = `
       <strong>${escapeHtml(String(client.name || "Unnamed client"))}</strong>
-      <span>${escapeHtml(String(client.id || "-"))} | ${escapeHtml(String(client.location || "-"))}</span>
-      <span>Postcode: ${escapeHtml(postcode || "Not available")}</span>
       <span>Route address: ${escapeHtml(routeAddress || "Not available")}</span>
     `;
 
@@ -353,6 +399,7 @@ async function init() {
     renderClientPostcodes();
     setClientSearchStatus("Loading clients...");
     allClients = await fetchClients();
+    renderAreaFilters();
     renderClientSearchResults();
   } catch (error) {
     console.error(error);
@@ -388,8 +435,10 @@ clearRunBtn?.addEventListener("click", () => {
   if (clientSearchInput) {
     clientSearchInput.value = "";
   }
+  selectedArea = "ALL";
   clientPostcodes.length = 0;
   renderClientPostcodes();
+  renderAreaFilters();
   renderClientSearchResults();
   hideRun();
   setStatus("Cleared.");
