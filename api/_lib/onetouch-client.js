@@ -35,10 +35,6 @@ function getRequiredEnv() {
   };
 }
 
-function getOneTouchAccount() {
-  return String(process.env.ONETOUCH_ACCOUNT || process.env.ONETOUCH_ACCOUNT_CODE || "").trim();
-}
-
 async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
@@ -111,13 +107,11 @@ async function getAccessToken() {
   tokenInFlight = (async () => {
     const { baseUrl, username, password } = getRequiredEnv();
     const loginUrl = `${baseUrl}/auth`;
-    const account = getOneTouchAccount();
 
     console.info("[OneTouch] Auth request", {
       url: loginUrl,
       usernameMasked: maskValue(username),
       hasPassword: Boolean(password),
-      account,
     });
 
     async function requestToken() {
@@ -147,7 +141,6 @@ async function getAccessToken() {
           status: response.status,
           detail,
           usernameMasked: maskValue(username),
-          account,
         });
         throw new Error(`OneTouch auth failed (${response.status}): ${detail}`);
       }
@@ -172,7 +165,6 @@ async function getAccessToken() {
       console.warn("[OneTouch] Auth retrying once after failure", {
         reason: firstError?.message || String(firstError),
         usernameMasked: maskValue(username),
-        account,
       });
       await new Promise((resolve) => setTimeout(resolve, 200));
       return requestToken().catch(() => {
@@ -188,14 +180,10 @@ async function getAccessToken() {
 
 async function callOneTouch(endpointPath, query = {}) {
   const { baseUrl } = getRequiredEnv();
-  const account = getOneTouchAccount();
   const accessToken = await getAccessToken();
 
   const endpoint = String(endpointPath || "").replace(/^\/+/, "");
   const url = new URL(`${baseUrl}/${endpoint}`);
-  if (account) {
-    url.searchParams.set("account", account);
-  }
   url.searchParams.set("access_token", accessToken);
 
   for (const [key, value] of Object.entries(query)) {

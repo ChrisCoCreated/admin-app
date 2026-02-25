@@ -237,13 +237,6 @@ function addClientStop(address, label = "") {
     return false;
   }
 
-  const key = compactLocationQuery(input);
-  const exists = selectedClientStops.some((stop) => compactLocationQuery(stop.address) === key);
-  if (exists) {
-    setStatus("Client stop already added.", true);
-    return false;
-  }
-
   selectedClientStops.push({
     label: normalizeLocationQuery(label),
     address: input,
@@ -611,7 +604,7 @@ function renderRun(run) {
   const legs = Array.isArray(run.legs) ? run.legs : [];
 
   runTotals.textContent = `Total distance: ${run.totalDistanceMiles || 0} mi | Total time: ${run.totalDurationText || "0 min"}`;
-  renderCost(run.cost || null);
+  renderCost(run);
 
   runOrderList.innerHTML = "";
   const startItem = document.createElement("li");
@@ -653,7 +646,30 @@ function renderRun(run) {
   runResults.hidden = false;
 }
 
-function renderCost(cost) {
+function calculateTravelPerHourMetrics(run) {
+  const cost = run?.cost || {};
+  const visitCount = Array.isArray(run?.orderedClients) ? run.orderedClients.length : 0;
+  const visitHours = (visitCount * getVisitDurationMinutes()) / 60;
+  if (!Number.isFinite(visitHours) || visitHours <= 0) {
+    return {
+      visitHours: 0,
+      exceptionalTravelPerHour: null,
+      totalTravelPerHour: null,
+    };
+  }
+
+  const exceptionalTotal = Number(cost.totals?.exceptionalHomeTotal || 0);
+  const totalTravel = Number(cost.totals?.grandTotal || 0);
+
+  return {
+    visitHours,
+    exceptionalTravelPerHour: exceptionalTotal / visitHours,
+    totalTravelPerHour: totalTravel / visitHours,
+  };
+}
+
+function renderCost(run) {
+  const cost = run?.cost || null;
   if (!runCostSummary || !runCostBreakdown) {
     return;
   }
@@ -675,6 +691,12 @@ function renderCost(cost) {
 
   const homeSeconds = Number(cost.homeTravel?.paidDurationSeconds || 0);
   const runSeconds = Number(cost.runTravel?.durationSeconds || 0);
+  const metrics = calculateTravelPerHourMetrics(run);
+  const visitHoursText = metrics.visitHours > 0 ? metrics.visitHours.toFixed(2) : "0.00";
+  const exceptionalPerHourText =
+    metrics.exceptionalTravelPerHour === null ? "n/a" : `£${metrics.exceptionalTravelPerHour.toFixed(2)}`;
+  const totalPerHourText =
+    metrics.totalTravelPerHour === null ? "n/a" : `£${metrics.totalTravelPerHour.toFixed(2)}`;
   runCostBreakdown.innerHTML = `
     <section class="cost-section">
       <h3>Exceptional Travel Costs from Home</h3>
@@ -682,6 +704,7 @@ function renderCost(cost) {
       <p>Time cost: £${Number(cost.components?.homeTimeCost || 0).toFixed(2)}</p>
       <p>Mileage cost: £${Number(cost.components?.homeMileageCost || 0).toFixed(2)}</p>
       <p class="cost-total">Exceptional Travel Total: £${Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2)}</p>
+      <p class="cost-metric">Exceptional Travel £/hour: ${exceptionalPerHourText}</p>
     </section>
     <section class="cost-section">
       <h3>Run Travel</h3>
@@ -693,6 +716,8 @@ function renderCost(cost) {
     <section class="cost-section grand">
       <h3>Grand Total</h3>
       <p class="cost-total">£${Number(cost.totals?.grandTotal || 0).toFixed(2)}</p>
+      <p>Total visit hours: ${visitHoursText} h</p>
+      <p class="cost-metric">Total Travel £/hour: ${totalPerHourText}</p>
     </section>
   `;
 }
@@ -730,6 +755,8 @@ function collectRunExportRecord(name) {
     .filter(Boolean)
     .join(" | ");
 
+  const travelPerHour = calculateTravelPerHourMetrics(run);
+
   return {
     savedAt: new Date().toISOString(),
     name,
@@ -744,6 +771,11 @@ function collectRunExportRecord(name) {
     exceptionalTravelTotal: Number(cost.totals?.exceptionalHomeTotal || 0).toFixed(2),
     runTravelTotal: Number(cost.totals?.runTravelTotal || 0).toFixed(2),
     grandTotal: Number(cost.totals?.grandTotal || 0).toFixed(2),
+    totalVisitHours: travelPerHour.visitHours.toFixed(2),
+    exceptionalTravelPerHour:
+      travelPerHour.exceptionalTravelPerHour === null ? "" : travelPerHour.exceptionalTravelPerHour.toFixed(2),
+    totalTravelPerHour:
+      travelPerHour.totalTravelPerHour === null ? "" : travelPerHour.totalTravelPerHour.toFixed(2),
     schedule: scheduleText,
   };
 }
@@ -788,6 +820,9 @@ function exportSavedRunsAsCsv() {
     "Exceptional Travel Total",
     "Run Travel Total",
     "Grand Total",
+    "Total Visit Hours",
+    "Exceptional Travel £/hour",
+    "Total Travel £/hour",
     "Schedule",
   ];
 
@@ -807,6 +842,9 @@ function exportSavedRunsAsCsv() {
       row.exceptionalTravelTotal,
       row.runTravelTotal,
       row.grandTotal,
+      row.totalVisitHours,
+      row.exceptionalTravelPerHour,
+      row.totalTravelPerHour,
       row.schedule,
     ];
     lines.push(values.map(escapeCsvValue).join(","));

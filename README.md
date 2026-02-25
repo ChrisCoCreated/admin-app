@@ -47,7 +47,6 @@ Set values in `frontend-config.js`:
 - `AZURE_TENANT_ID`
 - `AZURE_API_AUDIENCE` or `AZURE_API_CLIENT_ID`
 - `AZURE_REQUIRED_SCOPE` (default `client.read`)
-- `ONETOUCH_ACCOUNT` (or `ONETOUCH_ACCOUNT_CODE`)
 - `ONETOUCH_USERNAME`
 - `ONETOUCH_PASSWORD`
 

@@ -459,6 +459,11 @@ dd {
   font-weight: 800;
 }
 
+.cost-metric {
+  font-weight: 700;
+  color: #1f3b73;
+}
+
 .schedule-list {
   margin-top: 10px;
   display: grid;
