@@ -2,6 +2,7 @@ const { OVERLAY_FIELD_MAP, buildTaskKey, fromOverlayFields } = require("./unifie
 
 const OVERLAY_PAGE_SIZE = 200;
 const OVERLAY_CACHE_TTL_MS = 45 * 1000;
+const GRAPH_TASKS_DEBUG = process.env.GRAPH_TASKS_DEBUG === "1";
 
 const siteCache = {
   key: "",
@@ -13,6 +14,17 @@ const userOverlayCache = new Map();
 
 function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function logOverlayDebug(message, details) {
+  if (!GRAPH_TASKS_DEBUG) {
+    return;
+  }
+  if (details !== undefined) {
+    console.log(`[overlay-repo] ${message}`, details);
+    return;
+  }
+  console.log(`[overlay-repo] ${message}`);
 }
 
 function requireSharePointConfig() {
@@ -149,14 +161,51 @@ async function listOverlaysByUser(graphClient, userUpn) {
   });
 
   const initialUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
-  const items = await graphClient.fetchAllPages(initialUrl);
+  let items = [];
+
+  try {
+    items = await graphClient.fetchAllPages(initialUrl);
+  } catch (error) {
+    const code = String(error?.code || "").toLowerCase();
+    const isFilterSyntaxIssue =
+      Number(error?.status) === 400 && (code.includes("invalidrequest") || code.includes("badrequest"));
+
+    if (!isFilterSyntaxIssue) {
+      throw error;
+    }
+
+    // Fallback for Person/Group field filtering quirks in Graph list-item queries.
+    logOverlayDebug("UserUPN filtered query failed; falling back to in-memory user filter.", {
+      status: error?.status || 0,
+      code: error?.code || "",
+      message: error?.message || "",
+    });
+
+    const fallbackParams = new URLSearchParams({
+      $expand: `fields($select=${selectFields})`,
+      $top: String(OVERLAY_PAGE_SIZE),
+    });
+    const fallbackUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${fallbackParams.toString()}`;
+    items = await graphClient.fetchAllPages(fallbackUrl, { maxPages: 25 });
+  }
 
   const mapped = mapOverlays(items);
+  const normalizedUserUpn = String(userUpn || "").trim().toLowerCase();
+  const filteredOverlays = mapped.overlays.filter((overlay) => {
+    return String(overlay?.userUpn || "").trim().toLowerCase() === normalizedUserUpn;
+  });
+  const byKey = new Map();
+  for (const overlay of filteredOverlays) {
+    if (!byKey.has(overlay.key)) {
+      byKey.set(overlay.key, overlay);
+    }
+  }
+
   const value = {
     siteId,
     listId,
-    overlays: mapped.overlays,
-    byKey: mapped.byKey,
+    overlays: filteredOverlays,
+    byKey,
   };
 
   userOverlayCache.set(key, {

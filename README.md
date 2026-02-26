@@ -43,7 +43,7 @@ Set values in `frontend-config.js`:
 - `tenantId`
 - `spaClientId`
 - `apiScope` (example: `api://<api-app-id>/client.read`)
-- `graphTaskScopes` (default `Tasks.ReadWrite`, `Group.Read.All`, `Sites.ReadWrite.All`)
+- `graphTaskScopes` (default `User.Read`, `Tasks.ReadWrite`, `Group.Read.All`, `Sites.ReadWrite.All`)
 - `apiBaseUrl` (empty for same-origin)
 
 ## Required backend env vars
