@@ -47,16 +47,26 @@ function setPhotosStatus(message, isError = false) {
   photosStatus.classList.toggle("error", isError);
 }
 
-async function copyToClipboard(text) {
-  const value = String(text || "").trim();
+async function copyImageToClipboard(url) {
+  const value = String(url || "").trim();
   if (!value) {
-    throw new Error("No link available.");
+    throw new Error("No image available.");
   }
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    throw new Error("Clipboard image copy is unavailable in this browser.");
   }
-  throw new Error("Clipboard API unavailable.");
+
+  const response = await fetch(value, {
+    mode: "cors",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(`Image request failed (${response.status}).`);
+  }
+
+  const blob = await response.blob();
+  const mimeType = blob.type || "image/png";
+  await navigator.clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
 }
 
 function isVideoMedia(photo) {
@@ -94,9 +104,10 @@ function renderLightboxPhoto() {
   }
   const originalUrl = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "";
   if (lightboxCopyLinkBtn) {
-    lightboxCopyLinkBtn.dataset.url = originalUrl;
+    const copyUrl = photo.imageUrl || photo.mediaUrl || photo.attachmentUrl || "";
+    lightboxCopyLinkBtn.dataset.url = copyUrl;
     lightboxCopyLinkBtn.hidden = !originalUrl;
-    lightboxCopyLinkBtn.textContent = "Copy link";
+    lightboxCopyLinkBtn.textContent = "Copy image";
   }
 
   if (isVideoMedia(photo)) {
@@ -146,7 +157,7 @@ function closeLightbox() {
   if (lightboxCopyLinkBtn) {
     lightboxCopyLinkBtn.dataset.url = "";
     lightboxCopyLinkBtn.hidden = true;
-    lightboxCopyLinkBtn.textContent = "Copy link";
+    lightboxCopyLinkBtn.textContent = "Copy image";
   }
   if (copyLabelResetTimer) {
     clearTimeout(copyLabelResetTimer);
@@ -213,20 +224,20 @@ function renderPhotoGrid(photos) {
     const copyLinkBtn = document.createElement("button");
     copyLinkBtn.type = "button";
     copyLinkBtn.className = "marketing-photo-copy-link";
-    copyLinkBtn.textContent = "Copy link";
+    copyLinkBtn.textContent = "Copy image";
     copyLinkBtn.addEventListener("click", async (event) => {
       event.stopPropagation();
-      const sourceUrl = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "";
+      const sourceUrl = photo.imageUrl || photo.mediaUrl || photo.attachmentUrl || "";
       try {
-        await copyToClipboard(sourceUrl);
+        await copyImageToClipboard(sourceUrl);
         copyLinkBtn.textContent = "Copied";
         setTimeout(() => {
-          copyLinkBtn.textContent = "Copy link";
+          copyLinkBtn.textContent = "Copy image";
         }, 1400);
       } catch {
         copyLinkBtn.textContent = "Failed";
         setTimeout(() => {
-          copyLinkBtn.textContent = "Copy link";
+          copyLinkBtn.textContent = "Copy image";
         }, 1400);
       }
     });
@@ -324,7 +335,7 @@ lightboxNextBtn?.addEventListener("click", () => stepLightbox(1));
 lightboxCopyLinkBtn?.addEventListener("click", async () => {
   const sourceUrl = String(lightboxCopyLinkBtn.dataset.url || "").trim();
   try {
-    await copyToClipboard(sourceUrl);
+    await copyImageToClipboard(sourceUrl);
     lightboxCopyLinkBtn.textContent = "Copied";
   } catch {
     lightboxCopyLinkBtn.textContent = "Failed";
@@ -334,7 +345,7 @@ lightboxCopyLinkBtn?.addEventListener("click", async () => {
   }
   copyLabelResetTimer = setTimeout(() => {
     if (lightboxCopyLinkBtn) {
-      lightboxCopyLinkBtn.textContent = "Copy link";
+      lightboxCopyLinkBtn.textContent = "Copy image";
     }
   }, 1400);
 });
