@@ -4,6 +4,11 @@ const TODO_LISTS_PAGE_SIZE = 100;
 const TODO_TASKS_PAGE_SIZE = 200;
 const TODO_LIST_CONCURRENCY = 4;
 
+function isInvalidRequestError(error) {
+  const code = String(error?.code || "").toLowerCase();
+  return Number(error?.status) === 400 && code.includes("invalidrequest");
+}
+
 function mapLimit(items, concurrency, mapper) {
   return new Promise((resolve, reject) => {
     const results = new Array(items.length);
@@ -63,8 +68,18 @@ function normalizeTodoTask(task, listId) {
 }
 
 async function fetchTodoTasks(graphClient) {
-  const listsUrl = `https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName&$top=${TODO_LISTS_PAGE_SIZE}`;
-  const lists = await graphClient.fetchAllPages(listsUrl);
+  let lists = [];
+  try {
+    const listsUrl = `https://graph.microsoft.com/v1.0/me/todo/lists?$select=id,displayName&$top=${TODO_LISTS_PAGE_SIZE}`;
+    lists = await graphClient.fetchAllPages(listsUrl);
+  } catch (error) {
+    if (!isInvalidRequestError(error)) {
+      throw error;
+    }
+    // Some tenants/mailboxes reject selected field shape; retry with the broad endpoint.
+    const fallbackListsUrl = `https://graph.microsoft.com/v1.0/me/todo/lists?$top=${TODO_LISTS_PAGE_SIZE}`;
+    lists = await graphClient.fetchAllPages(fallbackListsUrl);
+  }
 
   const taskBatches = await mapLimit(lists, TODO_LIST_CONCURRENCY, async (list) => {
     const listId = String(list?.id || "").trim();
@@ -72,10 +87,21 @@ async function fetchTodoTasks(graphClient) {
       return [];
     }
 
-    const tasksUrl =
-      `https://graph.microsoft.com/v1.0/me/todo/lists/${encodeURIComponent(listId)}` +
-      `/tasks?$select=id,title,status,dueDateTime,completedDateTime,bodyLastModifiedDateTime,webLink&$top=${TODO_TASKS_PAGE_SIZE}`;
-    const tasks = await graphClient.fetchAllPages(tasksUrl);
+    let tasks = [];
+    try {
+      const tasksUrl =
+        `https://graph.microsoft.com/v1.0/me/todo/lists/${encodeURIComponent(listId)}` +
+        `/tasks?$select=id,title,status,dueDateTime,completedDateTime,bodyLastModifiedDateTime,webLink&$top=${TODO_TASKS_PAGE_SIZE}`;
+      tasks = await graphClient.fetchAllPages(tasksUrl);
+    } catch (error) {
+      if (!isInvalidRequestError(error)) {
+        throw error;
+      }
+      const fallbackTasksUrl =
+        `https://graph.microsoft.com/v1.0/me/todo/lists/${encodeURIComponent(listId)}` +
+        `/tasks?$top=${TODO_TASKS_PAGE_SIZE}`;
+      tasks = await graphClient.fetchAllPages(fallbackTasksUrl);
+    }
 
     return tasks
       .map((task) => normalizeTodoTask(task, listId))
