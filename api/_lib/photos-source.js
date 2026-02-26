@@ -103,9 +103,9 @@ async function resolveSiteId(token, hostName, sitePath) {
   return data.id;
 }
 
-async function resolveListId(token, siteId, listName) {
+async function resolveList(token, siteId, listName) {
   const params = new URLSearchParams({
-    $select: "id,displayName",
+    $select: "id,displayName,webUrl",
     $filter: `displayName eq ${quoteODataString(listName)}`,
     $top: "1",
   });
@@ -118,7 +118,10 @@ async function resolveListId(token, siteId, listName) {
     throw new Error(`Could not find SharePoint list '${listName}'.`);
   }
 
-  return list.id;
+  return {
+    id: list.id,
+    webUrl: String(list.webUrl || "").trim(),
+  };
 }
 
 async function resolveListColumns(token, siteId, listId) {
@@ -191,6 +194,10 @@ function extractFileNameWithExtension(value) {
 
 function extractKnownFileName(value) {
   return extractFileNameWithExtension(value) || extractFileName(value);
+}
+
+function hasKnownMediaExtension(name) {
+  return /\.(?:png|jpe?g|gif|webp|bmp|mp4|mov|webm)$/i.test(String(name || "").trim());
 }
 
 function inferMediaType(value) {
@@ -452,7 +459,7 @@ function pickAssetUrls(fields, hostName, mediaType) {
   };
 }
 
-function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
+function mapGraphItemToPhoto(item, hostName, listPathname) {
   const fields = item?.fields || {};
   const consent = pickClientConsent(fields);
 
@@ -480,12 +487,12 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
   const directMediaUrl = assetUrls.mediaUrl;
   let attachmentUrl = "";
   if (fallbackName) {
-    const encodedList = photosListName
+    const safeListPath = String(listPathname || "")
       .split("/")
-      .map((part) => encodeURIComponent(part))
+      .map((part) => encodeURIComponent(decodeURIComponent(part)))
       .join("/");
     const encodedFile = encodeURIComponent(fallbackName);
-    attachmentUrl = `https://${hostName}${sitePath}/Lists/${encodedList}/Attachments/${id}/${encodedFile}`;
+    attachmentUrl = `https://${hostName}${safeListPath}/Attachments/${id}/${encodedFile}`;
   }
 
   const mediaUrl =
@@ -544,16 +551,42 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
     attachmentUrl,
     mediaType,
     fileName: fallbackName || fileName || title,
+    needsAttachmentLookup: !hasKnownMediaExtension(fallbackName),
     consentValue: consent.consentValue,
     consented: consent.consented,
   };
+}
+
+async function resolveAttachmentUrlFromGraph(token, siteId, listId, itemId) {
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/driveItem/children?$select=name,webUrl`;
+  const data = await fetchJson(url, { headers: graphHeaders(token) });
+  const children = Array.isArray(data?.value) ? data.value : [];
+  for (const child of children) {
+    const name = String(child?.name || "").trim();
+    const webUrl = String(child?.webUrl || "").trim();
+    if (!webUrl) {
+      continue;
+    }
+    if (hasKnownMediaExtension(name) || hasKnownMediaExtension(webUrl)) {
+      return webUrl;
+    }
+  }
+  return "";
 }
 
 async function readMarketingPhotos() {
   const token = await getGraphAccessToken();
   const { hostName, sitePath, photosListName } = requireSharePointConfig();
   const siteId = await resolveSiteId(token, hostName, sitePath);
-  const listId = await resolveListId(token, siteId, photosListName);
+  const list = await resolveList(token, siteId, photosListName);
+  const listId = list.id;
+  const listPathname = (() => {
+    try {
+      return new URL(list.webUrl).pathname || `${sitePath}/Lists/${photosListName}`;
+    } catch {
+      return `${sitePath}/Lists/${photosListName}`;
+    }
+  })();
   const columns = await resolveListColumns(token, siteId, listId);
   const consentSelectFields = resolveConsentSelectFields(columns);
   const fieldSelect = [
@@ -572,6 +605,7 @@ async function readMarketingPhotos() {
 
   logMarketingDebug("list-field-select", {
     listId,
+    listPathname,
     selectedFields: fieldSelect,
     consentSelectFields,
   });
@@ -587,8 +621,20 @@ async function readMarketingPhotos() {
     totalItemsRead += items.length;
 
     for (const item of items) {
-      const photo = mapGraphItemToPhoto(item, hostName, sitePath, photosListName);
+      const photo = mapGraphItemToPhoto(item, hostName, listPathname);
       if (photo) {
+        if (photo.needsAttachmentLookup) {
+          const resolvedUrl = await resolveAttachmentUrlFromGraph(token, siteId, listId, photo.id);
+          if (resolvedUrl) {
+            photo.attachmentUrl = resolvedUrl;
+            if (!photo.imageUrl || !isImageUrl(photo.imageUrl)) {
+              photo.imageUrl = resolvedUrl;
+            }
+            photo.mediaUrl = resolvedUrl;
+            photo.fileName = extractFileName(resolvedUrl) || photo.fileName;
+          }
+        }
+        delete photo.needsAttachmentLookup;
         photos.push(photo);
       } else {
         skippedNoImage += 1;
