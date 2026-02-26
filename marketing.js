@@ -12,6 +12,7 @@ const lightboxEl = document.getElementById("photoLightbox");
 const lightboxImage = document.getElementById("lightboxImage");
 const lightboxVideo = document.getElementById("lightboxVideo");
 const lightboxCaption = document.getElementById("lightboxCaption");
+const lightboxOpenOriginalBtn = document.getElementById("lightboxOpenOriginalBtn");
 const lightboxCloseBtn = document.getElementById("lightboxCloseBtn");
 const lightboxPrevBtn = document.getElementById("lightboxPrevBtn");
 const lightboxNextBtn = document.getElementById("lightboxNextBtn");
@@ -78,6 +79,11 @@ function renderLightboxPhoto() {
   if (!photo) {
     return;
   }
+  const originalUrl = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "";
+  if (lightboxOpenOriginalBtn) {
+    lightboxOpenOriginalBtn.href = originalUrl || "#";
+    lightboxOpenOriginalBtn.hidden = !originalUrl;
+  }
 
   if (isVideoMedia(photo)) {
     attemptedVideoSources = new Set();
@@ -123,6 +129,10 @@ function closeLightbox() {
   lightboxVideo.pause();
   lightboxVideo.src = "";
   lightboxVideo.hidden = true;
+  if (lightboxOpenOriginalBtn) {
+    lightboxOpenOriginalBtn.href = "#";
+    lightboxOpenOriginalBtn.hidden = true;
+  }
   attemptedVideoSources = new Set();
   activePhotoIndex = -1;
   document.body.classList.remove("lightbox-open");
@@ -179,7 +189,20 @@ function renderPhotoGrid(photos) {
     caption.className = "marketing-photo-caption";
     caption.textContent = photo.client || photo.title || "Untitled";
 
-    button.append(media, caption);
+    const actions = document.createElement("div");
+    actions.className = "marketing-photo-actions";
+    const openOriginal = document.createElement("a");
+    openOriginal.className = "marketing-photo-open-original";
+    openOriginal.target = "_blank";
+    openOriginal.rel = "noopener noreferrer";
+    openOriginal.textContent = "Open original";
+    openOriginal.href = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "#";
+    openOriginal.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    actions.append(openOriginal);
+
+    button.append(media, caption, actions);
     button.addEventListener("click", () => openLightbox(index));
     fragment.append(button);
   }

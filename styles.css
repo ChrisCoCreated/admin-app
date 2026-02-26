@@ -365,6 +365,22 @@ dd {
   color: #1c2940;
 }
 
+.marketing-photo-actions {
+  padding: 0 10px 10px;
+}
+
+.marketing-photo-open-original {
+  display: inline-block;
+  text-decoration: none;
+  border: 1px solid #cad5ea;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1f3c88;
+  background: #f3f7ff;
+}
+
 body.lightbox-open {
   overflow: hidden;
 }
@@ -402,18 +418,26 @@ body.lightbox-open {
 }
 
 .photo-close-btn,
+.photo-open-original-btn,
 .photo-nav-btn {
   border: 1px solid rgba(255, 255, 255, 0.34);
   background: rgba(18, 23, 34, 0.72);
   color: #fff;
   border-radius: 999px;
   padding: 8px 12px;
+  text-decoration: none;
 }
 
 .photo-close-btn {
   grid-column: 1 / -1;
   grid-row: 1;
   justify-self: end;
+}
+
+.photo-open-original-btn {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-self: start;
 }
 
 .photo-nav-btn.prev {

@@ -104,25 +104,6 @@ function userCacheKey(userUpn) {
   return String(userUpn || "").trim().toLowerCase();
 }
 
-function pickOverlaySelectableFields() {
-  return [
-    OVERLAY_FIELD_MAP.userUpn,
-    OVERLAY_FIELD_MAP.provider,
-    OVERLAY_FIELD_MAP.externalTaskId,
-    OVERLAY_FIELD_MAP.workingStatus,
-    OVERLAY_FIELD_MAP.workType,
-    OVERLAY_FIELD_MAP.tags,
-    OVERLAY_FIELD_MAP.activeStartedAt,
-    OVERLAY_FIELD_MAP.lastWorkedAt,
-    OVERLAY_FIELD_MAP.energy,
-    OVERLAY_FIELD_MAP.effortMinutes,
-    OVERLAY_FIELD_MAP.impact,
-    OVERLAY_FIELD_MAP.overlayNotes,
-    OVERLAY_FIELD_MAP.pinned,
-    OVERLAY_FIELD_MAP.lastOverlayUpdatedAt,
-  ].join(",");
-}
-
 function mapOverlays(items) {
   const overlays = [];
   const byKey = new Map();
@@ -153,9 +134,8 @@ async function listOverlaysByUser(graphClient, userUpn) {
   }
 
   const { siteId, listId } = await resolveSiteAndListIds(graphClient);
-  const selectFields = pickOverlaySelectableFields();
   const params = new URLSearchParams({
-    $expand: `fields($select=${selectFields})`,
+    $expand: "fields",
     $filter: `fields/${OVERLAY_FIELD_MAP.userUpn} eq ${quoteODataString(userUpn)}`,
     $top: String(OVERLAY_PAGE_SIZE),
   });
@@ -182,7 +162,7 @@ async function listOverlaysByUser(graphClient, userUpn) {
     });
 
     const fallbackParams = new URLSearchParams({
-      $expand: `fields($select=${selectFields})`,
+      $expand: "fields",
       $top: String(OVERLAY_PAGE_SIZE),
     });
     const fallbackUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${fallbackParams.toString()}`;
