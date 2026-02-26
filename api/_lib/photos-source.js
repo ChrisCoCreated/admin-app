@@ -141,16 +141,50 @@ function extractLookupText(value) {
   if (typeof value === "string") {
     const parsed = parseMaybeJson(value);
     if (parsed && typeof parsed === "object") {
-      return (
-        String(parsed.lookupValue || parsed.LookupValue || parsed.value || parsed.Value || "").trim()
-      );
+      return String(
+        parsed.lookupValue ||
+          parsed.LookupValue ||
+          parsed.value ||
+          parsed.Value ||
+          parsed.label ||
+          parsed.Label ||
+          parsed.text ||
+          parsed.Text ||
+          ""
+      ).trim();
     }
     return value.trim();
   }
   if (typeof value === "object") {
-    return String(value.lookupValue || value.LookupValue || value.value || value.Value || "").trim();
+    return String(
+      value.lookupValue ||
+        value.LookupValue ||
+        value.value ||
+        value.Value ||
+        value.label ||
+        value.Label ||
+        value.text ||
+        value.Text ||
+        ""
+    ).trim();
   }
   return String(value).trim();
+}
+
+function lookupValueHasGiven(value) {
+  const text = extractLookupText(value);
+  if (!text) {
+    return false;
+  }
+  const normalized = normalizeToken(text);
+  if (normalized === "given") {
+    return true;
+  }
+  if (normalized.includes("given")) {
+    return true;
+  }
+  // Handles legacy SharePoint lookup serialization such as "1;#Given".
+  return /(?:^|[;#,\s])given(?:$|[;#,\s])/i.test(text);
 }
 
 function pickClientConsent(fields) {
@@ -170,38 +204,37 @@ function pickClientConsent(fields) {
     }
   }
 
-  const preferredTokens = [
+  const preferredTokens = new Set([
     "clientconsentformarketing",
     "clientx003aconsentx0020forx0020marketing",
-    "clientconsentformarketinglookup",
-    "clientconsentformarketingvalue",
-  ];
-  for (const preferred of preferredTokens) {
-    const found = tokenPairs.find(([token]) => token === preferred);
-    if (found) {
-      const consentValue = extractLookupText(found[1]);
-      const consentToken = normalizeToken(consentValue);
-      return {
-        consentValue,
-        consented: consentToken === "given" || consentToken.startsWith("given"),
-      };
-    }
-  }
-
+  ]);
+  const candidateValues = [];
   for (const [token, value] of tokenPairs) {
-    const isMarketingConsentLookup =
+    const isPreferred = preferredTokens.has(token);
+    const isMarketingConsentField =
       token.includes("client") &&
       token.includes("consent") &&
       token.includes("marketing") &&
       !token.endsWith("lookupid");
-    if (isMarketingConsentLookup) {
-      const consentValue = extractLookupText(value);
-      const consentToken = normalizeToken(consentValue);
+    if (isPreferred || isMarketingConsentField) {
+      candidateValues.push(value);
+    }
+  }
+
+  for (const value of candidateValues) {
+    if (lookupValueHasGiven(value)) {
       return {
-        consentValue,
-        consented: consentToken === "given" || consentToken.startsWith("given"),
+        consentValue: extractLookupText(value),
+        consented: true,
       };
     }
+  }
+
+  if (candidateValues.length > 0) {
+    return {
+      consentValue: extractLookupText(candidateValues[0]),
+      consented: false,
+    };
   }
 
   return {
