@@ -121,6 +121,41 @@ async function resolveListId(token, siteId, listName) {
   return list.id;
 }
 
+async function resolveListColumns(token, siteId, listId) {
+  const columns = [];
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName&$top=200`;
+
+  while (nextUrl) {
+    const data = await fetchJson(nextUrl, { headers: graphHeaders(token) });
+    const values = Array.isArray(data?.value) ? data.value : [];
+    columns.push(...values);
+    nextUrl = data?.["@odata.nextLink"] || "";
+  }
+
+  return columns;
+}
+
+function resolveConsentSelectFields(columns) {
+  const result = new Set();
+  for (const column of columns) {
+    const name = String(column?.name || "").trim();
+    const displayName = String(column?.displayName || "").trim();
+    if (!name) {
+      continue;
+    }
+
+    const nameToken = normalizeToken(name);
+    const displayToken = normalizeToken(displayName);
+    const isConsentMarketing =
+      (nameToken.includes("consent") && nameToken.includes("marketing")) ||
+      (displayToken.includes("consent") && displayToken.includes("marketing"));
+    if (isConsentMarketing) {
+      result.add(name);
+    }
+  }
+  return Array.from(result);
+}
+
 function toAbsoluteUrl(value, hostName) {
   const input = String(value || "").trim();
   if (!input) {
@@ -365,6 +400,7 @@ function mapGraphItemToPhoto(item, hostName) {
     title,
     client,
     fileName,
+    fieldKeys: Object.keys(fields),
     consentValue: consent.consentValue,
     consented: consent.consented,
     consentFields: consentDebugFields,
@@ -385,9 +421,30 @@ async function readMarketingPhotos() {
   const { hostName, sitePath, photosListName } = requireSharePointConfig();
   const siteId = await resolveSiteId(token, hostName, sitePath);
   const listId = await resolveListId(token, siteId, photosListName);
+  const columns = await resolveListColumns(token, siteId, listId);
+  const consentSelectFields = resolveConsentSelectFields(columns);
+  const fieldSelect = [
+    "ID",
+    "Title",
+    "Photo",
+    "Client",
+    "FileLeafRef",
+    "FileName",
+    ...consentSelectFields,
+  ];
+  const query = new URLSearchParams({
+    $expand: `fields($select=${fieldSelect.join(",")})`,
+    $top: "200",
+  });
+
+  logMarketingDebug("list-field-select", {
+    listId,
+    selectedFields: fieldSelect,
+    consentSelectFields,
+  });
 
   const photos = [];
-  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?$expand=fields&$top=200`;
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${query.toString()}`;
 
   while (nextUrl) {
     const data = await fetchJson(nextUrl, { headers: graphHeaders(token) });
