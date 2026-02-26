@@ -61,7 +61,7 @@ function normalizeTodoTask(task, listId) {
     completedDateTimeUtc,
     source: {
       rawId: String(task?.id || "").trim(),
-      webUrl: String(task?.webLink || "").trim() || undefined,
+      webUrl: undefined,
       etag: String(task?.["@odata.etag"] || "").trim() || undefined,
     },
   };
@@ -91,7 +91,7 @@ async function fetchTodoTasks(graphClient) {
     try {
       const tasksUrl =
         `https://graph.microsoft.com/v1.0/me/todo/lists/${encodeURIComponent(listId)}` +
-        `/tasks?$select=id,title,status,dueDateTime,completedDateTime,bodyLastModifiedDateTime,webLink&$top=${TODO_TASKS_PAGE_SIZE}`;
+        `/tasks?$select=id,title,status,dueDateTime,completedDateTime,bodyLastModifiedDateTime&$top=${TODO_TASKS_PAGE_SIZE}`;
       tasks = await graphClient.fetchAllPages(tasksUrl);
     } catch (error) {
       if (!isInvalidRequestError(error)) {

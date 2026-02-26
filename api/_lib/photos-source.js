@@ -189,6 +189,10 @@ function extractFileNameWithExtension(value) {
   return /\.(?:png|jpe?g|gif|webp|bmp|mp4|mov|webm)$/i.test(name) ? name : "";
 }
 
+function extractKnownFileName(value) {
+  return extractFileNameWithExtension(value) || extractFileName(value);
+}
+
 function inferMediaType(value) {
   const text = String(value || "").trim().toLowerCase();
   if (!text) {
@@ -460,11 +464,15 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
   const title = String(fields.Title || fields.Client || fields.ClientName || `Photo ${id}`).trim();
   const client = String(fields.Client || fields.ClientName || title).trim();
   const fileName = String(fields.FileLeafRef || fields.FileName || "").trim();
-  const fallbackName =
+  const fallbackNameWithExtension =
     extractFileNameWithExtension(fileName) ||
     extractFileNameWithExtension(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
-    extractFileNameWithExtension(fields.Photo) ||
-    extractFileNameWithExtension(title);
+    extractFileNameWithExtension(fields.Photo);
+  const fallbackName =
+    fallbackNameWithExtension ||
+    extractKnownFileName(fileName) ||
+    extractKnownFileName(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
+    extractKnownFileName(fields.Photo);
 
   const mediaType = inferMediaType(fallbackName || fileName || title);
   const assetUrls = pickAssetUrls(fields, hostName, mediaType);
@@ -482,7 +490,7 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
 
   const mediaUrl =
     mediaType === "video"
-      ? directMediaUrl || attachmentUrl || previewUrl
+      ? attachmentUrl || directMediaUrl || previewUrl
       : previewUrl || attachmentUrl || directMediaUrl;
   const imageUrl = previewUrl || attachmentUrl;
 
