@@ -24,11 +24,13 @@
 body {
   margin: 0;
   color: var(--ink);
+  min-height: 100vh;
   background:
     radial-gradient(1000px 500px at 100% -10%, rgba(49, 183, 200, 0.18), transparent 60%),
     radial-gradient(720px 420px at -10% 100%, rgba(201, 67, 155, 0.12), transparent 56%),
     var(--bg);
   background-repeat: no-repeat;
+  background-size: 100% 100%, 100% 100%, auto;
   font-family: "Manrope", "Segoe UI", Arial, sans-serif;
 }
 

@@ -4,6 +4,19 @@ function normalizeToken(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+const MARKETING_PHOTOS_DEBUG = process.env.MARKETING_PHOTOS_DEBUG === "1";
+
+function logMarketingDebug(message, details) {
+  if (!MARKETING_PHOTOS_DEBUG) {
+    return;
+  }
+  if (details !== undefined) {
+    console.log(`[marketing-photos] ${message}`, details);
+    return;
+  }
+  console.log(`[marketing-photos] ${message}`);
+}
+
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
   const text = await response.text();
@@ -138,6 +151,10 @@ function extractLookupText(value) {
   if (value === null || value === undefined) {
     return "";
   }
+  if (Array.isArray(value)) {
+    const firstText = value.map((entry) => extractLookupText(entry)).find((entry) => Boolean(entry));
+    return firstText || "";
+  }
   if (typeof value === "string") {
     const parsed = parseMaybeJson(value);
     if (parsed && typeof parsed === "object") {
@@ -156,6 +173,14 @@ function extractLookupText(value) {
     return value.trim();
   }
   if (typeof value === "object") {
+    if (Array.isArray(value.results)) {
+      const firstResult = value.results
+        .map((entry) => extractLookupText(entry))
+        .find((entry) => Boolean(entry));
+      if (firstResult) {
+        return firstResult;
+      }
+    }
     return String(
       value.lookupValue ||
         value.LookupValue ||
@@ -209,15 +234,21 @@ function pickClientConsent(fields) {
     "clientx003aconsentx0020forx0020marketing",
   ]);
   const candidateValues = [];
+  const fallbackConsentValues = [];
   for (const [token, value] of tokenPairs) {
     const isPreferred = preferredTokens.has(token);
-    const isMarketingConsentField =
+    const isClientMarketingConsentField =
       token.includes("client") &&
       token.includes("consent") &&
       token.includes("marketing") &&
       !token.endsWith("lookupid");
-    if (isPreferred || isMarketingConsentField) {
+    const isMarketingConsentField =
+      token.includes("consent") && token.includes("marketing") && !token.endsWith("lookupid");
+    if (isPreferred || isClientMarketingConsentField || isMarketingConsentField) {
       candidateValues.push(value);
+    }
+    if (token.includes("consent") && !token.endsWith("lookupid")) {
+      fallbackConsentValues.push(value);
     }
   }
 
@@ -233,6 +264,22 @@ function pickClientConsent(fields) {
   if (candidateValues.length > 0) {
     return {
       consentValue: extractLookupText(candidateValues[0]),
+      consented: false,
+    };
+  }
+
+  for (const value of fallbackConsentValues) {
+    if (lookupValueHasGiven(value)) {
+      return {
+        consentValue: extractLookupText(value),
+        consented: true,
+      };
+    }
+  }
+
+  if (fallbackConsentValues.length > 0) {
+    return {
+      consentValue: extractLookupText(fallbackConsentValues[0]),
       consented: false,
     };
   }
@@ -300,6 +347,28 @@ function mapGraphItemToPhoto(item, hostName) {
 
   const title = String(fields.Title || fields.Client || fields.ClientName || `Photo ${id}`).trim();
   const client = String(fields.Client || fields.ClientName || title).trim();
+  const fileName = String(fields.FileLeafRef || fields.FileName || "").trim();
+
+  const consentDebugFields = Object.entries(fields)
+    .filter(([key]) => {
+      const token = normalizeToken(key);
+      return token.includes("consent") && !token.endsWith("lookupid");
+    })
+    .map(([key, value]) => ({
+      key,
+      value: extractLookupText(value),
+      rawType: Array.isArray(value) ? "array" : typeof value,
+    }));
+
+  logMarketingDebug("parsed-photo-consent", {
+    id,
+    title,
+    client,
+    fileName,
+    consentValue: consent.consentValue,
+    consented: consent.consented,
+    consentFields: consentDebugFields,
+  });
 
   return {
     id,
