@@ -2,6 +2,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const GRAPH_TASKS_DEBUG = process.env.GRAPH_TASKS_DEBUG === "1";
+
+function logGraphTasksDebug(message, details) {
+  if (!GRAPH_TASKS_DEBUG) {
+    return;
+  }
+  if (details !== undefined) {
+    console.log(`[graph-tasks] ${message}`, details);
+    return;
+  }
+  console.log(`[graph-tasks] ${message}`);
+}
+
 function parseRetryAfter(retryAfterValue) {
   const value = String(retryAfterValue || "").trim();
   if (!value) {
@@ -79,6 +92,13 @@ async function fetchJsonWithRetry(url, token, options = {}) {
         body,
       });
     } catch (error) {
+      logGraphTasksDebug("Network failure when calling Graph.", {
+        method,
+        url,
+        attempt,
+        maxAttempts,
+        message: error?.message || String(error),
+      });
       lastError = error;
       if (attempt >= maxAttempts) {
         throw error;
@@ -96,6 +116,16 @@ async function fetchJsonWithRetry(url, token, options = {}) {
 
     const currentError = buildErrorFromResponse(response, payload, "GRAPH_REQUEST_FAILED");
     lastError = currentError;
+    logGraphTasksDebug("Graph request returned non-OK response.", {
+      method,
+      url,
+      status: response.status,
+      graphCode: currentError?.code || "",
+      graphMessage: currentError?.message || "",
+      attempt,
+      maxAttempts,
+      retryable: currentError.retryable,
+    });
 
     if (!(currentError.retryable && attempt < maxAttempts)) {
       throw currentError;

@@ -186,7 +186,7 @@ function extractFileNameWithExtension(value) {
   if (!name) {
     return "";
   }
-  return /\.[a-z0-9]{2,5}$/i.test(name) ? name : "";
+  return /\.(?:png|jpe?g|gif|webp|bmp|mp4|mov|webm)$/i.test(name) ? name : "";
 }
 
 function inferMediaType(value) {
@@ -355,45 +355,97 @@ function pickClientConsent(fields) {
   };
 }
 
-function pickImageUrl(fields, hostName) {
-  const values = Object.values(fields || {});
-  for (const value of values) {
-    if (!value) {
-      continue;
-    }
+function isVideoUrl(url) {
+  return /\.(mp4|mov|webm)(?:$|[?#])/i.test(String(url || ""));
+}
 
-    if (typeof value === "object" && !Array.isArray(value)) {
-      const objectUrl =
-        toAbsoluteUrl(value.url, hostName) ||
-        toAbsoluteUrl(value.nativeUrl, hostName) ||
-        toAbsoluteUrl(value.serverRelativeUrl, hostName) ||
-        toAbsoluteUrl(value.serverUrl, hostName);
-      if (objectUrl) {
-        return objectUrl;
-      }
-    }
+function isImageUrl(url) {
+  return /\.(png|jpe?g|gif|webp|bmp)(?:$|[?#])/i.test(String(url || ""));
+}
 
-    if (typeof value === "string") {
-      const parsed = parseMaybeJson(value);
-      if (parsed && typeof parsed === "object") {
-        const parsedUrl =
-          toAbsoluteUrl(parsed.url, hostName) ||
-          toAbsoluteUrl(parsed.nativeUrl, hostName) ||
-          toAbsoluteUrl(parsed.serverRelativeUrl, hostName) ||
-          toAbsoluteUrl(parsed.serverUrl, hostName);
-        if (parsedUrl) {
-          return parsedUrl;
-        }
-      }
+function isPreviewUrl(url) {
+  return /\/_layouts\/15\/getpreview/i.test(String(url || ""));
+}
 
-      const asUrl = toAbsoluteUrl(value, hostName);
-      if (asUrl) {
-        return asUrl;
-      }
+function collectUrlsFromValue(value, hostName) {
+  const urls = [];
+  const pushUrl = (candidate) => {
+    const absolute = toAbsoluteUrl(candidate, hostName);
+    if (absolute && !urls.includes(absolute)) {
+      urls.push(absolute);
     }
+  };
+
+  if (!value) {
+    return urls;
   }
 
-  return "";
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      for (const nested of collectUrlsFromValue(entry, hostName)) {
+        pushUrl(nested);
+      }
+    }
+    return urls;
+  }
+
+  if (typeof value === "object") {
+    pushUrl(value.url);
+    pushUrl(value.nativeUrl);
+    pushUrl(value.serverRelativeUrl);
+    pushUrl(value.serverUrl);
+    pushUrl(value.fileUrl);
+    pushUrl(value.src);
+    return urls;
+  }
+
+  if (typeof value === "string") {
+    const parsed = parseMaybeJson(value);
+    if (parsed && typeof parsed === "object") {
+      for (const nested of collectUrlsFromValue(parsed, hostName)) {
+        pushUrl(nested);
+      }
+    }
+    pushUrl(value);
+    return urls;
+  }
+
+  return urls;
+}
+
+function pickAssetUrls(fields, hostName, mediaType) {
+  const candidates = [];
+  const addCandidates = (value) => {
+    for (const url of collectUrlsFromValue(value, hostName)) {
+      if (!candidates.includes(url)) {
+        candidates.push(url);
+      }
+    }
+  };
+
+  addCandidates(fields?.Photo);
+  for (const value of Object.values(fields || {})) {
+    addCandidates(value);
+  }
+
+  const directVideoUrl = candidates.find((url) => isVideoUrl(url)) || "";
+  const imagePreviewUrl =
+    candidates.find((url) => isImageUrl(url) || isPreviewUrl(url)) || candidates[0] || "";
+  const nonPreviewUrl = candidates.find((url) => !isPreviewUrl(url)) || "";
+
+  if (mediaType === "video") {
+    return {
+      previewUrl: imagePreviewUrl,
+      mediaUrl: directVideoUrl || nonPreviewUrl || imagePreviewUrl,
+      directVideoUrl,
+    };
+  }
+
+  return {
+    previewUrl: imagePreviewUrl,
+    mediaUrl: nonPreviewUrl || imagePreviewUrl,
+    directVideoUrl: "",
+  };
 }
 
 function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
@@ -414,7 +466,10 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
     extractFileNameWithExtension(fields.Photo) ||
     extractFileNameWithExtension(title);
 
-  const previewUrl = pickImageUrl(fields, hostName);
+  const mediaType = inferMediaType(fallbackName || fileName || title);
+  const assetUrls = pickAssetUrls(fields, hostName, mediaType);
+  const previewUrl = assetUrls.previewUrl;
+  const directMediaUrl = assetUrls.mediaUrl;
   let attachmentUrl = "";
   if (fallbackName) {
     const encodedList = photosListName
@@ -425,8 +480,10 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
     attachmentUrl = `https://${hostName}${sitePath}/Lists/${encodedList}/Attachments/${id}/${encodedFile}`;
   }
 
-  const mediaType = inferMediaType(fallbackName || fileName || title || previewUrl);
-  const mediaUrl = mediaType === "video" ? attachmentUrl || previewUrl : previewUrl || attachmentUrl;
+  const mediaUrl =
+    mediaType === "video"
+      ? directMediaUrl || attachmentUrl || previewUrl
+      : previewUrl || attachmentUrl || directMediaUrl;
   const imageUrl = previewUrl || attachmentUrl;
 
   if (!imageUrl) {
@@ -437,6 +494,7 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
       fileName,
       fallbackName,
       previewUrl,
+      directMediaUrl,
       attachmentUrl,
       fieldKeys: Object.keys(fields),
     });
@@ -459,6 +517,10 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
     title,
     client,
     fileName,
+    mediaType,
+    imageUrl,
+    mediaUrl,
+    directMediaUrl: assetUrls.directVideoUrl,
     fieldKeys: Object.keys(fields),
     consentValue: consent.consentValue,
     consented: consent.consented,
@@ -471,6 +533,7 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
     client,
     imageUrl,
     mediaUrl,
+    attachmentUrl,
     mediaType,
     fileName: fallbackName || fileName || title,
     consentValue: consent.consentValue,

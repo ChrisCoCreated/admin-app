@@ -25,6 +25,7 @@ let allMarketingPhotos = [];
 let visibleMarketingPhotos = [];
 let consentFilterOn = false;
 let activePhotoIndex = -1;
+let attemptedVideoSources = new Set();
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -79,11 +80,13 @@ function renderLightboxPhoto() {
   }
 
   if (isVideoMedia(photo)) {
+    attemptedVideoSources = new Set();
     lightboxImage.hidden = true;
     lightboxImage.src = "";
     lightboxImage.alt = "";
     lightboxVideo.hidden = false;
     lightboxVideo.src = photo.mediaUrl || photo.imageUrl;
+    attemptedVideoSources.add(String(lightboxVideo.src || ""));
     lightboxVideo.load();
   } else {
     lightboxVideo.pause();
@@ -120,6 +123,7 @@ function closeLightbox() {
   lightboxVideo.pause();
   lightboxVideo.src = "";
   lightboxVideo.hidden = true;
+  attemptedVideoSources = new Set();
   activePhotoIndex = -1;
   document.body.classList.remove("lightbox-open");
 }
@@ -264,6 +268,22 @@ signOutBtn?.addEventListener("click", async () => {
 lightboxCloseBtn?.addEventListener("click", closeLightbox);
 lightboxPrevBtn?.addEventListener("click", () => stepLightbox(-1));
 lightboxNextBtn?.addEventListener("click", () => stepLightbox(1));
+lightboxVideo?.addEventListener("error", () => {
+  const photo = visibleMarketingPhotos[activePhotoIndex];
+  if (!photo || !isVideoMedia(photo)) {
+    return;
+  }
+  const candidates = [photo.mediaUrl, photo.attachmentUrl, photo.imageUrl]
+    .map((value) => String(value || "").trim())
+    .filter((value, index, array) => Boolean(value) && array.indexOf(value) === index);
+  const nextSource = candidates.find((candidate) => !attemptedVideoSources.has(candidate));
+  if (!nextSource) {
+    return;
+  }
+  attemptedVideoSources.add(nextSource);
+  lightboxVideo.src = nextSource;
+  lightboxVideo.load();
+});
 consentFilterBtn?.addEventListener("click", () => {
   consentFilterOn = !consentFilterOn;
   closeLightbox();

@@ -58,6 +58,16 @@ function setStatus(message, isError = false) {
   statusMessage.classList.toggle("error", isError);
 }
 
+function logTaskError(context, error) {
+  console.error(`[tasks-ui] ${context}`, {
+    status: error?.status,
+    code: error?.code,
+    retryable: error?.retryable,
+    correlationId: error?.correlationId,
+    detail: error?.detail || error?.message || String(error),
+  });
+}
+
 function formatDateTime(value) {
   if (!value) {
     return "-";
@@ -274,7 +284,7 @@ async function submitOverlayPatch(provider, externalTaskId, patch) {
     renderTasks();
     setStatus("Overlay updated.");
   } catch (error) {
-    console.error(error);
+    logTaskError("Overlay update failed", error);
     setStatus(error?.message || "Could not update overlay.", true);
   } finally {
     setBusy(false);
@@ -298,7 +308,7 @@ async function refreshTasks() {
     setStatus(`Loaded ${allTasks.length} task(s).`);
     renderTasks();
   } catch (error) {
-    console.error(error);
+    logTaskError("Unified task fetch failed", error);
     setStatus(error?.message || "Could not load unified tasks.", true);
     emptyState.hidden = false;
     tasksTableBody.innerHTML = "";
@@ -338,7 +348,7 @@ async function init() {
     renderTopNavigation({ role });
     await refreshTasks();
   } catch (error) {
-    console.error(error);
+    logTaskError("Tasks page init failed", error);
     setStatus(error?.message || "Could not initialize page.", true);
   } finally {
     document.body.classList.remove("auth-pending");

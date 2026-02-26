@@ -3,6 +3,7 @@ const authorizedUsersConfig = require("../../data/authorized-users.json");
 
 const openIdConfigCache = new Map();
 const jwksCache = new Map();
+const GRAPH_AUTH_DEBUG = process.env.GRAPH_AUTH_DEBUG === "1";
 const authorizedUsers = new Map(
   (Array.isArray(authorizedUsersConfig?.users) ? authorizedUsersConfig.users : [])
     .map((entry) => {
@@ -19,6 +20,17 @@ const authorizedUsers = new Map(
     })
     .filter(Boolean)
 );
+
+function logGraphAuthDebug(message, details) {
+  if (!GRAPH_AUTH_DEBUG) {
+    return;
+  }
+  if (details !== undefined) {
+    console.log(`[graph-auth] ${message}`, details);
+    return;
+  }
+  console.log(`[graph-auth] ${message}`);
+}
 
 function base64UrlDecode(input) {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -143,6 +155,13 @@ async function validateBearerToken(token) {
   }
 
   const { signingInput, header, payload, signature } = parseJwt(token);
+  logGraphAuthDebug("Validating delegated Graph token claims.", {
+    aud: payload?.aud || "",
+    iss: payload?.iss || "",
+    upn: payload?.upn || payload?.preferred_username || payload?.email || "",
+    scp: payload?.scp || "",
+    rolesCount: Array.isArray(payload?.roles) ? payload.roles.length : 0,
+  });
   if (header.alg !== "RS256") {
     throw new Error("Unsupported token algorithm.");
   }
@@ -174,6 +193,7 @@ async function requireGraphAuth(req, res, options = {}) {
   const match = /^Bearer\s+(.+)$/i.exec(authHeader);
 
   if (!match) {
+    logGraphAuthDebug("Authorization header missing bearer token.");
     res.status(401).json({
       error: { code: "UNAUTHORIZED", message: "Missing bearer token." },
     });
@@ -186,6 +206,9 @@ async function requireGraphAuth(req, res, options = {}) {
     const role = authorizedUsers.get(email);
 
     if (!email || !role) {
+      logGraphAuthDebug("Validated token belongs to unauthorized user.", {
+        email,
+      });
       res.status(403).json({
         error: { code: "FORBIDDEN", message: "Forbidden." },
       });
@@ -193,6 +216,11 @@ async function requireGraphAuth(req, res, options = {}) {
     }
 
     if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+      logGraphAuthDebug("Validated token user role not permitted for route.", {
+        email,
+        role,
+        allowedRoles,
+      });
       res.status(403).json({
         error: { code: "FORBIDDEN", message: "Forbidden." },
       });
@@ -207,9 +235,18 @@ async function requireGraphAuth(req, res, options = {}) {
     };
 
     return claims;
-  } catch {
+  } catch (error) {
+    logGraphAuthDebug("Delegated Graph token rejected.", {
+      reason: error?.message || String(error),
+      routeMethod: req?.method || "",
+    });
     res.status(401).json({
-      error: { code: "TOKEN_EXPIRED_OR_INVALID", message: "Unauthorized." },
+      error: {
+        code: "TOKEN_EXPIRED_OR_INVALID",
+        message: GRAPH_AUTH_DEBUG
+          ? `Unauthorized: ${error?.message || "Token validation failed."}`
+          : "Unauthorized.",
+      },
     });
     return null;
   }
