@@ -421,6 +421,20 @@ function collectUrlsFromValue(value, hostName) {
       urls.push(absolute);
     }
   };
+  const extractUrlsFromString = (raw) => {
+    const text = String(raw || "");
+    if (!text) {
+      return;
+    }
+    const absoluteMatches = text.match(/https?:\/\/[^\s"'<>]+/gi) || [];
+    for (const match of absoluteMatches) {
+      pushUrl(match);
+    }
+    const relativeMatches = text.match(/\/sites\/[^\s"'<>]+/gi) || [];
+    for (const match of relativeMatches) {
+      pushUrl(match);
+    }
+  };
 
   if (!value) {
     return urls;
@@ -452,11 +466,23 @@ function collectUrlsFromValue(value, hostName) {
         pushUrl(nested);
       }
     }
+    extractUrlsFromString(value);
     pushUrl(value);
     return urls;
   }
 
   return urls;
+}
+
+function extractKnownFileNameFromUrls(value, hostName) {
+  const urls = collectUrlsFromValue(value, hostName);
+  for (const url of urls) {
+    const name = extractKnownFileName(url);
+    if (name) {
+      return name;
+    }
+  }
+  return "";
 }
 
 function pickAssetUrls(fields, hostName, mediaType) {
@@ -515,6 +541,7 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
     extractKnownFileName(fileName) ||
     extractKnownFileName(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
     extractPhotoPayloadFileName(fields.Photo) ||
+    extractKnownFileNameFromUrls(fields.Photo, hostName) ||
     extractKnownFileName(fields.Photo);
 
   const mediaType = inferMediaType(fallbackName || fileName || title);
