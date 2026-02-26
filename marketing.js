@@ -45,8 +45,28 @@ function setPhotosStatus(message, isError = false) {
 }
 
 function isVideoMedia(photo) {
-  const source = String(photo?.imageUrl || photo?.title || "").toLowerCase();
+  const explicitType = String(photo?.mediaType || "").toLowerCase();
+  if (explicitType === "video") {
+    return true;
+  }
+  const source = String(photo?.mediaUrl || photo?.fileName || photo?.title || "").toLowerCase();
   return source.includes(".mp4") || source.includes(".mov") || source.includes(".webm");
+}
+
+function isLikelyImageUrl(url) {
+  const source = String(url || "").toLowerCase();
+  if (!source) {
+    return false;
+  }
+  return (
+    source.includes(".png") ||
+    source.includes(".jpg") ||
+    source.includes(".jpeg") ||
+    source.includes(".webp") ||
+    source.includes(".gif") ||
+    source.includes(".bmp") ||
+    source.includes("getpreview")
+  );
 }
 
 function renderLightboxPhoto() {
@@ -63,7 +83,7 @@ function renderLightboxPhoto() {
     lightboxImage.src = "";
     lightboxImage.alt = "";
     lightboxVideo.hidden = false;
-    lightboxVideo.src = photo.imageUrl;
+    lightboxVideo.src = photo.mediaUrl || photo.imageUrl;
     lightboxVideo.load();
   } else {
     lightboxVideo.pause();
@@ -133,15 +153,20 @@ function renderPhotoGrid(photos) {
     button.setAttribute("aria-label", `Open ${photo.client || photo.title}`);
 
     const mediaIsVideo = isVideoMedia(photo);
-    const media = mediaIsVideo ? document.createElement("video") : document.createElement("img");
-    media.src = photo.imageUrl;
-    media.className = "marketing-photo-image";
-    if (mediaIsVideo) {
+    const previewUrl = photo.imageUrl || photo.mediaUrl;
+    let media;
+    if (mediaIsVideo && !isLikelyImageUrl(previewUrl)) {
+      media = document.createElement("video");
+      media.src = photo.mediaUrl || previewUrl;
+      media.className = "marketing-photo-image";
       media.muted = true;
       media.playsInline = true;
       media.preload = "metadata";
       media.setAttribute("aria-label", photo.title || photo.client || "Client video");
     } else {
+      media = document.createElement("img");
+      media.src = previewUrl;
+      media.className = "marketing-photo-image";
       media.alt = photo.title || photo.client || "Client photo";
       media.loading = "lazy";
     }

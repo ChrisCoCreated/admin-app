@@ -181,6 +181,25 @@ function extractFileName(value) {
   return match ? match[1] : "";
 }
 
+function extractFileNameWithExtension(value) {
+  const name = extractFileName(value);
+  if (!name) {
+    return "";
+  }
+  return /\.[a-z0-9]{2,5}$/i.test(name) ? name : "";
+}
+
+function inferMediaType(value) {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) {
+    return "image";
+  }
+  if (text.includes(".mp4") || text.includes(".mov") || text.includes(".webm")) {
+    return "video";
+  }
+  return "image";
+}
+
 function parseMaybeJson(value) {
   const raw = String(value || "").trim();
   if (!raw || (!raw.startsWith("{") && !raw.startsWith("["))) {
@@ -390,20 +409,26 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
   const client = String(fields.Client || fields.ClientName || title).trim();
   const fileName = String(fields.FileLeafRef || fields.FileName || "").trim();
   const fallbackName =
-    extractFileName(fileName) ||
-    extractFileName(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
-    extractFileName(fields.Photo) ||
-    extractFileName(title);
+    extractFileNameWithExtension(fileName) ||
+    extractFileNameWithExtension(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
+    extractFileNameWithExtension(fields.Photo) ||
+    extractFileNameWithExtension(title);
 
-  let imageUrl = pickImageUrl(fields, hostName);
-  if (!imageUrl && fallbackName) {
+  const previewUrl = pickImageUrl(fields, hostName);
+  let attachmentUrl = "";
+  if (fallbackName) {
     const encodedList = photosListName
       .split("/")
       .map((part) => encodeURIComponent(part))
       .join("/");
     const encodedFile = encodeURIComponent(fallbackName);
-    imageUrl = `https://${hostName}${sitePath}/Lists/${encodedList}/Attachments/${id}/${encodedFile}`;
+    attachmentUrl = `https://${hostName}${sitePath}/Lists/${encodedList}/Attachments/${id}/${encodedFile}`;
   }
+
+  const mediaType = inferMediaType(fallbackName || fileName || title || previewUrl);
+  const mediaUrl = mediaType === "video" ? attachmentUrl || previewUrl : previewUrl || attachmentUrl;
+  const imageUrl = previewUrl || attachmentUrl;
+
   if (!imageUrl) {
     logMarketingDebug("skipped-photo-no-image-url", {
       id,
@@ -411,6 +436,8 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
       client,
       fileName,
       fallbackName,
+      previewUrl,
+      attachmentUrl,
       fieldKeys: Object.keys(fields),
     });
     return null;
@@ -443,6 +470,9 @@ function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
     title,
     client,
     imageUrl,
+    mediaUrl,
+    mediaType,
+    fileName: fallbackName || fileName || title,
     consentValue: consent.consentValue,
     consented: consent.consented,
   };

@@ -1,13 +1,14 @@
 const ROLE_PAGES = {
-  admin: ["clients", "carers", "mapping", "marketing"],
-  care_manager: ["clients", "carers", "mapping"],
-  operations: ["clients", "carers", "mapping"],
+  admin: ["clients", "carers", "tasks", "mapping", "marketing"],
+  care_manager: ["clients", "carers", "tasks", "mapping"],
+  operations: ["clients", "carers", "tasks", "mapping"],
   marketing: ["marketing"],
 };
 
 const PAGE_META = {
   clients: { href: "./clients.html", label: "Clients" },
   carers: { href: "./carers.html", label: "Carers" },
+  tasks: { href: "./tasks.html", label: "Tasks" },
   mapping: { href: "./mapping.html", label: "Time Mapping" },
   marketing: { href: "./marketing.html", label: "Marketing" },
 };
