@@ -83,12 +83,16 @@ async function getUnifiedTasks({ graphAccessToken, claims }) {
     overlaysPromise,
   ]);
 
-  const todoTasks = todoResult.ok ? todoResult.tasks : [];
+  const todoTasks = todoResult.ok
+    ? todoResult.tasks.filter((task) => task && task.isCompleted !== true)
+    : [];
   if (!todoResult.ok) {
     providerErrors.todo = toProviderError(todoResult.error);
   }
 
-  const plannerTasks = plannerResult.ok ? plannerResult.tasks : [];
+  const plannerTasks = plannerResult.ok
+    ? plannerResult.tasks.filter((task) => task && task.isCompleted !== true)
+    : [];
   if (!plannerResult.ok) {
     providerErrors.planner = toProviderError(plannerResult.error);
   }
