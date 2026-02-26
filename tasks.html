@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Tasks</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg" />
+    <link rel="alternate icon" href="./favicon.ico" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./tasks.html" aria-label="Tasks page">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container tasks-main">
+      <section class="hero compact">
+        <h1>Unified Tasks</h1>
+        <p>Microsoft To Do + Planner tasks with personal TaskOverlay metadata.</p>
+      </section>
+
+      <section class="panel">
+        <div class="task-toolbar">
+          <label class="field" for="searchInput">
+            Search
+            <input id="searchInput" type="search" placeholder="Search by title, provider or task id" autocomplete="off" />
+          </label>
+          <button id="refreshBtn" class="secondary" type="button">Refresh</button>
+        </div>
+        <p id="statusMessage" class="muted">Loading tasks...</p>
+        <p id="metaMessage" class="muted"></p>
+      </section>
+
+      <section class="clients-grid">
+        <article class="panel list-panel">
+          <h2>Task List</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Provider</th>
+                  <th>Title</th>
+                  <th>Due</th>
+                  <th>Done</th>
+                  <th>Work</th>
+                  <th>Pinned</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tasksTableBody"></tbody>
+            </table>
+          </div>
+          <p id="emptyState" class="muted" hidden>No tasks found.</p>
+        </article>
+
+        <article class="panel detail-panel">
+          <h2>Task Detail</h2>
+          <dl id="taskDetail" class="detail-list">
+            <div>
+              <dt>Provider</dt>
+              <dd data-field="provider">-</dd>
+            </div>
+            <div>
+              <dt>Title</dt>
+              <dd data-field="title">Select a task</dd>
+            </div>
+            <div>
+              <dt>Task ID</dt>
+              <dd data-field="taskId">-</dd>
+            </div>
+            <div>
+              <dt>Container</dt>
+              <dd data-field="containerId">-</dd>
+            </div>
+            <div>
+              <dt>Due</dt>
+              <dd data-field="due">-</dd>
+            </div>
+            <div>
+              <dt>Completed</dt>
+              <dd data-field="completed">-</dd>
+            </div>
+          </dl>
+
+          <h2 class="subheading">Overlay</h2>
+          <div class="overlay-form">
+            <label class="field" for="workingStatusSelect">
+              Working status
+              <select id="workingStatusSelect">
+                <option value="">-</option>
+                <option value="active">Active</option>
+                <option value="parked">Parked</option>
+              </select>
+            </label>
+            <label class="field" for="workTypeInput">
+              Work type
+              <input id="workTypeInput" type="text" placeholder="e.g. Deep work" />
+            </label>
+            <label class="field" for="tagsInput">
+              Tags (comma-separated)
+              <input id="tagsInput" type="text" placeholder="priority, admin" />
+            </label>
+            <label class="field" for="overlayNotesInput">
+              Notes
+              <textarea id="overlayNotesInput" rows="4" placeholder="Overlay notes"></textarea>
+            </label>
+            <label class="checkbox-row" for="pinnedInput">
+              <input id="pinnedInput" type="checkbox" />
+              Pinned
+            </label>
+            <div class="row wrap-row">
+              <button id="startBtn" type="button">Start working</button>
+              <button id="stopBtn" class="secondary" type="button">Stop working</button>
+              <button id="saveOverlayBtn" class="secondary" type="button">Save overlay</button>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./tasks.js"></script>
+  </body>
+</html>

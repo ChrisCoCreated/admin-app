@@ -7,6 +7,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Entra ID sign-in/sign-out (MSAL popup with redirect fallback)
 - Authenticated Clients page (`clients.html`)
 - Authenticated Carers page (`carers.html`)
+- Authenticated Tasks page (`tasks.html`) for unified To Do + Planner with overlay updates
 - Authenticated Time Mapping page (`mapping.html`) for run planning
 - Secure backend APIs:
   - `GET /api/clients` (original SharePoint/local clients list; used by Time Mapping)

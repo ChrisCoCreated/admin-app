@@ -168,13 +168,22 @@ button {
 }
 
 input[type="search"],
-input[type="text"] {
+input[type="text"],
+select,
+textarea {
   width: 100%;
   height: 44px;
   border-radius: 11px;
   border: 1px solid #c9d1e1;
   padding: 0 12px;
   background: #fdfefe;
+}
+
+textarea {
+  height: auto;
+  min-height: 96px;
+  padding: 10px 12px;
+  resize: vertical;
 }
 
 button {
@@ -425,6 +434,43 @@ body.lightbox-open {
   padding-bottom: 40px;
 }
 
+.tasks-main {
+  padding-bottom: 40px;
+}
+
+.task-toolbar {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.task-action-group {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.task-action-btn {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.overlay-form {
+  margin-top: 8px;
+  display: grid;
+  gap: 10px;
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
 .mapping-grid {
   display: grid;
   gap: 14px;
@@ -634,6 +680,10 @@ body.lightbox-open {
   }
 
   .mapping-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-toolbar {
     grid-template-columns: 1fr;
   }
 
