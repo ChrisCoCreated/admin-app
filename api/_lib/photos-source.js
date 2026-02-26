@@ -200,6 +200,41 @@ function hasKnownMediaExtension(name) {
   return /\.(?:png|jpe?g|gif|webp|bmp|mp4|mov|webm)$/i.test(String(name || "").trim());
 }
 
+function extractPhotoPayloadFileName(photoValue) {
+  if (!photoValue) {
+    return "";
+  }
+  const parseObject = (obj) => {
+    if (!obj || typeof obj !== "object") {
+      return "";
+    }
+    return (
+      extractKnownFileName(obj.fileName) ||
+      extractKnownFileName(obj.FileName) ||
+      extractKnownFileName(obj.name) ||
+      extractKnownFileName(obj.Name) ||
+      ""
+    );
+  };
+
+  if (typeof photoValue === "string") {
+    const parsed = parseMaybeJson(photoValue);
+    return parseObject(parsed);
+  }
+
+  if (Array.isArray(photoValue)) {
+    for (const entry of photoValue) {
+      const fileName = extractPhotoPayloadFileName(entry);
+      if (fileName) {
+        return fileName;
+      }
+    }
+    return "";
+  }
+
+  return parseObject(photoValue);
+}
+
 function inferMediaType(value) {
   const text = String(value || "").trim().toLowerCase();
   if (!text) {
@@ -479,6 +514,7 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
     fallbackNameWithExtension ||
     extractKnownFileName(fileName) ||
     extractKnownFileName(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
+    extractPhotoPayloadFileName(fields.Photo) ||
     extractKnownFileName(fields.Photo);
 
   const mediaType = inferMediaType(fallbackName || fileName || title);
@@ -558,18 +594,46 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
 }
 
 async function resolveAttachmentUrlFromGraph(token, siteId, listId, itemId) {
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/driveItem/children?$select=name,webUrl`;
-  const data = await fetchJson(url, { headers: graphHeaders(token) });
-  const children = Array.isArray(data?.value) ? data.value : [];
-  for (const child of children) {
-    const name = String(child?.name || "").trim();
-    const webUrl = String(child?.webUrl || "").trim();
-    if (!webUrl) {
-      continue;
+  try {
+    const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/attachments?$select=id,name,webUrl`;
+    const data = await fetchJson(url, { headers: graphHeaders(token) });
+    const attachments = Array.isArray(data?.value) ? data.value : [];
+    for (const attachment of attachments) {
+      const name = String(attachment?.name || "").trim();
+      const webUrl = String(attachment?.webUrl || "").trim();
+      if (!webUrl) {
+        continue;
+      }
+      if (hasKnownMediaExtension(name) || hasKnownMediaExtension(webUrl)) {
+        return webUrl;
+      }
     }
-    if (hasKnownMediaExtension(name) || hasKnownMediaExtension(webUrl)) {
-      return webUrl;
+  } catch (error) {
+    logMarketingDebug("attachment-endpoint-unavailable", {
+      itemId,
+      detail: error && error.message ? error.message : String(error),
+    });
+  }
+
+  try {
+    const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/driveItem/children?$select=name,webUrl`;
+    const data = await fetchJson(url, { headers: graphHeaders(token) });
+    const children = Array.isArray(data?.value) ? data.value : [];
+    for (const child of children) {
+      const name = String(child?.name || "").trim();
+      const webUrl = String(child?.webUrl || "").trim();
+      if (!webUrl) {
+        continue;
+      }
+      if (hasKnownMediaExtension(name) || hasKnownMediaExtension(webUrl)) {
+        return webUrl;
+      }
     }
+  } catch (error) {
+    logMarketingDebug("attachment-lookup-unavailable", {
+      itemId,
+      detail: error && error.message ? error.message : String(error),
+    });
   }
   return "";
 }
