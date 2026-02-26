@@ -64,6 +64,40 @@ async function getGraphAccessToken() {
   return payload.access_token;
 }
 
+async function getSharePointAccessToken(hostName) {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_API_CLIENT_ID;
+  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope: `https://${hostName}/.default`,
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  const payload = await response.json();
+  if (!response.ok || !payload?.access_token) {
+    const errorText = payload?.error_description || payload?.error || "Could not get SharePoint token.";
+    throw new Error(errorText);
+  }
+
+  return payload.access_token;
+}
+
 function requireSharePointConfig() {
   const siteUrlValue = process.env.SHAREPOINT_SITE_URL;
   if (!siteUrlValue) {
@@ -532,16 +566,18 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
   const title = String(fields.Title || fields.Client || fields.ClientName || `Photo ${id}`).trim();
   const client = String(fields.Client || fields.ClientName || title).trim();
   const fileName = String(fields.FileLeafRef || fields.FileName || "").trim();
+  const photoFieldFileName =
+    extractPhotoPayloadFileName(fields.Photo) || extractKnownFileNameFromUrls(fields.Photo, hostName);
   const fallbackNameWithExtension =
     extractFileNameWithExtension(fileName) ||
     extractFileNameWithExtension(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
+    extractFileNameWithExtension(photoFieldFileName) ||
     extractFileNameWithExtension(fields.Photo);
   const fallbackName =
     fallbackNameWithExtension ||
     extractKnownFileName(fileName) ||
     extractKnownFileName(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
-    extractPhotoPayloadFileName(fields.Photo) ||
-    extractKnownFileNameFromUrls(fields.Photo, hostName) ||
+    photoFieldFileName ||
     extractKnownFileName(fields.Photo);
 
   const mediaType = inferMediaType(fallbackName || fileName || title);
@@ -620,44 +656,47 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
   };
 }
 
-async function resolveAttachmentUrlFromGraph(token, siteId, listId, itemId) {
+async function resolveAttachmentUrlFromSharePointApi(
+  sharePointToken,
+  hostName,
+  sitePath,
+  listId,
+  itemId
+) {
   try {
-    const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/attachments?$select=id,name,webUrl`;
-    const data = await fetchJson(url, { headers: graphHeaders(token) });
-    const attachments = Array.isArray(data?.value) ? data.value : [];
-    for (const attachment of attachments) {
-      const name = String(attachment?.name || "").trim();
-      const webUrl = String(attachment?.webUrl || "").trim();
-      if (!webUrl) {
-        continue;
-      }
-      if (hasKnownMediaExtension(name) || hasKnownMediaExtension(webUrl)) {
-        return webUrl;
-      }
+    const safeListGuid = String(listId || "").trim().toUpperCase();
+    const safeItemId = Number(itemId);
+    if (!safeListGuid || !Number.isFinite(safeItemId)) {
+      return "";
     }
-  } catch (error) {
-    logMarketingDebug("attachment-endpoint-unavailable", {
-      itemId,
-      detail: error && error.message ? error.message : String(error),
-    });
-  }
 
-  try {
-    const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/driveItem/children?$select=name,webUrl`;
-    const data = await fetchJson(url, { headers: graphHeaders(token) });
-    const children = Array.isArray(data?.value) ? data.value : [];
-    for (const child of children) {
-      const name = String(child?.name || "").trim();
-      const webUrl = String(child?.webUrl || "").trim();
-      if (!webUrl) {
+    const url = `https://${hostName}${sitePath}/_api/web/lists(guid'${safeListGuid}')/items(${safeItemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
+    const data = await fetchJson(url, {
+      headers: {
+        Authorization: `Bearer ${sharePointToken}`,
+        Accept: "application/json;odata=nometadata",
+      },
+    });
+
+    const attachments = Array.isArray(data?.value)
+      ? data.value
+      : Array.isArray(data?.d?.results)
+        ? data.d.results
+        : [];
+
+    for (const attachment of attachments) {
+      const file = String(attachment?.FileName || attachment?.name || "").trim();
+      const rel =
+        String(attachment?.ServerRelativeUrl || attachment?.ServerRelativePath?.DecodedUrl || "").trim();
+      if (!rel) {
         continue;
       }
-      if (hasKnownMediaExtension(name) || hasKnownMediaExtension(webUrl)) {
-        return webUrl;
+      if (hasKnownMediaExtension(file) || hasKnownMediaExtension(rel)) {
+        return toAbsoluteUrl(rel, hostName);
       }
     }
   } catch (error) {
-    logMarketingDebug("attachment-lookup-unavailable", {
+    logMarketingDebug("attachment-api-unavailable", {
       itemId,
       detail: error && error.message ? error.message : String(error),
     });
@@ -704,6 +743,8 @@ async function readMarketingPhotos() {
   const photos = [];
   let totalItemsRead = 0;
   let skippedNoImage = 0;
+  let sharePointToken = "";
+  let sharePointTokenAttempted = false;
   let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${query.toString()}`;
 
   while (nextUrl) {
@@ -715,7 +756,26 @@ async function readMarketingPhotos() {
       const photo = mapGraphItemToPhoto(item, hostName, listPathname);
       if (photo) {
         if (photo.needsAttachmentLookup) {
-          const resolvedUrl = await resolveAttachmentUrlFromGraph(token, siteId, listId, photo.id);
+          if (!sharePointTokenAttempted) {
+            sharePointTokenAttempted = true;
+            try {
+              sharePointToken = await getSharePointAccessToken(hostName);
+            } catch (error) {
+              logMarketingDebug("sharepoint-token-unavailable", {
+                detail: error && error.message ? error.message : String(error),
+              });
+            }
+          }
+
+          const resolvedUrl = sharePointToken
+            ? await resolveAttachmentUrlFromSharePointApi(
+                sharePointToken,
+                hostName,
+                sitePath,
+                listId,
+                photo.id
+              )
+            : "";
           if (resolvedUrl) {
             photo.attachmentUrl = resolvedUrl;
             if (!photo.imageUrl || !isImageUrl(photo.imageUrl)) {
