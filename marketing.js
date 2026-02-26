@@ -58,7 +58,13 @@ async function copyImageToClipboard(url) {
 
   const proxyUrl = new URL("/api/marketing/media", window.location.origin);
   proxyUrl.searchParams.set("url", value);
-  const response = await fetch(proxyUrl.toString());
+  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
+  const response = await fetch(proxyUrl.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
   if (!response.ok) {
     throw new Error(`Image request failed (${response.status}).`);
   }
