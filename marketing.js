@@ -56,16 +56,25 @@ async function copyImageToClipboard(url) {
     throw new Error("Clipboard image copy is unavailable in this browser.");
   }
 
-  const response = await fetch(value, {
-    mode: "cors",
-    credentials: "include",
-  });
+  const proxyUrl = new URL("/api/marketing/media", window.location.origin);
+  proxyUrl.searchParams.set("url", value);
+  const response = await fetch(proxyUrl.toString());
   if (!response.ok) {
     throw new Error(`Image request failed (${response.status}).`);
   }
 
-  const blob = await response.blob();
-  const mimeType = blob.type || "image/png";
+  const payload = await response.json();
+  const mimeType = String(payload?.mimeType || "image/png");
+  const dataBase64 = String(payload?.dataBase64 || "");
+  if (!dataBase64) {
+    throw new Error("Image payload missing.");
+  }
+  const binary = atob(dataBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const blob = new Blob([bytes], { type: mimeType });
   await navigator.clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
 }
 
