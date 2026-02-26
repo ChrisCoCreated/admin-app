@@ -12,7 +12,7 @@ const lightboxEl = document.getElementById("photoLightbox");
 const lightboxImage = document.getElementById("lightboxImage");
 const lightboxVideo = document.getElementById("lightboxVideo");
 const lightboxCaption = document.getElementById("lightboxCaption");
-const lightboxOpenOriginalBtn = document.getElementById("lightboxOpenOriginalBtn");
+const lightboxCopyLinkBtn = document.getElementById("lightboxCopyLinkBtn");
 const lightboxCloseBtn = document.getElementById("lightboxCloseBtn");
 const lightboxPrevBtn = document.getElementById("lightboxPrevBtn");
 const lightboxNextBtn = document.getElementById("lightboxNextBtn");
@@ -27,6 +27,7 @@ let visibleMarketingPhotos = [];
 let consentFilterOn = false;
 let activePhotoIndex = -1;
 let attemptedVideoSources = new Set();
+let copyLabelResetTimer = null;
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -44,6 +45,18 @@ function setPhotosStatus(message, isError = false) {
   }
   photosStatus.textContent = message;
   photosStatus.classList.toggle("error", isError);
+}
+
+async function copyToClipboard(text) {
+  const value = String(text || "").trim();
+  if (!value) {
+    throw new Error("No link available.");
+  }
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  throw new Error("Clipboard API unavailable.");
 }
 
 function isVideoMedia(photo) {
@@ -80,9 +93,10 @@ function renderLightboxPhoto() {
     return;
   }
   const originalUrl = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "";
-  if (lightboxOpenOriginalBtn) {
-    lightboxOpenOriginalBtn.href = originalUrl || "#";
-    lightboxOpenOriginalBtn.hidden = !originalUrl;
+  if (lightboxCopyLinkBtn) {
+    lightboxCopyLinkBtn.dataset.url = originalUrl;
+    lightboxCopyLinkBtn.hidden = !originalUrl;
+    lightboxCopyLinkBtn.textContent = "Copy link";
   }
 
   if (isVideoMedia(photo)) {
@@ -129,9 +143,14 @@ function closeLightbox() {
   lightboxVideo.pause();
   lightboxVideo.src = "";
   lightboxVideo.hidden = true;
-  if (lightboxOpenOriginalBtn) {
-    lightboxOpenOriginalBtn.href = "#";
-    lightboxOpenOriginalBtn.hidden = true;
+  if (lightboxCopyLinkBtn) {
+    lightboxCopyLinkBtn.dataset.url = "";
+    lightboxCopyLinkBtn.hidden = true;
+    lightboxCopyLinkBtn.textContent = "Copy link";
+  }
+  if (copyLabelResetTimer) {
+    clearTimeout(copyLabelResetTimer);
+    copyLabelResetTimer = null;
   }
   attemptedVideoSources = new Set();
   activePhotoIndex = -1;
@@ -191,16 +210,27 @@ function renderPhotoGrid(photos) {
 
     const actions = document.createElement("div");
     actions.className = "marketing-photo-actions";
-    const openOriginal = document.createElement("a");
-    openOriginal.className = "marketing-photo-open-original";
-    openOriginal.target = "_blank";
-    openOriginal.rel = "noopener noreferrer";
-    openOriginal.textContent = "Open original";
-    openOriginal.href = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "#";
-    openOriginal.addEventListener("click", (event) => {
+    const copyLinkBtn = document.createElement("button");
+    copyLinkBtn.type = "button";
+    copyLinkBtn.className = "marketing-photo-copy-link";
+    copyLinkBtn.textContent = "Copy link";
+    copyLinkBtn.addEventListener("click", async (event) => {
       event.stopPropagation();
+      const sourceUrl = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "";
+      try {
+        await copyToClipboard(sourceUrl);
+        copyLinkBtn.textContent = "Copied";
+        setTimeout(() => {
+          copyLinkBtn.textContent = "Copy link";
+        }, 1400);
+      } catch {
+        copyLinkBtn.textContent = "Failed";
+        setTimeout(() => {
+          copyLinkBtn.textContent = "Copy link";
+        }, 1400);
+      }
     });
-    actions.append(openOriginal);
+    actions.append(copyLinkBtn);
 
     button.append(media, caption, actions);
     button.addEventListener("click", () => openLightbox(index));
@@ -291,6 +321,23 @@ signOutBtn?.addEventListener("click", async () => {
 lightboxCloseBtn?.addEventListener("click", closeLightbox);
 lightboxPrevBtn?.addEventListener("click", () => stepLightbox(-1));
 lightboxNextBtn?.addEventListener("click", () => stepLightbox(1));
+lightboxCopyLinkBtn?.addEventListener("click", async () => {
+  const sourceUrl = String(lightboxCopyLinkBtn.dataset.url || "").trim();
+  try {
+    await copyToClipboard(sourceUrl);
+    lightboxCopyLinkBtn.textContent = "Copied";
+  } catch {
+    lightboxCopyLinkBtn.textContent = "Failed";
+  }
+  if (copyLabelResetTimer) {
+    clearTimeout(copyLabelResetTimer);
+  }
+  copyLabelResetTimer = setTimeout(() => {
+    if (lightboxCopyLinkBtn) {
+      lightboxCopyLinkBtn.textContent = "Copy link";
+    }
+  }, 1400);
+});
 lightboxVideo?.addEventListener("error", () => {
   const photo = visibleMarketingPhotos[activePhotoIndex];
   if (!photo || !isVideoMedia(photo)) {
