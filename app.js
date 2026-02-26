@@ -1,6 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
+import { canAccessPage } from "./navigation.js";
 
 const signInBtn = document.getElementById("signInBtn");
 const authState = document.getElementById("authState");
@@ -37,11 +38,15 @@ async function fetchCurrentUser() {
 async function routeToRoleHome() {
   const profile = await fetchCurrentUser();
   const role = String(profile?.role || "").trim().toLowerCase();
-  if (role === "marketing") {
+  if (canAccessPage(role, "marketing") && !canAccessPage(role, "clients")) {
     window.location.href = "./marketing.html";
     return;
   }
-  window.location.href = "./clients.html";
+  if (canAccessPage(role, "clients")) {
+    window.location.href = "./clients.html";
+    return;
+  }
+  window.location.href = "./unauthorized.html";
 }
 
 async function init() {
@@ -55,6 +60,10 @@ async function init() {
     }
     await routeToRoleHome();
   } catch (error) {
+    if (error?.status === 403) {
+      window.location.href = "./unauthorized.html";
+      return;
+    }
     console.error(error);
     setStatus(error?.message || "Could not initialize authentication.", true);
     authCard.hidden = false;

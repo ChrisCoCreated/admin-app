@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { renderTopNavigation } from "./navigation.js";
+import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
@@ -39,6 +39,11 @@ const authController = createAuthController({
 });
 
 const directoryApi = createDirectoryApi(authController);
+
+function redirectToUnauthorized(pageKey) {
+  const page = encodeURIComponent(String(pageKey || "clients").trim().toLowerCase());
+  window.location.href = `./unauthorized.html?page=${page}`;
+}
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -171,8 +176,8 @@ async function init() {
 
     const profile = await directoryApi.getCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
-    if (role === "marketing") {
-      window.location.href = "./marketing.html";
+    if (!canAccessPage(role, "clients")) {
+      redirectToUnauthorized("clients");
       return;
     }
     renderTopNavigation({ role });
@@ -188,6 +193,10 @@ async function init() {
     setStatus(`Loaded ${allClients.length} client(s).`);
     renderClients();
   } catch (error) {
+    if (error?.status === 403) {
+      redirectToUnauthorized("clients");
+      return;
+    }
     console.error(error);
     setStatus(error?.message || "Could not load clients.", true);
     emptyState.hidden = false;

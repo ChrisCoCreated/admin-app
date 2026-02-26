@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { renderTopNavigation } from "./navigation.js";
+import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
@@ -75,6 +75,11 @@ function normalizeText(value) {
 function setStatus(message, isError = false) {
   mappingStatus.textContent = message;
   mappingStatus.classList.toggle("error", isError);
+}
+
+function redirectToUnauthorized(pageKey) {
+  const page = encodeURIComponent(String(pageKey || "mapping").trim().toLowerCase());
+  window.location.href = `./unauthorized.html?page=${page}`;
 }
 
 function setBusy(isBusy) {
@@ -922,6 +927,10 @@ async function calculateRun() {
 
     const data = await response.json();
     if (!response.ok) {
+      if (response.status === 403) {
+        redirectToUnauthorized("mapping");
+        return;
+      }
       throw new Error(data?.detail || data?.error || `Run request failed (${response.status}).`);
     }
 
@@ -945,8 +954,8 @@ async function init() {
 
     const profile = await directoryApi.getCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
-    if (role === "marketing") {
-      window.location.href = "./marketing.html";
+    if (!canAccessPage(role, "mapping")) {
+      redirectToUnauthorized("mapping");
       return;
     }
     renderTopNavigation({ role });
@@ -962,6 +971,10 @@ async function init() {
     renderAreaFilters();
     renderClientSearchResults();
   } catch (error) {
+    if (error?.status === 403) {
+      redirectToUnauthorized("mapping");
+      return;
+    }
     console.error(error);
     setStatus(error?.message || "Could not initialize authentication.", true);
     setClientSearchStatus(error?.message || "Could not load clients.", true);

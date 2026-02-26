@@ -27,6 +27,10 @@ export function getAccessiblePages(role) {
   return Array.isArray(pages) ? pages : [];
 }
 
+export function canAccessPage(role, pageKey) {
+  return getAccessiblePages(role).includes(String(pageKey || "").trim().toLowerCase());
+}
+
 export function renderTopNavigation({ role, currentPathname = window.location.pathname } = {}) {
   const nav = document.getElementById("primaryNav");
   if (!nav) {

@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { renderTopNavigation } from "./navigation.js";
+import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
@@ -28,6 +28,11 @@ let activePhotoIndex = -1;
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
+}
+
+function redirectToUnauthorized(pageKey) {
+  const page = encodeURIComponent(String(pageKey || "marketing").trim().toLowerCase());
+  window.location.href = `./unauthorized.html?page=${page}`;
 }
 
 function setPhotosStatus(message, isError = false) {
@@ -169,8 +174,8 @@ async function init() {
     const profile = await fetchCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
 
-    if (role !== "marketing" && role !== "admin") {
-      window.location.href = "./clients.html";
+    if (!canAccessPage(role, "marketing")) {
+      redirectToUnauthorized("marketing");
       return;
     }
     renderTopNavigation({ role });
@@ -179,6 +184,10 @@ async function init() {
     setStatus(email ? `Signed in as ${email}` : "Signed in");
     await loadPhotos();
   } catch (error) {
+    if (error?.status === 403) {
+      redirectToUnauthorized("marketing");
+      return;
+    }
     console.error(error);
     setStatus(error?.message || "Could not initialize authentication.", true);
     setPhotosStatus(error?.message || "Could not load marketing photos.", true);

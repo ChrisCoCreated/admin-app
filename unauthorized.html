@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Access Denied</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg" />
+    <link rel="alternate icon" href="./favicon.ico" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <h1>Access denied</h1>
+        <p id="deniedMessage" class="muted">You do not have permission to view this page.</p>
+      </section>
+
+      <section class="panel">
+        <p class="muted">If this is unexpected, ask an admin to update your role in the allowlist.</p>
+        <div class="row">
+          <a class="button-link" href="./index.html">Back to sign-in</a>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./unauthorized.js"></script>
+  </body>
+</html>

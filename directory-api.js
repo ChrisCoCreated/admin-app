@@ -28,7 +28,10 @@ async function parseError(response, fallbackLabel) {
   }
 
   const detail = payload?.detail || payload?.error || text || "Unknown error";
-  throw new Error(`${fallbackLabel} (${response.status}): ${detail}`);
+  const error = new Error(`${fallbackLabel} (${response.status}): ${detail}`);
+  error.status = response.status;
+  error.detail = detail;
+  throw error;
 }
 
 export function createDirectoryApi(authController) {
