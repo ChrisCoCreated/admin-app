@@ -10,6 +10,7 @@ const photosGrid = document.getElementById("photosGrid");
 const consentFilterBtn = document.getElementById("consentFilterBtn");
 const lightboxEl = document.getElementById("photoLightbox");
 const lightboxImage = document.getElementById("lightboxImage");
+const lightboxVideo = document.getElementById("lightboxVideo");
 const lightboxCaption = document.getElementById("lightboxCaption");
 const lightboxCloseBtn = document.getElementById("lightboxCloseBtn");
 const lightboxPrevBtn = document.getElementById("lightboxPrevBtn");
@@ -43,8 +44,13 @@ function setPhotosStatus(message, isError = false) {
   photosStatus.classList.toggle("error", isError);
 }
 
+function isVideoMedia(photo) {
+  const source = String(photo?.imageUrl || photo?.title || "").toLowerCase();
+  return source.includes(".mp4") || source.includes(".mov") || source.includes(".webm");
+}
+
 function renderLightboxPhoto() {
-  if (!lightboxImage || !lightboxCaption || !lightboxPrevBtn || !lightboxNextBtn) {
+  if (!lightboxImage || !lightboxVideo || !lightboxCaption || !lightboxPrevBtn || !lightboxNextBtn) {
     return;
   }
   const photo = visibleMarketingPhotos[activePhotoIndex];
@@ -52,8 +58,21 @@ function renderLightboxPhoto() {
     return;
   }
 
-  lightboxImage.src = photo.imageUrl;
-  lightboxImage.alt = photo.title || photo.client || "Client photo";
+  if (isVideoMedia(photo)) {
+    lightboxImage.hidden = true;
+    lightboxImage.src = "";
+    lightboxImage.alt = "";
+    lightboxVideo.hidden = false;
+    lightboxVideo.src = photo.imageUrl;
+    lightboxVideo.load();
+  } else {
+    lightboxVideo.pause();
+    lightboxVideo.src = "";
+    lightboxVideo.hidden = true;
+    lightboxImage.hidden = false;
+    lightboxImage.src = photo.imageUrl;
+    lightboxImage.alt = photo.title || photo.client || "Client photo";
+  }
   lightboxCaption.textContent = `${photo.client || photo.title}${photo.title && photo.client !== photo.title ? ` - ${photo.title}` : ""}`;
   const canNavigate = visibleMarketingPhotos.length > 1;
   lightboxPrevBtn.disabled = !canNavigate;
@@ -71,12 +90,16 @@ function openLightbox(index) {
 }
 
 function closeLightbox() {
-  if (!lightboxEl || !lightboxImage) {
+  if (!lightboxEl || !lightboxImage || !lightboxVideo) {
     return;
   }
   lightboxEl.hidden = true;
   lightboxImage.src = "";
   lightboxImage.alt = "";
+  lightboxImage.hidden = false;
+  lightboxVideo.pause();
+  lightboxVideo.src = "";
+  lightboxVideo.hidden = true;
   activePhotoIndex = -1;
   document.body.classList.remove("lightbox-open");
 }
@@ -109,17 +132,25 @@ function renderPhotoGrid(photos) {
     button.className = "marketing-photo-card";
     button.setAttribute("aria-label", `Open ${photo.client || photo.title}`);
 
-    const image = document.createElement("img");
-    image.src = photo.imageUrl;
-    image.alt = photo.title || photo.client || "Client photo";
-    image.loading = "lazy";
-    image.className = "marketing-photo-image";
+    const mediaIsVideo = isVideoMedia(photo);
+    const media = mediaIsVideo ? document.createElement("video") : document.createElement("img");
+    media.src = photo.imageUrl;
+    media.className = "marketing-photo-image";
+    if (mediaIsVideo) {
+      media.muted = true;
+      media.playsInline = true;
+      media.preload = "metadata";
+      media.setAttribute("aria-label", photo.title || photo.client || "Client video");
+    } else {
+      media.alt = photo.title || photo.client || "Client photo";
+      media.loading = "lazy";
+    }
 
     const caption = document.createElement("span");
     caption.className = "marketing-photo-caption";
     caption.textContent = photo.client || photo.title || "Untitled";
 
-    button.append(image, caption);
+    button.append(media, caption);
     button.addEventListener("click", () => openLightbox(index));
     fragment.append(button);
   }

@@ -373,7 +373,8 @@ body.lightbox-open {
   background: rgba(7, 10, 17, 0.84);
 }
 
-.photo-lightbox-image {
+.photo-lightbox-image,
+.photo-lightbox-video {
   grid-column: 2;
   grid-row: 2;
   width: 100%;
@@ -679,7 +680,8 @@ body.lightbox-open {
     grid-column: 1 / -1;
   }
 
-  .photo-lightbox-image {
+  .photo-lightbox-image,
+  .photo-lightbox-video {
     grid-column: 1 / -1;
     grid-row: 2;
     max-height: calc(100vh - 180px);
