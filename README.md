@@ -14,6 +14,8 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `GET /api/onetouch/clients` (OneTouch list with relationship metadata)
   - `GET /api/carers`
   - `POST /api/routes/run`
+  - `GET /api/tasks/unified` (delegated Microsoft Graph token)
+  - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
 
@@ -47,6 +49,9 @@ Set values in `frontend-config.js`:
 - `AZURE_TENANT_ID`
 - `AZURE_API_AUDIENCE` or `AZURE_API_CLIENT_ID`
 - `AZURE_REQUIRED_SCOPE` (default `client.read`)
+- `SHAREPOINT_SITE_URL`
+- `SHAREPOINT_TASK_OVERLAY_LIST_NAME` (optional; default `TaskOverlay`)
+- `GRAPH_TOKEN_AUDIENCE` (optional override; defaults include Graph audiences)
 - `ONETOUCH_USERNAME`
 - `ONETOUCH_PASSWORD`
 - `ONETOUCH_CLIENTS_TIMEOUT_MS` (optional; default `12000`)

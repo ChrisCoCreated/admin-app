@@ -11,6 +11,8 @@ const oneTouchClientsHandler = require("./api/onetouch/clients");
 const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
 const marketingPhotosHandler = require("./api/marketing/photos");
+const tasksUnifiedHandler = require("./api/tasks/unified");
+const tasksOverlayHandler = require("./api/tasks/overlay");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -201,6 +203,19 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/marketing/photos") {
     await marketingPhotosHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/tasks/unified") {
+    await tasksUnifiedHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/tasks/overlay") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await tasksOverlayHandler(apiReq, apiRes);
     return true;
   }
 

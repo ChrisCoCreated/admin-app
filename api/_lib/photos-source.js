@@ -170,6 +170,17 @@ function toAbsoluteUrl(value, hostName) {
   return "";
 }
 
+function extractFileName(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  const cleaned = text.replace(/^['"]|['"]$/g, "");
+  const withoutQuery = cleaned.split("?")[0];
+  const match = /([^/\\]+)$/.exec(withoutQuery);
+  return match ? match[1] : "";
+}
+
 function parseMaybeJson(value) {
   const raw = String(value || "").trim();
   if (!raw || (!raw.startsWith("{") && !raw.startsWith("["))) {
@@ -357,7 +368,7 @@ function pickImageUrl(fields, hostName) {
       }
 
       const asUrl = toAbsoluteUrl(value, hostName);
-      if (asUrl && /(\.png|\.jpe?g|\.gif|\.webp|\.bmp|\/_layouts\/15\/getpreview)/i.test(asUrl)) {
+      if (asUrl) {
         return asUrl;
       }
     }
@@ -366,14 +377,9 @@ function pickImageUrl(fields, hostName) {
   return "";
 }
 
-function mapGraphItemToPhoto(item, hostName) {
+function mapGraphItemToPhoto(item, hostName, sitePath, photosListName) {
   const fields = item?.fields || {};
   const consent = pickClientConsent(fields);
-
-  const imageUrl = pickImageUrl(fields, hostName);
-  if (!imageUrl) {
-    return null;
-  }
 
   const id = String(fields.ID || item?.id || "").trim();
   if (!id) {
@@ -383,6 +389,32 @@ function mapGraphItemToPhoto(item, hostName) {
   const title = String(fields.Title || fields.Client || fields.ClientName || `Photo ${id}`).trim();
   const client = String(fields.Client || fields.ClientName || title).trim();
   const fileName = String(fields.FileLeafRef || fields.FileName || "").trim();
+  const fallbackName =
+    extractFileName(fileName) ||
+    extractFileName(fields.Photo?.fileName || fields.Photo?.FileName || "") ||
+    extractFileName(fields.Photo) ||
+    extractFileName(title);
+
+  let imageUrl = pickImageUrl(fields, hostName);
+  if (!imageUrl && fallbackName) {
+    const encodedList = photosListName
+      .split("/")
+      .map((part) => encodeURIComponent(part))
+      .join("/");
+    const encodedFile = encodeURIComponent(fallbackName);
+    imageUrl = `https://${hostName}${sitePath}/Lists/${encodedList}/Attachments/${id}/${encodedFile}`;
+  }
+  if (!imageUrl) {
+    logMarketingDebug("skipped-photo-no-image-url", {
+      id,
+      title,
+      client,
+      fileName,
+      fallbackName,
+      fieldKeys: Object.keys(fields),
+    });
+    return null;
+  }
 
   const consentDebugFields = Object.entries(fields)
     .filter(([key]) => {
@@ -444,16 +476,21 @@ async function readMarketingPhotos() {
   });
 
   const photos = [];
+  let totalItemsRead = 0;
+  let skippedNoImage = 0;
   let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${query.toString()}`;
 
   while (nextUrl) {
     const data = await fetchJson(nextUrl, { headers: graphHeaders(token) });
     const items = Array.isArray(data?.value) ? data.value : [];
+    totalItemsRead += items.length;
 
     for (const item of items) {
-      const photo = mapGraphItemToPhoto(item, hostName);
+      const photo = mapGraphItemToPhoto(item, hostName, sitePath, photosListName);
       if (photo) {
         photos.push(photo);
+      } else {
+        skippedNoImage += 1;
       }
     }
 
@@ -461,6 +498,11 @@ async function readMarketingPhotos() {
   }
 
   photos.sort((a, b) => a.client.localeCompare(b.client, undefined, { sensitivity: "base" }));
+  logMarketingDebug("photos-fetch-summary", {
+    totalItemsRead,
+    returnedPhotos: photos.length,
+    skippedNoImage,
+  });
   return photos;
 }
 
