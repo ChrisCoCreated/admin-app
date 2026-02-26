@@ -113,6 +113,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getMarketingMedia(query = {}) {
+      const response = await authFetch(buildUrl("/api/marketing/media", query));
+      if (!response.ok) {
+        await parseError(response, "Marketing media request failed");
+      }
+      return response.json();
+    },
+
     async getUnifiedTasks(query = {}) {
       const response = await authFetch(buildUrl("/api/tasks/unified", query), {
         scopes: FRONTEND_CONFIG.graphTaskScopes,

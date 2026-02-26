@@ -359,25 +359,28 @@ dd {
 
 .marketing-photo-caption {
   display: block;
-  padding: 8px 10px;
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: #1c2940;
+  padding: 7px 10px 4px;
+  font-weight: 500;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  color: #5f6b82;
+  line-height: 1.3;
 }
 
 .marketing-photo-actions {
-  padding: 0 10px 10px;
+  padding: 0 10px 8px;
 }
 
 .marketing-photo-copy-link {
   display: inline-block;
-  border: 1px solid #cad5ea;
+  border: 1px solid #dde3ef;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #1f3c88;
-  background: #f3f7ff;
+  padding: 3px 9px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #6b7790;
+  background: #f8faff;
+  opacity: 0.88;
 }
 
 .marketing-photo-copy-link:focus-visible {

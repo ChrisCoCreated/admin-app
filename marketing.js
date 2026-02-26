@@ -56,20 +56,7 @@ async function copyImageToClipboard(url) {
     throw new Error("Clipboard image copy is unavailable in this browser.");
   }
 
-  const proxyUrl = new URL("/api/marketing/media", window.location.origin);
-  proxyUrl.searchParams.set("url", value);
-  const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
-  const response = await fetch(proxyUrl.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(`Image request failed (${response.status}).`);
-  }
-
-  const payload = await response.json();
+  const payload = await directoryApi.getMarketingMedia({ url: value });
   const mimeType = String(payload?.mimeType || "image/png");
   const dataBase64 = String(payload?.dataBase64 || "");
   if (!dataBase64) {
