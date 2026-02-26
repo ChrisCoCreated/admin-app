@@ -300,10 +300,17 @@ async function refreshTasks() {
     allTasks = sortTasks(Array.isArray(payload?.tasks) ? payload.tasks : []);
 
     const meta = payload?.meta || {};
+    const providerErrors = meta.providerErrors && typeof meta.providerErrors === "object"
+      ? meta.providerErrors
+      : {};
+    const providerErrorLabels = Object.keys(providerErrors);
     metaMessage.textContent =
       `Total: ${meta.total || 0} | To Do: ${meta.todoCount || 0} | ` +
       `Planner: ${meta.plannerCount || 0} | Overlay matched: ${meta.overlayMatchedCount || 0} | ` +
       `Overlay orphans: ${meta.overlayOrphanCount || 0}`;
+    if (meta.partial && providerErrorLabels.length > 0) {
+      metaMessage.textContent += ` | Partial: ${providerErrorLabels.join(", ")}`;
+    }
 
     setStatus(`Loaded ${allTasks.length} task(s).`);
     renderTasks();

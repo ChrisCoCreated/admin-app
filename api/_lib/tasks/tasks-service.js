@@ -53,19 +53,65 @@ function mapGraphError(error) {
   };
 }
 
+function toProviderError(error) {
+  return {
+    code: String(error?.code || "PROVIDER_FETCH_FAILED"),
+    status: Number(error?.status) || 502,
+    message: error?.message || "Provider fetch failed.",
+    retryable: Boolean(error?.retryable),
+  };
+}
+
 async function getUnifiedTasks({ graphAccessToken, claims }) {
   const userUpn = resolveUserUpn(claims);
   const graphClient = createGraphDelegatedClient(graphAccessToken);
+  const providerErrors = {};
 
-  const [todoTasks, plannerTasks, overlaysBundle] = await Promise.all([
-    fetchTodoTasks(graphClient),
-    fetchPlannerTasks(graphClient),
-    listOverlaysByUser(graphClient, userUpn),
+  const todoPromise = fetchTodoTasks(graphClient)
+    .then((tasks) => ({ ok: true, tasks }))
+    .catch((error) => ({ ok: false, error }));
+  const plannerPromise = fetchPlannerTasks(graphClient)
+    .then((tasks) => ({ ok: true, tasks }))
+    .catch((error) => ({ ok: false, error }));
+  const overlaysPromise = listOverlaysByUser(graphClient, userUpn)
+    .then((bundle) => ({ ok: true, bundle }))
+    .catch((error) => ({ ok: false, error }));
+
+  const [todoResult, plannerResult, overlaysResult] = await Promise.all([
+    todoPromise,
+    plannerPromise,
+    overlaysPromise,
   ]);
+
+  const todoTasks = todoResult.ok ? todoResult.tasks : [];
+  if (!todoResult.ok) {
+    providerErrors.todo = toProviderError(todoResult.error);
+  }
+
+  const plannerTasks = plannerResult.ok ? plannerResult.tasks : [];
+  if (!plannerResult.ok) {
+    providerErrors.planner = toProviderError(plannerResult.error);
+  }
+
+  const overlaysBundle = overlaysResult.ok
+    ? overlaysResult.bundle
+    : { siteId: "", listId: "", overlays: [], byKey: new Map() };
+  if (!overlaysResult.ok) {
+    providerErrors.overlay = toProviderError(overlaysResult.error);
+  }
+
+  if (!todoResult.ok && !plannerResult.ok) {
+    const error = new Error("Both To Do and Planner providers failed.");
+    error.status = 502;
+    error.code = "UNIFIED_PROVIDERS_FAILED";
+    error.retryable = false;
+    throw error;
+  }
 
   const allTasks = [...todoTasks, ...plannerTasks];
   const merged = mergeTasksWithOverlays(allTasks, overlaysBundle.byKey);
   const sortedTasks = sortUnifiedTasks(merged.tasks);
+  const partial = Object.keys(providerErrors).length > 0;
 
   return {
     tasks: sortedTasks,
@@ -75,6 +121,8 @@ async function getUnifiedTasks({ graphAccessToken, claims }) {
       plannerCount: plannerTasks.length,
       overlayMatchedCount: merged.overlayMatchedCount,
       overlayOrphanCount: merged.overlayOrphanCount,
+      partial,
+      providerErrors,
     },
   };
 }
