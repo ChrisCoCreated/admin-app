@@ -229,6 +229,7 @@ button.secondary {
 #signOutBtn {
   min-width: 170px;
   padding: 14px 28px;
+  margin-top: 10px;
 }
 
 button:disabled {
