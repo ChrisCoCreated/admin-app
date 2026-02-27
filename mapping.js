@@ -1182,7 +1182,7 @@ async function init() {
     setCarerSearchStatus("Loading associates...");
     setClientSearchStatus("Loading clients...");
     const [clientsPayload, carersPayload] = await Promise.all([
-      directoryApi.listClients({ limit: 1000 }),
+      directoryApi.listOneTouchClients({ limit: 500 }),
       directoryApi.listCarers({ limit: 500 }),
     ]);
     allClients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
