@@ -287,9 +287,9 @@ function normalizeCarer(record) {
   return {
     id,
     name,
-    email: asString(record?.email || record?.email_address),
-    phone: asString(record?.phone || record?.mobile),
-    postcode: asString(record?.postcode || record?.post_code),
+    email: asString(record?.primary_email || record?.email || record?.email_address),
+    phone: asString(record?.phone_mobile || record?.phone || record?.mobile),
+    postcode: asString(record?.postcode || record?.post_code || record?.postCode || record?.zip),
     status: asString(record?.status || record?.carer_status),
     raw: record,
   };
@@ -314,10 +314,24 @@ async function listClients() {
 }
 
 async function listCarers() {
-  const payload = await callOneTouch("carers/all");
-  const records = resolveRecords(payload, ["carers"]);
+  const allRecords = [];
+  let page = 1;
 
-  return records.map(normalizeCarer).filter((carer) => carer.id);
+  while (true) {
+    const payload = await callOneTouch("carers/all", { page });
+    const records = resolveRecords(payload, ["carers"]);
+    allRecords.push(...records);
+
+    const currentPage = Number(payload?.current_page || page);
+    const lastPage = Number(payload?.last_page || currentPage);
+    const hasNextUrl = Boolean(payload?.next_page_url);
+    if (!hasNextUrl && (!Number.isFinite(lastPage) || currentPage >= lastPage)) {
+      break;
+    }
+    page = currentPage + 1;
+  }
+
+  return allRecords.map(normalizeCarer).filter((carer) => carer.id);
 }
 
 async function listVisits() {

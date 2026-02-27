@@ -363,18 +363,16 @@ function renderAreaFilters() {
 function getFilteredCarers() {
   const query = normalizeText(carerSearchInput?.value);
   if (!query) {
-    return allCarers.slice(0, 12);
+    return allCarers;
   }
 
-  return allCarers
-    .filter((carer) => {
-      return (
-        normalizeText(carer.name).includes(query) ||
-        normalizeText(carer.id).includes(query) ||
-        normalizeText(carer.postcode).includes(query)
-      );
-    })
-    .slice(0, 25);
+  return allCarers.filter((carer) => {
+    return (
+      normalizeText(carer.name).includes(query) ||
+      normalizeText(carer.id).includes(query) ||
+      normalizeText(carer.postcode).includes(query)
+    );
+  });
 }
 
 function renderCarerSearchResults() {
