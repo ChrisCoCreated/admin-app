@@ -19,6 +19,93 @@ const {
   toGraphOverlayFields,
 } = require("./unified-model");
 
+const unifiedTasksCache = new Map();
+
+function unifiedTasksCacheKey(userUpn) {
+  return String(userUpn || "").trim().toLowerCase();
+}
+
+function getUnifiedTasksCacheTtlMs() {
+  const configured = Number(process.env.TASKS_UNIFIED_CACHE_TTL_MS || 90000);
+  if (!Number.isFinite(configured) || configured < 0) {
+    return 90000;
+  }
+  return Math.floor(configured);
+}
+
+function clearUnifiedTasksCache(userUpn) {
+  if (userUpn) {
+    unifiedTasksCache.delete(unifiedTasksCacheKey(userUpn));
+    return;
+  }
+  unifiedTasksCache.clear();
+}
+
+function buildUnifiedTasks(graphClient, userUpn) {
+  const providerErrors = {};
+
+  const todoPromise = fetchTodoTasks(graphClient)
+    .then((tasks) => ({ ok: true, tasks }))
+    .catch((error) => ({ ok: false, error }));
+  const plannerPromise = fetchPlannerTasks(graphClient)
+    .then((tasks) => ({ ok: true, tasks }))
+    .catch((error) => ({ ok: false, error }));
+  const overlaysPromise = listOverlaysByUser(graphClient, userUpn)
+    .then((bundle) => ({ ok: true, bundle }))
+    .catch((error) => ({ ok: false, error }));
+
+  return Promise.all([todoPromise, plannerPromise, overlaysPromise]).then(
+    ([todoResult, plannerResult, overlaysResult]) => {
+      const todoTasks = todoResult.ok
+        ? todoResult.tasks.filter((task) => task && task.isCompleted !== true)
+        : [];
+      if (!todoResult.ok) {
+        providerErrors.todo = toProviderError(todoResult.error);
+      }
+
+      const plannerTasks = plannerResult.ok
+        ? plannerResult.tasks.filter((task) => task && task.isCompleted !== true)
+        : [];
+      if (!plannerResult.ok) {
+        providerErrors.planner = toProviderError(plannerResult.error);
+      }
+
+      const overlaysBundle = overlaysResult.ok
+        ? overlaysResult.bundle
+        : { siteId: "", listId: "", overlays: [], byKey: new Map() };
+      if (!overlaysResult.ok) {
+        providerErrors.overlay = toProviderError(overlaysResult.error);
+      }
+
+      if (!todoResult.ok && !plannerResult.ok) {
+        const error = new Error("Both To Do and Planner providers failed.");
+        error.status = 502;
+        error.code = "UNIFIED_PROVIDERS_FAILED";
+        error.retryable = false;
+        throw error;
+      }
+
+      const allTasks = [...todoTasks, ...plannerTasks];
+      const merged = mergeTasksWithOverlays(allTasks, overlaysBundle.byKey);
+      const sortedTasks = sortUnifiedTasks(merged.tasks);
+      const partial = Object.keys(providerErrors).length > 0;
+
+      return {
+        tasks: sortedTasks,
+        meta: {
+          total: sortedTasks.length,
+          todoCount: todoTasks.length,
+          plannerCount: plannerTasks.length,
+          overlayMatchedCount: merged.overlayMatchedCount,
+          overlayOrphanCount: merged.overlayOrphanCount,
+          partial,
+          providerErrors,
+        },
+      };
+    }
+  );
+}
+
 function mapGraphError(error) {
   const message = error?.message || "Graph request failed.";
   const status = Number(error?.status) || 502;
@@ -65,70 +152,60 @@ function toProviderError(error) {
 async function getUnifiedTasks({ graphAccessToken, claims }) {
   const userUpn = resolveUserUpn(claims);
   const graphClient = createGraphDelegatedClient(graphAccessToken);
-  const providerErrors = {};
+  return buildUnifiedTasks(graphClient, userUpn);
+}
 
-  const todoPromise = fetchTodoTasks(graphClient)
-    .then((tasks) => ({ ok: true, tasks }))
-    .catch((error) => ({ ok: false, error }));
-  const plannerPromise = fetchPlannerTasks(graphClient)
-    .then((tasks) => ({ ok: true, tasks }))
-    .catch((error) => ({ ok: false, error }));
-  const overlaysPromise = listOverlaysByUser(graphClient, userUpn)
-    .then((bundle) => ({ ok: true, bundle }))
-    .catch((error) => ({ ok: false, error }));
+async function getUnifiedTasksCached({ graphAccessToken, claims }) {
+  const userUpn = resolveUserUpn(claims);
+  const key = unifiedTasksCacheKey(userUpn);
+  const now = Date.now();
+  const cached = unifiedTasksCache.get(key);
 
-  const [todoResult, plannerResult, overlaysResult] = await Promise.all([
-    todoPromise,
-    plannerPromise,
-    overlaysPromise,
-  ]);
-
-  const todoTasks = todoResult.ok
-    ? todoResult.tasks.filter((task) => task && task.isCompleted !== true)
-    : [];
-  if (!todoResult.ok) {
-    providerErrors.todo = toProviderError(todoResult.error);
+  if (cached && cached.value && cached.expiresAt > now) {
+    return cached.value;
   }
 
-  const plannerTasks = plannerResult.ok
-    ? plannerResult.tasks.filter((task) => task && task.isCompleted !== true)
-    : [];
-  if (!plannerResult.ok) {
-    providerErrors.planner = toProviderError(plannerResult.error);
-  }
+  const startRefresh = () => {
+    const current = unifiedTasksCache.get(key);
+    if (current?.inFlight) {
+      return current.inFlight;
+    }
 
-  const overlaysBundle = overlaysResult.ok
-    ? overlaysResult.bundle
-    : { siteId: "", listId: "", overlays: [], byKey: new Map() };
-  if (!overlaysResult.ok) {
-    providerErrors.overlay = toProviderError(overlaysResult.error);
-  }
+    const graphClient = createGraphDelegatedClient(graphAccessToken);
+    const inFlight = buildUnifiedTasks(graphClient, userUpn)
+      .then((value) => {
+        unifiedTasksCache.set(key, {
+          value,
+          expiresAt: Date.now() + getUnifiedTasksCacheTtlMs(),
+          inFlight: null,
+        });
+        return value;
+      })
+      .catch((error) => {
+        const previous = unifiedTasksCache.get(key);
+        unifiedTasksCache.set(key, {
+          value: previous?.value || null,
+          expiresAt: previous?.expiresAt || 0,
+          inFlight: null,
+        });
+        throw error;
+      });
 
-  if (!todoResult.ok && !plannerResult.ok) {
-    const error = new Error("Both To Do and Planner providers failed.");
-    error.status = 502;
-    error.code = "UNIFIED_PROVIDERS_FAILED";
-    error.retryable = false;
-    throw error;
-  }
+    unifiedTasksCache.set(key, {
+      value: cached?.value || null,
+      expiresAt: cached?.expiresAt || 0,
+      inFlight,
+    });
 
-  const allTasks = [...todoTasks, ...plannerTasks];
-  const merged = mergeTasksWithOverlays(allTasks, overlaysBundle.byKey);
-  const sortedTasks = sortUnifiedTasks(merged.tasks);
-  const partial = Object.keys(providerErrors).length > 0;
-
-  return {
-    tasks: sortedTasks,
-    meta: {
-      total: sortedTasks.length,
-      todoCount: todoTasks.length,
-      plannerCount: plannerTasks.length,
-      overlayMatchedCount: merged.overlayMatchedCount,
-      overlayOrphanCount: merged.overlayOrphanCount,
-      partial,
-      providerErrors,
-    },
+    return inFlight;
   };
+
+  if (cached?.value) {
+    void startRefresh();
+    return cached.value;
+  }
+
+  return startRefresh();
 }
 
 async function upsertOverlay({ graphAccessToken, claims, body }) {
@@ -172,6 +249,7 @@ async function upsertOverlay({ graphAccessToken, claims, body }) {
   }
 
   clearOverlayUserCache(userUpn);
+  clearUnifiedTasksCache(userUpn);
 
   const overlay = fromOverlayFields({
     id: itemId,
@@ -204,7 +282,9 @@ async function upsertOverlay({ graphAccessToken, claims, body }) {
 }
 
 module.exports = {
+  clearUnifiedTasksCache,
   getUnifiedTasks,
+  getUnifiedTasksCached,
   mapGraphError,
   upsertOverlay,
 };

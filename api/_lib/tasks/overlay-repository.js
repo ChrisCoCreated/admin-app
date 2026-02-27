@@ -1,7 +1,6 @@
 const { OVERLAY_FIELD_MAP, buildTaskKey, fromOverlayFields } = require("./unified-model");
 
 const OVERLAY_PAGE_SIZE = 200;
-const OVERLAY_CACHE_TTL_MS = 45 * 1000;
 const GRAPH_TASKS_DEBUG = process.env.GRAPH_TASKS_DEBUG === "1";
 
 const siteCache = {
@@ -104,6 +103,14 @@ function userCacheKey(userUpn) {
   return String(userUpn || "").trim().toLowerCase();
 }
 
+function getOverlayCacheTtlMs() {
+  const configured = Number(process.env.TASKS_OVERLAY_CACHE_TTL_MS || 120000);
+  if (!Number.isFinite(configured) || configured < 0) {
+    return 120000;
+  }
+  return Math.floor(configured);
+}
+
 function mapOverlays(items) {
   const overlays = [];
   const byKey = new Map();
@@ -133,67 +140,105 @@ async function listOverlaysByUser(graphClient, userUpn) {
     return cached.value;
   }
 
-  const { siteId, listId } = await resolveSiteAndListIds(graphClient);
-  const params = new URLSearchParams({
-    $expand: "fields",
-    $filter: `fields/${OVERLAY_FIELD_MAP.userUpn} eq ${quoteODataString(userUpn)}`,
-    $top: String(OVERLAY_PAGE_SIZE),
-  });
+  const startRefresh = async () => {
+    const current = userOverlayCache.get(key);
+    if (current?.inFlight) {
+      return current.inFlight;
+    }
 
-  const initialUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
-  let items = [];
+    const inFlight = (async () => {
+      const { siteId, listId } = await resolveSiteAndListIds(graphClient);
+      const params = new URLSearchParams({
+        $expand: "fields",
+        $filter: `fields/${OVERLAY_FIELD_MAP.userUpn} eq ${quoteODataString(userUpn)}`,
+        $top: String(OVERLAY_PAGE_SIZE),
+      });
 
-  try {
-    items = await graphClient.fetchAllPages(initialUrl);
-  } catch (error) {
-    const code = String(error?.code || "").toLowerCase();
-    const isFilterSyntaxIssue =
-      Number(error?.status) === 400 && (code.includes("invalidrequest") || code.includes("badrequest"));
+      const initialUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
+      let items = [];
 
-    if (!isFilterSyntaxIssue) {
+      try {
+        items = await graphClient.fetchAllPages(initialUrl);
+      } catch (error) {
+        const code = String(error?.code || "").toLowerCase();
+        const isFilterSyntaxIssue =
+          Number(error?.status) === 400 && (code.includes("invalidrequest") || code.includes("badrequest"));
+
+        if (!isFilterSyntaxIssue) {
+          throw error;
+        }
+
+        // Fallback for Person/Group field filtering quirks in Graph list-item queries.
+        logOverlayDebug("UserUPN filtered query failed; falling back to in-memory user filter.", {
+          status: error?.status || 0,
+          code: error?.code || "",
+          message: error?.message || "",
+        });
+
+        const fallbackParams = new URLSearchParams({
+          $expand: "fields",
+          $top: String(OVERLAY_PAGE_SIZE),
+        });
+        const fallbackUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${fallbackParams.toString()}`;
+        items = await graphClient.fetchAllPages(fallbackUrl, { maxPages: 25 });
+      }
+
+      const mapped = mapOverlays(items);
+      const normalizedUserUpn = String(userUpn || "").trim().toLowerCase();
+      const filteredOverlays = mapped.overlays.filter((overlay) => {
+        return String(overlay?.userUpn || "").trim().toLowerCase() === normalizedUserUpn;
+      });
+      const byKey = new Map();
+      for (const overlay of filteredOverlays) {
+        if (!byKey.has(overlay.key)) {
+          byKey.set(overlay.key, overlay);
+        }
+      }
+
+      const value = {
+        siteId,
+        listId,
+        overlays: filteredOverlays,
+        byKey,
+      };
+
+      userOverlayCache.set(key, {
+        expiresAt: Date.now() + getOverlayCacheTtlMs(),
+        value,
+        inFlight: null,
+      });
+
+      return value;
+    })();
+
+    userOverlayCache.set(key, {
+      expiresAt: cached?.expiresAt || 0,
+      value: cached?.value || null,
+      inFlight,
+    });
+
+    try {
+      return await inFlight;
+    } catch (error) {
+      const previous = userOverlayCache.get(key);
+      userOverlayCache.set(key, {
+        expiresAt: previous?.expiresAt || 0,
+        value: previous?.value || null,
+        inFlight: null,
+      });
       throw error;
     }
-
-    // Fallback for Person/Group field filtering quirks in Graph list-item queries.
-    logOverlayDebug("UserUPN filtered query failed; falling back to in-memory user filter.", {
-      status: error?.status || 0,
-      code: error?.code || "",
-      message: error?.message || "",
-    });
-
-    const fallbackParams = new URLSearchParams({
-      $expand: "fields",
-      $top: String(OVERLAY_PAGE_SIZE),
-    });
-    const fallbackUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${fallbackParams.toString()}`;
-    items = await graphClient.fetchAllPages(fallbackUrl, { maxPages: 25 });
-  }
-
-  const mapped = mapOverlays(items);
-  const normalizedUserUpn = String(userUpn || "").trim().toLowerCase();
-  const filteredOverlays = mapped.overlays.filter((overlay) => {
-    return String(overlay?.userUpn || "").trim().toLowerCase() === normalizedUserUpn;
-  });
-  const byKey = new Map();
-  for (const overlay of filteredOverlays) {
-    if (!byKey.has(overlay.key)) {
-      byKey.set(overlay.key, overlay);
-    }
-  }
-
-  const value = {
-    siteId,
-    listId,
-    overlays: filteredOverlays,
-    byKey,
   };
 
-  userOverlayCache.set(key, {
-    expiresAt: Date.now() + OVERLAY_CACHE_TTL_MS,
-    value,
-  });
+  if (cached?.value) {
+    void startRefresh();
+    return cached.value;
+  }
 
-  return value;
+  if (cached?.inFlight) {
+    return cached.inFlight;
+  }
+  return startRefresh();
 }
 
 function clearOverlayUserCache(userUpn) {

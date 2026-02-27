@@ -2,7 +2,14 @@ const { toUtcIsoOrNull } = require("./unified-model");
 
 const TODO_LISTS_PAGE_SIZE = 100;
 const TODO_TASKS_PAGE_SIZE = 200;
-const TODO_LIST_CONCURRENCY = 4;
+
+function getTodoListConcurrency() {
+  const configured = Number(process.env.TASKS_TODO_LIST_CONCURRENCY || 4);
+  if (!Number.isFinite(configured) || configured < 1) {
+    return 4;
+  }
+  return Math.min(Math.floor(configured), 12);
+}
 
 function mapLimit(items, concurrency, mapper) {
   return new Promise((resolve, reject) => {
@@ -66,7 +73,7 @@ async function fetchTodoTasks(graphClient) {
   const listsUrl = `https://graph.microsoft.com/v1.0/me/todo/lists?$top=${TODO_LISTS_PAGE_SIZE}`;
   const lists = await graphClient.fetchAllPages(listsUrl);
 
-  const taskBatches = await mapLimit(lists, TODO_LIST_CONCURRENCY, async (list) => {
+  const taskBatches = await mapLimit(lists, getTodoListConcurrency(), async (list) => {
     const listId = String(list?.id || "").trim();
     if (!listId) {
       return [];

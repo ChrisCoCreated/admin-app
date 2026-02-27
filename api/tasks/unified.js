@@ -1,5 +1,5 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
-const { getUnifiedTasks, mapGraphError } = require("../_lib/tasks/tasks-service");
+const { getUnifiedTasksCached, mapGraphError } = require("../_lib/tasks/tasks-service");
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
@@ -17,12 +17,12 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const payload = await getUnifiedTasks({
+    const payload = await getUnifiedTasksCached({
       graphAccessToken: req.authUser?.graphAccessToken,
       claims: req.authUser?.claims,
     });
 
-    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Cache-Control", "private, max-age=20");
     res.status(200).json(payload);
   } catch (error) {
     const mapped = mapGraphError(error);
