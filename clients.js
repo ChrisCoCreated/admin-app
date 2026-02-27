@@ -27,6 +27,7 @@ const detailFields = {
 };
 
 const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
+const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
 
 let allClients = [];
 let selectedClientId = "";
@@ -124,7 +125,21 @@ function collectStatusOptions(items) {
       set.add(status);
     }
   }
-  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  if (!set.has("active")) {
+    set.add("active");
+  }
+  if (!set.has("pending")) {
+    set.add("pending");
+  }
+  if (!set.has("archived")) {
+    set.add("archived");
+  }
+
+  const preferred = STATUS_FILTER_ORDER.filter((status) => set.has(status));
+  const remaining = Array.from(set)
+    .filter((status) => !preferred.includes(status))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return [...preferred, ...remaining];
 }
 
 function formatStatusLabel(status) {
@@ -188,17 +203,6 @@ function renderStatusFilters() {
   clientStatusFilters.hidden = false;
   clientStatusFilters.innerHTML = "";
 
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = `status-filter-btn${selectedClientStatuses.size === options.length ? " active" : ""}`;
-  allBtn.textContent = "All";
-  allBtn.addEventListener("click", () => {
-    selectedClientStatuses = new Set(options);
-    renderStatusFilters();
-    renderClients();
-  });
-  clientStatusFilters.appendChild(allBtn);
-
   for (const status of options) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -220,6 +224,17 @@ function renderStatusFilters() {
     });
     clientStatusFilters.appendChild(btn);
   }
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `status-filter-btn${selectedClientStatuses.size === options.length ? " active" : ""}`;
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    selectedClientStatuses = new Set(options);
+    renderStatusFilters();
+    renderClients();
+  });
+  clientStatusFilters.appendChild(allBtn);
 }
 
 function getFilteredClients() {

@@ -46,6 +46,7 @@ let allClients = [];
 let allCarers = [];
 let selectedArea = "ALL";
 const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
+const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
 let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
 let selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
@@ -306,7 +307,15 @@ function getStatusOptions(items) {
   if (!set.has("pending")) {
     set.add("pending");
   }
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
+  if (!set.has("archived")) {
+    set.add("archived");
+  }
+
+  const preferred = STATUS_FILTER_ORDER.filter((status) => set.has(status));
+  const remaining = Array.from(set)
+    .filter((status) => !preferred.includes(status))
+    .sort((a, b) => a.localeCompare(b));
+  return [...preferred, ...remaining];
 }
 
 function formatStatusLabel(status) {
@@ -323,16 +332,6 @@ function renderStatusFilters(root, options, selectedSet, onToggle) {
   }
 
   root.innerHTML = "";
-
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = `status-filter-btn${selectedSet.size === options.length ? " active" : ""}`;
-  allBtn.textContent = "All";
-  allBtn.addEventListener("click", () => {
-    const full = new Set(options);
-    onToggle(full);
-  });
-  root.appendChild(allBtn);
 
   for (const status of options) {
     const btn = document.createElement("button");
@@ -353,6 +352,16 @@ function renderStatusFilters(root, options, selectedSet, onToggle) {
     });
     root.appendChild(btn);
   }
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `status-filter-btn${selectedSet.size === options.length ? " active" : ""}`;
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    const full = new Set(options);
+    onToggle(full);
+  });
+  root.appendChild(allBtn);
 }
 
 function getFilteredClients() {
