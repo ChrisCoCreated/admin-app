@@ -570,6 +570,29 @@ body.lightbox-open {
   gap: 8px;
 }
 
+.status-filter-row {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.status-filter-btn {
+  border: 1px solid #cad5ea;
+  background: #f6f8fd;
+  color: #24314a;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.status-filter-btn.active {
+  background: #1f3c88;
+  color: #fff;
+  border-color: #1f3c88;
+}
+
 .area-filter-btn {
   border: 1px solid #cad5ea;
   background: #f4f7fe;

@@ -6,10 +6,12 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const signOutBtn = document.getElementById("signOutBtn");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
 const carerSearchInput = document.getElementById("carerSearchInput");
+const associateStatusFilters = document.getElementById("associateStatusFilters");
 const carerSearchResults = document.getElementById("carerSearchResults");
 const carerSearchStatus = document.getElementById("carerSearchStatus");
 const clientPostcodeInput = document.getElementById("clientPostcodeInput");
 const clientSearchInput = document.getElementById("clientSearchInput");
+const clientStatusFilters = document.getElementById("clientStatusFilters");
 const areaFilters = document.getElementById("areaFilters");
 const clientSearchResults = document.getElementById("clientSearchResults");
 const clientSearchStatus = document.getElementById("clientSearchStatus");
@@ -43,6 +45,9 @@ const selectedClientStops = [];
 let allClients = [];
 let allCarers = [];
 let selectedArea = "ALL";
+const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
+let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
+let selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
 const DEFAULT_VISIT_DURATION_MINUTES = 60;
 const SAVED_RUNS_KEY = "thrive.mapping.savedRuns.v1";
@@ -278,9 +283,85 @@ function getClientArea(client) {
   return normalizeLocationQuery(client.area || client.location || "");
 }
 
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function passesStatusFilter(status, selectedSet) {
+  const normalized = normalizeStatus(status);
+  return selectedSet.has(normalized);
+}
+
+function getStatusOptions(items) {
+  const set = new Set();
+  for (const item of items) {
+    const status = normalizeStatus(item?.status);
+    if (status) {
+      set.add(status);
+    }
+  }
+  if (!set.has("active")) {
+    set.add("active");
+  }
+  if (!set.has("pending")) {
+    set.add("pending");
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+function formatStatusLabel(status) {
+  const lower = normalizeStatus(status);
+  if (!lower) {
+    return "Unknown";
+  }
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function renderStatusFilters(root, options, selectedSet, onToggle) {
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML = "";
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `status-filter-btn${selectedSet.size === options.length ? " active" : ""}`;
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    const full = new Set(options);
+    onToggle(full);
+  });
+  root.appendChild(allBtn);
+
+  for (const status of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `status-filter-btn${selectedSet.has(status) ? " active" : ""}`;
+    btn.textContent = formatStatusLabel(status);
+    btn.addEventListener("click", () => {
+      const next = new Set(selectedSet);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      if (!next.size) {
+        next.add(status);
+      }
+      onToggle(next);
+    });
+    root.appendChild(btn);
+  }
+}
+
 function getFilteredClients() {
   const query = normalizeText(clientSearchInput?.value);
   return allClients.filter((client) => {
+    if (!passesStatusFilter(client.status, selectedClientStatuses)) {
+      return false;
+    }
+
     const area = getClientArea(client) || "Unassigned";
     const matchesArea = selectedArea === "ALL" || area === selectedArea;
     if (!matchesArea) {
@@ -360,13 +441,58 @@ function renderAreaFilters() {
   }
 }
 
+function renderAssociateStatusFilters() {
+  const options = getStatusOptions(allCarers);
+  if (!selectedAssociateStatuses.size) {
+    selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
+  }
+  selectedAssociateStatuses = new Set(
+    Array.from(selectedAssociateStatuses).filter((status) => options.includes(status))
+  );
+  if (!selectedAssociateStatuses.size) {
+    selectedAssociateStatuses = new Set(options.filter((status) => DEFAULT_STATUS_FILTERS.has(status)));
+    if (!selectedAssociateStatuses.size) {
+      selectedAssociateStatuses = new Set(options);
+    }
+  }
+  renderStatusFilters(associateStatusFilters, options, selectedAssociateStatuses, (nextSet) => {
+    selectedAssociateStatuses = nextSet;
+    renderAssociateStatusFilters();
+    renderCarerSearchResults();
+  });
+}
+
+function renderClientStatusFilters() {
+  const options = getStatusOptions(allClients);
+  if (!selectedClientStatuses.size) {
+    selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
+  }
+  selectedClientStatuses = new Set(
+    Array.from(selectedClientStatuses).filter((status) => options.includes(status))
+  );
+  if (!selectedClientStatuses.size) {
+    selectedClientStatuses = new Set(options.filter((status) => DEFAULT_STATUS_FILTERS.has(status)));
+    if (!selectedClientStatuses.size) {
+      selectedClientStatuses = new Set(options);
+    }
+  }
+  renderStatusFilters(clientStatusFilters, options, selectedClientStatuses, (nextSet) => {
+    selectedClientStatuses = nextSet;
+    renderClientStatusFilters();
+    renderClientSearchResults();
+  });
+}
+
 function getFilteredCarers() {
   const query = normalizeText(carerSearchInput?.value);
-  if (!query) {
-    return allCarers;
-  }
-
   return allCarers.filter((carer) => {
+    if (!passesStatusFilter(carer.status, selectedAssociateStatuses)) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
+
     return (
       normalizeText(carer.name).includes(query) ||
       normalizeText(carer.id).includes(query) ||
@@ -382,17 +508,17 @@ function renderCarerSearchResults() {
   carerSearchResults.innerHTML = "";
 
   if (!allCarers.length) {
-    setCarerSearchStatus("No carers loaded.");
+    setCarerSearchStatus("No associates loaded.");
     return;
   }
 
   const filtered = getFilteredCarers();
   if (!filtered.length) {
-    setCarerSearchStatus("No matching carers.");
+    setCarerSearchStatus("No matching associates.");
     return;
   }
 
-  setCarerSearchStatus(`Showing ${filtered.length} carer(s).`);
+  setCarerSearchStatus(`Showing ${filtered.length} associate(s).`);
   for (const carer of filtered) {
     const li = document.createElement("li");
     li.className = "carer-result-row";
@@ -400,7 +526,7 @@ function renderCarerSearchResults() {
     const info = document.createElement("div");
     info.className = "client-result-info";
     info.innerHTML = `
-      <strong>${escapeHtml(String(carer.name || "Unnamed carer"))}</strong>
+      <strong>${escapeHtml(String(carer.name || "Unnamed associate"))}</strong>
       <span>${escapeHtml(String(carer.id || "-"))}</span>
       <span>Postcode: ${escapeHtml(String(carer.postcode || "Not available"))}</span>
     `;
@@ -413,11 +539,11 @@ function renderCarerSearchResults() {
     selectBtn.addEventListener("click", () => {
       const postcode = normalizePostcode(carer.postcode);
       if (!postcode) {
-        setStatus("Selected carer has no postcode.", true);
+        setStatus("Selected associate has no postcode.", true);
         return;
       }
       staffPostcodeInput.value = postcode;
-      setStatus(`Staff postcode set from ${carer.name || "carer"}.`);
+      setStatus(`Staff postcode set from ${carer.name || "associate"}.`);
     });
 
     li.append(info, selectBtn);
@@ -1040,9 +1166,11 @@ async function init() {
     if (runDateInput && !runDateInput.value) {
       runDateInput.value = toDateInputValue(getNextMondayDate());
     }
+    selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
+    selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
     loadSavedRuns();
     renderClientPostcodes();
-    setCarerSearchStatus("Loading carers...");
+    setCarerSearchStatus("Loading associates...");
     setClientSearchStatus("Loading clients...");
     const [clientsPayload, carersPayload] = await Promise.all([
       directoryApi.listClients({ limit: 1000 }),
@@ -1050,6 +1178,8 @@ async function init() {
     ]);
     allClients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
     allCarers = Array.isArray(carersPayload?.carers) ? carersPayload.carers : [];
+    renderAssociateStatusFilters();
+    renderClientStatusFilters();
     renderCarerSearchResults();
     renderAreaFilters();
     renderClientSearchResults();
@@ -1060,7 +1190,7 @@ async function init() {
     }
     console.error(error);
     setStatus(error?.message || "Could not initialize authentication.", true);
-    setCarerSearchStatus(error?.message || "Could not load carers.", true);
+    setCarerSearchStatus(error?.message || "Could not load associates.", true);
     setClientSearchStatus(error?.message || "Could not load clients.", true);
   } finally {
     document.body.classList.remove("auth-pending");
@@ -1121,7 +1251,11 @@ clearRunBtn?.addEventListener("click", () => {
     clientSearchInput.value = "";
   }
   selectedArea = "ALL";
+  selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
+  selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
   selectedClientStops.length = 0;
+  renderAssociateStatusFilters();
+  renderClientStatusFilters();
   renderCarerSearchResults();
   renderClientPostcodes();
   renderAreaFilters();

@@ -40,11 +40,12 @@
             <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA" autocomplete="postal-code" />
           </label>
           <label class="field" for="carerSearchInput">
-            Search carers (associates)
+            Search associates
             <input id="carerSearchInput" type="search" placeholder="Search by name, id, or postcode" autocomplete="off" />
           </label>
+          <div id="associateStatusFilters" class="status-filter-row"></div>
           <ul id="carerSearchResults" class="carer-search-results"></ul>
-          <p id="carerSearchStatus" class="muted">Loading carers...</p>
+          <p id="carerSearchStatus" class="muted">Loading associates...</p>
         </article>
 
         <article class="panel">
@@ -53,6 +54,7 @@
             Search client (name, id, location, postcode)
             <input id="clientSearchInput" type="search" placeholder="Type to search clients" autocomplete="off" />
           </label>
+          <div id="clientStatusFilters" class="status-filter-row"></div>
           <div id="areaFilters" class="area-filter-row"></div>
           <ul id="clientSearchResults" class="client-search-results"></ul>
           <p id="clientSearchStatus" class="muted">Loading clients...</p>
