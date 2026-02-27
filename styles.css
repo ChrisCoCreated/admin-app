@@ -226,6 +226,11 @@ button.secondary {
   color: #1c2433;
 }
 
+#signOutBtn {
+  min-width: 170px;
+  padding: 14px 28px;
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
