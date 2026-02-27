@@ -149,6 +149,31 @@ body.auth-pending .auth-card {
   display: none;
 }
 
+.home-menu-grid {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.home-menu-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border: 1px solid #ccd5e6;
+  border-radius: 11px;
+  background: #f9fbff;
+  color: #1d2a42;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 8px 12px;
+}
+
+.home-menu-link:hover {
+  background: #edf3ff;
+}
+
 .row {
   margin-top: 14px;
   display: flex;

@@ -19,6 +19,10 @@
           <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
           <span class="brand-text">Thrive Admin</span>
         </a>
+        <div id="topbarActions" class="topbar-actions" hidden>
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
       </div>
     </header>
 
@@ -30,11 +34,17 @@
 
       <section class="panel auth-card">
         <h2>Sign in</h2>
-        <p class="muted">Use Microsoft Entra (your normal work login).</p>
+        <p class="muted">Use Microsoft Entra (your normal work login) to open the menu.</p>
         <div class="row">
           <button id="signInBtn" type="button">Sign in</button>
           <span id="authState" class="muted">Please sign in</span>
         </div>
+      </section>
+
+      <section id="homeMenuSection" class="panel home-menu-panel" hidden>
+        <h2>Menu</h2>
+        <p class="muted">Choose a section to continue.</p>
+        <div id="homeMenuGrid" class="home-menu-grid"></div>
       </section>
     </main>
 

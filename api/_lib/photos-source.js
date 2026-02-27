@@ -519,6 +519,23 @@ function extractKnownFileNameFromUrls(value, hostName) {
   return "";
 }
 
+async function mapWithConcurrency(items, worker, concurrency) {
+  const limit = Number.isFinite(concurrency) && concurrency > 0 ? Math.floor(concurrency) : 1;
+  const queue = Array.from(items || []);
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (true) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= queue.length) {
+        return;
+      }
+      await worker(queue[index], index);
+    }
+  });
+  await Promise.all(workers);
+}
+
 function pickAssetUrls(fields, hostName, mediaType) {
   const candidates = [];
   const addCandidates = (value) => {
@@ -704,6 +721,55 @@ async function resolveAttachmentUrlFromSharePointApi(
   return "";
 }
 
+function getAttachmentLookupConcurrency() {
+  const configured = Number(process.env.MARKETING_ATTACHMENT_LOOKUP_CONCURRENCY || 6);
+  if (!Number.isFinite(configured) || configured < 1) {
+    return 6;
+  }
+  return Math.min(Math.floor(configured), 24);
+}
+
+async function resolveAttachmentUrlsForPhotos(photos, params) {
+  if (!Array.isArray(photos) || !photos.length) {
+    return;
+  }
+
+  const { hostName, sitePath, listId } = params;
+  let sharePointToken = "";
+  try {
+    sharePointToken = await getSharePointAccessToken(hostName);
+  } catch (error) {
+    logMarketingDebug("sharepoint-token-unavailable", {
+      detail: error && error.message ? error.message : String(error),
+    });
+    return;
+  }
+
+  const concurrency = getAttachmentLookupConcurrency();
+  await mapWithConcurrency(
+    photos,
+    async (photo) => {
+      const resolvedUrl = await resolveAttachmentUrlFromSharePointApi(
+        sharePointToken,
+        hostName,
+        sitePath,
+        listId,
+        photo.id
+      );
+      if (!resolvedUrl) {
+        return;
+      }
+      photo.attachmentUrl = resolvedUrl;
+      if (!photo.imageUrl || !isImageUrl(photo.imageUrl)) {
+        photo.imageUrl = resolvedUrl;
+      }
+      photo.mediaUrl = resolvedUrl;
+      photo.fileName = extractFileName(resolvedUrl) || photo.fileName;
+    },
+    concurrency
+  );
+}
+
 async function readMarketingPhotos() {
   const token = await getGraphAccessToken();
   const { hostName, sitePath, photosListName } = requireSharePointConfig();
@@ -743,8 +809,7 @@ async function readMarketingPhotos() {
   const photos = [];
   let totalItemsRead = 0;
   let skippedNoImage = 0;
-  let sharePointToken = "";
-  let sharePointTokenAttempted = false;
+  const photosNeedingAttachmentLookup = [];
   let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${query.toString()}`;
 
   while (nextUrl) {
@@ -756,34 +821,7 @@ async function readMarketingPhotos() {
       const photo = mapGraphItemToPhoto(item, hostName, listPathname);
       if (photo) {
         if (photo.needsAttachmentLookup) {
-          if (!sharePointTokenAttempted) {
-            sharePointTokenAttempted = true;
-            try {
-              sharePointToken = await getSharePointAccessToken(hostName);
-            } catch (error) {
-              logMarketingDebug("sharepoint-token-unavailable", {
-                detail: error && error.message ? error.message : String(error),
-              });
-            }
-          }
-
-          const resolvedUrl = sharePointToken
-            ? await resolveAttachmentUrlFromSharePointApi(
-                sharePointToken,
-                hostName,
-                sitePath,
-                listId,
-                photo.id
-              )
-            : "";
-          if (resolvedUrl) {
-            photo.attachmentUrl = resolvedUrl;
-            if (!photo.imageUrl || !isImageUrl(photo.imageUrl)) {
-              photo.imageUrl = resolvedUrl;
-            }
-            photo.mediaUrl = resolvedUrl;
-            photo.fileName = extractFileName(resolvedUrl) || photo.fileName;
-          }
+          photosNeedingAttachmentLookup.push(photo);
         }
         delete photo.needsAttachmentLookup;
         photos.push(photo);
@@ -794,6 +832,12 @@ async function readMarketingPhotos() {
 
     nextUrl = data?.["@odata.nextLink"] || "";
   }
+
+  await resolveAttachmentUrlsForPhotos(photosNeedingAttachmentLookup, {
+    hostName,
+    sitePath,
+    listId,
+  });
 
   photos.sort((a, b) => a.client.localeCompare(b.client, undefined, { sensitivity: "base" }));
   logMarketingDebug("photos-fetch-summary", {
