@@ -39,6 +39,12 @@
             Staff postcode
             <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA" autocomplete="postal-code" />
           </label>
+          <label class="field" for="carerSearchInput">
+            Search carers (associates)
+            <input id="carerSearchInput" type="search" placeholder="Search by name, id, or postcode" autocomplete="off" />
+          </label>
+          <ul id="carerSearchResults" class="carer-search-results"></ul>
+          <p id="carerSearchStatus" class="muted">Loading carers...</p>
         </article>
 
         <article class="panel">

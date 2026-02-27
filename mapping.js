@@ -5,6 +5,9 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
+const carerSearchInput = document.getElementById("carerSearchInput");
+const carerSearchResults = document.getElementById("carerSearchResults");
+const carerSearchStatus = document.getElementById("carerSearchStatus");
 const clientPostcodeInput = document.getElementById("clientPostcodeInput");
 const clientSearchInput = document.getElementById("clientSearchInput");
 const areaFilters = document.getElementById("areaFilters");
@@ -38,6 +41,7 @@ const RUN_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/routes/run` : "/api/rou
 
 const selectedClientStops = [];
 let allClients = [];
+let allCarers = [];
 let selectedArea = "ALL";
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
 const DEFAULT_VISIT_DURATION_MINUTES = 60;
@@ -94,6 +98,14 @@ function setBusy(isBusy) {
 function setClientSearchStatus(message, isError = false) {
   clientSearchStatus.textContent = message;
   clientSearchStatus.classList.toggle("error", isError);
+}
+
+function setCarerSearchStatus(message, isError = false) {
+  if (!carerSearchStatus) {
+    return;
+  }
+  carerSearchStatus.textContent = message;
+  carerSearchStatus.classList.toggle("error", isError);
 }
 
 function updateSavedRunsStatus() {
@@ -345,6 +357,73 @@ function renderAreaFilters() {
       renderClientSearchResults();
     });
     areaFilters.appendChild(btn);
+  }
+}
+
+function getFilteredCarers() {
+  const query = normalizeText(carerSearchInput?.value);
+  if (!query) {
+    return allCarers.slice(0, 12);
+  }
+
+  return allCarers
+    .filter((carer) => {
+      return (
+        normalizeText(carer.name).includes(query) ||
+        normalizeText(carer.id).includes(query) ||
+        normalizeText(carer.postcode).includes(query)
+      );
+    })
+    .slice(0, 25);
+}
+
+function renderCarerSearchResults() {
+  if (!carerSearchResults) {
+    return;
+  }
+  carerSearchResults.innerHTML = "";
+
+  if (!allCarers.length) {
+    setCarerSearchStatus("No carers loaded.");
+    return;
+  }
+
+  const filtered = getFilteredCarers();
+  if (!filtered.length) {
+    setCarerSearchStatus("No matching carers.");
+    return;
+  }
+
+  setCarerSearchStatus(`Showing ${filtered.length} carer(s).`);
+  for (const carer of filtered) {
+    const li = document.createElement("li");
+    li.className = "carer-result-row";
+
+    const info = document.createElement("div");
+    info.className = "client-result-info";
+    info.innerHTML = `
+      <strong>${escapeHtml(String(carer.name || "Unnamed carer"))}</strong>
+      <span>${escapeHtml(String(carer.id || "-"))}</span>
+      <span>Postcode: ${escapeHtml(String(carer.postcode || "Not available"))}</span>
+    `;
+
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.className = "secondary";
+    selectBtn.textContent = "Set staff";
+    selectBtn.disabled = !normalizePostcode(carer.postcode);
+    selectBtn.addEventListener("click", () => {
+      const postcode = normalizePostcode(carer.postcode);
+      if (!postcode) {
+        setStatus("Selected carer has no postcode.", true);
+        return;
+      }
+      staffPostcodeInput.value = postcode;
+      setStatus(`Staff postcode set from ${carer.name || "carer"}.`);
+    });
+
+    li.append(info, selectBtn);
+    carerSearchResults.appendChild(li);
   }
 }
 
@@ -965,9 +1044,15 @@ async function init() {
     }
     loadSavedRuns();
     renderClientPostcodes();
+    setCarerSearchStatus("Loading carers...");
     setClientSearchStatus("Loading clients...");
-    const clientsPayload = await directoryApi.listClients({ limit: 1000 });
+    const [clientsPayload, carersPayload] = await Promise.all([
+      directoryApi.listClients({ limit: 1000 }),
+      directoryApi.listCarers({ limit: 500 }),
+    ]);
     allClients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
+    allCarers = Array.isArray(carersPayload?.carers) ? carersPayload.carers : [];
+    renderCarerSearchResults();
     renderAreaFilters();
     renderClientSearchResults();
   } catch (error) {
@@ -977,6 +1062,7 @@ async function init() {
     }
     console.error(error);
     setStatus(error?.message || "Could not initialize authentication.", true);
+    setCarerSearchStatus(error?.message || "Could not load carers.", true);
     setClientSearchStatus(error?.message || "Could not load clients.", true);
   } finally {
     document.body.classList.remove("auth-pending");
@@ -996,6 +1082,10 @@ clientPostcodeInput?.addEventListener("keydown", (event) => {
 
 clientSearchInput?.addEventListener("input", () => {
   renderClientSearchResults();
+});
+
+carerSearchInput?.addEventListener("input", () => {
+  renderCarerSearchResults();
 });
 
 runNameInput?.addEventListener("keydown", (event) => {
@@ -1026,11 +1116,15 @@ clearRunBtn?.addEventListener("click", () => {
   }
   staffPostcodeInput.value = "";
   clientPostcodeInput.value = "";
+  if (carerSearchInput) {
+    carerSearchInput.value = "";
+  }
   if (clientSearchInput) {
     clientSearchInput.value = "";
   }
   selectedArea = "ALL";
   selectedClientStops.length = 0;
+  renderCarerSearchResults();
   renderClientPostcodes();
   renderAreaFilters();
   renderClientSearchResults();

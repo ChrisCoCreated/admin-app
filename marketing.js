@@ -12,7 +12,6 @@ const lightboxEl = document.getElementById("photoLightbox");
 const lightboxImage = document.getElementById("lightboxImage");
 const lightboxVideo = document.getElementById("lightboxVideo");
 const lightboxCaption = document.getElementById("lightboxCaption");
-const lightboxCopyLinkBtn = document.getElementById("lightboxCopyLinkBtn");
 const lightboxCloseBtn = document.getElementById("lightboxCloseBtn");
 const lightboxPrevBtn = document.getElementById("lightboxPrevBtn");
 const lightboxNextBtn = document.getElementById("lightboxNextBtn");
@@ -27,7 +26,6 @@ let visibleMarketingPhotos = [];
 let consentFilterOn = false;
 let activePhotoIndex = -1;
 let attemptedVideoSources = new Set();
-let copyLabelResetTimer = null;
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -45,30 +43,6 @@ function setPhotosStatus(message, isError = false) {
   }
   photosStatus.textContent = message;
   photosStatus.classList.toggle("error", isError);
-}
-
-async function copyImageToClipboard(url) {
-  const value = String(url || "").trim();
-  if (!value) {
-    throw new Error("No image available.");
-  }
-  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
-    throw new Error("Clipboard image copy is unavailable in this browser.");
-  }
-
-  const payload = await directoryApi.getMarketingMedia({ url: value });
-  const mimeType = String(payload?.mimeType || "image/png");
-  const dataBase64 = String(payload?.dataBase64 || "");
-  if (!dataBase64) {
-    throw new Error("Image payload missing.");
-  }
-  const binary = atob(dataBase64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  const blob = new Blob([bytes], { type: mimeType });
-  await navigator.clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
 }
 
 function isVideoMedia(photo) {
@@ -103,13 +77,6 @@ function renderLightboxPhoto() {
   const photo = visibleMarketingPhotos[activePhotoIndex];
   if (!photo) {
     return;
-  }
-  const originalUrl = photo.mediaUrl || photo.attachmentUrl || photo.imageUrl || "";
-  if (lightboxCopyLinkBtn) {
-    const copyUrl = photo.imageUrl || photo.mediaUrl || photo.attachmentUrl || "";
-    lightboxCopyLinkBtn.dataset.url = copyUrl;
-    lightboxCopyLinkBtn.hidden = !originalUrl;
-    lightboxCopyLinkBtn.textContent = "Copy image";
   }
 
   if (isVideoMedia(photo)) {
@@ -156,15 +123,6 @@ function closeLightbox() {
   lightboxVideo.pause();
   lightboxVideo.src = "";
   lightboxVideo.hidden = true;
-  if (lightboxCopyLinkBtn) {
-    lightboxCopyLinkBtn.dataset.url = "";
-    lightboxCopyLinkBtn.hidden = true;
-    lightboxCopyLinkBtn.textContent = "Copy image";
-  }
-  if (copyLabelResetTimer) {
-    clearTimeout(copyLabelResetTimer);
-    copyLabelResetTimer = null;
-  }
   attemptedVideoSources = new Set();
   activePhotoIndex = -1;
   document.body.classList.remove("lightbox-open");
@@ -221,31 +179,7 @@ function renderPhotoGrid(photos) {
     caption.className = "marketing-photo-caption";
     caption.textContent = photo.client || photo.title || "Untitled";
 
-    const actions = document.createElement("div");
-    actions.className = "marketing-photo-actions";
-    const copyLinkBtn = document.createElement("button");
-    copyLinkBtn.type = "button";
-    copyLinkBtn.className = "marketing-photo-copy-link";
-    copyLinkBtn.textContent = "Copy image";
-    copyLinkBtn.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const sourceUrl = photo.imageUrl || photo.mediaUrl || photo.attachmentUrl || "";
-      try {
-        await copyImageToClipboard(sourceUrl);
-        copyLinkBtn.textContent = "Copied";
-        setTimeout(() => {
-          copyLinkBtn.textContent = "Copy image";
-        }, 1400);
-      } catch {
-        copyLinkBtn.textContent = "Failed";
-        setTimeout(() => {
-          copyLinkBtn.textContent = "Copy image";
-        }, 1400);
-      }
-    });
-    actions.append(copyLinkBtn);
-
-    button.append(media, caption, actions);
+    button.append(media, caption);
     button.addEventListener("click", () => openLightbox(index));
     fragment.append(button);
   }
@@ -334,23 +268,6 @@ signOutBtn?.addEventListener("click", async () => {
 lightboxCloseBtn?.addEventListener("click", closeLightbox);
 lightboxPrevBtn?.addEventListener("click", () => stepLightbox(-1));
 lightboxNextBtn?.addEventListener("click", () => stepLightbox(1));
-lightboxCopyLinkBtn?.addEventListener("click", async () => {
-  const sourceUrl = String(lightboxCopyLinkBtn.dataset.url || "").trim();
-  try {
-    await copyImageToClipboard(sourceUrl);
-    lightboxCopyLinkBtn.textContent = "Copied";
-  } catch {
-    lightboxCopyLinkBtn.textContent = "Failed";
-  }
-  if (copyLabelResetTimer) {
-    clearTimeout(copyLabelResetTimer);
-  }
-  copyLabelResetTimer = setTimeout(() => {
-    if (lightboxCopyLinkBtn) {
-      lightboxCopyLinkBtn.textContent = "Copy image";
-    }
-  }, 1400);
-});
 lightboxVideo?.addEventListener("error", () => {
   const photo = visibleMarketingPhotos[activePhotoIndex];
   if (!photo || !isVideoMedia(photo)) {
