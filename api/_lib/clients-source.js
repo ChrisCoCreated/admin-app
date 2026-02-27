@@ -2,9 +2,11 @@ const fs = require("fs/promises");
 const path = require("path");
 
 function normalizeClient(client) {
+  const status = String(client.status || "").trim().toLowerCase();
   return {
     id: String(client.id || "").trim(),
     name: String(client.name || "").trim(),
+    status: status || "active",
     area: String(client.area || "").trim(),
     address: String(client.address || "").trim(),
     town: String(client.town || "").trim(),
@@ -204,6 +206,7 @@ function mapGraphItemToClient(item) {
       "Address_x0020_Line_x0020_1",
     ]) || inferAddressLikeValue();
   const area = pickFieldValue(["Area", "Location", "Patch", "Zone"]);
+  const status = pickFieldValue(["Status", "ClientStatus", "State", "CurrentStatus"]);
   const town = pickFieldValue(["Town", "City", "Suburb", "Town_x0020_City"]);
   const county = pickFieldValue(["County", "Region", "State"]);
   const postcode = pickFieldValue([
@@ -218,6 +221,7 @@ function mapGraphItemToClient(item) {
   return normalizeClient({
     id: graphId,
     name,
+    status,
     area,
     address,
     town,
