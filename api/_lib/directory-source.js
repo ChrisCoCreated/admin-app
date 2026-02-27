@@ -13,6 +13,22 @@ let carersCache = {
   inFlight: null,
 };
 
+function getDirectoryCacheTtlMs() {
+  const configured = Number(process.env.ONETOUCH_DIRECTORY_CACHE_TTL_MS || 180000);
+  if (!Number.isFinite(configured) || configured < 0) {
+    return 180000;
+  }
+  return Math.floor(configured);
+}
+
+function getCarersCacheTtlMs() {
+  const configured = Number(process.env.ONETOUCH_CARERS_CACHE_TTL_MS || getDirectoryCacheTtlMs());
+  if (!Number.isFinite(configured) || configured < 0) {
+    return getDirectoryCacheTtlMs();
+  }
+  return Math.floor(configured);
+}
+
 function normalizeString(value) {
   return String(value || "").trim();
 }
@@ -337,52 +353,70 @@ async function loadCarersDirectoryData() {
 }
 
 async function readDirectoryData() {
+  function refreshDirectoryData() {
+    if (directoryCache.inFlight) {
+      return directoryCache.inFlight;
+    }
+
+    directoryCache.inFlight = loadDirectoryData()
+      .then((data) => {
+        directoryCache.data = data;
+        directoryCache.expiresAtMs = Date.now() + getDirectoryCacheTtlMs();
+        return data;
+      })
+      .finally(() => {
+        directoryCache.inFlight = null;
+      });
+
+    return directoryCache.inFlight;
+  }
+
   const now = Date.now();
 
   if (directoryCache.data && directoryCache.expiresAtMs > now) {
     return directoryCache.data;
   }
 
-  if (directoryCache.inFlight) {
-    return directoryCache.inFlight;
+  if (directoryCache.data) {
+    void refreshDirectoryData();
+    return directoryCache.data;
   }
 
-  directoryCache.inFlight = loadDirectoryData()
-    .then((data) => {
-      directoryCache.data = data;
-      directoryCache.expiresAtMs = Date.now() + 45_000;
-      return data;
-    })
-    .finally(() => {
-      directoryCache.inFlight = null;
-    });
-
-  return directoryCache.inFlight;
+  return refreshDirectoryData();
 }
 
 module.exports = {
   readCarersDirectoryData: async function readCarersDirectoryData() {
+    function refreshCarersDirectoryData() {
+      if (carersCache.inFlight) {
+        return carersCache.inFlight;
+      }
+
+      carersCache.inFlight = loadCarersDirectoryData()
+        .then((data) => {
+          carersCache.data = data;
+          carersCache.expiresAtMs = Date.now() + getCarersCacheTtlMs();
+          return data;
+        })
+        .finally(() => {
+          carersCache.inFlight = null;
+        });
+
+      return carersCache.inFlight;
+    }
+
     const now = Date.now();
 
     if (carersCache.data && carersCache.expiresAtMs > now) {
       return carersCache.data;
     }
 
-    if (carersCache.inFlight) {
-      return carersCache.inFlight;
+    if (carersCache.data) {
+      void refreshCarersDirectoryData();
+      return carersCache.data;
     }
 
-    carersCache.inFlight = loadCarersDirectoryData()
-      .then((data) => {
-        carersCache.data = data;
-        carersCache.expiresAtMs = Date.now() + 45_000;
-        return data;
-      })
-      .finally(() => {
-        carersCache.inFlight = null;
-      });
-
-    return carersCache.inFlight;
+    return refreshCarersDirectoryData();
   },
   readDirectoryData,
 };

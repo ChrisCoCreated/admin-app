@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
         })
       : directory.clients;
 
-    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Cache-Control", "private, max-age=30");
     res.setHeader("X-Client-Source", directory.source);
 
     res.status(200).json({

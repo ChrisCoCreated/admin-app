@@ -314,21 +314,43 @@ async function listClients() {
 }
 
 async function listCarers() {
-  const allRecords = [];
-  let page = 1;
+  const firstPayload = await callOneTouch("carers/all", { page: 1 });
+  const allRecords = [...resolveRecords(firstPayload, ["carers"])];
 
-  while (true) {
-    const payload = await callOneTouch("carers/all", { page });
-    const records = resolveRecords(payload, ["carers"]);
-    allRecords.push(...records);
+  const firstCurrentPage = Number(firstPayload?.current_page || 1);
+  const firstLastPage = Number(firstPayload?.last_page || firstCurrentPage);
+  const hasNextUrl = Boolean(firstPayload?.next_page_url);
+  const hasMorePages =
+    hasNextUrl || (Number.isFinite(firstLastPage) && firstLastPage > firstCurrentPage);
 
-    const currentPage = Number(payload?.current_page || page);
-    const lastPage = Number(payload?.last_page || currentPage);
-    const hasNextUrl = Boolean(payload?.next_page_url);
-    if (!hasNextUrl && (!Number.isFinite(lastPage) || currentPage >= lastPage)) {
-      break;
+  if (hasMorePages && Number.isFinite(firstLastPage) && firstLastPage > 1) {
+    const pageNumbers = [];
+    for (let page = 2; page <= firstLastPage; page += 1) {
+      pageNumbers.push(page);
     }
-    page = currentPage + 1;
+
+    const concurrencyRaw = Number(process.env.ONETOUCH_CARERS_PAGE_CONCURRENCY || 4);
+    const concurrency = Number.isFinite(concurrencyRaw)
+      ? Math.max(1, Math.min(Math.floor(concurrencyRaw), 10))
+      : 4;
+    let nextIndex = 0;
+
+    const workers = Array.from(
+      { length: Math.min(concurrency, pageNumbers.length) },
+      async () => {
+        while (true) {
+          const index = nextIndex;
+          nextIndex += 1;
+          if (index >= pageNumbers.length) {
+            return;
+          }
+          const payload = await callOneTouch("carers/all", { page: pageNumbers[index] });
+          allRecords.push(...resolveRecords(payload, ["carers"]));
+        }
+      }
+    );
+
+    await Promise.all(workers);
   }
 
   return allRecords.map(normalizeCarer).filter((carer) => carer.id);
