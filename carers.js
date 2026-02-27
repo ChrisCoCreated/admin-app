@@ -6,6 +6,7 @@ import { renderTopNavigation } from "./navigation.js";
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
+const carerStatusFilters = document.getElementById("carerStatusFilters");
 const carersTableBody = document.getElementById("carersTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
@@ -18,13 +19,18 @@ const detailFields = {
   postcode: detailRoot?.querySelector('[data-field="postcode"]'),
   email: detailRoot?.querySelector('[data-field="email"]'),
   phone: detailRoot?.querySelector('[data-field="phone"]'),
+  status: detailRoot?.querySelector('[data-field="status"]'),
+  tags: detailRoot?.querySelector('[data-field="tags"]'),
   visitCount: detailRoot?.querySelector('[data-field="visitCount"]'),
   clientCount: detailRoot?.querySelector('[data-field="clientCount"]'),
   lastVisitAt: detailRoot?.querySelector('[data-field="lastVisitAt"]'),
 };
 
+const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
+
 let allCarers = [];
 let selectedCarerId = "";
+let selectedCarerStatuses = new Set(DEFAULT_STATUS_FILTERS);
 let account = null;
 
 const authController = createAuthController({
@@ -65,6 +71,8 @@ function setDetail(carer) {
     detailFields.postcode.textContent = "-";
     detailFields.email.textContent = "-";
     detailFields.phone.textContent = "-";
+    detailFields.status.textContent = "-";
+    detailFields.tags.textContent = "-";
     detailFields.visitCount.textContent = "-";
     detailFields.clientCount.textContent = "-";
     detailFields.lastVisitAt.textContent = "-";
@@ -77,6 +85,8 @@ function setDetail(carer) {
   detailFields.postcode.textContent = carer.postcode || "-";
   detailFields.email.textContent = carer.email || "-";
   detailFields.phone.textContent = carer.phone || "-";
+  detailFields.status.textContent = formatStatusLabel(carer.status);
+  detailFields.tags.textContent = formatTags(carer.tags);
   detailFields.visitCount.textContent = String(carer.relationships?.visitCount || 0);
   detailFields.clientCount.textContent = String(carer.relationships?.clientCount || 0);
   detailFields.lastVisitAt.textContent = formatDateTime(carer.relationships?.lastVisitAt);
@@ -97,17 +107,131 @@ function setDetail(carer) {
   }
 }
 
-function getFilteredCarers() {
-  const query = String(searchInput.value || "").trim().toLowerCase();
-  if (!query) {
-    return allCarers;
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function collectStatusOptions(items) {
+  const set = new Set();
+  for (const item of items) {
+    const status = normalizeStatus(item?.status);
+    if (status) {
+      set.add(status);
+    }
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function formatStatusLabel(status) {
+  const normalized = normalizeStatus(status);
+  if (!normalized) {
+    return "Unknown";
+  }
+  return normalized
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatTags(tags) {
+  if (!Array.isArray(tags) || !tags.length) {
+    return "-";
+  }
+  const unique = Array.from(
+    new Set(
+      tags
+        .map((tag) => String(tag || "").trim())
+        .filter(Boolean)
+    )
+  );
+  return unique.length ? unique.join(", ") : "-";
+}
+
+function passesStatusFilter(status) {
+  if (!selectedCarerStatuses.size) {
+    return true;
+  }
+  const normalized = normalizeStatus(status);
+  if (!normalized) {
+    return false;
+  }
+  return selectedCarerStatuses.has(normalized);
+}
+
+function renderStatusFilters() {
+  if (!carerStatusFilters) {
+    return;
   }
 
+  const options = collectStatusOptions(allCarers);
+  if (!options.length) {
+    carerStatusFilters.hidden = true;
+    return;
+  }
+
+  const nextSelected = new Set(Array.from(selectedCarerStatuses).filter((status) => options.includes(status)));
+  if (!nextSelected.size) {
+    selectedCarerStatuses = new Set(options.filter((status) => DEFAULT_STATUS_FILTERS.has(status)));
+    if (!selectedCarerStatuses.size) {
+      selectedCarerStatuses = new Set(options);
+    }
+  } else {
+    selectedCarerStatuses = nextSelected;
+  }
+
+  carerStatusFilters.hidden = false;
+  carerStatusFilters.innerHTML = "";
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `status-filter-btn${selectedCarerStatuses.size === options.length ? " active" : ""}`;
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    selectedCarerStatuses = new Set(options);
+    renderStatusFilters();
+    renderCarers();
+  });
+  carerStatusFilters.appendChild(allBtn);
+
+  for (const status of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `status-filter-btn${selectedCarerStatuses.has(status) ? " active" : ""}`;
+    btn.textContent = formatStatusLabel(status);
+    btn.addEventListener("click", () => {
+      const next = new Set(selectedCarerStatuses);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      if (!next.size) {
+        next.add(status);
+      }
+      selectedCarerStatuses = next;
+      renderStatusFilters();
+      renderCarers();
+    });
+    carerStatusFilters.appendChild(btn);
+  }
+}
+
+function getFilteredCarers() {
+  const query = String(searchInput.value || "").trim().toLowerCase();
   return allCarers.filter((carer) => {
+    if (!passesStatusFilter(carer.status)) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
     return (
       String(carer.id || "").toLowerCase().includes(query) ||
       String(carer.name || "").toLowerCase().includes(query) ||
-      String(carer.postcode || "").toLowerCase().includes(query)
+      String(carer.postcode || "").toLowerCase().includes(query) ||
+      formatStatusLabel(carer.status).toLowerCase().includes(query) ||
+      formatTags(carer.tags).toLowerCase().includes(query)
     );
   });
 }
@@ -143,6 +267,7 @@ function renderCarers() {
     tr.innerHTML = `
       <td>${escapeHtml(carer.id)}</td>
       <td>${escapeHtml(carer.name)}</td>
+      <td>${escapeHtml(formatStatusLabel(carer.status))}</td>
       <td>${escapeHtml(carer.postcode || "-")}</td>
       <td>${escapeHtml(String(carer.relationships?.clientCount || 0))}</td>
       <td>${escapeHtml(String(carer.relationships?.visitCount || 0))}</td>
@@ -185,6 +310,7 @@ async function init() {
     warningState.hidden = warnings.length === 0;
     warningState.textContent = warnings.join(" ");
 
+    renderStatusFilters();
     setStatus(`Loaded ${allCarers.length} carer(s).`);
     renderCarers();
   } catch (error) {

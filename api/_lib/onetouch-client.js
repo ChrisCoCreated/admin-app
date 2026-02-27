@@ -265,6 +265,11 @@ function buildName(record, firstKeys, lastKeys, fallbackKeys) {
 function normalizeClient(record) {
   const id = asString(record?.id || record?.client_id || record?.external_id || record?.ID);
   const name = buildName(record, ["first_name", "firstname"], ["last_name", "lastname"], ["name", "full_name"]);
+  const tags = Array.isArray(record?.tags)
+    ? record.tags
+        .map((tag) => asString(tag?.tag || tag?.name || tag))
+        .filter(Boolean)
+    : [];
 
   return {
     id,
@@ -276,6 +281,7 @@ function normalizeClient(record) {
     email: asString(record?.email || record?.email_address),
     phone: asString(record?.phone || record?.mobile),
     status: asString(record?.status || record?.client_status),
+    tags,
     raw: record,
   };
 }
@@ -283,6 +289,11 @@ function normalizeClient(record) {
 function normalizeCarer(record) {
   const id = asString(record?.id || record?.carer_id || record?.external_id || record?.ID);
   const name = buildName(record, ["first_name", "firstname"], ["last_name", "lastname"], ["name", "full_name"]);
+  const tags = Array.isArray(record?.tags)
+    ? record.tags
+        .map((tag) => asString(tag?.tag || tag?.name || tag))
+        .filter(Boolean)
+    : [];
 
   return {
     id,
@@ -291,6 +302,7 @@ function normalizeCarer(record) {
     phone: asString(record?.phone_mobile || record?.phone || record?.mobile),
     postcode: asString(record?.postcode || record?.post_code || record?.postCode || record?.zip),
     status: asString(record?.status || record?.carer_status),
+    tags,
     raw: record,
   };
 }
@@ -307,10 +319,46 @@ function normalizeVisit(record) {
 }
 
 async function listClients() {
-  const payload = await callOneTouch("clients/all");
-  const records = resolveRecords(payload, ["clients"]);
+  const firstPayload = await callOneTouch("clients/all", { page: 1 });
+  const allRecords = [...resolveRecords(firstPayload, ["clients"])];
 
-  return records.map(normalizeClient).filter((client) => client.id);
+  const firstCurrentPage = Number(firstPayload?.current_page || 1);
+  const firstLastPage = Number(firstPayload?.last_page || firstCurrentPage);
+  const hasNextUrl = Boolean(firstPayload?.next_page_url);
+  const hasMorePages =
+    hasNextUrl || (Number.isFinite(firstLastPage) && firstLastPage > firstCurrentPage);
+
+  if (hasMorePages && Number.isFinite(firstLastPage) && firstLastPage > 1) {
+    const pageNumbers = [];
+    for (let page = 2; page <= firstLastPage; page += 1) {
+      pageNumbers.push(page);
+    }
+
+    const concurrencyRaw = Number(process.env.ONETOUCH_CLIENTS_PAGE_CONCURRENCY || 4);
+    const concurrency = Number.isFinite(concurrencyRaw)
+      ? Math.max(1, Math.min(Math.floor(concurrencyRaw), 10))
+      : 4;
+    let nextIndex = 0;
+
+    const workers = Array.from(
+      { length: Math.min(concurrency, pageNumbers.length) },
+      async () => {
+        while (true) {
+          const index = nextIndex;
+          nextIndex += 1;
+          if (index >= pageNumbers.length) {
+            return;
+          }
+          const payload = await callOneTouch("clients/all", { page: pageNumbers[index] });
+          allRecords.push(...resolveRecords(payload, ["clients"]));
+        }
+      }
+    );
+
+    await Promise.all(workers);
+  }
+
+  return allRecords.map(normalizeClient).filter((client) => client.id);
 }
 
 async function listCarers() {

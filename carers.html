@@ -37,6 +37,7 @@
           Search
           <input id="searchInput" type="search" placeholder="Search by name, id or postcode" autocomplete="off" />
         </label>
+        <div id="carerStatusFilters" class="status-filter-row"></div>
         <p id="statusMessage" class="muted">Loading carers...</p>
         <p id="warningState" class="muted" hidden></p>
       </section>
@@ -50,6 +51,7 @@
                 <tr>
                   <th>ID</th>
                   <th>Name</th>
+                  <th>Status</th>
                   <th>Postcode</th>
                   <th>Clients</th>
                   <th>Visits</th>
@@ -83,6 +85,14 @@
             <div>
               <dt>Phone</dt>
               <dd data-field="phone">-</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd data-field="status">-</dd>
+            </div>
+            <div>
+              <dt>Tags</dt>
+              <dd data-field="tags">-</dd>
             </div>
             <div>
               <dt>Total Visits</dt>

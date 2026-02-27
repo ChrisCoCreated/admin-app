@@ -6,6 +6,7 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
+const clientStatusFilters = document.getElementById("clientStatusFilters");
 const clientsTableBody = document.getElementById("clientsTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
@@ -18,13 +19,18 @@ const detailFields = {
   postcode: detailRoot?.querySelector('[data-field="postcode"]'),
   email: detailRoot?.querySelector('[data-field="email"]'),
   phone: detailRoot?.querySelector('[data-field="phone"]'),
+  status: detailRoot?.querySelector('[data-field="status"]'),
+  tags: detailRoot?.querySelector('[data-field="tags"]'),
   visitCount: detailRoot?.querySelector('[data-field="visitCount"]'),
   carerCount: detailRoot?.querySelector('[data-field="carerCount"]'),
   lastVisitAt: detailRoot?.querySelector('[data-field="lastVisitAt"]'),
 };
 
+const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
+
 let allClients = [];
 let selectedClientId = "";
+let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
 let account = null;
 
 const authController = createAuthController({
@@ -70,6 +76,8 @@ function setDetail(client) {
     detailFields.postcode.textContent = "-";
     detailFields.email.textContent = "-";
     detailFields.phone.textContent = "-";
+    detailFields.status.textContent = "-";
+    detailFields.tags.textContent = "-";
     detailFields.visitCount.textContent = "-";
     detailFields.carerCount.textContent = "-";
     detailFields.lastVisitAt.textContent = "-";
@@ -82,6 +90,8 @@ function setDetail(client) {
   detailFields.postcode.textContent = client.postcode || "-";
   detailFields.email.textContent = client.email || "-";
   detailFields.phone.textContent = client.phone || "-";
+  detailFields.status.textContent = formatStatusLabel(client.status);
+  detailFields.tags.textContent = formatTags(client.tags);
   detailFields.visitCount.textContent = String(client.relationships?.visitCount || 0);
   detailFields.carerCount.textContent = String(client.relationships?.carerCount || 0);
   detailFields.lastVisitAt.textContent = formatDateTime(client.relationships?.lastVisitAt);
@@ -102,17 +112,131 @@ function setDetail(client) {
   }
 }
 
-function getFilteredClients() {
-  const query = String(searchInput.value || "").trim().toLowerCase();
-  if (!query) {
-    return allClients;
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function collectStatusOptions(items) {
+  const set = new Set();
+  for (const item of items) {
+    const status = normalizeStatus(item?.status);
+    if (status) {
+      set.add(status);
+    }
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function formatStatusLabel(status) {
+  const normalized = normalizeStatus(status);
+  if (!normalized) {
+    return "Unknown";
+  }
+  return normalized
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatTags(tags) {
+  if (!Array.isArray(tags) || !tags.length) {
+    return "-";
+  }
+  const unique = Array.from(
+    new Set(
+      tags
+        .map((tag) => String(tag || "").trim())
+        .filter(Boolean)
+    )
+  );
+  return unique.length ? unique.join(", ") : "-";
+}
+
+function passesStatusFilter(status) {
+  if (!selectedClientStatuses.size) {
+    return true;
+  }
+  const normalized = normalizeStatus(status);
+  if (!normalized) {
+    return false;
+  }
+  return selectedClientStatuses.has(normalized);
+}
+
+function renderStatusFilters() {
+  if (!clientStatusFilters) {
+    return;
   }
 
+  const options = collectStatusOptions(allClients);
+  if (!options.length) {
+    clientStatusFilters.hidden = true;
+    return;
+  }
+
+  const nextSelected = new Set(Array.from(selectedClientStatuses).filter((status) => options.includes(status)));
+  if (!nextSelected.size) {
+    selectedClientStatuses = new Set(options.filter((status) => DEFAULT_STATUS_FILTERS.has(status)));
+    if (!selectedClientStatuses.size) {
+      selectedClientStatuses = new Set(options);
+    }
+  } else {
+    selectedClientStatuses = nextSelected;
+  }
+
+  clientStatusFilters.hidden = false;
+  clientStatusFilters.innerHTML = "";
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `status-filter-btn${selectedClientStatuses.size === options.length ? " active" : ""}`;
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    selectedClientStatuses = new Set(options);
+    renderStatusFilters();
+    renderClients();
+  });
+  clientStatusFilters.appendChild(allBtn);
+
+  for (const status of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `status-filter-btn${selectedClientStatuses.has(status) ? " active" : ""}`;
+    btn.textContent = formatStatusLabel(status);
+    btn.addEventListener("click", () => {
+      const next = new Set(selectedClientStatuses);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      if (!next.size) {
+        next.add(status);
+      }
+      selectedClientStatuses = next;
+      renderStatusFilters();
+      renderClients();
+    });
+    clientStatusFilters.appendChild(btn);
+  }
+}
+
+function getFilteredClients() {
+  const query = String(searchInput.value || "").trim().toLowerCase();
   return allClients.filter((client) => {
+    if (!passesStatusFilter(client.status)) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
     return (
       String(client.id || "").toLowerCase().includes(query) ||
       String(client.name || "").toLowerCase().includes(query) ||
-      String(client.postcode || "").toLowerCase().includes(query)
+      String(client.postcode || "").toLowerCase().includes(query) ||
+      formatStatusLabel(client.status).toLowerCase().includes(query) ||
+      formatTags(client.tags).toLowerCase().includes(query)
     );
   });
 }
@@ -148,6 +272,7 @@ function renderClients() {
     tr.innerHTML = `
       <td>${escapeHtml(client.id)}</td>
       <td>${escapeHtml(client.name)}</td>
+      <td>${escapeHtml(formatStatusLabel(client.status))}</td>
       <td>${escapeHtml(client.postcode || "-")}</td>
       <td>${escapeHtml(String(client.relationships?.carerCount || 0))}</td>
       <td>${escapeHtml(String(client.relationships?.visitCount || 0))}</td>
@@ -190,6 +315,7 @@ async function init() {
     warningState.hidden = warnings.length === 0;
     warningState.textContent = warnings.join(" ");
 
+    renderStatusFilters();
     setStatus(`Loaded ${allClients.length} client(s).`);
     renderClients();
   } catch (error) {
