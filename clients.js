@@ -19,6 +19,7 @@ const copyIdBody = document.getElementById("copyIdBody");
 const missingBody = document.getElementById("missingBody");
 const updateBody = document.getElementById("updateBody");
 const ambiguousBody = document.getElementById("ambiguousBody");
+const updateAllBtn = document.getElementById("updateAllBtn");
 
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
@@ -318,6 +319,21 @@ function setReconcileBusy(isBusy) {
   if (reconcileRefreshBtn) {
     reconcileRefreshBtn.disabled = isBusy;
   }
+  if (updateAllBtn) {
+    const hasItems = Array.isArray(reconcilePreview?.updateCandidates) && reconcilePreview.updateCandidates.length > 0;
+    updateAllBtn.disabled = isBusy || !hasItems;
+  }
+  if (reconcilePanel) {
+    const controls = reconcilePanel.querySelectorAll(".recon-action-btn, .recon-select");
+    for (const control of controls) {
+      if (control.classList.contains("recon-action-btn")) {
+        const baseDisabled = control.dataset.baseDisabled === "1";
+        control.disabled = isBusy || baseDisabled;
+      } else {
+        control.disabled = isBusy;
+      }
+    }
+  }
 }
 
 function renderEmptyRow(root, message, colspan = 4) {
@@ -335,7 +351,8 @@ function createActionButton(label, onClick, disabled = false) {
   btn.type = "button";
   btn.className = "secondary recon-action-btn";
   btn.textContent = label;
-  btn.disabled = disabled || reconcileBusy;
+  btn.dataset.baseDisabled = disabled ? "1" : "0";
+  btn.disabled = disabled;
   btn.addEventListener("click", async (event) => {
     event.preventDefault();
     await onClick();
@@ -414,7 +431,9 @@ function renderCopyCandidates(items) {
     tr.innerHTML = `
       <td>${escapeHtml(item?.sharePoint?.name || "-")}</td>
       <td>${escapeHtml(item?.sharePoint?.dateOfBirth || "-")}</td>
-      <td>${escapeHtml(item?.oneTouch?.name || "-")} (${escapeHtml(item?.oneTouch?.id || "-")})</td>
+      <td>${escapeHtml(item?.oneTouch?.name || "-")} (${escapeHtml(item?.oneTouch?.id || "-")})${
+        item?.matchType === "fuzzy" ? " [fuzzy]" : ""
+      }</td>
       <td></td>
     `;
     const actionCell = tr.lastElementChild;
@@ -477,6 +496,9 @@ function renderUpdateCandidates(items) {
   updateBody.innerHTML = "";
   if (!items.length) {
     renderEmptyRow(updateBody, "No update candidates.");
+    if (updateAllBtn) {
+      updateAllBtn.disabled = true;
+    }
     return;
   }
 
@@ -505,6 +527,10 @@ function renderUpdateCandidates(items) {
       )
     );
     updateBody.appendChild(tr);
+  }
+
+  if (updateAllBtn) {
+    updateAllBtn.disabled = reconcileBusy || items.length === 0;
   }
 }
 
@@ -565,6 +591,51 @@ function renderReconcilePreview() {
   renderMissingCandidates(Array.isArray(payload.missingInSharePoint) ? payload.missingInSharePoint : []);
   renderUpdateCandidates(Array.isArray(payload.updateCandidates) ? payload.updateCandidates : []);
   renderAmbiguousCandidates(Array.isArray(payload.ambiguousMatches) ? payload.ambiguousMatches : []);
+}
+
+async function applyUpdateAllCandidates() {
+  const items = Array.isArray(reconcilePreview?.updateCandidates) ? reconcilePreview.updateCandidates : [];
+  if (!items.length || reconcileBusy) {
+    return;
+  }
+
+  setReconcileBusy(true);
+  setReconcileStatus(`Updating ${items.length} record(s)...`);
+  let updated = 0;
+  let failed = 0;
+  let lastError = "";
+
+  try {
+    for (const item of items) {
+      try {
+        const response = await directoryApi.applyClientsReconcileAction({
+          action: "update_record",
+          sharePointItemId: item?.sharePoint?.itemId || "",
+          oneTouchClientId: item?.oneTouch?.id || "",
+          expectedFingerprint: item?.expectedFingerprint || "",
+        });
+        if (response?.result?.updated === false) {
+          continue;
+        }
+        updated += 1;
+      } catch (error) {
+        failed += 1;
+        lastError = error?.message || String(error);
+      }
+    }
+  } finally {
+    setReconcileBusy(false);
+  }
+
+  await Promise.all([refreshClientsData(), loadReconcilePreview()]);
+  if (failed > 0) {
+    setReconcileStatus(
+      `Update all complete: ${updated} updated, ${failed} failed.${lastError ? ` Last error: ${lastError}` : ""}`,
+      true
+    );
+    return;
+  }
+  setReconcileStatus(`Update all complete: ${updated} updated.`);
 }
 
 function renderClients() {
@@ -662,6 +733,10 @@ searchInput?.addEventListener("input", () => {
 
 reconcileRefreshBtn?.addEventListener("click", async () => {
   await loadReconcilePreview();
+});
+
+updateAllBtn?.addEventListener("click", async () => {
+  await applyUpdateAllCandidates();
 });
 
 signOutBtn?.addEventListener("click", async () => {

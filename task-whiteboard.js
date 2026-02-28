@@ -543,15 +543,11 @@ async function refreshBoard() {
   setBusy(true);
   setStatus("Loading whiteboard tasks...");
   try {
-    const payload = await directoryApi.getUnifiedTasks();
+    const payload = await directoryApi.getWhiteboardTasks();
     const tasks = Array.isArray(payload?.tasks) ? payload.tasks : [];
 
     tasksByKey = new Map();
     for (const task of tasks) {
-      if (!isPinned(task?.overlay?.pinned)) {
-        continue;
-      }
-
       const key = taskKey(task);
       const overlay = task.overlay || {};
       tasksByKey.set(key, {
@@ -568,9 +564,7 @@ async function refreshBoard() {
       });
     }
 
-    const meta = payload?.meta || {};
-    const partialTag = meta.partial ? " (partial provider data)" : "";
-    setStatus(`Loaded ${tasksByKey.size} pinned task(s) from ${tasks.length} task(s)${partialTag}.`);
+    setStatus(`Loaded ${tasksByKey.size} pinned task(s) from TaskOverlay.`);
     renderBoard();
   } catch (error) {
     console.error("[whiteboard] Refresh failed", error);

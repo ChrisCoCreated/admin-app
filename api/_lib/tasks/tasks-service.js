@@ -155,6 +155,55 @@ async function getUnifiedTasks({ graphAccessToken, claims }) {
   return buildUnifiedTasks(graphClient, userUpn);
 }
 
+async function getWhiteboardTasks({ graphAccessToken, claims }) {
+  const userUpn = resolveUserUpn(claims);
+  const graphClient = createGraphDelegatedClient(graphAccessToken);
+  const overlaysBundle = await listOverlaysByUser(graphClient, userUpn);
+  const overlays = Array.isArray(overlaysBundle?.overlays) ? overlaysBundle.overlays : [];
+
+  const tasks = overlays
+    .filter((overlay) => overlay?.pinned === true)
+    .map((overlay) => {
+      return {
+        provider: String(overlay.provider || "").trim().toLowerCase(),
+        externalTaskId: String(overlay.externalTaskId || "").trim(),
+        externalContainerId: "",
+        title: String(overlay.title || "").trim() || String(overlay.externalTaskId || "").trim(),
+        createdDateTimeUtc: null,
+        dueDateTimeUtc: null,
+        isCompleted: false,
+        completedDateTimeUtc: null,
+        source: {
+          rawId: String(overlay.itemId || "").trim(),
+        },
+        overlay: {
+          itemId: overlay.itemId,
+          workingStatus: overlay.workingStatus,
+          workType: overlay.workType,
+          tags: overlay.tags,
+          activeStartedAt: overlay.activeStartedAt,
+          lastWorkedAt: overlay.lastWorkedAt,
+          energy: overlay.energy,
+          effortMinutes: overlay.effortMinutes,
+          impact: overlay.impact,
+          overlayNotes: overlay.overlayNotes,
+          pinned: overlay.pinned === true,
+          layout: overlay.layout || "",
+          category: overlay.category || "",
+          lastOverlayUpdatedAt: overlay.lastOverlayUpdatedAt,
+        },
+      };
+    });
+
+  return {
+    tasks,
+    meta: {
+      total: tasks.length,
+      source: "taskoverlay",
+    },
+  };
+}
+
 async function getUnifiedTasksCached({ graphAccessToken, claims }) {
   const userUpn = resolveUserUpn(claims);
   const key = unifiedTasksCacheKey(userUpn);
@@ -295,6 +344,7 @@ module.exports = {
   clearUnifiedTasksCache,
   getUnifiedTasks,
   getUnifiedTasksCached,
+  getWhiteboardTasks,
   mapGraphError,
   upsertOverlay,
 };

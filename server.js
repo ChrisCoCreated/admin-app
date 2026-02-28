@@ -16,6 +16,7 @@ const marketingPhotosHandler = require("./api/marketing/photos");
 const marketingMediaHandler = require("./api/marketing/media");
 const tasksUnifiedHandler = require("./api/tasks/unified");
 const tasksOverlayHandler = require("./api/tasks/overlay");
+const tasksWhiteboardHandler = require("./api/tasks/whiteboard");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -237,6 +238,11 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await tasksOverlayHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/tasks/whiteboard") {
+    await tasksWhiteboardHandler(apiReq, apiRes);
     return true;
   }
 

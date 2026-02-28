@@ -30,6 +30,43 @@ function normalizeName(value) {
     .replace(/\s+/g, " ");
 }
 
+function nameTokens(value) {
+  return normalizeName(value)
+    .split(" ")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function fuzzyNameMatch(left, right) {
+  const a = normalizeName(left);
+  const b = normalizeName(right);
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  if (a.includes(b) || b.includes(a)) {
+    return true;
+  }
+
+  const aTokens = new Set(nameTokens(a));
+  const bTokens = new Set(nameTokens(b));
+  if (!aTokens.size || !bTokens.size) {
+    return false;
+  }
+
+  let shared = 0;
+  for (const token of aTokens) {
+    if (bTokens.has(token)) {
+      shared += 1;
+    }
+  }
+
+  const ratio = shared / Math.max(aTokens.size, bTokens.size);
+  return ratio >= 0.67;
+}
+
 function normalizeId(value) {
   return normalizeText(value).toLowerCase();
 }
@@ -79,6 +116,33 @@ function datesMatch(left, right) {
     return false;
   }
   return a.year === b.year && a.month === b.month && a.day === b.day;
+}
+
+function findNameDobCandidates(sharePointClient, oneTouchClients) {
+  const sharePointName = normalizeName(sharePointClient?.name);
+  const sharePointDob = normalizeText(sharePointClient?.dateOfBirth);
+  if (!sharePointName || !sharePointDob) {
+    return { candidates: [], matchType: "none" };
+  }
+
+  const sameDob = oneTouchClients.filter((client) => {
+    if (!normalizeId(client?.id)) {
+      return false;
+    }
+    return datesMatch(sharePointDob, client?.dateOfBirth);
+  });
+
+  const exact = sameDob.filter((client) => normalizeName(client?.name) === sharePointName);
+  if (exact.length) {
+    return { candidates: exact, matchType: "exact" };
+  }
+
+  const fuzzy = sameDob.filter((client) => fuzzyNameMatch(client?.name, sharePointClient?.name));
+  if (fuzzy.length) {
+    return { candidates: fuzzy, matchType: "fuzzy" };
+  }
+
+  return { candidates: [], matchType: "none" };
 }
 
 function summarizeClient(client) {
@@ -196,21 +260,7 @@ async function buildReconciliationPreview() {
       continue;
     }
 
-    const sharePointName = normalizeName(sharePointClient?.name);
-    const sharePointDob = normalizeText(sharePointClient?.dateOfBirth);
-    if (!sharePointName || !sharePointDob) {
-      continue;
-    }
-
-    const candidates = oneTouchClients.filter((client) => {
-      if (!normalizeId(client?.id)) {
-        return false;
-      }
-      if (normalizeName(client?.name) !== sharePointName) {
-        return false;
-      }
-      return datesMatch(sharePointDob, client?.dateOfBirth);
-    });
+    const { candidates, matchType } = findNameDobCandidates(sharePointClient, oneTouchClients);
 
     if (candidates.length === 1) {
       const source = candidates[0];
@@ -219,6 +269,7 @@ async function buildReconciliationPreview() {
       copyOneTouchIdCandidates.push({
         sharePoint: summarizeClient(sharePointClient),
         oneTouch: summarizeClient(source),
+        matchType,
         expectedFingerprint: buildFingerprint({
           itemId: normalizeText(sharePointClient?.itemId),
           oneTouchId: normalizeText(source?.id),
@@ -232,6 +283,7 @@ async function buildReconciliationPreview() {
       ambiguousMatches.push({
         sharePoint: summarizeClient(sharePointClient),
         oneTouchCandidates: candidates.map((client) => summarizeClient(client)),
+        matchType,
         expectedFingerprint: buildFingerprint({
           itemId: normalizeText(sharePointClient?.itemId),
           sharePoint: summarizeClient(sharePointClient),
@@ -307,8 +359,8 @@ async function applyReconciliationAction(body) {
       throw error;
     }
     if (
-      normalizeName(sharePointClient.name) !== normalizeName(oneTouchClient.name) ||
-      !datesMatch(sharePointClient.dateOfBirth, oneTouchClient.dateOfBirth)
+      !datesMatch(sharePointClient.dateOfBirth, oneTouchClient.dateOfBirth) ||
+      !fuzzyNameMatch(sharePointClient.name, oneTouchClient.name)
     ) {
       const error = new Error("Selected OneTouch client no longer matches SharePoint name and date of birth.");
       error.status = 409;

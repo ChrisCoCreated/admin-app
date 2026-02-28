@@ -153,6 +153,16 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getWhiteboardTasks(query = {}) {
+      const response = await authFetch(buildUrl("/api/tasks/whiteboard", query), {
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+      });
+      if (!response.ok) {
+        await parseError(response, "Whiteboard tasks request failed");
+      }
+      return response.json();
+    },
+
     async upsertTaskOverlay({ provider, externalTaskId, patch }) {
       const response = await authFetch(endpoint("/api/tasks/overlay"), {
         method: "POST",

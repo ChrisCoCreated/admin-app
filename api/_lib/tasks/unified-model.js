@@ -16,6 +16,7 @@ const WRITABLE_OVERLAY_FIELDS = new Set([
 ]);
 
 const OVERLAY_FIELD_MAP = {
+  title: "Title",
   userUpn: "UserUPN",
   provider: "Provider",
   externalTaskId: "ExternalTaskId",
@@ -259,6 +260,7 @@ function fromOverlayFields(item) {
 
   const overlay = {
     itemId: String(item?.id || ""),
+    title: String(fields[OVERLAY_FIELD_MAP.title] || "").trim(),
     userUpn: parseUserUpnValue(fields[OVERLAY_FIELD_MAP.userUpn]),
     provider,
     externalTaskId,
