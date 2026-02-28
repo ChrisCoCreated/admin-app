@@ -31,6 +31,13 @@ function coerceBoolean(value) {
     return null;
   }
 
+  if (/not[\s_-]*given/.test(raw) || /withdrawn|refused|declined/.test(raw)) {
+    return false;
+  }
+  if (/(^|[;#,\s])given($|[;#,\s])/.test(raw)) {
+    return true;
+  }
+
   const compact = raw.replace(/[\s_-]+/g, "");
   if (compact.includes("notconsent")) {
     return false;
@@ -71,6 +78,70 @@ function coerceBoolean(value) {
   }
 
   return null;
+}
+
+function extractLookupText(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => extractLookupText(item)).find(Boolean) || "";
+  }
+  if (value && typeof value === "object") {
+    return String(
+      value.lookupValue ||
+        value.LookupValue ||
+        value.value ||
+        value.Value ||
+        value.label ||
+        value.Label ||
+        value.text ||
+        value.Text ||
+        ""
+    ).trim();
+  }
+  return String(value || "").trim();
+}
+
+function pickMarketingConsent(entries, byToken) {
+  const preferred = pickTokenValue(byToken, [
+    "MarketingConsent",
+    "ConsentForMarketing",
+    "ClientConsentForMarketing",
+    "ClientConsentforMarketing",
+    "MarketingPermission",
+    "Clientconsentformarketing",
+    "Clientx003aConsentx0020forx0020Marketing",
+  ]);
+  if (preferred) {
+    return extractLookupText(preferred);
+  }
+
+  for (const [key, value] of entries) {
+    const token = normalizeToken(key);
+    const isMarketingConsentField = token.includes("consent") && token.includes("marketing");
+    if (!isMarketingConsentField) {
+      continue;
+    }
+    if (token.endsWith("lookupid")) {
+      continue;
+    }
+    const parsed = extractLookupText(value);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  // Fallback: include lookup-only fields if that is all we have.
+  for (const [key, value] of entries) {
+    const token = normalizeToken(key);
+    if (!(token.includes("consent") && token.includes("marketing"))) {
+      continue;
+    }
+    const parsed = extractLookupText(value);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return "";
 }
 
 function parseDateOfBirth(value) {
@@ -361,14 +432,7 @@ function mapGraphItemToClient(item) {
       "DdMandate",
     ]) ||
     pickTokenByPredicate(byToken, (token) => token.includes("mandate") || token.includes("directdebit") || token === "dd");
-  const marketingConsentValue =
-    pickTokenValue(byToken, [
-      "MarketingConsent",
-      "ConsentForMarketing",
-      "ClientConsentForMarketing",
-      "MarketingPermission",
-    ]) ||
-    pickTokenByPredicate(byToken, (token) => token.includes("consent") && token.includes("marketing"));
+  const marketingConsentValue = pickMarketingConsent(entries, byToken);
 
   const oneTouchId =
     pickTokenValue(byToken, [
