@@ -167,6 +167,41 @@ function userCacheKey(userUpn) {
   return String(userUpn || "").trim().toLowerCase();
 }
 
+function normalizeMatchToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
+function overlayMatchesUser(overlayUserUpn, currentUserUpn) {
+  const overlayToken = normalizeMatchToken(overlayUserUpn);
+  const currentToken = normalizeMatchToken(currentUserUpn);
+  if (!overlayToken || !currentToken) {
+    return false;
+  }
+
+  if (overlayToken === currentToken) {
+    return true;
+  }
+
+  const currentLocal = currentToken.split("@")[0] || "";
+  const overlayLocal = overlayToken.split("@")[0] || "";
+  if (!currentLocal || !overlayLocal) {
+    return false;
+  }
+
+  // Person fields sometimes resolve to display-like text instead of full UPN.
+  if (overlayToken === currentLocal || overlayLocal === currentLocal) {
+    return true;
+  }
+  if (overlayToken.includes(currentLocal) || currentLocal.includes(overlayToken)) {
+    return true;
+  }
+
+  return false;
+}
+
 function getOverlayCacheTtlMs() {
   const configured = Number(process.env.TASKS_OVERLAY_CACHE_TTL_MS || 120000);
   if (!Number.isFinite(configured) || configured < 0) {
@@ -264,10 +299,21 @@ async function listOverlaysByUser(graphClient, userUpn) {
       }
 
       const mapped = mapOverlays(items, fieldMap);
-      const normalizedUserUpn = String(userUpn || "").trim().toLowerCase();
       const filteredOverlays = mapped.overlays.filter((overlay) => {
-        return String(overlay?.userUpn || "").trim().toLowerCase() === normalizedUserUpn;
+        return overlayMatchesUser(overlay?.userUpn || "", userUpn);
       });
+
+      if (filteredOverlays.length === 0 && mapped.overlays.length > 0) {
+        const sampleUsers = mapped.overlays
+          .map((overlay) => String(overlay?.userUpn || "").trim())
+          .filter(Boolean)
+          .slice(0, 6);
+        logOverlayDebug("No strict user match for overlays.", {
+          requestedUserUpn: String(userUpn || "").trim().toLowerCase(),
+          overlayRowsLoaded: mapped.overlays.length,
+          sampleOverlayUserValues: sampleUsers,
+        });
+      }
       const byKey = new Map();
       for (const overlay of filteredOverlays) {
         if (!byKey.has(overlay.key)) {

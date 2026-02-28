@@ -566,6 +566,7 @@ async function refreshBoard() {
 
     const meta = payload?.meta || {};
     const totalOverlayRows = Number(meta?.totalOverlayRows || 0);
+    const requestedUserUpn = String(meta?.requestedUserUpn || "").trim().toLowerCase();
     const totalByProvider = meta?.totalByProvider && typeof meta.totalByProvider === "object"
       ? meta.totalByProvider
       : {};
@@ -576,7 +577,8 @@ async function refreshBoard() {
       `TaskOverlay rows: ${totalOverlayRows} ` +
       `(planner ${totalByProvider.planner || 0}, todo ${totalByProvider.todo || 0}) | ` +
       `Pinned shown: ${tasksByKey.size} ` +
-      `(planner ${pinnedByProvider.planner || 0}, todo ${pinnedByProvider.todo || 0})`
+      `(planner ${pinnedByProvider.planner || 0}, todo ${pinnedByProvider.todo || 0})` +
+      `${requestedUserUpn ? ` | user ${requestedUserUpn}` : ""}`
     );
     renderBoard();
   } catch (error) {

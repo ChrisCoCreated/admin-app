@@ -11,7 +11,6 @@ const clientsTableBody = document.getElementById("clientsTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
 const detailRoot = document.getElementById("clientDetail");
-const linkedCarersList = document.getElementById("linkedCarersList");
 const reconcilePanel = document.getElementById("reconcilePanel");
 const reconcileRefreshBtn = document.getElementById("reconcileRefreshBtn");
 const reconcileStatus = document.getElementById("reconcileStatus");
@@ -30,9 +29,6 @@ const detailFields = {
   phone: detailRoot?.querySelector('[data-field="phone"]'),
   status: detailRoot?.querySelector('[data-field="status"]'),
   tags: detailRoot?.querySelector('[data-field="tags"]'),
-  visitCount: detailRoot?.querySelector('[data-field="visitCount"]'),
-  carerCount: detailRoot?.querySelector('[data-field="carerCount"]'),
-  lastVisitAt: detailRoot?.querySelector('[data-field="lastVisitAt"]'),
 };
 
 const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
@@ -69,19 +65,6 @@ function setStatus(message, isError = false) {
   statusMessage.classList.toggle("error", isError);
 }
 
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
-
 function setDetail(client) {
   if (!client) {
     detailFields.id.textContent = "-";
@@ -91,10 +74,6 @@ function setDetail(client) {
     detailFields.phone.textContent = "-";
     detailFields.status.textContent = "-";
     detailFields.tags.textContent = "-";
-    detailFields.visitCount.textContent = "-";
-    detailFields.carerCount.textContent = "-";
-    detailFields.lastVisitAt.textContent = "-";
-    linkedCarersList.innerHTML = "";
     return;
   }
 
@@ -105,24 +84,6 @@ function setDetail(client) {
   detailFields.phone.textContent = client.phone || "-";
   detailFields.status.textContent = formatStatusLabel(client.status);
   detailFields.tags.textContent = formatTags(client.tags);
-  detailFields.visitCount.textContent = String(client.relationships?.visitCount || 0);
-  detailFields.carerCount.textContent = String(client.relationships?.carerCount || 0);
-  detailFields.lastVisitAt.textContent = formatDateTime(client.relationships?.lastVisitAt);
-
-  linkedCarersList.innerHTML = "";
-  const carers = Array.isArray(client.relationships?.carers) ? client.relationships.carers : [];
-  if (!carers.length) {
-    const li = document.createElement("li");
-    li.textContent = "No linked carers found.";
-    linkedCarersList.appendChild(li);
-    return;
-  }
-
-  for (const carer of carers) {
-    const li = document.createElement("li");
-    li.textContent = `${carer.name || "Unknown"} (${carer.id || "-"})`;
-    linkedCarersList.appendChild(li);
-  }
 }
 
 function normalizeStatus(value) {
@@ -720,8 +681,6 @@ function renderClients() {
       <td>${escapeHtml(client.name)}</td>
       <td>${escapeHtml(formatStatusLabel(client.status))}</td>
       <td>${escapeHtml(client.postcode || "-")}</td>
-      <td>${escapeHtml(String(client.relationships?.carerCount || 0))}</td>
-      <td>${escapeHtml(String(client.relationships?.visitCount || 0))}</td>
       <td>${renderXeroLink(client.xeroId)}</td>
       <td class="indicator-cell">${renderIndicator(client.hasMandate, "Mandate")}</td>
       <td class="indicator-cell">${renderIndicator(client.hasMarketingConsent, "Marketing Consent")}</td>

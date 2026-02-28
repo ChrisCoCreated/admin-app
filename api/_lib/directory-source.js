@@ -264,28 +264,14 @@ function attachCarerRelationshipsFromVisits(carers, visits) {
 async function loadDirectoryData() {
   const loadStartedAt = Date.now();
   if (process.env.USE_LOCAL_CLIENTS_FALLBACK === "1") {
-    const localClients = (await readLocalClients()).sort(sortByNameThenId);
-    const withRelationships = localClients.map((client) => ({
-      ...client,
-      relationships: {
-        carerCount: 0,
-        visitCount: 0,
-        lastVisitAt: "",
-        carers: [],
-      },
-    }));
-
     return {
       source: "local-fallback",
-      clients: withRelationships,
-      carers: [],
-      warnings: ["Using local client fallback data. OneTouch carers and relationships are unavailable."],
+      clients: (await readLocalClients()).sort(sortByNameThenId),
+      warnings: ["Using local client fallback data."],
     };
   }
 
   const clientsTimeoutMs = Number(process.env.ONETOUCH_CLIENTS_TIMEOUT_MS || "12000");
-  const carersTimeoutMs = Number(process.env.ONETOUCH_CARERS_TIMEOUT_MS || "12000");
-  const visitsTimeoutMs = Number(process.env.ONETOUCH_VISITS_TIMEOUT_MS || "6000");
   const enrichmentPromise = readListClients()
     .then((result) => ({
       clients: Array.isArray(result?.clients) ? result.clients : [],
@@ -298,24 +284,14 @@ async function loadDirectoryData() {
       error: error?.message || String(error),
     }));
 
-  const [clients, carers, visitsResult, enrichmentResult] = await Promise.all([
+  const [clients, enrichmentResult] = await Promise.all([
     timed("clients/all", () => withTimeout(listClients(), clientsTimeoutMs, "clients/all")),
-    timed("carers/all", () => withTimeout(listCarers(), carersTimeoutMs, "carers/all")),
-    timed("visits", () => withTimeout(listVisits(), visitsTimeoutMs, "visits")).then(
-      (visits) => ({ visits, error: "" }),
-      (error) => ({ visits: [], error: error?.message || String(error) })
-    ),
     enrichmentPromise,
   ]);
 
   const sortedClients = clients.sort(sortByNameThenId);
-  const sortedCarers = carers.sort(sortByNameThenId);
-  const relationshipData = attachRelationships(sortedClients, sortedCarers, visitsResult.visits);
 
   const warnings = [];
-  if (visitsResult.error) {
-    warnings.push(`Visits endpoint unavailable: ${visitsResult.error}`);
-  }
   if (enrichmentResult.error) {
     warnings.push(`Client enrichment unavailable: ${enrichmentResult.error}`);
   }
@@ -334,7 +310,7 @@ async function loadDirectoryData() {
     });
   }
 
-  const enrichedClients = relationshipData.clients.map((client) => {
+  const enrichedClients = sortedClients.map((client) => {
     const enrichment = enrichmentById.get(normalizeJoinId(client?.id));
     return {
       ...client,
@@ -347,15 +323,12 @@ async function loadDirectoryData() {
   console.info("[OneTouch] Directory load complete", {
     elapsedMs: Date.now() - loadStartedAt,
     clients: sortedClients.length,
-    carers: sortedCarers.length,
-    visits: visitsResult.visits.length,
     warnings: warnings.length,
   });
 
   return {
     source: "onetouch",
     clients: enrichedClients,
-    carers: relationshipData.carers,
     warnings,
   };
 }

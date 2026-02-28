@@ -237,6 +237,7 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
       total: tasks.length,
       source: "taskoverlay",
       totalOverlayRows: overlays.length,
+      requestedUserUpn: userUpn,
       totalByProvider,
       pinnedByProvider,
     },

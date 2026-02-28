@@ -14,7 +14,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Secure backend APIs:
   - `GET /api/clients` (original SharePoint/local clients list)
   - `GET /api/clients/:id`
-  - `GET /api/onetouch/clients` (OneTouch list with relationship metadata enriched with SharePoint Xero/consent fields when available)
+  - `GET /api/onetouch/clients` (OneTouch clients list enriched with SharePoint Xero/consent fields; no carers/visits relationship lookup)
   - `GET /api/clients/reconcile/preview` (admin + care_manager; OneTouch-to-SharePoint reconciliation preview)
   - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)
   - `GET /api/carers`
