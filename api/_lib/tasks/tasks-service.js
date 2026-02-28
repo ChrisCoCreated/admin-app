@@ -21,6 +21,7 @@ const {
 } = require("./unified-model");
 
 const unifiedTasksCache = new Map();
+const GRAPH_TASKS_DEBUG = process.env.GRAPH_TASKS_DEBUG === "1";
 
 function unifiedTasksCacheKey(userUpn) {
   return String(userUpn || "").trim().toLowerCase();
@@ -150,6 +151,55 @@ function toProviderError(error) {
   };
 }
 
+function logTasksDebug(message, details) {
+  if (!GRAPH_TASKS_DEBUG) {
+    return;
+  }
+  if (details !== undefined) {
+    console.log(`[tasks-service] ${message}`, details);
+    return;
+  }
+  console.log(`[tasks-service] ${message}`);
+}
+
+function mapLimit(items, concurrency, mapper) {
+  return new Promise((resolve, reject) => {
+    if (!Array.isArray(items) || items.length === 0) {
+      resolve([]);
+      return;
+    }
+
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    let active = 0;
+    let completed = 0;
+
+    function launch() {
+      if (completed >= items.length) {
+        resolve(results);
+        return;
+      }
+
+      while (active < concurrency && nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        active += 1;
+
+        Promise.resolve(mapper(items[currentIndex], currentIndex))
+          .then((value) => {
+            results[currentIndex] = value;
+            active -= 1;
+            completed += 1;
+            launch();
+          })
+          .catch(reject);
+      }
+    }
+
+    launch();
+  });
+}
+
 function looksOpaqueTaskId(value) {
   const text = String(value || "").trim();
   if (!text || /\s/.test(text)) {
@@ -173,6 +223,25 @@ function pickDisplayTitle(graphTask, overlay) {
     return "Untitled task";
   }
   return overlayTitle;
+}
+
+function shouldBackfillOverlayTitle(overlayTitle, externalTaskId, graphTitle) {
+  const normalizedGraphTitle = String(graphTitle || "").trim();
+  if (!normalizedGraphTitle) {
+    return false;
+  }
+
+  const normalizedOverlayTitle = String(overlayTitle || "").trim();
+  if (!normalizedOverlayTitle) {
+    return true;
+  }
+  if (normalizedOverlayTitle === normalizedGraphTitle) {
+    return false;
+  }
+  if ((externalTaskId && normalizedOverlayTitle === externalTaskId) || looksOpaqueTaskId(normalizedOverlayTitle)) {
+    return true;
+  }
+  return false;
 }
 
 async function getUnifiedTasks({ graphAccessToken, claims }) {
@@ -214,6 +283,50 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
     }
   } else {
     providerErrors.planner = toProviderError(plannerResult.reason);
+  }
+
+  const titleBackfillOps = [];
+  for (const overlay of overlays) {
+    const key = buildTaskKey(overlay.provider, overlay.externalTaskId);
+    const graphTask = graphTasksByKey.get(key);
+    const graphTitle = String(graphTask?.title || "").trim();
+    if (!shouldBackfillOverlayTitle(overlay?.title, overlay?.externalTaskId, graphTitle)) {
+      continue;
+    }
+
+    overlay.title = graphTitle;
+    titleBackfillOps.push({
+      itemId: String(overlay?.itemId || "").trim(),
+      title: graphTitle,
+    });
+  }
+
+  if (titleBackfillOps.length > 0) {
+    await mapLimit(titleBackfillOps, 3, async (entry) => {
+      if (!entry.itemId || !entry.title) {
+        return;
+      }
+      try {
+        await patchOverlayFields(
+          graphClient,
+          overlaysBundle.siteId,
+          overlaysBundle.listId,
+          entry.itemId,
+          { Title: entry.title },
+          overlaysBundle.fieldMap
+        );
+      } catch (error) {
+        logTasksDebug("TaskOverlay title backfill failed for whiteboard row.", {
+          itemId: entry.itemId,
+          status: error?.status || 0,
+          code: error?.code || "",
+          message: error?.message || "",
+        });
+      }
+    });
+    if (titleBackfillOps.length > 0) {
+      clearOverlayUserCache(userUpn);
+    }
   }
 
   const totalByProvider = {
@@ -305,6 +418,7 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
       pinnedByProvider,
       graphMatchedCount,
       graphMissCount: Math.max(0, tasks.length - graphMatchedCount),
+      titleBackfilledCount: titleBackfillOps.length,
       partial: Object.keys(providerErrors).length > 0,
       providerErrors,
     },

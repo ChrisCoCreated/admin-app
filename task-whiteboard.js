@@ -10,10 +10,14 @@ const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const boardCanvas = document.getElementById("boardCanvas");
 const stagingLane = document.getElementById("stagingLane");
+const stagingDropZone = document.getElementById("stagingDropZone");
+const togglePinnedBtn = document.getElementById("togglePinnedBtn");
+const stagingWrap = document.querySelector(".whiteboard-staging-wrap");
 
 const DEFAULT_CARD_W = 220;
 const DEFAULT_CARD_H = 72;
 const SAVE_DEBOUNCE_MS = 320;
+const GRID_SIZE = 24;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -27,6 +31,8 @@ let tasksByKey = new Map();
 let categoryBoxes = [];
 let drawDraft = null;
 let movingBox = null;
+let stagedTaskCount = 0;
+let pinnedMinimized = false;
 
 const persistQueue = new Map();
 const persistSequenceByKey = new Map();
@@ -129,6 +135,74 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function snapToGrid(value) {
+  return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
+function normalizeCategoryLabel(value) {
+  return String(value || "").trim();
+}
+
+function parseCategoryValue(raw) {
+  const text = String(raw || "").trim();
+  if (!text) {
+    return { raw: "", label: "", box: null };
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    const label = normalizeCategoryLabel(parsed?.label || parsed?.name || parsed?.category);
+    if (!label) {
+      return { raw: text, label: "", box: null };
+    }
+    const box = parsed?.box && typeof parsed.box === "object" ? parsed.box : null;
+    if (!box) {
+      return { raw: text, label, box: null };
+    }
+    const x = Number(box.x);
+    const y = Number(box.y);
+    const w = Number(box.w);
+    const h = Number(box.h);
+    const color = String(box.color || "").trim();
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h)) {
+      return { raw: text, label, box: null };
+    }
+    return {
+      raw: text,
+      label,
+      box: {
+        x: snapToGrid(x),
+        y: snapToGrid(y),
+        w: Math.max(GRID_SIZE * 2, snapToGrid(w)),
+        h: Math.max(GRID_SIZE * 2, snapToGrid(h)),
+        color: color || "#4f74d9",
+      },
+    };
+  } catch {
+    return { raw: text, label: text, box: null };
+  }
+}
+
+function buildCategoryValue(label, box) {
+  const normalizedLabel = normalizeCategoryLabel(label);
+  if (!normalizedLabel) {
+    return "";
+  }
+  if (!box) {
+    return normalizedLabel;
+  }
+  return JSON.stringify({
+    label: normalizedLabel,
+    box: {
+      x: Number(box.x) || 0,
+      y: Number(box.y) || 0,
+      w: Number(box.w) || GRID_SIZE * 8,
+      h: Number(box.h) || GRID_SIZE * 6,
+      color: String(box.color || "#4f74d9"),
+    },
+  });
+}
+
 function boardBounds() {
   const rect = boardCanvas.getBoundingClientRect();
   return {
@@ -142,6 +216,21 @@ function updateDrawModeUi() {
   drawBoxBtn.textContent = drawMode ? "Drawing... (Click board)" : "Draw Category Box";
 }
 
+function updatePinnedPanelUi() {
+  const collapsed = pinnedMinimized || stagedTaskCount === 0;
+  stagingWrap?.classList.toggle("is-collapsed", collapsed);
+  stagingWrap?.classList.toggle("is-empty", stagedTaskCount === 0);
+  if (togglePinnedBtn) {
+    togglePinnedBtn.textContent = pinnedMinimized ? "Expand" : "Minimize";
+    togglePinnedBtn.setAttribute("aria-expanded", pinnedMinimized ? "false" : "true");
+  }
+  if (stagingDropZone) {
+    stagingDropZone.textContent = stagedTaskCount === 0
+      ? "Pinned staging is empty. Drag tasks here to unplace them."
+      : "Drag here to return a task to pinned staging";
+  }
+}
+
 function topZForCards() {
   let top = 1;
   for (const task of tasksByKey.values()) {
@@ -153,13 +242,13 @@ function topZForCards() {
   return top;
 }
 
-function findCategoryLabelForPoint(x, y) {
+function findCategoryBoxForPoint(x, y) {
   for (const box of categoryBoxes) {
     if (x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h) {
-      return box.label;
+      return box;
     }
   }
-  return "";
+  return null;
 }
 
 function updateTaskOverlayLocally(key, patch) {
@@ -171,6 +260,63 @@ function updateTaskOverlayLocally(key, patch) {
     ...(task.overlay || {}),
     ...patch,
   };
+}
+
+function persistCategoryForLabel(label, boxOrNull) {
+  const normalizedLabel = normalizeCategoryLabel(label);
+  if (!normalizedLabel) {
+    return;
+  }
+
+  for (const [key, task] of tasksByKey.entries()) {
+    const currentCategory = parseCategoryValue(task?.overlay?.category || "");
+    if (normalizeCategoryLabel(currentCategory.label) !== normalizedLabel) {
+      continue;
+    }
+
+    const nextCategory = boxOrNull ? buildCategoryValue(normalizedLabel, boxOrNull) : "";
+    const rollbackSnapshot = {
+      layout: String(task?.overlay?.layout || ""),
+      category: String(task?.overlay?.category || ""),
+    };
+
+    updateTaskOverlayLocally(key, { category: nextCategory });
+    schedulePersist(
+      key,
+      {
+        title: String(task?.title || "").trim(),
+        layout: String(task?.overlay?.layout || ""),
+        category: nextCategory,
+      },
+      rollbackSnapshot
+    );
+  }
+}
+
+function hydrateCategoryBoxesFromTasks() {
+  const byLabel = new Map();
+
+  for (const task of tasksByKey.values()) {
+    const parsedCategory = parseCategoryValue(task?.overlay?.category || "");
+    if (!parsedCategory.label || !parsedCategory.box) {
+      continue;
+    }
+    const key = normalizeCategoryLabel(parsedCategory.label).toLowerCase();
+    if (byLabel.has(key)) {
+      continue;
+    }
+    byLabel.set(key, {
+      id: `box_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      label: parsedCategory.label,
+      x: parsedCategory.box.x,
+      y: parsedCategory.box.y,
+      w: parsedCategory.box.w,
+      h: parsedCategory.box.h,
+      color: parsedCategory.box.color || "#4f74d9",
+    });
+  }
+
+  categoryBoxes = Array.from(byLabel.values());
 }
 
 function schedulePersist(key, patch, rollbackSnapshot) {
@@ -274,6 +420,7 @@ function renderBoxes() {
     deleteBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       categoryBoxes = categoryBoxes.filter((entry) => entry.id !== box.id);
+      persistCategoryForLabel(box.label, null);
       renderBoard();
     });
 
@@ -298,7 +445,10 @@ function renderTaskCards() {
     }
   }
 
-  staged.sort((a, b) => String(a.task?.title || "").localeCompare(String(b.task?.title || ""), undefined, {
+  stagedTaskCount = staged.length;
+  updatePinnedPanelUi();
+
+  staged.sort((a, b) => displayTaskTitle(a.task).localeCompare(displayTaskTitle(b.task), undefined, {
     sensitivity: "base",
   }));
 
@@ -307,7 +457,7 @@ function renderTaskCards() {
     if (zCmp !== 0) {
       return zCmp;
     }
-    return String(a.task?.title || "").localeCompare(String(b.task?.title || ""), undefined, {
+    return displayTaskTitle(a.task).localeCompare(displayTaskTitle(b.task), undefined, {
       sensitivity: "base",
     });
   });
@@ -325,8 +475,9 @@ function renderTaskCards() {
 
     const meta = document.createElement("div");
     meta.className = "whiteboard-task-meta";
+    const parsedCategory = parseCategoryValue(entry.task?.overlay?.category || "");
     meta.textContent = `${formatDate(entry.task?.dueDateTimeUtc)}${
-      entry.task?.overlay?.category ? ` • ${entry.task.overlay.category}` : ""
+      parsedCategory.label ? ` • ${parsedCategory.label}` : ""
     }`;
 
     card.appendChild(title);
@@ -352,8 +503,9 @@ function renderTaskCards() {
 
     const meta = document.createElement("div");
     meta.className = "whiteboard-task-meta";
+    const parsedCategory = parseCategoryValue(entry.task?.overlay?.category || "");
     meta.textContent = `${formatDate(entry.task?.dueDateTimeUtc)}${
-      entry.task?.overlay?.category ? ` • ${entry.task.overlay.category}` : ""
+      parsedCategory.label ? ` • ${parsedCategory.label}` : ""
     }`;
 
     card.appendChild(title);
@@ -383,11 +535,12 @@ function applyBoardDrop(task, key, boardX, boardY) {
   const current = parseLayout(task?.overlay?.layout || "");
   const cardW = current?.w || DEFAULT_CARD_W;
   const cardH = current?.h || DEFAULT_CARD_H;
-  const x = clamp(Math.round(boardX - cardW / 2), 0, Math.max(0, bounds.width - cardW));
-  const y = clamp(Math.round(boardY - cardH / 2), 0, Math.max(0, bounds.height - cardH));
+  const x = clamp(snapToGrid(boardX - cardW / 2), 0, Math.max(0, bounds.width - cardW));
+  const y = clamp(snapToGrid(boardY - cardH / 2), 0, Math.max(0, bounds.height - cardH));
   const z = topZForCards() + 1;
   const nextLayout = { x, y, w: cardW, h: cardH, z };
-  const category = findCategoryLabelForPoint(x + cardW / 2, y + cardH / 2);
+  const categoryBox = findCategoryBoxForPoint(x + cardW / 2, y + cardH / 2);
+  const category = categoryBox ? buildCategoryValue(categoryBox.label, categoryBox) : "";
   const layoutRaw = JSON.stringify(nextLayout);
 
   const rollbackSnapshot = {
@@ -442,10 +595,10 @@ function createBoxFromDraft() {
 
   const minW = 80;
   const minH = 60;
-  const x = Math.min(drawDraft.startX, drawDraft.endX);
-  const y = Math.min(drawDraft.startY, drawDraft.endY);
-  const w = Math.abs(drawDraft.endX - drawDraft.startX);
-  const h = Math.abs(drawDraft.endY - drawDraft.startY);
+  const x = snapToGrid(Math.min(drawDraft.startX, drawDraft.endX));
+  const y = snapToGrid(Math.min(drawDraft.startY, drawDraft.endY));
+  const w = Math.max(GRID_SIZE * 2, snapToGrid(Math.abs(drawDraft.endX - drawDraft.startX)));
+  const h = Math.max(GRID_SIZE * 2, snapToGrid(Math.abs(drawDraft.endY - drawDraft.startY)));
 
   drawDraft = null;
   renderBoard();
@@ -473,6 +626,8 @@ function createBoxFromDraft() {
     color,
   });
 
+  const created = categoryBoxes[categoryBoxes.length - 1];
+  persistCategoryForLabel(created.label, created);
   renderBoard();
 }
 
@@ -558,8 +713,8 @@ function onBoardMouseMove(event) {
     const nextX = movingBox.originX + (x - movingBox.startX);
     const nextY = movingBox.originY + (y - movingBox.startY);
     const bounds = boardBounds();
-    box.x = clamp(Math.round(nextX), 0, Math.max(0, bounds.width - box.w));
-    box.y = clamp(Math.round(nextY), 0, Math.max(0, bounds.height - box.h));
+    box.x = clamp(snapToGrid(nextX), 0, Math.max(0, bounds.width - box.w));
+    box.y = clamp(snapToGrid(nextY), 0, Math.max(0, bounds.height - box.h));
     renderBoard();
     return;
   }
@@ -576,6 +731,10 @@ function onBoardMouseMove(event) {
 
 function onBoardMouseUp() {
   if (movingBox) {
+    const box = categoryBoxes.find((entry) => entry.id === movingBox.id) || null;
+    if (box) {
+      persistCategoryForLabel(box.label, box);
+    }
     movingBox = null;
     return;
   }
@@ -609,6 +768,7 @@ async function refreshBoard() {
         category: String(overlay.category || ""),
       });
     }
+    hydrateCategoryBoxesFromTasks();
 
     const meta = payload?.meta || {};
     const totalOverlayRows = Number(meta?.totalOverlayRows || 0);
@@ -621,6 +781,7 @@ async function refreshBoard() {
       : {};
     const graphMatchedCount = Number(meta?.graphMatchedCount || 0);
     const graphMissCount = Number(meta?.graphMissCount || 0);
+    const titleBackfilledCount = Number(meta?.titleBackfilledCount || 0);
     const partial = meta?.partial === true;
     setStatus(
       `TaskOverlay rows: ${totalOverlayRows} ` +
@@ -628,6 +789,7 @@ async function refreshBoard() {
       `Pinned shown: ${tasksByKey.size} ` +
       `(planner ${pinnedByProvider.planner || 0}, todo ${pinnedByProvider.todo || 0}) | ` +
       `Graph matched: ${graphMatchedCount}, unmatched: ${graphMissCount}` +
+      (titleBackfilledCount > 0 ? ` | title synced: ${titleBackfilledCount}` : "") +
       (partial ? " | partial provider data" : "") +
       `${requestedUserUpn ? ` | user ${requestedUserUpn}` : ""}`
     );
@@ -690,12 +852,7 @@ boardCanvas?.addEventListener("drop", (event) => {
   applyBoardDrop(task, key, x, y);
 });
 
-stagingLane?.addEventListener("dragover", (event) => {
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "move";
-});
-
-stagingLane?.addEventListener("drop", (event) => {
+function handleStagingDrop(event) {
   event.preventDefault();
   const key = String(event.dataTransfer.getData("text/task-key") || "").trim();
   if (!key) {
@@ -708,7 +865,18 @@ stagingLane?.addEventListener("drop", (event) => {
   }
 
   applyStagingDrop(task, key);
+}
+
+stagingLane?.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
 });
+stagingLane?.addEventListener("drop", handleStagingDrop);
+stagingDropZone?.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+});
+stagingDropZone?.addEventListener("drop", handleStagingDrop);
 
 boardCanvas?.addEventListener("mousedown", onBoardMouseDown);
 window.addEventListener("mousemove", onBoardMouseMove);
@@ -729,8 +897,17 @@ drawBoxBtn?.addEventListener("click", () => {
 });
 
 clearBoxesBtn?.addEventListener("click", () => {
+  const labels = categoryBoxes.map((entry) => entry.label);
   categoryBoxes = [];
+  for (const label of labels) {
+    persistCategoryForLabel(label, null);
+  }
   renderBoard();
+});
+
+togglePinnedBtn?.addEventListener("click", () => {
+  pinnedMinimized = !pinnedMinimized;
+  updatePinnedPanelUi();
 });
 
 signOutBtn?.addEventListener("click", async () => {
@@ -743,4 +920,5 @@ signOutBtn?.addEventListener("click", async () => {
 });
 
 updateDrawModeUi();
+updatePinnedPanelUi();
 void init();

@@ -651,6 +651,24 @@ body.lightbox-open {
   margin-top: 14px;
 }
 
+.whiteboard-staging-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.whiteboard-staging-drop {
+  margin-top: 10px;
+  border: 1px dashed #b7c8e8;
+  border-radius: 10px;
+  background: #f5f9ff;
+  color: #3f557e;
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 10px;
+}
+
 .whiteboard-board {
   position: relative;
   min-height: 640px;
@@ -667,8 +685,17 @@ body.lightbox-open {
   display: grid;
   gap: 8px;
   align-content: start;
+  margin-top: 10px;
   max-height: 640px;
   overflow: auto;
+}
+
+.whiteboard-staging-wrap.is-collapsed .whiteboard-staging {
+  display: none;
+}
+
+.whiteboard-staging-wrap.is-empty:not(.is-collapsed) .whiteboard-staging {
+  min-height: 52px;
 }
 
 .whiteboard-task-card {

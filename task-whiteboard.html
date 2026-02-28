@@ -48,7 +48,13 @@
         </article>
 
         <article class="panel whiteboard-staging-wrap">
-          <h2>Pinned (Unplaced)</h2>
+          <div class="whiteboard-staging-head">
+            <h2>Pinned (Unplaced)</h2>
+            <button id="togglePinnedBtn" class="secondary" type="button" aria-expanded="true">Minimize</button>
+          </div>
+          <div id="stagingDropZone" class="whiteboard-staging-drop" aria-label="Drop zone for unplaced pinned tasks">
+            Drag here to return a task to pinned staging
+          </div>
           <div id="stagingLane" class="whiteboard-staging" aria-label="Unplaced pinned tasks"></div>
         </article>
       </section>
