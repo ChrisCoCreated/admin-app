@@ -6,6 +6,14 @@ let tokenCache = {
 };
 let tokenInFlight = null;
 
+function clearTokenCache() {
+  tokenCache = {
+    accessToken: "",
+    expiresAtMs: 0,
+  };
+  tokenInFlight = null;
+}
+
 function maskValue(value) {
   const raw = String(value || "");
   if (!raw) {
@@ -180,8 +188,6 @@ async function getAccessToken() {
 
 async function callOneTouch(endpointPath, query = {}) {
   const { baseUrl } = getRequiredEnv();
-  const accessToken = await getAccessToken();
-
   const endpoint = String(endpointPath || "").replace(/^\/+/, "");
   const url = new URL(`${baseUrl}/${endpoint}`);
 
@@ -192,27 +198,47 @@ async function callOneTouch(endpointPath, query = {}) {
     url.searchParams.set(key, String(value));
   }
 
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  async function requestWithToken(accessToken) {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  const text = await response.text();
-  let payload = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = null;
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
+
+    return { response, payload, text };
   }
 
-  if (!response.ok) {
-    const detail = payload?.error || payload?.message || text || `HTTP ${response.status}`;
-    throw new Error(`OneTouch request failed (${response.status}): ${detail}`);
+  const firstToken = await getAccessToken();
+  const first = await requestWithToken(firstToken);
+  if (first.response.ok) {
+    return first.payload;
   }
 
-  return payload;
+  if (first.response.status === 401) {
+    console.warn("[OneTouch] Received 401, clearing cached token and retrying request once.", {
+      endpoint,
+    });
+    clearTokenCache();
+    const retryToken = await getAccessToken();
+    const retry = await requestWithToken(retryToken);
+    if (retry.response.ok) {
+      return retry.payload;
+    }
+    const retryDetail = retry.payload?.error || retry.payload?.message || retry.text || `HTTP ${retry.response.status}`;
+    throw new Error(`OneTouch request failed (${retry.response.status}): ${retryDetail}`);
+  }
+
+  const detail = first.payload?.error || first.payload?.message || first.text || `HTTP ${first.response.status}`;
+  throw new Error(`OneTouch request failed (${first.response.status}): ${detail}`);
 }
 
 function resolveRecords(payload, explicitKeys = []) {

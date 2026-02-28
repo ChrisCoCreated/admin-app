@@ -139,6 +139,10 @@ function parseUserUpnValue(value) {
 
   if (typeof value === "string") {
     const text = value.trim().toLowerCase();
+    const claimMatch = /i:0[.]f[|][^|]+[|]([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i.exec(text);
+    if (claimMatch && claimMatch[1]) {
+      return claimMatch[1].toLowerCase();
+    }
     const emailMatch = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.exec(text);
     if (emailMatch) {
       return emailMatch[0].toLowerCase();
@@ -151,6 +155,25 @@ function parseUserUpnValue(value) {
       const first = value.map((entry) => parseUserUpnValue(entry)).find(Boolean);
       return first || "";
     }
+    const claimSource = String(
+      value.claims ||
+        value.Claims ||
+        value.name ||
+        value.Name ||
+        ""
+    )
+      .trim()
+      .toLowerCase();
+    if (claimSource) {
+      const claimMatch = /i:0[.]f[|][^|]+[|]([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/i.exec(claimSource);
+      if (claimMatch && claimMatch[1]) {
+        return claimMatch[1].toLowerCase();
+      }
+      const emailMatch = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.exec(claimSource);
+      if (emailMatch) {
+        return emailMatch[0].toLowerCase();
+      }
+    }
     return String(
       value.email ||
         value.userPrincipalName ||
@@ -158,6 +181,7 @@ function parseUserUpnValue(value) {
         value.lookupValue ||
         value.LookupValue ||
         value.displayName ||
+        value.DisplayName ||
         value.value ||
         ""
     )

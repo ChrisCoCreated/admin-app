@@ -247,6 +247,32 @@ function mapOverlays(items, fieldMap) {
   return { overlays, byKey };
 }
 
+function buildOverlayRowDiagnostics({ items, mappedOverlays, userUpnField, requestedUserUpn }) {
+  const requested = String(requestedUserUpn || "").trim().toLowerCase();
+  const mappedById = new Map();
+  for (const overlay of mappedOverlays) {
+    mappedById.set(String(overlay?.itemId || ""), overlay);
+  }
+
+  return items.map((item) => {
+    const itemId = String(item?.id || "");
+    const fields = item?.fields || {};
+    const mapped = mappedById.get(itemId) || null;
+    const normalizedUser = String(mapped?.userUpn || "").trim().toLowerCase();
+    const matchResult = overlayMatchesUser(normalizedUser, requested);
+    return {
+      itemId,
+      title: String(fields?.Title || mapped?.title || "").trim(),
+      provider: String(fields?.Provider || fields?.field_1 || mapped?.provider || "").trim().toLowerCase(),
+      externalTaskId: String(fields?.ExternalTaskId || fields?.field_2 || mapped?.externalTaskId || "").trim(),
+      rawUserField: fields?.[userUpnField],
+      rawUserLookupId: fields?.[`${userUpnField}LookupId`],
+      normalizedUserToken: normalizedUser,
+      matchResult,
+    };
+  });
+}
+
 async function listOverlaysByUser(graphClient, userUpn) {
   const key = userCacheKey(userUpn);
   const cached = userOverlayCache.get(key);
@@ -318,20 +344,18 @@ async function listOverlaysByUser(graphClient, userUpn) {
       });
 
       if (filteredOverlays.length === 0 && mapped.overlays.length > 0) {
-        const sampleUsers = mapped.overlays
-          .map((overlay) => String(overlay?.userUpn || "").trim())
-          .filter(Boolean)
-          .slice(0, 6);
-        const rawSamples = items
-          .map((item) => item?.fields?.[userUpnField])
-          .filter((entry) => entry !== undefined && entry !== null)
-          .slice(0, 6);
+        const rowDiagnostics = buildOverlayRowDiagnostics({
+          items,
+          mappedOverlays: mapped.overlays,
+          userUpnField,
+          requestedUserUpn: userUpn,
+        });
         logOverlayDebug("No strict user match for overlays.", {
           requestedUserUpn: String(userUpn || "").trim().toLowerCase(),
           userUpnField,
-          overlayRowsLoaded: mapped.overlays.length,
-          sampleOverlayUserValues: sampleUsers,
-          sampleRawUserFieldValues: rawSamples,
+          totalRowsLoaded: mapped.overlays.length,
+          matchedRowsCount: 0,
+          rowDiagnostics,
         });
       }
       const byKey = new Map();
