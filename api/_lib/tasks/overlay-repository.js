@@ -247,6 +247,22 @@ function mapOverlays(items, fieldMap) {
   return { overlays, byKey };
 }
 
+function inferLookupIdFromItems(items, userUpnField) {
+  const lookupField = `${userUpnField}LookupId`;
+  const ids = new Set();
+  for (const item of items) {
+    const raw = item?.fields?.[lookupField];
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) {
+      ids.add(n);
+    }
+  }
+  if (ids.size === 1) {
+    return Array.from(ids)[0];
+  }
+  return null;
+}
+
 function buildOverlayRowDiagnostics({ items, mappedOverlays, userUpnField, requestedUserUpn }) {
   const requested = String(requestedUserUpn || "").trim().toLowerCase();
   const mappedById = new Map();
@@ -342,6 +358,7 @@ async function listOverlaysByUser(graphClient, userUpn) {
       const filteredOverlays = mapped.overlays.filter((overlay) => {
         return overlayMatchesUser(overlay?.userUpn || "", userUpn);
       });
+      const inferredLookupId = inferLookupIdFromItems(items, userUpnField);
 
       if (filteredOverlays.length === 0 && mapped.overlays.length > 0) {
         const rowDiagnostics = buildOverlayRowDiagnostics({
@@ -369,6 +386,7 @@ async function listOverlaysByUser(graphClient, userUpn) {
         siteId,
         listId,
         fieldMap,
+        userLookupId: inferredLookupId,
         overlays: filteredOverlays,
         byKey,
       };
@@ -420,6 +438,19 @@ function translateFieldsForWrite(fields, fieldMap) {
   const translated = {};
 
   for (const [key, value] of Object.entries(fields || {})) {
+    if (key.endsWith("LookupId")) {
+      const canonicalBase = key.slice(0, -8);
+      const logicalEntryByBase = Object.entries(OVERLAY_FIELD_MAP).find(([, canonical]) => canonical === canonicalBase);
+      if (logicalEntryByBase) {
+        const logicalKey = logicalEntryByBase[0];
+        const actualBaseName = fieldMap?.[logicalKey] || canonicalBase;
+        translated[`${actualBaseName}LookupId`] = value;
+        continue;
+      }
+      translated[key] = value;
+      continue;
+    }
+
     const logicalEntry = Object.entries(OVERLAY_FIELD_MAP).find(([, canonical]) => canonical === key);
     if (!logicalEntry) {
       translated[key] = value;
@@ -460,7 +491,64 @@ async function createOverlayItem(graphClient, siteId, listId, fields, fieldMap) 
   return created;
 }
 
+async function backfillMissingOverlayUsers(graphClient, userUpn) {
+  const { siteId, listId, fieldMap } = await resolveSiteAndListIds(graphClient);
+  const userUpnField = fieldMap?.userUpn || OVERLAY_FIELD_MAP.userUpn;
+  const userUpnLookupField = `${userUpnField}LookupId`;
+  const fallbackParams = new URLSearchParams({
+    $expand: "fields",
+    $top: String(OVERLAY_PAGE_SIZE),
+  });
+  const fallbackUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${fallbackParams.toString()}`;
+  const items = await graphClient.fetchAllPages(fallbackUrl, { maxPages: 25 });
+
+  const inferredLookupId = inferLookupIdFromItems(items, userUpnField);
+  let updated = 0;
+  let skipped = 0;
+
+  for (const item of items) {
+    const itemId = String(item?.id || "").trim();
+    if (!itemId) {
+      continue;
+    }
+    const fields = item?.fields || {};
+    const hasUserValue = Boolean(fields[userUpnField]);
+    const hasLookupId = Number.isFinite(Number(fields[userUpnLookupField])) && Number(fields[userUpnLookupField]) > 0;
+    if (hasUserValue || hasLookupId) {
+      skipped += 1;
+      continue;
+    }
+
+    const patch = {
+      [userUpnField]: String(userUpn || "").trim().toLowerCase(),
+    };
+    if (Number.isFinite(inferredLookupId) && inferredLookupId > 0) {
+      patch[userUpnLookupField] = inferredLookupId;
+    }
+
+    await patchOverlayFields(graphClient, siteId, listId, itemId, patch, fieldMap);
+    updated += 1;
+  }
+
+  if (updated > 0) {
+    logOverlayDebug("Backfilled missing TaskOverlay UserUPN values.", {
+      requestedUserUpn: String(userUpn || "").trim().toLowerCase(),
+      userUpnField,
+      inferredLookupId,
+      updatedRows: updated,
+      skippedRows: skipped,
+    });
+  }
+
+  return {
+    updatedRows: updated,
+    skippedRows: skipped,
+    inferredLookupId,
+  };
+}
+
 module.exports = {
+  backfillMissingOverlayUsers,
   clearOverlayUserCache,
   createOverlayItem,
   listOverlaysByUser,

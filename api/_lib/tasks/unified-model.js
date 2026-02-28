@@ -239,6 +239,9 @@ function toGraphOverlayFields(input) {
   const fields = {};
 
   fields[OVERLAY_FIELD_MAP.userUpn] = String(input.userUpn || "").trim().toLowerCase();
+  if (input.userUpnLookupId !== null && input.userUpnLookupId !== undefined && input.userUpnLookupId !== "") {
+    fields[`${OVERLAY_FIELD_MAP.userUpn}LookupId`] = Number(input.userUpnLookupId);
+  }
   fields[OVERLAY_FIELD_MAP.provider] = normalizeProvider(input.provider);
   fields[OVERLAY_FIELD_MAP.externalTaskId] = normalizeExternalTaskId(input.externalTaskId);
   fields[OVERLAY_FIELD_MAP.lastOverlayUpdatedAt] = toUtcIsoOrNull(input.lastOverlayUpdatedAt) || new Date().toISOString();

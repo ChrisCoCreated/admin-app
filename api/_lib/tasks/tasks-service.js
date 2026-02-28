@@ -2,6 +2,7 @@ const { createGraphDelegatedClient } = require("./graph-delegated-client");
 const { resolveUserUpn } = require("./identity");
 const { mergeTasksWithOverlays, sortUnifiedTasks } = require("./merge-sort");
 const {
+  backfillMissingOverlayUsers,
   clearOverlayUserCache,
   createOverlayItem,
   listOverlaysByUser,
@@ -158,6 +159,10 @@ async function getUnifiedTasks({ graphAccessToken, claims }) {
 async function getWhiteboardTasks({ graphAccessToken, claims }) {
   const userUpn = resolveUserUpn(claims);
   const graphClient = createGraphDelegatedClient(graphAccessToken);
+  const backfillResult = await backfillMissingOverlayUsers(graphClient, userUpn);
+  if (Number(backfillResult?.updatedRows || 0) > 0) {
+    clearOverlayUserCache(userUpn);
+  }
   const overlaysBundle = await listOverlaysByUser(graphClient, userUpn);
   const overlays = Array.isArray(overlaysBundle?.overlays) ? overlaysBundle.overlays : [];
   const totalByProvider = {
@@ -314,6 +319,7 @@ async function upsertOverlay({ graphAccessToken, claims, body }) {
   const payload = {
     ...nextPatch,
     userUpn,
+    userUpnLookupId: overlaysBundle?.userLookupId || null,
     provider,
     externalTaskId,
     lastOverlayUpdatedAt: nowIso,
