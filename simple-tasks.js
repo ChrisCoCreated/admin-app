@@ -145,7 +145,10 @@ function render() {
         const result = await directoryApi.upsertTaskOverlay({
           provider: task.provider,
           externalTaskId: task.externalTaskId,
-          patch: { pinned: !(task?.overlay?.pinned === true) },
+          patch: {
+            title: String(task?.title || "").trim(),
+            pinned: !(task?.overlay?.pinned === true),
+          },
         });
 
         const key = taskKey(task);

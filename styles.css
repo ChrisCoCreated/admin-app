@@ -682,6 +682,7 @@ body.lightbox-open {
   padding: 8px 10px;
   cursor: grab;
   user-select: none;
+  overflow: hidden;
 }
 
 .whiteboard-task-card.staged {
@@ -694,12 +695,22 @@ body.lightbox-open {
   font-weight: 800;
   font-size: 0.9rem;
   line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .whiteboard-task-meta {
   color: #4a5977;
   font-size: 0.82rem;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .whiteboard-category-box {

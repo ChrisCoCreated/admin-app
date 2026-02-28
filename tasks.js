@@ -279,7 +279,13 @@ function updateTaskOverlayInMemory(provider, externalTaskId, overlay) {
 async function submitOverlayPatch(provider, externalTaskId, patch) {
   setBusy(true);
   try {
-    const result = await directoryApi.upsertTaskOverlay({ provider, externalTaskId, patch });
+    const key = `${String(provider || "").trim().toLowerCase()}|${String(externalTaskId || "").trim()}`;
+    const task = allTasks.find((entry) => taskKey(entry) === key);
+    const patchWithTitle = {
+      ...(patch && typeof patch === "object" ? patch : {}),
+      title: String(task?.title || "").trim(),
+    };
+    const result = await directoryApi.upsertTaskOverlay({ provider, externalTaskId, patch: patchWithTitle });
     updateTaskOverlayInMemory(provider, externalTaskId, result?.overlay || {});
     renderTasks();
     setStatus("Overlay updated.");

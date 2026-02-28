@@ -70,6 +70,32 @@ function isPinned(value) {
   return text === "true" || text === "1" || text === "yes";
 }
 
+function looksOpaqueTaskId(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return false;
+  }
+  if (/\s/.test(text)) {
+    return false;
+  }
+  return text.length >= 28;
+}
+
+function displayTaskTitle(task) {
+  const title = String(task?.title || "").trim();
+  const externalTaskId = String(task?.externalTaskId || "").trim();
+  if (!title) {
+    return "Untitled task";
+  }
+  if (externalTaskId && title === externalTaskId) {
+    return "Untitled task";
+  }
+  if (looksOpaqueTaskId(title)) {
+    return "Untitled task";
+  }
+  return title;
+}
+
 function parseLayout(raw) {
   if (!raw || typeof raw !== "string") {
     return null;
@@ -292,10 +318,19 @@ function renderTaskCards() {
     card.className = "whiteboard-task-card staged";
     card.draggable = true;
     card.dataset.taskKey = entry.key;
-    card.innerHTML = `
-      <div class="whiteboard-task-title">${entry.task?.title || "Untitled task"}</div>
-      <div class="whiteboard-task-meta">${formatDate(entry.task?.dueDateTimeUtc)}${entry.task?.overlay?.category ? ` • ${entry.task.overlay.category}` : ""}</div>
-    `;
+    const title = document.createElement("div");
+    title.className = "whiteboard-task-title";
+    title.textContent = displayTaskTitle(entry.task);
+    title.title = title.textContent;
+
+    const meta = document.createElement("div");
+    meta.className = "whiteboard-task-meta";
+    meta.textContent = `${formatDate(entry.task?.dueDateTimeUtc)}${
+      entry.task?.overlay?.category ? ` • ${entry.task.overlay.category}` : ""
+    }`;
+
+    card.appendChild(title);
+    card.appendChild(meta);
     card.addEventListener("dragstart", onTaskDragStart);
     stagingLane.appendChild(card);
   }
@@ -310,10 +345,19 @@ function renderTaskCards() {
     card.style.width = `${entry.layout.w}px`;
     card.style.height = `${entry.layout.h}px`;
     card.style.zIndex = String(entry.layout.z || 1);
-    card.innerHTML = `
-      <div class="whiteboard-task-title">${entry.task?.title || "Untitled task"}</div>
-      <div class="whiteboard-task-meta">${formatDate(entry.task?.dueDateTimeUtc)}${entry.task?.overlay?.category ? ` • ${entry.task.overlay.category}` : ""}</div>
-    `;
+    const title = document.createElement("div");
+    title.className = "whiteboard-task-title";
+    title.textContent = displayTaskTitle(entry.task);
+    title.title = title.textContent;
+
+    const meta = document.createElement("div");
+    meta.className = "whiteboard-task-meta";
+    meta.textContent = `${formatDate(entry.task?.dueDateTimeUtc)}${
+      entry.task?.overlay?.category ? ` • ${entry.task.overlay.category}` : ""
+    }`;
+
+    card.appendChild(title);
+    card.appendChild(meta);
     card.addEventListener("dragstart", onTaskDragStart);
     boardCanvas.appendChild(card);
   }
@@ -360,6 +404,7 @@ function applyBoardDrop(task, key, boardX, boardY) {
   schedulePersist(
     key,
     {
+      title: String(task?.title || "").trim(),
       layout: layoutRaw,
       category,
     },
@@ -382,6 +427,7 @@ function applyStagingDrop(task, key) {
   schedulePersist(
     key,
     {
+      title: String(task?.title || "").trim(),
       layout: "",
       category: "",
     },

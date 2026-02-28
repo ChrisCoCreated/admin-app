@@ -1,6 +1,7 @@
 const ALLOWED_PROVIDERS = new Set(["todo", "planner"]);
 
 const WRITABLE_OVERLAY_FIELDS = new Set([
+  "title",
   "workingStatus",
   "workType",
   "tags",
@@ -247,6 +248,7 @@ function toGraphOverlayFields(input) {
   fields[OVERLAY_FIELD_MAP.lastOverlayUpdatedAt] = toUtcIsoOrNull(input.lastOverlayUpdatedAt) || new Date().toISOString();
 
   const optional = [
+    "title",
     "workingStatus",
     "workType",
     "activeStartedAt",
