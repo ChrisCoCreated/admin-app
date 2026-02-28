@@ -619,11 +619,16 @@ async function refreshBoard() {
     const pinnedByProvider = meta?.pinnedByProvider && typeof meta.pinnedByProvider === "object"
       ? meta.pinnedByProvider
       : {};
+    const graphMatchedCount = Number(meta?.graphMatchedCount || 0);
+    const graphMissCount = Number(meta?.graphMissCount || 0);
+    const partial = meta?.partial === true;
     setStatus(
       `TaskOverlay rows: ${totalOverlayRows} ` +
       `(planner ${totalByProvider.planner || 0}, todo ${totalByProvider.todo || 0}) | ` +
       `Pinned shown: ${tasksByKey.size} ` +
-      `(planner ${pinnedByProvider.planner || 0}, todo ${pinnedByProvider.todo || 0})` +
+      `(planner ${pinnedByProvider.planner || 0}, todo ${pinnedByProvider.todo || 0}) | ` +
+      `Graph matched: ${graphMatchedCount}, unmatched: ${graphMissCount}` +
+      (partial ? " | partial provider data" : "") +
       `${requestedUserUpn ? ` | user ${requestedUserUpn}` : ""}`
     );
     renderBoard();

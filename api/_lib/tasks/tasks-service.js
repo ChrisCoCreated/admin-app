@@ -150,6 +150,31 @@ function toProviderError(error) {
   };
 }
 
+function looksOpaqueTaskId(value) {
+  const text = String(value || "").trim();
+  if (!text || /\s/.test(text)) {
+    return false;
+  }
+  return text.length >= 28;
+}
+
+function pickDisplayTitle(graphTask, overlay) {
+  const graphTitle = String(graphTask?.title || "").trim();
+  if (graphTitle) {
+    return graphTitle;
+  }
+
+  const overlayTitle = String(overlay?.title || "").trim();
+  const externalTaskId = String(overlay?.externalTaskId || "").trim();
+  if (!overlayTitle) {
+    return "Untitled task";
+  }
+  if ((externalTaskId && overlayTitle === externalTaskId) || looksOpaqueTaskId(overlayTitle)) {
+    return "Untitled task";
+  }
+  return overlayTitle;
+}
+
 async function getUnifiedTasks({ graphAccessToken, claims }) {
   const userUpn = resolveUserUpn(claims);
   const graphClient = createGraphDelegatedClient(graphAccessToken);
@@ -165,6 +190,32 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
   }
   const overlaysBundle = await listOverlaysByUser(graphClient, userUpn);
   const overlays = Array.isArray(overlaysBundle?.overlays) ? overlaysBundle.overlays : [];
+  const providerErrors = {};
+  const graphTasksByKey = new Map();
+
+  const [todoResult, plannerResult] = await Promise.allSettled([
+    fetchTodoTasks(graphClient),
+    fetchPlannerTasks(graphClient),
+  ]);
+
+  if (todoResult.status === "fulfilled") {
+    for (const task of todoResult.value || []) {
+      const key = buildTaskKey(task.provider, task.externalTaskId);
+      graphTasksByKey.set(key, task);
+    }
+  } else {
+    providerErrors.todo = toProviderError(todoResult.reason);
+  }
+
+  if (plannerResult.status === "fulfilled") {
+    for (const task of plannerResult.value || []) {
+      const key = buildTaskKey(task.provider, task.externalTaskId);
+      graphTasksByKey.set(key, task);
+    }
+  } else {
+    providerErrors.planner = toProviderError(plannerResult.reason);
+  }
+
   const totalByProvider = {
     todo: 0,
     planner: 0,
@@ -184,20 +235,27 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
     totalByProvider.other += 1;
   }
 
+  let graphMatchedCount = 0;
   const tasks = overlays
     .filter((overlay) => overlay?.pinned === true)
     .map((overlay) => {
+      const key = buildTaskKey(overlay.provider, overlay.externalTaskId);
+      const graphTask = graphTasksByKey.get(key);
+      if (graphTask) {
+        graphMatchedCount += 1;
+      }
       return {
         provider: String(overlay.provider || "").trim().toLowerCase(),
         externalTaskId: String(overlay.externalTaskId || "").trim(),
-        externalContainerId: "",
-        title: String(overlay.title || "").trim() || "Untitled task",
-        createdDateTimeUtc: null,
-        dueDateTimeUtc: null,
-        isCompleted: false,
-        completedDateTimeUtc: null,
+        externalContainerId: String(graphTask?.externalContainerId || "").trim(),
+        title: pickDisplayTitle(graphTask, overlay),
+        createdDateTimeUtc: graphTask?.createdDateTimeUtc || null,
+        dueDateTimeUtc: graphTask?.dueDateTimeUtc || null,
+        isCompleted: graphTask?.isCompleted === true,
+        completedDateTimeUtc: graphTask?.completedDateTimeUtc || null,
         source: {
-          rawId: String(overlay.itemId || "").trim(),
+          rawId: String(graphTask?.source?.rawId || overlay.itemId || "").trim(),
+          etag: graphTask?.source?.etag,
         },
         overlay: {
           itemId: overlay.itemId,
@@ -245,6 +303,10 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
       requestedUserUpn: userUpn,
       totalByProvider,
       pinnedByProvider,
+      graphMatchedCount,
+      graphMissCount: Math.max(0, tasks.length - graphMatchedCount),
+      partial: Object.keys(providerErrors).length > 0,
+      providerErrors,
     },
   };
 }
