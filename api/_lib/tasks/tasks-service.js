@@ -236,13 +236,21 @@ async function upsertOverlay({ graphAccessToken, claims, body }) {
 
   if (existing) {
     itemId = String(existing.itemId || "").trim();
-    await patchOverlayFields(graphClient, overlaysBundle.siteId, overlaysBundle.listId, itemId, graphFields);
+    await patchOverlayFields(
+      graphClient,
+      overlaysBundle.siteId,
+      overlaysBundle.listId,
+      itemId,
+      graphFields,
+      overlaysBundle.fieldMap
+    );
   } else {
     const createdItem = await createOverlayItem(
       graphClient,
       overlaysBundle.siteId,
       overlaysBundle.listId,
-      graphFields
+      graphFields,
+      overlaysBundle.fieldMap
     );
     itemId = String(createdItem?.id || "").trim();
     created = true;

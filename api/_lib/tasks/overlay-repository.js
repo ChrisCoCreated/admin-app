@@ -7,6 +7,7 @@ const siteCache = {
   key: "",
   siteId: "",
   listId: "",
+  fieldMap: null,
 };
 
 const userOverlayCache = new Map();
@@ -53,14 +54,71 @@ function requireSharePointConfig() {
   };
 }
 
+function normalizeToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+async function resolveListColumns(graphClient, siteId, listId) {
+  const columns = [];
+  let nextUrl =
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}` +
+    `/columns?$select=name,displayName&$top=200`;
+
+  while (nextUrl) {
+    const payload = await graphClient.fetchJson(nextUrl);
+    const values = Array.isArray(payload?.value) ? payload.value : [];
+    columns.push(...values);
+    nextUrl = String(payload?.["@odata.nextLink"] || "");
+  }
+
+  return columns;
+}
+
+function resolveOverlayFieldMap(columns) {
+  const resolved = {};
+  const byNameToken = new Map();
+  const byDisplayToken = new Map();
+
+  for (const column of columns) {
+    const name = String(column?.name || "").trim();
+    const displayName = String(column?.displayName || "").trim();
+    if (!name) {
+      continue;
+    }
+
+    const nameToken = normalizeToken(name);
+    const displayToken = normalizeToken(displayName);
+    if (nameToken && !byNameToken.has(nameToken)) {
+      byNameToken.set(nameToken, name);
+    }
+    if (displayToken && !byDisplayToken.has(displayToken)) {
+      byDisplayToken.set(displayToken, name);
+    }
+  }
+
+  for (const [logicalKey, expectedFieldName] of Object.entries(OVERLAY_FIELD_MAP)) {
+    const token = normalizeToken(expectedFieldName);
+    resolved[logicalKey] =
+      byDisplayToken.get(token) ||
+      byNameToken.get(token) ||
+      expectedFieldName;
+  }
+
+  return resolved;
+}
+
 async function resolveSiteAndListIds(graphClient) {
   const { hostName, sitePath, listName } = requireSharePointConfig();
   const cacheKey = `${hostName}|${sitePath}|${listName}`;
 
-  if (siteCache.key === cacheKey && siteCache.siteId && siteCache.listId) {
+  if (siteCache.key === cacheKey && siteCache.siteId && siteCache.listId && siteCache.fieldMap) {
     return {
       siteId: siteCache.siteId,
       listId: siteCache.listId,
+      fieldMap: siteCache.fieldMap,
     };
   }
 
@@ -92,11 +150,17 @@ async function resolveSiteAndListIds(graphClient) {
     throw error;
   }
 
+  const columns = await resolveListColumns(graphClient, siteId, listId);
+  const fieldMap = resolveOverlayFieldMap(columns);
+
   siteCache.key = cacheKey;
   siteCache.siteId = siteId;
   siteCache.listId = listId;
+  siteCache.fieldMap = fieldMap;
 
-  return { siteId, listId };
+  logOverlayDebug("Resolved TaskOverlay field map.", fieldMap);
+
+  return { siteId, listId, fieldMap };
 }
 
 function userCacheKey(userUpn) {
@@ -111,12 +175,27 @@ function getOverlayCacheTtlMs() {
   return Math.floor(configured);
 }
 
-function mapOverlays(items) {
+function mapOverlays(items, fieldMap) {
   const overlays = [];
   const byKey = new Map();
 
   for (const item of items) {
-    const overlay = fromOverlayFields(item);
+    const rawFields = item?.fields || {};
+    const normalizedFields = { ...rawFields };
+    for (const [logicalKey, canonicalDisplayName] of Object.entries(OVERLAY_FIELD_MAP)) {
+      const actualFieldName = fieldMap?.[logicalKey] || canonicalDisplayName;
+      if (
+        Object.prototype.hasOwnProperty.call(rawFields, actualFieldName) &&
+        !Object.prototype.hasOwnProperty.call(normalizedFields, canonicalDisplayName)
+      ) {
+        normalizedFields[canonicalDisplayName] = rawFields[actualFieldName];
+      }
+    }
+
+    const overlay = fromOverlayFields({
+      ...item,
+      fields: normalizedFields,
+    });
     if (!overlay) {
       continue;
     }
@@ -147,10 +226,11 @@ async function listOverlaysByUser(graphClient, userUpn) {
     }
 
     const inFlight = (async () => {
-      const { siteId, listId } = await resolveSiteAndListIds(graphClient);
+      const { siteId, listId, fieldMap } = await resolveSiteAndListIds(graphClient);
+      const userUpnField = fieldMap?.userUpn || OVERLAY_FIELD_MAP.userUpn;
       const params = new URLSearchParams({
         $expand: "fields",
-        $filter: `fields/${OVERLAY_FIELD_MAP.userUpn} eq ${quoteODataString(userUpn)}`,
+        $filter: `fields/${userUpnField} eq ${quoteODataString(userUpn)}`,
         $top: String(OVERLAY_PAGE_SIZE),
       });
 
@@ -183,7 +263,7 @@ async function listOverlaysByUser(graphClient, userUpn) {
         items = await graphClient.fetchAllPages(fallbackUrl, { maxPages: 25 });
       }
 
-      const mapped = mapOverlays(items);
+      const mapped = mapOverlays(items, fieldMap);
       const normalizedUserUpn = String(userUpn || "").trim().toLowerCase();
       const filteredOverlays = mapped.overlays.filter((overlay) => {
         return String(overlay?.userUpn || "").trim().toLowerCase() === normalizedUserUpn;
@@ -198,6 +278,7 @@ async function listOverlaysByUser(graphClient, userUpn) {
       const value = {
         siteId,
         listId,
+        fieldMap,
         overlays: filteredOverlays,
         byKey,
       };
@@ -245,25 +326,45 @@ function clearOverlayUserCache(userUpn) {
   userOverlayCache.delete(userCacheKey(userUpn));
 }
 
-async function patchOverlayFields(graphClient, siteId, listId, itemId, fields) {
+function translateFieldsForWrite(fields, fieldMap) {
+  const translated = {};
+
+  for (const [key, value] of Object.entries(fields || {})) {
+    const logicalEntry = Object.entries(OVERLAY_FIELD_MAP).find(([, canonical]) => canonical === key);
+    if (!logicalEntry) {
+      translated[key] = value;
+      continue;
+    }
+
+    const logicalKey = logicalEntry[0];
+    const actualName = fieldMap?.[logicalKey] || key;
+    translated[actualName] = value;
+  }
+
+  return translated;
+}
+
+async function patchOverlayFields(graphClient, siteId, listId, itemId, fields, fieldMap) {
+  const translatedFields = translateFieldsForWrite(fields, fieldMap);
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
   await graphClient.fetchJson(url, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(fields),
+    body: JSON.stringify(translatedFields),
   });
 }
 
-async function createOverlayItem(graphClient, siteId, listId, fields) {
+async function createOverlayItem(graphClient, siteId, listId, fields, fieldMap) {
+  const translatedFields = translateFieldsForWrite(fields, fieldMap);
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`;
   const created = await graphClient.fetchJson(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ fields }),
+    body: JSON.stringify({ fields: translatedFields }),
   });
 
   return created;
