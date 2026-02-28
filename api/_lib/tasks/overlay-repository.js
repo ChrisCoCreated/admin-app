@@ -355,10 +355,40 @@ async function listOverlaysByUser(graphClient, userUpn) {
       }
 
       const mapped = mapOverlays(items, fieldMap);
-      const filteredOverlays = mapped.overlays.filter((overlay) => {
+      let filteredOverlays = mapped.overlays.filter((overlay) => {
         return overlayMatchesUser(overlay?.userUpn || "", userUpn);
       });
       const inferredLookupId = inferLookupIdFromItems(items, userUpnField);
+
+      if (filteredOverlays.length === 0 && Number.isFinite(inferredLookupId) && inferredLookupId > 0) {
+        const lookupByItemId = new Map();
+        const lookupField = `${userUpnField}LookupId`;
+        for (const item of items) {
+          const itemId = String(item?.id || "").trim();
+          if (!itemId) {
+            continue;
+          }
+          const lookupId = Number(item?.fields?.[lookupField]);
+          if (Number.isFinite(lookupId) && lookupId > 0) {
+            lookupByItemId.set(itemId, lookupId);
+          }
+        }
+
+        const lookupMatched = mapped.overlays.filter((overlay) => {
+          const itemId = String(overlay?.itemId || "").trim();
+          return lookupByItemId.get(itemId) === inferredLookupId;
+        });
+
+        if (lookupMatched.length > 0) {
+          logOverlayDebug("Using UserUPN lookup-id fallback match for overlays.", {
+            requestedUserUpn: String(userUpn || "").trim().toLowerCase(),
+            userUpnField,
+            inferredLookupId,
+            matchedRowsCount: lookupMatched.length,
+          });
+          filteredOverlays = lookupMatched;
+        }
+      }
 
       if (filteredOverlays.length === 0 && mapped.overlays.length > 0) {
         const rowDiagnostics = buildOverlayRowDiagnostics({
