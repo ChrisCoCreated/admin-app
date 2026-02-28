@@ -163,6 +163,21 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async syncWhiteboardTasks(payload = {}) {
+      const response = await authFetch(endpoint("/api/tasks/whiteboard-sync"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Whiteboard sync request failed");
+      }
+      return response.json();
+    },
+
     async upsertTaskOverlay({ provider, externalTaskId, patch }) {
       const response = await authFetch(endpoint("/api/tasks/overlay"), {
         method: "POST",

@@ -14,6 +14,10 @@ const WRITABLE_OVERLAY_FIELDS = new Set([
   "pinned",
   "layout",
   "category",
+  "lastExternalSyncAt",
+  "externalState",
+  "lastKnownDueDateUtc",
+  "lastKnownCompleted",
 ]);
 
 const OVERLAY_FIELD_MAP = {
@@ -34,6 +38,10 @@ const OVERLAY_FIELD_MAP = {
   layout: "Layout",
   category: "Category",
   lastOverlayUpdatedAt: "LastOverlayUpdatedAt",
+  lastExternalSyncAt: "LastExternalSyncAt",
+  externalState: "ExternalState",
+  lastKnownDueDateUtc: "LastKnownDueDateUtc",
+  lastKnownCompleted: "LastKnownCompleted",
 };
 
 function normalizeProvider(value) {
@@ -225,8 +233,18 @@ function sanitizeOverlayPatch(patch) {
       continue;
     }
 
-    if (key === "activeStartedAt" || key === "lastWorkedAt") {
+    if (
+      key === "activeStartedAt" ||
+      key === "lastWorkedAt" ||
+      key === "lastExternalSyncAt" ||
+      key === "lastKnownDueDateUtc"
+    ) {
       sanitized[key] = value ? toUtcIsoOrNull(value) : null;
+      continue;
+    }
+
+    if (key === "lastKnownCompleted") {
+      sanitized.lastKnownCompleted = parseBoolean(value);
       continue;
     }
 
@@ -260,6 +278,10 @@ function toGraphOverlayFields(input) {
     "pinned",
     "layout",
     "category",
+    "lastExternalSyncAt",
+    "externalState",
+    "lastKnownDueDateUtc",
+    "lastKnownCompleted",
   ];
 
   for (const key of optional) {
@@ -313,6 +335,10 @@ function fromOverlayFields(item) {
     layout: String(fields[OVERLAY_FIELD_MAP.layout] || "").trim(),
     category: String(fields[OVERLAY_FIELD_MAP.category] || "").trim(),
     lastOverlayUpdatedAt: toUtcIsoOrNull(fields[OVERLAY_FIELD_MAP.lastOverlayUpdatedAt]),
+    lastExternalSyncAt: toUtcIsoOrNull(fields[OVERLAY_FIELD_MAP.lastExternalSyncAt]),
+    externalState: String(fields[OVERLAY_FIELD_MAP.externalState] || "").trim().toLowerCase(),
+    lastKnownDueDateUtc: toUtcIsoOrNull(fields[OVERLAY_FIELD_MAP.lastKnownDueDateUtc]),
+    lastKnownCompleted: parseBoolean(fields[OVERLAY_FIELD_MAP.lastKnownCompleted]),
   };
 
   overlay.key = buildTaskKey(overlay.provider, overlay.externalTaskId);

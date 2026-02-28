@@ -33,6 +33,7 @@ let drawDraft = null;
 let movingBox = null;
 let stagedTaskCount = 0;
 let pinnedMinimized = false;
+let whiteboardSyncInFlight = false;
 
 const persistQueue = new Map();
 const persistSequenceByKey = new Map();
@@ -779,21 +780,23 @@ async function refreshBoard() {
     const pinnedByProvider = meta?.pinnedByProvider && typeof meta.pinnedByProvider === "object"
       ? meta.pinnedByProvider
       : {};
-    const graphMatchedCount = Number(meta?.graphMatchedCount || 0);
-    const graphMissCount = Number(meta?.graphMissCount || 0);
-    const titleBackfilledCount = Number(meta?.titleBackfilledCount || 0);
-    const partial = meta?.partial === true;
+    const cached = meta?.cached === true;
+    const syncStale = meta?.syncStale === true;
+    const lastSyncedAt = String(meta?.lastSyncedAt || "").trim();
+    const syncLabel = lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : "never";
     setStatus(
       `TaskOverlay rows: ${totalOverlayRows} ` +
       `(planner ${totalByProvider.planner || 0}, todo ${totalByProvider.todo || 0}) | ` +
       `Pinned shown: ${tasksByKey.size} ` +
       `(planner ${pinnedByProvider.planner || 0}, todo ${pinnedByProvider.todo || 0}) | ` +
-      `Graph matched: ${graphMatchedCount}, unmatched: ${graphMissCount}` +
-      (titleBackfilledCount > 0 ? ` | title synced: ${titleBackfilledCount}` : "") +
-      (partial ? " | partial provider data" : "") +
+      `sync ${syncStale ? "stale" : "fresh"} (last ${syncLabel})` +
+      (cached ? " | cached" : "") +
       `${requestedUserUpn ? ` | user ${requestedUserUpn}` : ""}`
     );
     renderBoard();
+    if (syncStale) {
+      void triggerBackgroundSync();
+    }
   } catch (error) {
     console.error("[whiteboard] Refresh failed", error);
     setStatus(error?.message || "Could not load whiteboard tasks.", true);
@@ -801,6 +804,30 @@ async function refreshBoard() {
     renderBoard();
   } finally {
     setBusy(false);
+  }
+}
+
+async function triggerBackgroundSync(force = false) {
+  if (whiteboardSyncInFlight) {
+    return;
+  }
+  whiteboardSyncInFlight = true;
+
+  try {
+    const result = await directoryApi.syncWhiteboardTasks({ force });
+    const meta = result?.meta || {};
+    if (meta?.alreadyRunning || meta?.skippedCooldown) {
+      return;
+    }
+    await refreshBoard();
+  } catch (error) {
+    console.error("[whiteboard] Background sync failed", {
+      status: error?.status,
+      code: error?.code,
+      detail: error?.detail || error?.message || String(error),
+    });
+  } finally {
+    whiteboardSyncInFlight = false;
   }
 }
 
@@ -887,6 +914,7 @@ refreshBtn?.addEventListener("click", async () => {
     return;
   }
   await refreshBoard();
+  void triggerBackgroundSync(true);
 });
 
 drawBoxBtn?.addEventListener("click", () => {

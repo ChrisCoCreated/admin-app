@@ -507,6 +507,69 @@ async function patchOverlayFields(graphClient, siteId, listId, itemId, fields, f
   });
 }
 
+function getOverlayPatchConcurrency() {
+  const configured = Number(process.env.TASKS_OVERLAY_PATCH_CONCURRENCY || 4);
+  if (!Number.isFinite(configured) || configured < 1) {
+    return 4;
+  }
+  return Math.min(Math.floor(configured), 12);
+}
+
+async function patchOverlayFieldsBatch(graphClient, siteId, listId, patches, fieldMap, concurrency) {
+  const queue = Array.isArray(patches) ? patches.filter(Boolean) : [];
+  if (!queue.length) {
+    return [];
+  }
+
+  const limit = Number.isFinite(concurrency) && concurrency > 0
+    ? Math.min(Math.floor(concurrency), 12)
+    : getOverlayPatchConcurrency();
+
+  const results = new Array(queue.length);
+  let nextIndex = 0;
+  let active = 0;
+  let completed = 0;
+
+  return new Promise((resolve) => {
+    const launch = () => {
+      if (completed >= queue.length) {
+        resolve(results);
+        return;
+      }
+
+      while (active < limit && nextIndex < queue.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        active += 1;
+        const entry = queue[currentIndex];
+
+        Promise.resolve()
+          .then(async () => {
+            await patchOverlayFields(
+              graphClient,
+              siteId,
+              listId,
+              String(entry?.itemId || "").trim(),
+              entry?.fields || {},
+              fieldMap
+            );
+            results[currentIndex] = { ok: true };
+          })
+          .catch((error) => {
+            results[currentIndex] = { ok: false, error };
+          })
+          .finally(() => {
+            active -= 1;
+            completed += 1;
+            launch();
+          });
+      }
+    };
+
+    launch();
+  });
+}
+
 async function createOverlayItem(graphClient, siteId, listId, fields, fieldMap) {
   const translatedFields = translateFieldsForWrite(fields, fieldMap);
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`;
@@ -577,10 +640,32 @@ async function backfillMissingOverlayUsers(graphClient, userUpn) {
   };
 }
 
+async function listPinnedOverlaysByUser(graphClient, userUpn) {
+  const bundle = await listOverlaysByUser(graphClient, userUpn);
+  const overlays = Array.isArray(bundle?.overlays) ? bundle.overlays : [];
+  const totalRows = overlays.length;
+  const pinnedOverlays = overlays.filter((overlay) => overlay?.pinned === true);
+  const byKey = new Map();
+  for (const overlay of pinnedOverlays) {
+    if (!byKey.has(overlay.key)) {
+      byKey.set(overlay.key, overlay);
+    }
+  }
+  return {
+    ...bundle,
+    totalRows,
+    allOverlays: overlays,
+    overlays: pinnedOverlays,
+    byKey,
+  };
+}
+
 module.exports = {
   backfillMissingOverlayUsers,
   clearOverlayUserCache,
   createOverlayItem,
+  listPinnedOverlaysByUser,
   listOverlaysByUser,
+  patchOverlayFieldsBatch,
   patchOverlayFields,
 };
