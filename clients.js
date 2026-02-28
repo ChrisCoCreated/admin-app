@@ -265,6 +265,32 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function formatBooleanIndicator(value) {
+  if (value === true) {
+    return { klass: "is-yes", label: "Yes" };
+  }
+  if (value === false) {
+    return { klass: "is-no", label: "No" };
+  }
+  return { klass: "is-unknown", label: "Unknown" };
+}
+
+function renderIndicator(value, fieldLabel) {
+  const indicator = formatBooleanIndicator(value);
+  return `<span class="client-indicator ${indicator.klass}" role="img" aria-label="${escapeHtml(
+    `${fieldLabel}: ${indicator.label}`
+  )}" title="${escapeHtml(indicator.label)}"></span>`;
+}
+
+function renderXeroLink(xeroId) {
+  const id = String(xeroId || "").trim();
+  if (!id) {
+    return "-";
+  }
+  const url = `https://go.xero.com/app/!q4T5z/contacts/contact/${encodeURIComponent(id)}`;
+  return `<a class="xero-link-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Xero</a>`;
+}
+
 function renderClients() {
   const filtered = getFilteredClients();
   clientsTableBody.innerHTML = "";
@@ -291,7 +317,17 @@ function renderClients() {
       <td>${escapeHtml(client.postcode || "-")}</td>
       <td>${escapeHtml(String(client.relationships?.carerCount || 0))}</td>
       <td>${escapeHtml(String(client.relationships?.visitCount || 0))}</td>
+      <td>${renderXeroLink(client.xeroId)}</td>
+      <td class="indicator-cell">${renderIndicator(client.hasMandate, "Mandate")}</td>
+      <td class="indicator-cell">${renderIndicator(client.hasMarketingConsent, "Marketing Consent")}</td>
     `;
+
+    const xeroLink = tr.querySelector(".xero-link-btn");
+    if (xeroLink) {
+      xeroLink.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+    }
 
     tr.addEventListener("click", () => {
       selectedClientId = client.id;

@@ -1,6 +1,7 @@
 const fs = require("fs/promises");
 const path = require("path");
 const { listCarers, listClients, listVisits } = require("./onetouch-client");
+const { readClients: readListClients } = require("./clients-source");
 
 let directoryCache = {
   data: null,
@@ -31,6 +32,10 @@ function getCarersCacheTtlMs() {
 
 function normalizeString(value) {
   return String(value || "").trim();
+}
+
+function normalizeJoinId(value) {
+  return normalizeString(value).toLowerCase();
 }
 
 function sortByNameThenId(a, b) {
@@ -100,6 +105,9 @@ async function readLocalClients() {
     email: normalizeString(item.email),
     phone: normalizeString(item.phone),
     status: normalizeString(item.status),
+    xeroId: normalizeString(item.xeroId),
+    hasMandate: typeof item.hasMandate === "boolean" ? item.hasMandate : null,
+    hasMarketingConsent: typeof item.hasMarketingConsent === "boolean" ? item.hasMarketingConsent : null,
     raw: item,
   }));
 }
@@ -277,14 +285,26 @@ async function loadDirectoryData() {
   const clientsTimeoutMs = Number(process.env.ONETOUCH_CLIENTS_TIMEOUT_MS || "12000");
   const carersTimeoutMs = Number(process.env.ONETOUCH_CARERS_TIMEOUT_MS || "12000");
   const visitsTimeoutMs = Number(process.env.ONETOUCH_VISITS_TIMEOUT_MS || "6000");
+  const enrichmentPromise = readListClients()
+    .then((result) => ({
+      clients: Array.isArray(result?.clients) ? result.clients : [],
+      source: String(result?.source || ""),
+      error: "",
+    }))
+    .catch((error) => ({
+      clients: [],
+      source: "",
+      error: error?.message || String(error),
+    }));
 
-  const [clients, carers, visitsResult] = await Promise.all([
+  const [clients, carers, visitsResult, enrichmentResult] = await Promise.all([
     timed("clients/all", () => withTimeout(listClients(), clientsTimeoutMs, "clients/all")),
     timed("carers/all", () => withTimeout(listCarers(), carersTimeoutMs, "carers/all")),
     timed("visits", () => withTimeout(listVisits(), visitsTimeoutMs, "visits")).then(
       (visits) => ({ visits, error: "" }),
       (error) => ({ visits: [], error: error?.message || String(error) })
     ),
+    enrichmentPromise,
   ]);
 
   const sortedClients = clients.sort(sortByNameThenId);
@@ -295,6 +315,33 @@ async function loadDirectoryData() {
   if (visitsResult.error) {
     warnings.push(`Visits endpoint unavailable: ${visitsResult.error}`);
   }
+  if (enrichmentResult.error) {
+    warnings.push(`Client enrichment unavailable: ${enrichmentResult.error}`);
+  }
+
+  const enrichmentById = new Map();
+  for (const client of enrichmentResult.clients) {
+    const id = normalizeJoinId(client?.id);
+    if (!id) {
+      continue;
+    }
+    enrichmentById.set(id, {
+      xeroId: normalizeString(client?.xeroId),
+      hasMandate: client?.hasMandate === true ? true : client?.hasMandate === false ? false : null,
+      hasMarketingConsent:
+        client?.hasMarketingConsent === true ? true : client?.hasMarketingConsent === false ? false : null,
+    });
+  }
+
+  const enrichedClients = relationshipData.clients.map((client) => {
+    const enrichment = enrichmentById.get(normalizeJoinId(client?.id));
+    return {
+      ...client,
+      xeroId: enrichment?.xeroId || "",
+      hasMandate: enrichment ? enrichment.hasMandate : null,
+      hasMarketingConsent: enrichment ? enrichment.hasMarketingConsent : null,
+    };
+  });
 
   console.info("[OneTouch] Directory load complete", {
     elapsedMs: Date.now() - loadStartedAt,
@@ -306,7 +353,7 @@ async function loadDirectoryData() {
 
   return {
     source: "onetouch",
-    clients: relationshipData.clients,
+    clients: enrichedClients,
     carers: relationshipData.carers,
     warnings,
   };

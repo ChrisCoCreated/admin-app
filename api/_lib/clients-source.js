@@ -13,7 +13,62 @@ function normalizeClient(client) {
     county: String(client.county || "").trim(),
     postcode: String(client.postcode || "").trim(),
     email: String(client.email || "").trim(),
+    xeroId: String(client.xeroId || "").trim(),
+    hasMandate: coerceBoolean(client.hasMandate),
+    hasMarketingConsent: coerceBoolean(client.hasMarketingConsent),
   };
+}
+
+function coerceBoolean(value) {
+  if (value === true || value === false) {
+    return value;
+  }
+
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+
+  const compact = raw.replace(/[\s_-]+/g, "");
+  if (compact.includes("notconsent")) {
+    return false;
+  }
+
+  const truthy = new Set([
+    "yes",
+    "true",
+    "1",
+    "active",
+    "granted",
+    "consented",
+    "y",
+    "optedin",
+    "on",
+  ]);
+  if (truthy.has(compact)) {
+    return true;
+  }
+
+  const falsy = new Set([
+    "no",
+    "false",
+    "0",
+    "inactive",
+    "declined",
+    "notconsented",
+    "n",
+    "optedout",
+    "off",
+  ]);
+  if (falsy.has(compact)) {
+    return false;
+  }
+
+  if (raw.includes("not consent")) {
+    return false;
+  }
+
+  return null;
 }
 
 async function readLocalClients() {
@@ -143,6 +198,25 @@ function normalizeToken(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+function pickTokenValue(byToken, tokenCandidates) {
+  for (const candidate of tokenCandidates) {
+    const value = byToken.get(normalizeToken(candidate));
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function pickTokenByPredicate(byToken, predicate) {
+  for (const [token, value] of byToken.entries()) {
+    if (predicate(token)) {
+      return value;
+    }
+  }
+  return "";
+}
+
 function mapGraphItemToClient(item) {
   const fields = item?.fields || {};
   const graphId = fields.ID || item?.id;
@@ -217,6 +291,32 @@ function mapGraphItemToClient(item) {
     "Post_x0020_Code",
   ]);
   const email = fields.Email || fields.EmailAddress || fields.ClientEmail || "";
+  const xeroId =
+    pickTokenValue(byToken, [
+      "XeroId",
+      "XeroContactId",
+      "XeroContactID",
+      "XeroContact",
+      "Xero_Contact_Id",
+    ]) ||
+    pickTokenByPredicate(byToken, (token) => token.includes("xero") && (token.includes("contact") || token.includes("id")));
+  const mandateValue =
+    pickTokenValue(byToken, [
+      "Mandate",
+      "HasMandate",
+      "DirectDebitMandate",
+      "DirectDebit",
+      "DdMandate",
+    ]) ||
+    pickTokenByPredicate(byToken, (token) => token.includes("mandate") || token.includes("directdebit") || token === "dd");
+  const marketingConsentValue =
+    pickTokenValue(byToken, [
+      "MarketingConsent",
+      "ConsentForMarketing",
+      "ClientConsentForMarketing",
+      "MarketingPermission",
+    ]) ||
+    pickTokenByPredicate(byToken, (token) => token.includes("consent") && token.includes("marketing"));
 
   return normalizeClient({
     id: graphId,
@@ -228,6 +328,9 @@ function mapGraphItemToClient(item) {
     county,
     postcode,
     email,
+    xeroId,
+    hasMandate: coerceBoolean(mandateValue),
+    hasMarketingConsent: coerceBoolean(marketingConsentValue),
   });
 }
 

@@ -287,6 +287,52 @@ tbody tr.selected {
   background: #eaf5ff;
 }
 
+.xero-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #c9d4e8;
+  background: #f5f8ff;
+  color: #194e9e;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.xero-link-btn:hover {
+  background: #eaf1ff;
+}
+
+.indicator-cell {
+  text-align: center;
+}
+
+.client-indicator {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.client-indicator.is-yes {
+  background: #d7f5df;
+  border-color: #2a8f4a;
+}
+
+.client-indicator.is-no {
+  background: #fbe0df;
+  border-color: #c14a4a;
+}
+
+.client-indicator.is-unknown {
+  background: #e7ebf4;
+  border-color: #8f9bb3;
+}
+
 .detail-list {
   margin: 12px 0 0;
   display: grid;
@@ -501,6 +547,10 @@ body.lightbox-open {
   padding-bottom: 40px;
 }
 
+.simple-tasks-main {
+  padding-bottom: 40px;
+}
+
 .task-toolbar {
   display: grid;
   gap: 10px;
@@ -525,6 +575,43 @@ body.lightbox-open {
   margin-top: 8px;
   display: grid;
   gap: 10px;
+}
+
+.task-pill-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task-pill {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #dbe2f0;
+  border-radius: 999px;
+  background: #f8fbff;
+  padding: 8px 12px;
+}
+
+.task-pill-title {
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-pill-due {
+  color: #40506b;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.task-pill-pin {
+  min-height: 32px;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.86rem;
 }
 
 .checkbox-row {
@@ -795,6 +882,11 @@ body.lightbox-open {
 
   .task-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .task-pill {
+    grid-template-columns: 1fr;
+    border-radius: 14px;
   }
 
   .schedule-row {

@@ -8,11 +8,12 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Authenticated Clients page (`clients.html`)
 - Authenticated Carers page (`carers.html`)
 - Authenticated Tasks page (`tasks.html`) for unified To Do + Planner with overlay updates
+- Authenticated Simple Tasks page (`simple-tasks.html`) with pill view and pinning
 - Authenticated Time Mapping page (`mapping.html`) for run planning
 - Secure backend APIs:
-  - `GET /api/clients` (original SharePoint/local clients list; used by Time Mapping)
+  - `GET /api/clients` (original SharePoint/local clients list)
   - `GET /api/clients/:id`
-  - `GET /api/onetouch/clients` (OneTouch list with relationship metadata)
+  - `GET /api/onetouch/clients` (OneTouch list with relationship metadata enriched with SharePoint Xero/consent fields when available)
   - `GET /api/carers`
   - `POST /api/routes/run`
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)

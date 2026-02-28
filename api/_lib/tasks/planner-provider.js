@@ -11,6 +11,7 @@ function normalizePlannerTask(task) {
     externalTaskId: String(task?.id || "").trim(),
     externalContainerId: String(task?.planId || "").trim(),
     title: String(task?.title || "").trim(),
+    createdDateTimeUtc: toUtcIsoOrNull(task?.createdDateTime),
     dueDateTimeUtc: toUtcIsoOrNull(task?.dueDateTime),
     isCompleted: Boolean(completedDateTimeUtc) || percentComplete >= 100,
     completedDateTimeUtc,
@@ -25,7 +26,7 @@ function normalizePlannerTask(task) {
 async function fetchPlannerTasks(graphClient) {
   const url =
     `https://graph.microsoft.com/v1.0/me/planner/tasks` +
-    `?$select=id,title,planId,dueDateTime,completedDateTime,percentComplete&$top=${PLANNER_PAGE_SIZE}`;
+    `?$select=id,title,planId,dueDateTime,createdDateTime,completedDateTime,percentComplete&$top=${PLANNER_PAGE_SIZE}`;
 
   const tasks = await graphClient.fetchAllPages(url);
   return tasks

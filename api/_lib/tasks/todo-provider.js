@@ -58,6 +58,7 @@ function normalizeTodoTask(task, listId) {
     externalTaskId: String(task?.id || "").trim(),
     externalContainerId: String(listId || "").trim(),
     title: String(task?.title || "").trim(),
+    createdDateTimeUtc: toUtcIsoOrNull(task?.createdDateTime?.dateTime),
     dueDateTimeUtc: toUtcIsoOrNull(task?.dueDateTime?.dateTime),
     isCompleted: status === "completed" || Boolean(completedDateTimeUtc),
     completedDateTimeUtc,
