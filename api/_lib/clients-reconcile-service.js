@@ -23,6 +23,69 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function collectNonEmptyValues(values) {
+  return values.map((value) => normalizeText(value)).filter(Boolean);
+}
+
+function dedupeEmails(values) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const key = normalizeText(value).toLowerCase();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(normalizeText(value));
+  }
+  return output;
+}
+
+function normalizePhoneForCompare(value) {
+  return normalizeText(value).replace(/[^\d+]/g, "").toLowerCase();
+}
+
+function dedupePhones(values) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const raw = normalizeText(value);
+    const key = normalizePhoneForCompare(raw);
+    if (!raw || !key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(raw);
+  }
+  return output;
+}
+
+function buildCombinedEmail(oneTouchClient) {
+  const values = collectNonEmptyValues([
+    oneTouchClient?.emailPrimary,
+    oneTouchClient?.emailSecondary,
+    oneTouchClient?.email,
+    oneTouchClient?.raw?.primary_email,
+    oneTouchClient?.raw?.secondary_email,
+    oneTouchClient?.raw?.email,
+    oneTouchClient?.raw?.email_address,
+  ]);
+  return dedupeEmails(values).join("; ");
+}
+
+function buildCombinedPhone(oneTouchClient) {
+  const values = collectNonEmptyValues([
+    oneTouchClient?.phoneMobile,
+    oneTouchClient?.phoneHome,
+    oneTouchClient?.phone,
+    oneTouchClient?.raw?.phone_mobile,
+    oneTouchClient?.raw?.phone_home,
+    oneTouchClient?.raw?.phone,
+    oneTouchClient?.raw?.mobile,
+  ]);
+  return dedupePhones(values).join(" / ");
+}
+
 function normalizeName(value) {
   return normalizeText(value)
     .toLowerCase()
@@ -162,13 +225,15 @@ function summarizeClient(client) {
 }
 
 function oneTouchToSharePointFields(client) {
+  const email = buildCombinedEmail(client);
+  const phone = buildCombinedPhone(client);
   return {
     name: normalizeText(client?.name),
     dateOfBirth: normalizeText(client?.dateOfBirth),
     oneTouchId: normalizeText(client?.id),
     postcode: normalizeText(client?.postcode),
-    email: normalizeText(client?.email),
-    phone: normalizeText(client?.phone),
+    email,
+    phone,
     status: normalizeText(client?.status).toLowerCase(),
     address: normalizeText(client?.address),
     town: normalizeText(client?.town),
@@ -192,6 +257,9 @@ function diffFields(sharePointClient, oneTouchClient, syncableFields = CORE_FIEL
   for (const field of syncableFields) {
     const left = normalizeText(target[field]);
     const right = normalizeText(source[field]);
+    if (!right) {
+      continue;
+    }
     if (left !== right) {
       diffs.push({
         field,
@@ -201,6 +269,37 @@ function diffFields(sharePointClient, oneTouchClient, syncableFields = CORE_FIEL
     }
   }
   return diffs;
+}
+
+function computePatchPlan(sharePointClient, oneTouchClient, syncableFields = CORE_FIELDS) {
+  const target = summarizeClient(sharePointClient);
+  const source = oneTouchToSharePointFields(oneTouchClient);
+  const differences = [];
+  const patchFields = {};
+  const skippedFields = [];
+  for (const field of syncableFields) {
+    const left = normalizeText(target[field]);
+    const right = normalizeText(source[field]);
+    if (!right) {
+      skippedFields.push({ field, reason: "source_blank" });
+      continue;
+    }
+    if (left === right) {
+      continue;
+    }
+    patchFields[field] = right;
+    differences.push({
+        field,
+        sharePoint: left,
+        oneTouch: right,
+    });
+  }
+  return {
+    differences,
+    patchFields,
+    skippedFields,
+    source,
+  };
 }
 
 function buildFingerprint(payload) {
@@ -255,12 +354,12 @@ async function buildReconciliationPreview() {
       }
 
       matchedOneTouchIds.add(oneTouchIdKey);
-      const differences = diffFields(sharePointClient, source, syncableFields);
-      if (differences.length) {
+      const patchPlan = computePatchPlan(sharePointClient, source, syncableFields);
+      if (patchPlan.differences.length) {
         updateCandidates.push({
           sharePoint: summarizeClient(sharePointClient),
           oneTouch: summarizeClient(source),
-          differences,
+          differences: patchPlan.differences,
           expectedFingerprint: buildFingerprint({
             itemId: normalizeText(sharePointClient?.itemId),
             oneTouchId: normalizeText(source?.id),
@@ -461,29 +560,50 @@ async function applyReconciliationAction(body) {
       throw error;
     }
 
-    const diffs = diffFields(sharePointClient, oneTouchClient, syncableFields);
-    if (!diffs.length) {
+    const patchPlan = computePatchPlan(sharePointClient, oneTouchClient, syncableFields);
+    if (!patchPlan.differences.length) {
       return {
         action,
         updated: false,
         sharePointItemId: normalizeText(sharePointClient.itemId),
         oneTouchClientId: normalizeText(oneTouchClient.id),
+        skippedFields: patchPlan.skippedFields,
       };
     }
 
-    const patchFields = {};
-    const sourceFields = oneTouchToSharePointFields(oneTouchClient);
-    for (const diff of diffs) {
-      patchFields[diff.field] = sourceFields[diff.field];
-    }
-    await patchSharePointClient(sharePointClient.itemId, patchFields);
+    await patchSharePointClient(sharePointClient.itemId, patchPlan.patchFields);
 
     return {
       action,
       updated: true,
       sharePointItemId: normalizeText(sharePointClient.itemId),
       oneTouchClientId: normalizeText(oneTouchClient.id),
-      changedFields: diffs.map((item) => item.field),
+      changedFields: patchPlan.differences.map((item) => item.field),
+      skippedFields: patchPlan.skippedFields,
+      contactMerge: {
+        emailPartsUsed: dedupeEmails(
+          collectNonEmptyValues([
+            oneTouchClient?.emailPrimary,
+            oneTouchClient?.emailSecondary,
+            oneTouchClient?.email,
+            oneTouchClient?.raw?.primary_email,
+            oneTouchClient?.raw?.secondary_email,
+            oneTouchClient?.raw?.email,
+            oneTouchClient?.raw?.email_address,
+          ])
+        ),
+        phonePartsUsed: dedupePhones(
+          collectNonEmptyValues([
+            oneTouchClient?.phoneMobile,
+            oneTouchClient?.phoneHome,
+            oneTouchClient?.phone,
+            oneTouchClient?.raw?.phone_mobile,
+            oneTouchClient?.raw?.phone_home,
+            oneTouchClient?.raw?.phone,
+            oneTouchClient?.raw?.mobile,
+          ])
+        ),
+      },
     };
   }
 

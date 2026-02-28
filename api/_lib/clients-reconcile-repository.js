@@ -309,7 +309,11 @@ function toSharePointFields(logicalFields, fieldMap) {
     if (value === undefined || value === null) {
       return;
     }
-    mapped[targetField] = String(value).trim();
+    const normalized = String(value).trim();
+    if (!normalized) {
+      return;
+    }
+    mapped[targetField] = normalized;
   }
 
   setIfPresent("name", logicalFields.name);

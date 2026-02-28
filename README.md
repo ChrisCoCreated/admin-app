@@ -24,6 +24,8 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
 - Clients reconciliation workflow on `clients.html` treats OneTouch as source of truth and writes changes into SharePoint
+  - Reconciliation combines OneTouch multi-contact fields into SharePoint single fields (`email`, `phone`) with dedupe (`; ` for emails, ` / ` for phones)
+  - Reconciliation never clears SharePoint fields with blank/null OneTouch values
 
 ## Run locally
 

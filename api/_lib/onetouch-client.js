@@ -277,6 +277,63 @@ function asString(value) {
   return String(value || "").trim();
 }
 
+function collectNonEmptyValues(values) {
+  return values.map((value) => asString(value)).filter(Boolean);
+}
+
+function dedupeEmails(values) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const key = String(value || "").trim().toLowerCase();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(String(value).trim());
+  }
+  return output;
+}
+
+function normalizePhoneForCompare(value) {
+  return String(value || "").replace(/[^\d+]/g, "").toLowerCase();
+}
+
+function dedupePhones(values) {
+  const seen = new Set();
+  const output = [];
+  for (const value of values) {
+    const raw = String(value || "").trim();
+    const key = normalizePhoneForCompare(raw);
+    if (!raw || !key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(raw);
+  }
+  return output;
+}
+
+function buildCombinedEmail(record) {
+  const values = collectNonEmptyValues([
+    record?.primary_email,
+    record?.secondary_email,
+    record?.email,
+    record?.email_address,
+  ]);
+  return dedupeEmails(values).join("; ");
+}
+
+function buildCombinedPhone(record) {
+  const values = collectNonEmptyValues([
+    record?.phone_mobile,
+    record?.phone_home,
+    record?.phone,
+    record?.mobile,
+  ]);
+  return dedupePhones(values).join(" / ");
+}
+
 function parseDateOfBirth(value) {
   const raw = asString(value);
   if (!raw) {
@@ -350,6 +407,10 @@ function normalizeClient(record) {
   return {
     id,
     name,
+    emailPrimary: asString(record?.primary_email),
+    emailSecondary: asString(record?.secondary_email),
+    phoneMobile: asString(record?.phone_mobile),
+    phoneHome: asString(record?.phone_home),
     dateOfBirth: parseDateOfBirth(
       record?.date_of_birth || record?.dob || record?.birth_date || record?.birthdate
     ),
@@ -357,8 +418,8 @@ function normalizeClient(record) {
     town: asString(record?.town || record?.city),
     county: asString(record?.county || record?.region),
     postcode: asString(record?.postcode || record?.post_code || record?.zip),
-    email: asString(record?.email || record?.email_address),
-    phone: asString(record?.phone || record?.mobile),
+    email: buildCombinedEmail(record),
+    phone: buildCombinedPhone(record),
     status: asString(record?.status || record?.client_status),
     tags,
     raw: record,
