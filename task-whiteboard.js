@@ -57,6 +57,19 @@ function formatDate(value) {
   return parsed.toLocaleDateString();
 }
 
+function isPinned(value) {
+  if (value === true) {
+    return true;
+  }
+  if (value === 1) {
+    return true;
+  }
+  const text = String(value || "")
+    .trim()
+    .toLowerCase();
+  return text === "true" || text === "1" || text === "yes";
+}
+
 function parseLayout(raw) {
   if (!raw || typeof raw !== "string") {
     return null;
@@ -245,7 +258,7 @@ function renderBoxes() {
 }
 
 function renderTaskCards() {
-  const pinnedTasks = Array.from(tasksByKey.values()).filter((task) => task?.overlay?.pinned === true);
+  const pinnedTasks = Array.from(tasksByKey.values()).filter((task) => isPinned(task?.overlay?.pinned));
   const staged = [];
   const placed = [];
 
@@ -535,7 +548,7 @@ async function refreshBoard() {
 
     tasksByKey = new Map();
     for (const task of tasks) {
-      if (task?.overlay?.pinned !== true) {
+      if (!isPinned(task?.overlay?.pinned)) {
         continue;
       }
 
@@ -557,7 +570,7 @@ async function refreshBoard() {
 
     const meta = payload?.meta || {};
     const partialTag = meta.partial ? " (partial provider data)" : "";
-    setStatus(`Loaded ${tasksByKey.size} pinned task(s)${partialTag}.`);
+    setStatus(`Loaded ${tasksByKey.size} pinned task(s) from ${tasks.length} task(s)${partialTag}.`);
     renderBoard();
   } catch (error) {
     console.error("[whiteboard] Refresh failed", error);
