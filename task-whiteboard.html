@@ -34,6 +34,7 @@
 
       <section class="panel">
         <div class="whiteboard-toolbar">
+          <button id="addTaskBtn" type="button">Add Task</button>
           <button id="refreshBtn" class="secondary" type="button">Refresh</button>
           <button id="drawBoxBtn" class="secondary" type="button">Draw Category Box</button>
           <button id="clearBoxesBtn" class="secondary" type="button">Clear Boxes</button>
@@ -59,6 +60,26 @@
         </article>
       </section>
     </main>
+
+    <div id="addTaskModal" class="modal-backdrop" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="addTaskModalTitle">
+        <h2 id="addTaskModalTitle">Add Task</h2>
+        <form id="addTaskForm" class="modal-form">
+          <label class="field" for="addTaskTitleInput">
+            Title
+            <input id="addTaskTitleInput" name="title" type="text" maxlength="240" required />
+          </label>
+          <label class="field" for="addTaskDueInput">
+            Due date (optional)
+            <input id="addTaskDueInput" name="dueDate" type="datetime-local" />
+          </label>
+          <div class="modal-actions">
+            <button id="addTaskCancelBtn" class="secondary" type="button">Cancel</button>
+            <button id="addTaskSubmitBtn" type="submit">Create Task</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <script type="module" src="./task-whiteboard.js"></script>
   </body>

@@ -697,9 +697,114 @@ async function upsertOverlay({ graphAccessToken, claims, body }) {
   };
 }
 
+function toTodoDueDatePayload(value) {
+  if (!value) {
+    return null;
+  }
+  const iso = new Date(value);
+  if (Number.isNaN(iso.getTime())) {
+    const error = new Error("dueDateTimeUtc must be a valid datetime.");
+    error.status = 400;
+    error.code = "INVALID_DUE_DATE";
+    throw error;
+  }
+  return {
+    dateTime: iso.toISOString(),
+    timeZone: "UTC",
+  };
+}
+
+async function resolveDefaultTodoListId(graphClient) {
+  const lists = await graphClient.fetchAllPages("https://graph.microsoft.com/v1.0/me/todo/lists?$top=100");
+  if (!Array.isArray(lists) || lists.length === 0) {
+    const error = new Error("No Microsoft To Do list available for this user.");
+    error.status = 404;
+    error.code = "TODO_LIST_NOT_FOUND";
+    throw error;
+  }
+
+  const preferred =
+    lists.find((entry) => String(entry?.wellknownListName || "").trim().toLowerCase() === "defaultlist") ||
+    lists.find((entry) => String(entry?.displayName || "").trim().toLowerCase() === "tasks") ||
+    lists[0];
+  const listId = String(preferred?.id || "").trim();
+  if (!listId) {
+    const error = new Error("Could not resolve a Microsoft To Do list id.");
+    error.status = 404;
+    error.code = "TODO_LIST_NOT_FOUND";
+    throw error;
+  }
+  return listId;
+}
+
+async function createWhiteboardTask({ graphAccessToken, claims, body }) {
+  const title = String(body?.title || "").trim();
+  if (!title) {
+    const error = new Error("title is required.");
+    error.status = 400;
+    error.code = "INVALID_TITLE";
+    throw error;
+  }
+  const duePayload = toTodoDueDatePayload(body?.dueDateTimeUtc);
+  const graphClient = createGraphDelegatedClient(graphAccessToken);
+  const listId = await resolveDefaultTodoListId(graphClient);
+  const createdTask = await graphClient.fetchJson(
+    `https://graph.microsoft.com/v1.0/me/todo/lists/${encodeURIComponent(listId)}/tasks`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title,
+        ...(duePayload ? { dueDateTime: duePayload } : {}),
+      }),
+    }
+  );
+
+  const externalTaskId = String(createdTask?.id || "").trim();
+  if (!externalTaskId) {
+    const error = new Error("Failed to create Microsoft To Do task.");
+    error.status = 502;
+    error.code = "TODO_TASK_CREATE_FAILED";
+    throw error;
+  }
+
+  const overlayResult = await upsertOverlay({
+    graphAccessToken,
+    claims,
+    body: {
+      provider: "todo",
+      externalTaskId,
+      patch: {
+        title,
+        pinned: true,
+        layout: "",
+        category: "",
+      },
+    },
+  });
+
+  return {
+    task: {
+      provider: "todo",
+      externalTaskId,
+      externalContainerId: listId,
+      title,
+      dueDateTimeUtc: duePayload?.dateTime || null,
+    },
+    overlay: overlayResult?.overlay || null,
+    meta: {
+      ...overlayResult?.meta,
+      createdExternalTask: true,
+    },
+  };
+}
+
 module.exports = {
   clearWhiteboardTasksCache,
   clearUnifiedTasksCache,
+  createWhiteboardTask,
   getUnifiedTasks,
   getUnifiedTasksCached,
   getWhiteboardTasks,

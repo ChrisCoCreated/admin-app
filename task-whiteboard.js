@@ -4,6 +4,7 @@ import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const refreshBtn = document.getElementById("refreshBtn");
+const addTaskBtn = document.getElementById("addTaskBtn");
 const drawBoxBtn = document.getElementById("drawBoxBtn");
 const clearBoxesBtn = document.getElementById("clearBoxesBtn");
 const signOutBtn = document.getElementById("signOutBtn");
@@ -13,6 +14,12 @@ const stagingLane = document.getElementById("stagingLane");
 const stagingDropZone = document.getElementById("stagingDropZone");
 const togglePinnedBtn = document.getElementById("togglePinnedBtn");
 const stagingWrap = document.querySelector(".whiteboard-staging-wrap");
+const addTaskModal = document.getElementById("addTaskModal");
+const addTaskForm = document.getElementById("addTaskForm");
+const addTaskTitleInput = document.getElementById("addTaskTitleInput");
+const addTaskDueInput = document.getElementById("addTaskDueInput");
+const addTaskCancelBtn = document.getElementById("addTaskCancelBtn");
+const addTaskSubmitBtn = document.getElementById("addTaskSubmitBtn");
 
 const DEFAULT_CARD_W = 220;
 const DEFAULT_CARD_H = 72;
@@ -34,6 +41,7 @@ let movingBox = null;
 let stagedTaskCount = 0;
 let pinnedMinimized = false;
 let whiteboardSyncInFlight = false;
+let creatingTask = false;
 
 const persistQueue = new Map();
 const persistSequenceByKey = new Map();
@@ -47,6 +55,43 @@ function setStatus(message, isError = false) {
 function setBusy(value) {
   busy = value;
   refreshBtn.disabled = value;
+  if (addTaskBtn) {
+    addTaskBtn.disabled = value;
+  }
+}
+
+function setCreateTaskBusy(value) {
+  creatingTask = value;
+  if (addTaskSubmitBtn) {
+    addTaskSubmitBtn.disabled = value;
+  }
+  if (addTaskCancelBtn) {
+    addTaskCancelBtn.disabled = value;
+  }
+  if (addTaskTitleInput) {
+    addTaskTitleInput.disabled = value;
+  }
+  if (addTaskDueInput) {
+    addTaskDueInput.disabled = value;
+  }
+}
+
+function openAddTaskModal() {
+  if (!addTaskModal) {
+    return;
+  }
+  addTaskModal.hidden = false;
+  addTaskTitleInput?.focus();
+}
+
+function closeAddTaskModal() {
+  if (!addTaskModal) {
+    return;
+  }
+  addTaskModal.hidden = true;
+  if (addTaskForm) {
+    addTaskForm.reset();
+  }
 }
 
 function taskKey(task) {
@@ -915,6 +960,72 @@ refreshBtn?.addEventListener("click", async () => {
   }
   await refreshBoard();
   void triggerBackgroundSync(true);
+});
+
+addTaskBtn?.addEventListener("click", async () => {
+  if (busy) {
+    return;
+  }
+  openAddTaskModal();
+});
+
+addTaskCancelBtn?.addEventListener("click", () => {
+  if (creatingTask) {
+    return;
+  }
+  closeAddTaskModal();
+});
+
+addTaskModal?.addEventListener("click", (event) => {
+  if (event.target === addTaskModal && !creatingTask) {
+    closeAddTaskModal();
+  }
+});
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !addTaskModal?.hidden && !creatingTask) {
+    closeAddTaskModal();
+  }
+});
+
+addTaskForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (busy || creatingTask) {
+    return;
+  }
+
+  const title = String(addTaskTitleInput?.value || "").trim();
+  if (!title) {
+    addTaskTitleInput?.focus();
+    return;
+  }
+
+  let dueDateTimeUtc = null;
+  const rawDue = String(addTaskDueInput?.value || "").trim();
+  if (rawDue) {
+    const parsed = new Date(rawDue);
+    if (!Number.isNaN(parsed.getTime())) {
+      dueDateTimeUtc = parsed.toISOString();
+    }
+  }
+
+  setCreateTaskBusy(true);
+  setBusy(true);
+  try {
+    await directoryApi.createTask({
+      title,
+      ...(dueDateTimeUtc ? { dueDateTimeUtc } : {}),
+    });
+    closeAddTaskModal();
+    setStatus("Task created.");
+    await refreshBoard();
+  } catch (error) {
+    console.error("[whiteboard] Task create failed", error);
+    setStatus(error?.message || "Could not create task.", true);
+  } finally {
+    setCreateTaskBusy(false);
+    setBusy(false);
+  }
 });
 
 drawBoxBtn?.addEventListener("click", () => {

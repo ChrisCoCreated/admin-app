@@ -17,6 +17,8 @@ const marketingMediaHandler = require("./api/marketing/media");
 const tasksUnifiedHandler = require("./api/tasks/unified");
 const tasksOverlayHandler = require("./api/tasks/overlay");
 const tasksWhiteboardHandler = require("./api/tasks/whiteboard");
+const tasksWhiteboardSyncHandler = require("./api/tasks/whiteboard-sync");
+const tasksCreateHandler = require("./api/tasks/create");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -243,6 +245,22 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/tasks/whiteboard") {
     await tasksWhiteboardHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/tasks/whiteboard-sync") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await tasksWhiteboardSyncHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/tasks/create") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await tasksCreateHandler(apiReq, apiRes);
     return true;
   }
 

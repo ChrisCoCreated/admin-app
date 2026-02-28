@@ -178,6 +178,21 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async createTask(payload = {}) {
+      const response = await authFetch(endpoint("/api/tasks/create"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Task create failed");
+      }
+      return response.json();
+    },
+
     async upsertTaskOverlay({ provider, externalTaskId, patch }) {
       const response = await authFetch(endpoint("/api/tasks/overlay"), {
         method: "POST",
