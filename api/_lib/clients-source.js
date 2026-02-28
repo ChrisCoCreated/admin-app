@@ -7,6 +7,7 @@ function normalizeClient(client) {
     id: String(client.id || "").trim(),
     oneTouchId: String(client.oneTouchId || "").trim(),
     name: String(client.name || "").trim(),
+    dateOfBirth: parseDateOfBirth(client.dateOfBirth),
     status: status || "active",
     area: String(client.area || "").trim(),
     address: String(client.address || "").trim(),
@@ -70,6 +71,56 @@ function coerceBoolean(value) {
   }
 
   return null;
+}
+
+function parseDateOfBirth(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const datePart = raw.includes("T") ? raw.split("T")[0] : raw;
+  const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(datePart);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    ) {
+      return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  const slashMatch = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/.exec(datePart);
+  if (slashMatch) {
+    const day = Number(slashMatch[1]);
+    const month = Number(slashMatch[2]);
+    const yearRaw = Number(slashMatch[3]);
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    ) {
+      return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return [
+      String(parsed.getUTCFullYear()).padStart(4, "0"),
+      String(parsed.getUTCMonth() + 1).padStart(2, "0"),
+      String(parsed.getUTCDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  return "";
 }
 
 async function readLocalClients() {
@@ -329,10 +380,21 @@ function mapGraphItemToClient(item) {
     ]) ||
     pickTokenByPredicate(byToken, (token) => token.includes("onetouch") && token.includes("id"));
 
+  const dateOfBirth =
+    pickTokenValue(byToken, [
+      "DateOfBirth",
+      "DOB",
+      "BirthDate",
+      "Date_Of_Birth",
+    ]) ||
+    pickTokenByPredicate(byToken, (token) => token.includes("birth") && token.includes("date")) ||
+    pickTokenByPredicate(byToken, (token) => token === "dob");
+
   return normalizeClient({
     id: graphId,
     oneTouchId,
     name,
+    dateOfBirth,
     status,
     area,
     address,

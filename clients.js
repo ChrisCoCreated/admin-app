@@ -12,6 +12,13 @@ const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
 const detailRoot = document.getElementById("clientDetail");
 const linkedCarersList = document.getElementById("linkedCarersList");
+const reconcilePanel = document.getElementById("reconcilePanel");
+const reconcileRefreshBtn = document.getElementById("reconcileRefreshBtn");
+const reconcileStatus = document.getElementById("reconcileStatus");
+const copyIdBody = document.getElementById("copyIdBody");
+const missingBody = document.getElementById("missingBody");
+const updateBody = document.getElementById("updateBody");
+const ambiguousBody = document.getElementById("ambiguousBody");
 
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
@@ -33,6 +40,9 @@ let allClients = [];
 let selectedClientId = "";
 let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
 let account = null;
+let currentRole = "";
+let reconcilePreview = null;
+let reconcileBusy = false;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -291,6 +301,272 @@ function renderXeroLink(xeroId) {
   return `<a class="xero-link-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Xero</a>`;
 }
 
+function canManageReconciliation() {
+  return currentRole === "admin" || currentRole === "care_manager";
+}
+
+function setReconcileStatus(message, isError = false) {
+  if (!reconcileStatus) {
+    return;
+  }
+  reconcileStatus.textContent = message;
+  reconcileStatus.classList.toggle("error", isError);
+}
+
+function setReconcileBusy(isBusy) {
+  reconcileBusy = isBusy;
+  if (reconcileRefreshBtn) {
+    reconcileRefreshBtn.disabled = isBusy;
+  }
+}
+
+function renderEmptyRow(root, message, colspan = 4) {
+  if (!root) {
+    return;
+  }
+  root.innerHTML = "";
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td colspan="${colspan}" class="muted">${escapeHtml(message)}</td>`;
+  root.appendChild(tr);
+}
+
+function createActionButton(label, onClick, disabled = false) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "secondary recon-action-btn";
+  btn.textContent = label;
+  btn.disabled = disabled || reconcileBusy;
+  btn.addEventListener("click", async (event) => {
+    event.preventDefault();
+    await onClick();
+  });
+  return btn;
+}
+
+async function refreshClientsData() {
+  setStatus("Loading clients...");
+  const payload = await directoryApi.listOneTouchClients({ limit: 500 });
+  allClients = Array.isArray(payload?.clients) ? payload.clients : [];
+  const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
+  warningState.hidden = warnings.length === 0;
+  warningState.textContent = warnings.join(" ");
+  renderStatusFilters();
+  setStatus(`Loaded ${allClients.length} client(s).`);
+  renderClients();
+}
+
+async function loadReconcilePreview() {
+  if (!canManageReconciliation() || !reconcilePanel) {
+    return;
+  }
+  setReconcileBusy(true);
+  setReconcileStatus("Loading reconciliation preview...");
+  try {
+    reconcilePreview = await directoryApi.getClientsReconcilePreview();
+    renderReconcilePreview();
+    const totals = reconcilePreview?.totals || {};
+    setReconcileStatus(
+      `Copy: ${totals.copyOneTouchIdCandidates || 0}, Missing: ${totals.missingInSharePoint || 0}, ` +
+        `Update: ${totals.updateCandidates || 0}, Ambiguous: ${totals.ambiguousMatches || 0}.`
+    );
+  } catch (error) {
+    console.error(error);
+    setReconcileStatus(error?.message || "Could not load reconciliation preview.", true);
+    renderEmptyRow(copyIdBody, "Could not load data.");
+    renderEmptyRow(missingBody, "Could not load data.");
+    renderEmptyRow(updateBody, "Could not load data.");
+    renderEmptyRow(ambiguousBody, "Could not load data.");
+  } finally {
+    setReconcileBusy(false);
+  }
+}
+
+async function applyReconcileAction(payload, successMessage) {
+  if (reconcileBusy) {
+    return;
+  }
+  setReconcileBusy(true);
+  setReconcileStatus("Applying reconciliation change...");
+  try {
+    await directoryApi.applyClientsReconcileAction(payload);
+    setReconcileStatus(successMessage || "Reconciliation action applied.");
+    await Promise.all([refreshClientsData(), loadReconcilePreview()]);
+  } catch (error) {
+    console.error(error);
+    setReconcileStatus(error?.message || "Could not apply reconciliation action.", true);
+  } finally {
+    setReconcileBusy(false);
+  }
+}
+
+function renderCopyCandidates(items) {
+  if (!copyIdBody) {
+    return;
+  }
+  copyIdBody.innerHTML = "";
+  if (!items.length) {
+    renderEmptyRow(copyIdBody, "No copy candidates.");
+    return;
+  }
+
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(item?.sharePoint?.name || "-")}</td>
+      <td>${escapeHtml(item?.sharePoint?.dateOfBirth || "-")}</td>
+      <td>${escapeHtml(item?.oneTouch?.name || "-")} (${escapeHtml(item?.oneTouch?.id || "-")})</td>
+      <td></td>
+    `;
+    const actionCell = tr.lastElementChild;
+    actionCell.appendChild(
+      createActionButton("Copy", () =>
+        applyReconcileAction(
+          {
+            action: "copy_onetouch_id",
+            sharePointItemId: item?.sharePoint?.itemId || "",
+            oneTouchClientId: item?.oneTouch?.id || "",
+            expectedFingerprint: item?.expectedFingerprint || "",
+          },
+          "OneTouchID copied."
+        )
+      )
+    );
+    copyIdBody.appendChild(tr);
+  }
+}
+
+function renderMissingCandidates(items) {
+  if (!missingBody) {
+    return;
+  }
+  missingBody.innerHTML = "";
+  if (!items.length) {
+    renderEmptyRow(missingBody, "No missing records.");
+    return;
+  }
+
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(item?.oneTouch?.id || "-")}</td>
+      <td>${escapeHtml(item?.oneTouch?.name || "-")}</td>
+      <td>${escapeHtml(item?.oneTouch?.dateOfBirth || "-")}</td>
+      <td></td>
+    `;
+    const actionCell = tr.lastElementChild;
+    actionCell.appendChild(
+      createActionButton("Add", () =>
+        applyReconcileAction(
+          {
+            action: "add_missing",
+            oneTouchClientId: item?.oneTouch?.id || "",
+            expectedFingerprint: item?.expectedFingerprint || "",
+          },
+          "Missing SharePoint record added."
+        )
+      )
+    );
+    missingBody.appendChild(tr);
+  }
+}
+
+function renderUpdateCandidates(items) {
+  if (!updateBody) {
+    return;
+  }
+  updateBody.innerHTML = "";
+  if (!items.length) {
+    renderEmptyRow(updateBody, "No update candidates.");
+    return;
+  }
+
+  for (const item of items) {
+    const diffs = Array.isArray(item?.differences) ? item.differences : [];
+    const fieldsLabel = diffs.map((diff) => diff.field).join(", ") || "-";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(item?.sharePoint?.name || "-")}</td>
+      <td>${escapeHtml(item?.oneTouch?.id || "-")}</td>
+      <td>${escapeHtml(fieldsLabel)}</td>
+      <td></td>
+    `;
+    const actionCell = tr.lastElementChild;
+    actionCell.appendChild(
+      createActionButton("Update", () =>
+        applyReconcileAction(
+          {
+            action: "update_record",
+            sharePointItemId: item?.sharePoint?.itemId || "",
+            oneTouchClientId: item?.oneTouch?.id || "",
+            expectedFingerprint: item?.expectedFingerprint || "",
+          },
+          "SharePoint record updated."
+        )
+      )
+    );
+    updateBody.appendChild(tr);
+  }
+}
+
+function renderAmbiguousCandidates(items) {
+  if (!ambiguousBody) {
+    return;
+  }
+  ambiguousBody.innerHTML = "";
+  if (!items.length) {
+    renderEmptyRow(ambiguousBody, "No ambiguous matches.");
+    return;
+  }
+
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(item?.sharePoint?.name || "-")}</td>
+      <td>${escapeHtml(item?.sharePoint?.dateOfBirth || "-")}</td>
+      <td></td>
+      <td></td>
+    `;
+
+    const selectCell = tr.children[2];
+    const actionCell = tr.children[3];
+
+    const select = document.createElement("select");
+    select.className = "recon-select";
+    const candidates = Array.isArray(item?.oneTouchCandidates) ? item.oneTouchCandidates : [];
+    for (const candidate of candidates) {
+      const option = document.createElement("option");
+      option.value = String(candidate?.id || "");
+      option.textContent = `${candidate?.name || "Unknown"} (${candidate?.id || "-"})`;
+      select.appendChild(option);
+    }
+    selectCell.appendChild(select);
+
+    actionCell.appendChild(
+      createActionButton("Copy", () =>
+        applyReconcileAction(
+          {
+            action: "copy_onetouch_id",
+            sharePointItemId: item?.sharePoint?.itemId || "",
+            oneTouchClientId: select.value,
+            expectedFingerprint: item?.expectedFingerprint || "",
+          },
+          "OneTouchID copied."
+        )
+      )
+    );
+
+    ambiguousBody.appendChild(tr);
+  }
+}
+
+function renderReconcilePreview() {
+  const payload = reconcilePreview || {};
+  renderCopyCandidates(Array.isArray(payload.copyOneTouchIdCandidates) ? payload.copyOneTouchIdCandidates : []);
+  renderMissingCandidates(Array.isArray(payload.missingInSharePoint) ? payload.missingInSharePoint : []);
+  renderUpdateCandidates(Array.isArray(payload.updateCandidates) ? payload.updateCandidates : []);
+  renderAmbiguousCandidates(Array.isArray(payload.ambiguousMatches) ? payload.ambiguousMatches : []);
+}
+
 function renderClients() {
   const filtered = getFilteredClients();
   clientsTableBody.innerHTML = "";
@@ -352,23 +628,21 @@ async function init() {
 
     const profile = await directoryApi.getCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
+    currentRole = role;
     if (!canAccessPage(role, "clients")) {
       redirectToUnauthorized("clients");
       return;
     }
     renderTopNavigation({ role });
 
-    setStatus("Loading clients...");
-    const payload = await directoryApi.listOneTouchClients({ limit: 500 });
-    allClients = Array.isArray(payload?.clients) ? payload.clients : [];
+    await refreshClientsData();
 
-    const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
-    warningState.hidden = warnings.length === 0;
-    warningState.textContent = warnings.join(" ");
-
-    renderStatusFilters();
-    setStatus(`Loaded ${allClients.length} client(s).`);
-    renderClients();
+    if (reconcilePanel) {
+      reconcilePanel.hidden = !canManageReconciliation();
+      if (canManageReconciliation()) {
+        await loadReconcilePreview();
+      }
+    }
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("clients");
@@ -384,6 +658,10 @@ async function init() {
 
 searchInput?.addEventListener("input", () => {
   renderClients();
+});
+
+reconcileRefreshBtn?.addEventListener("click", async () => {
+  await loadReconcilePreview();
 });
 
 signOutBtn?.addEventListener("click", async () => {

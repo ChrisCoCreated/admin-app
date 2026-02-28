@@ -27,6 +27,10 @@ function setStatus(message, isError = false) {
 function setBusy(value) {
   busy = value;
   refreshBtn.disabled = value;
+  const pinButtons = pillList?.querySelectorAll?.(".task-pill-pin") || [];
+  for (const button of pinButtons) {
+    button.disabled = value;
+  }
 }
 
 function formatDate(value) {

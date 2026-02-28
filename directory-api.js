@@ -97,6 +97,28 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getClientsReconcilePreview() {
+      const response = await authFetch(endpoint("/api/clients/reconcile/preview"));
+      if (!response.ok) {
+        await parseError(response, "Clients reconciliation preview request failed");
+      }
+      return response.json();
+    },
+
+    async applyClientsReconcileAction(payload = {}) {
+      const response = await authFetch(endpoint("/api/clients/reconcile/apply"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Clients reconciliation apply request failed");
+      }
+      return response.json();
+    },
+
     async listCarers(query = {}) {
       const response = await authFetch(buildUrl("/api/carers", query));
       if (!response.ok) {

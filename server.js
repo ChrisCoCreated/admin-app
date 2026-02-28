@@ -6,6 +6,8 @@ const { URL } = require("url");
 
 const clientsIndexHandler = require("./api/clients/index");
 const clientsByIdHandler = require("./api/clients/[id]");
+const clientsReconcilePreviewHandler = require("./api/clients/reconcile/preview");
+const clientsReconcileApplyHandler = require("./api/clients/reconcile/apply");
 const carersIndexHandler = require("./api/carers/index");
 const oneTouchClientsHandler = require("./api/onetouch/clients");
 const authMeHandler = require("./api/auth/me");
@@ -176,6 +178,19 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/clients") {
     await clientsIndexHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/clients/reconcile/preview") {
+    await clientsReconcilePreviewHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/clients/reconcile/apply") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await clientsReconcileApplyHandler(apiReq, apiRes);
     return true;
   }
 

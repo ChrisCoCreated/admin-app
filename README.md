@@ -15,12 +15,15 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `GET /api/clients` (original SharePoint/local clients list)
   - `GET /api/clients/:id`
   - `GET /api/onetouch/clients` (OneTouch list with relationship metadata enriched with SharePoint Xero/consent fields when available)
+  - `GET /api/clients/reconcile/preview` (admin + care_manager; OneTouch-to-SharePoint reconciliation preview)
+  - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)
   - `GET /api/carers`
   - `POST /api/routes/run`
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)
   - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
+- Clients reconciliation workflow on `clients.html` treats OneTouch as source of truth and writes changes into SharePoint
 
 ## Run locally
 

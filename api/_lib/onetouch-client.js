@@ -251,6 +251,56 @@ function asString(value) {
   return String(value || "").trim();
 }
 
+function parseDateOfBirth(value) {
+  const raw = asString(value);
+  if (!raw) {
+    return "";
+  }
+
+  const datePart = raw.includes("T") ? raw.split("T")[0] : raw;
+  const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(datePart);
+  if (isoMatch) {
+    const year = Number(isoMatch[1]);
+    const month = Number(isoMatch[2]);
+    const day = Number(isoMatch[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    ) {
+      return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  const slashMatch = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/.exec(datePart);
+  if (slashMatch) {
+    const day = Number(slashMatch[1]);
+    const month = Number(slashMatch[2]);
+    const yearRaw = Number(slashMatch[3]);
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    ) {
+      return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return [
+      String(parsed.getUTCFullYear()).padStart(4, "0"),
+      String(parsed.getUTCMonth() + 1).padStart(2, "0"),
+      String(parsed.getUTCDate()).padStart(2, "0"),
+    ].join("-");
+  }
+
+  return "";
+}
+
 function buildName(record, firstKeys, lastKeys, fallbackKeys) {
   const fallback = fallbackKeys.map((key) => asString(record?.[key])).find(Boolean);
   if (fallback) {
@@ -274,6 +324,9 @@ function normalizeClient(record) {
   return {
     id,
     name,
+    dateOfBirth: parseDateOfBirth(
+      record?.date_of_birth || record?.dob || record?.birth_date || record?.birthdate
+    ),
     address: asString(record?.address || record?.address_1 || record?.address1),
     town: asString(record?.town || record?.city),
     county: asString(record?.county || record?.region),

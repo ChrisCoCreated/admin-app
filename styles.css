@@ -333,6 +333,22 @@ tbody tr.selected {
   border-color: #8f9bb3;
 }
 
+.recon-action-btn {
+  min-height: 30px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.recon-select {
+  min-width: 220px;
+  max-width: 340px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #c8d2e4;
+  padding: 0 8px;
+  background: #fff;
+}
+
 .detail-list {
   margin: 12px 0 0;
   display: grid;

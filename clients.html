@@ -42,6 +42,75 @@
         <p id="warningState" class="muted" hidden></p>
       </section>
 
+      <section id="reconcilePanel" class="panel" hidden>
+        <div class="row wrap-row">
+          <h2>Reconciliation</h2>
+          <button id="reconcileRefreshBtn" class="secondary" type="button">Refresh reconciliation</button>
+        </div>
+        <p class="muted">OneTouch is the source of truth. Actions write updates into SharePoint clients.</p>
+        <p id="reconcileStatus" class="muted">Loading reconciliation preview...</p>
+
+        <h3 class="subheading">Copy OneTouchID</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SharePoint Client</th>
+                <th>DOB</th>
+                <th>Matched OneTouch</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="copyIdBody"></tbody>
+          </table>
+        </div>
+
+        <h3 class="subheading">Missing in SharePoint</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>OneTouch ID</th>
+                <th>Name</th>
+                <th>DOB</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="missingBody"></tbody>
+          </table>
+        </div>
+
+        <h3 class="subheading">Inaccurate Records</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SharePoint Client</th>
+                <th>OneTouch ID</th>
+                <th>Fields to update</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="updateBody"></tbody>
+          </table>
+        </div>
+
+        <h3 class="subheading">Ambiguous Matches</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SharePoint Client</th>
+                <th>DOB</th>
+                <th>Select OneTouch Candidate</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="ambiguousBody"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="clients-grid">
         <article class="panel list-panel">
           <h2>Client List</h2>
