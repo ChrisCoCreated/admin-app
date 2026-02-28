@@ -18,6 +18,7 @@ const copyIdBody = document.getElementById("copyIdBody");
 const missingBody = document.getElementById("missingBody");
 const updateBody = document.getElementById("updateBody");
 const ambiguousBody = document.getElementById("ambiguousBody");
+const errorsBody = document.getElementById("errorsBody");
 const copyAllBtn = document.getElementById("copyAllBtn");
 const updateAllBtn = document.getElementById("updateAllBtn");
 
@@ -360,6 +361,7 @@ async function loadReconcilePreview() {
     renderEmptyRow(missingBody, "Could not load data.");
     renderEmptyRow(updateBody, "Could not load data.");
     renderEmptyRow(ambiguousBody, "Could not load data.");
+    renderEmptyRow(errorsBody, "Could not load data.", 3);
   } finally {
     setReconcileBusy(false);
   }
@@ -565,6 +567,28 @@ function renderReconcilePreview() {
   renderMissingCandidates(Array.isArray(payload.missingInSharePoint) ? payload.missingInSharePoint : []);
   renderUpdateCandidates(Array.isArray(payload.updateCandidates) ? payload.updateCandidates : []);
   renderAmbiguousCandidates(Array.isArray(payload.ambiguousMatches) ? payload.ambiguousMatches : []);
+  renderErrors(Array.isArray(payload.errors) ? payload.errors : []);
+}
+
+function renderErrors(items) {
+  if (!errorsBody) {
+    return;
+  }
+  errorsBody.innerHTML = "";
+  if (!items.length) {
+    renderEmptyRow(errorsBody, "No unmatched SharePoint records.", 3);
+    return;
+  }
+
+  for (const item of items) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(item?.sharePoint?.name || "-")}</td>
+      <td>${escapeHtml(item?.sharePoint?.oneTouchId || "-")}</td>
+      <td>${escapeHtml(item?.message || item?.type || "No matching OneTouch record.")}</td>
+    `;
+    errorsBody.appendChild(tr);
+  }
 }
 
 async function applyUpdateAllCandidates() {

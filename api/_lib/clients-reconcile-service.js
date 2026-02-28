@@ -118,26 +118,25 @@ function datesMatch(left, right) {
   return a.year === b.year && a.month === b.month && a.day === b.day;
 }
 
-function findNameDobCandidates(sharePointClient, oneTouchClients) {
+function findNameCandidates(sharePointClient, oneTouchClients) {
   const sharePointName = normalizeName(sharePointClient?.name);
-  const sharePointDob = normalizeText(sharePointClient?.dateOfBirth);
-  if (!sharePointName || !sharePointDob) {
+  if (!sharePointName) {
     return { candidates: [], matchType: "none" };
   }
 
-  const sameDob = oneTouchClients.filter((client) => {
+  const validClients = oneTouchClients.filter((client) => {
     if (!normalizeId(client?.id)) {
       return false;
     }
-    return datesMatch(sharePointDob, client?.dateOfBirth);
+    return Boolean(normalizeName(client?.name));
   });
 
-  const exact = sameDob.filter((client) => normalizeName(client?.name) === sharePointName);
+  const exact = validClients.filter((client) => normalizeName(client?.name) === sharePointName);
   if (exact.length) {
     return { candidates: exact, matchType: "exact" };
   }
 
-  const fuzzy = sameDob.filter((client) => fuzzyNameMatch(client?.name, sharePointClient?.name));
+  const fuzzy = validClients.filter((client) => fuzzyNameMatch(client?.name, sharePointClient?.name));
   if (fuzzy.length) {
     return { candidates: fuzzy, matchType: "fuzzy" };
   }
@@ -177,11 +176,20 @@ function oneTouchToSharePointFields(client) {
   };
 }
 
-function diffFields(sharePointClient, oneTouchClient) {
+function resolveSyncableFields(fieldMap) {
+  return CORE_FIELDS.filter((field) => {
+    if (field === "name") {
+      return true;
+    }
+    return Boolean(fieldMap?.[field]);
+  });
+}
+
+function diffFields(sharePointClient, oneTouchClient, syncableFields = CORE_FIELDS) {
   const target = summarizeClient(sharePointClient);
   const source = oneTouchToSharePointFields(oneTouchClient);
   const diffs = [];
-  for (const field of CORE_FIELDS) {
+  for (const field of syncableFields) {
     const left = normalizeText(target[field]);
     const right = normalizeText(source[field]);
     if (left !== right) {
@@ -206,14 +214,17 @@ async function loadSnapshot() {
     listSharePointClientsWithItemIds(),
   ]);
   const sharePointClients = Array.isArray(sharePointBundle?.clients) ? sharePointBundle.clients : [];
+  const sharePointFieldMap = sharePointBundle?.fieldMap || {};
   return {
     oneTouchClients,
     sharePointClients,
+    sharePointFieldMap,
   };
 }
 
 async function buildReconciliationPreview() {
-  const { oneTouchClients, sharePointClients } = await loadSnapshot();
+  const { oneTouchClients, sharePointClients, sharePointFieldMap } = await loadSnapshot();
+  const syncableFields = resolveSyncableFields(sharePointFieldMap);
 
   const oneTouchById = new Map();
   for (const client of oneTouchClients) {
@@ -244,7 +255,7 @@ async function buildReconciliationPreview() {
       }
 
       matchedOneTouchIds.add(oneTouchIdKey);
-      const differences = diffFields(sharePointClient, source);
+      const differences = diffFields(sharePointClient, source, syncableFields);
       if (differences.length) {
         updateCandidates.push({
           sharePoint: summarizeClient(sharePointClient),
@@ -260,7 +271,7 @@ async function buildReconciliationPreview() {
       continue;
     }
 
-    const { candidates, matchType } = findNameDobCandidates(sharePointClient, oneTouchClients);
+    const { candidates, matchType } = findNameCandidates(sharePointClient, oneTouchClients);
 
     if (candidates.length === 1) {
       const source = candidates[0];
@@ -290,7 +301,14 @@ async function buildReconciliationPreview() {
           candidateIds: candidates.map((item) => normalizeText(item?.id)).sort(),
         }),
       });
+      continue;
     }
+
+    errors.push({
+      type: "missing_onetouch_by_name",
+      sharePoint: summarizeClient(sharePointClient),
+      message: "No OneTouch client found by name fallback.",
+    });
   }
 
   const missingInSharePoint = [];
@@ -324,6 +342,7 @@ async function buildReconciliationPreview() {
       ambiguousMatches: ambiguousMatches.length,
       errors: errors.length,
     },
+    syncableFields,
   };
 }
 
@@ -343,7 +362,8 @@ async function applyReconciliationAction(body) {
   const oneTouchClientId = normalizeText(body?.oneTouchClientId);
   const expectedFingerprint = normalizeText(body?.expectedFingerprint);
 
-  const { oneTouchClients, sharePointClients } = await loadSnapshot();
+  const { oneTouchClients, sharePointClients, sharePointFieldMap } = await loadSnapshot();
+  const syncableFields = resolveSyncableFields(sharePointFieldMap);
 
   if (action === "copy_onetouch_id") {
     const sharePointClient = findSharePointClientByItemId(sharePointClients, sharePointItemId);
@@ -358,11 +378,8 @@ async function applyReconciliationAction(body) {
       error.status = 409;
       throw error;
     }
-    if (
-      !datesMatch(sharePointClient.dateOfBirth, oneTouchClient.dateOfBirth) ||
-      !fuzzyNameMatch(sharePointClient.name, oneTouchClient.name)
-    ) {
-      const error = new Error("Selected OneTouch client no longer matches SharePoint name and date of birth.");
+    if (!fuzzyNameMatch(sharePointClient.name, oneTouchClient.name)) {
+      const error = new Error("Selected OneTouch client no longer matches SharePoint name.");
       error.status = 409;
       throw error;
     }
@@ -444,7 +461,7 @@ async function applyReconciliationAction(body) {
       throw error;
     }
 
-    const diffs = diffFields(sharePointClient, oneTouchClient);
+    const diffs = diffFields(sharePointClient, oneTouchClient, syncableFields);
     if (!diffs.length) {
       return {
         action,

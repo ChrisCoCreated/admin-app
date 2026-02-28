@@ -298,6 +298,20 @@ async function listOverlaysByUser(graphClient, userUpn) {
         items = await graphClient.fetchAllPages(fallbackUrl, { maxPages: 25 });
       }
 
+      if (items.length === 0) {
+        // Person/Group equality filters can return no rows even when records exist.
+        logOverlayDebug("UserUPN filtered query returned zero rows; retrying with unfiltered scan.", {
+          requestedUserUpn: String(userUpn || "").trim().toLowerCase(),
+          userUpnField,
+        });
+        const fallbackParams = new URLSearchParams({
+          $expand: "fields",
+          $top: String(OVERLAY_PAGE_SIZE),
+        });
+        const fallbackUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${fallbackParams.toString()}`;
+        items = await graphClient.fetchAllPages(fallbackUrl, { maxPages: 25 });
+      }
+
       const mapped = mapOverlays(items, fieldMap);
       const filteredOverlays = mapped.overlays.filter((overlay) => {
         return overlayMatchesUser(overlay?.userUpn || "", userUpn);
@@ -308,10 +322,16 @@ async function listOverlaysByUser(graphClient, userUpn) {
           .map((overlay) => String(overlay?.userUpn || "").trim())
           .filter(Boolean)
           .slice(0, 6);
+        const rawSamples = items
+          .map((item) => item?.fields?.[userUpnField])
+          .filter((entry) => entry !== undefined && entry !== null)
+          .slice(0, 6);
         logOverlayDebug("No strict user match for overlays.", {
           requestedUserUpn: String(userUpn || "").trim().toLowerCase(),
+          userUpnField,
           overlayRowsLoaded: mapped.overlays.length,
           sampleOverlayUserValues: sampleUsers,
+          sampleRawUserFieldValues: rawSamples,
         });
       }
       const byKey = new Map();

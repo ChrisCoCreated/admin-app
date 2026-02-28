@@ -138,7 +138,12 @@ function parseUserUpnValue(value) {
   }
 
   if (typeof value === "string") {
-    return value.trim().toLowerCase();
+    const text = value.trim().toLowerCase();
+    const emailMatch = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.exec(text);
+    if (emailMatch) {
+      return emailMatch[0].toLowerCase();
+    }
+    return text;
   }
 
   if (typeof value === "object") {
@@ -151,6 +156,8 @@ function parseUserUpnValue(value) {
         value.userPrincipalName ||
         value.upn ||
         value.lookupValue ||
+        value.LookupValue ||
+        value.displayName ||
         value.value ||
         ""
     )
