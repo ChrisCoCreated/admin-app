@@ -97,6 +97,7 @@ async function readLocalClients() {
 
   return parsed.map((item) => ({
     id: normalizeString(item.id),
+    oneTouchId: normalizeString(item.oneTouchId || item.onetouchId || item.one_touch_id),
     name: normalizeString(item.name),
     address: normalizeString(item.address),
     town: normalizeString(item.town),
@@ -321,11 +322,11 @@ async function loadDirectoryData() {
 
   const enrichmentById = new Map();
   for (const client of enrichmentResult.clients) {
-    const id = normalizeJoinId(client?.id);
-    if (!id) {
+    const oneTouchId = normalizeJoinId(client?.oneTouchId);
+    if (!oneTouchId) {
       continue;
     }
-    enrichmentById.set(id, {
+    enrichmentById.set(oneTouchId, {
       xeroId: normalizeString(client?.xeroId),
       hasMandate: client?.hasMandate === true ? true : client?.hasMandate === false ? false : null,
       hasMarketingConsent:

@@ -7,8 +7,9 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Entra ID sign-in/sign-out (MSAL popup with redirect fallback)
 - Authenticated Clients page (`clients.html`)
 - Authenticated Carers page (`carers.html`)
-- Authenticated Tasks page (`tasks.html`) for unified To Do + Planner with overlay updates
-- Authenticated Simple Tasks page (`simple-tasks.html`) with pill view and pinning
+- Authenticated Tasks page (`task-whiteboard.html`) with draggable pinned cards and category boxes (default)
+- Authenticated Tasks (Simple) page (`simple-tasks.html`) with pill view and pinning
+- Authenticated Tasks (Advanced) page (`tasks.html`) for full unified To Do + Planner overlay editing
 - Authenticated Time Mapping page (`mapping.html`) for run planning
 - Secure backend APIs:
   - `GET /api/clients` (original SharePoint/local clients list)
@@ -35,6 +36,7 @@ npm start
 - `http://127.0.0.1:8081/index.html`
 - `http://127.0.0.1:8081/clients.html`
 - `http://127.0.0.1:8081/carers.html`
+- `http://127.0.0.1:8081/task-whiteboard.html`
 - `http://127.0.0.1:8081/mapping.html`
 
 ## Frontend config

@@ -11,6 +11,8 @@ const WRITABLE_OVERLAY_FIELDS = new Set([
   "impact",
   "overlayNotes",
   "pinned",
+  "layout",
+  "category",
 ]);
 
 const OVERLAY_FIELD_MAP = {
@@ -27,6 +29,8 @@ const OVERLAY_FIELD_MAP = {
   impact: "Impact",
   overlayNotes: "OverlayNotes",
   pinned: "Pinned",
+  layout: "Layout",
+  category: "Category",
   lastOverlayUpdatedAt: "LastOverlayUpdatedAt",
 };
 
@@ -217,6 +221,8 @@ function toGraphOverlayFields(input) {
     "impact",
     "overlayNotes",
     "pinned",
+    "layout",
+    "category",
   ];
 
   for (const key of optional) {
@@ -266,6 +272,8 @@ function fromOverlayFields(item) {
     impact: fields[OVERLAY_FIELD_MAP.impact] ?? "",
     overlayNotes: String(fields[OVERLAY_FIELD_MAP.overlayNotes] || "").trim(),
     pinned: parseBoolean(fields[OVERLAY_FIELD_MAP.pinned]),
+    layout: String(fields[OVERLAY_FIELD_MAP.layout] || "").trim(),
+    category: String(fields[OVERLAY_FIELD_MAP.category] || "").trim(),
     lastOverlayUpdatedAt: toUtcIsoOrNull(fields[OVERLAY_FIELD_MAP.lastOverlayUpdatedAt]),
   };
 

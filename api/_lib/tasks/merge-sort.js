@@ -30,6 +30,8 @@ function mergeTasksWithOverlays(tasks, overlaysByKey) {
         impact: overlay.impact,
         overlayNotes: overlay.overlayNotes,
         pinned: overlay.pinned,
+        layout: overlay.layout,
+        category: overlay.category,
         lastOverlayUpdatedAt: overlay.lastOverlayUpdatedAt,
       },
     };

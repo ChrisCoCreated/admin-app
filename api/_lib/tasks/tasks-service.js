@@ -279,6 +279,8 @@ async function upsertOverlay({ graphAccessToken, claims, body }) {
       impact: overlay?.impact || "",
       overlayNotes: overlay?.overlayNotes || "",
       pinned: overlay?.pinned === true,
+      layout: overlay?.layout || "",
+      category: overlay?.category || "",
       lastOverlayUpdatedAt: overlay?.lastOverlayUpdatedAt || nowIso,
     },
     meta: {

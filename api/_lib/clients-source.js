@@ -5,6 +5,7 @@ function normalizeClient(client) {
   const status = String(client.status || "").trim().toLowerCase();
   return {
     id: String(client.id || "").trim(),
+    oneTouchId: String(client.oneTouchId || "").trim(),
     name: String(client.name || "").trim(),
     status: status || "active",
     area: String(client.area || "").trim(),
@@ -318,8 +319,19 @@ function mapGraphItemToClient(item) {
     ]) ||
     pickTokenByPredicate(byToken, (token) => token.includes("consent") && token.includes("marketing"));
 
+  const oneTouchId =
+    pickTokenValue(byToken, [
+      "OnetouchID",
+      "OneTouchID",
+      "OneTouchClientId",
+      "OneTouchClientID",
+      "OneTouch_Id",
+    ]) ||
+    pickTokenByPredicate(byToken, (token) => token.includes("onetouch") && token.includes("id"));
+
   return normalizeClient({
     id: graphId,
+    oneTouchId,
     name,
     status,
     area,
