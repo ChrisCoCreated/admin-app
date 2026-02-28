@@ -19,6 +19,7 @@ const copyIdBody = document.getElementById("copyIdBody");
 const missingBody = document.getElementById("missingBody");
 const updateBody = document.getElementById("updateBody");
 const ambiguousBody = document.getElementById("ambiguousBody");
+const copyAllBtn = document.getElementById("copyAllBtn");
 const updateAllBtn = document.getElementById("updateAllBtn");
 
 const detailFields = {
@@ -319,6 +320,11 @@ function setReconcileBusy(isBusy) {
   if (reconcileRefreshBtn) {
     reconcileRefreshBtn.disabled = isBusy;
   }
+  if (copyAllBtn) {
+    const hasItems =
+      Array.isArray(reconcilePreview?.copyOneTouchIdCandidates) && reconcilePreview.copyOneTouchIdCandidates.length > 0;
+    copyAllBtn.disabled = isBusy || !hasItems;
+  }
   if (updateAllBtn) {
     const hasItems = Array.isArray(reconcilePreview?.updateCandidates) && reconcilePreview.updateCandidates.length > 0;
     updateAllBtn.disabled = isBusy || !hasItems;
@@ -423,6 +429,9 @@ function renderCopyCandidates(items) {
   copyIdBody.innerHTML = "";
   if (!items.length) {
     renderEmptyRow(copyIdBody, "No copy candidates.");
+    if (copyAllBtn) {
+      copyAllBtn.disabled = true;
+    }
     return;
   }
 
@@ -451,6 +460,10 @@ function renderCopyCandidates(items) {
       )
     );
     copyIdBody.appendChild(tr);
+  }
+
+  if (copyAllBtn) {
+    copyAllBtn.disabled = reconcileBusy || items.length === 0;
   }
 }
 
@@ -638,6 +651,51 @@ async function applyUpdateAllCandidates() {
   setReconcileStatus(`Update all complete: ${updated} updated.`);
 }
 
+async function applyCopyAllCandidates() {
+  const items = Array.isArray(reconcilePreview?.copyOneTouchIdCandidates) ? reconcilePreview.copyOneTouchIdCandidates : [];
+  if (!items.length || reconcileBusy) {
+    return;
+  }
+
+  setReconcileBusy(true);
+  setReconcileStatus(`Copying OneTouchID for ${items.length} record(s)...`);
+  let copied = 0;
+  let failed = 0;
+  let lastError = "";
+
+  try {
+    for (const item of items) {
+      try {
+        const response = await directoryApi.applyClientsReconcileAction({
+          action: "copy_onetouch_id",
+          sharePointItemId: item?.sharePoint?.itemId || "",
+          oneTouchClientId: item?.oneTouch?.id || "",
+          expectedFingerprint: item?.expectedFingerprint || "",
+        });
+        if (response?.result?.updated === false) {
+          continue;
+        }
+        copied += 1;
+      } catch (error) {
+        failed += 1;
+        lastError = error?.message || String(error);
+      }
+    }
+  } finally {
+    setReconcileBusy(false);
+  }
+
+  await Promise.all([refreshClientsData(), loadReconcilePreview()]);
+  if (failed > 0) {
+    setReconcileStatus(
+      `Copy all complete: ${copied} copied, ${failed} failed.${lastError ? ` Last error: ${lastError}` : ""}`,
+      true
+    );
+    return;
+  }
+  setReconcileStatus(`Copy all complete: ${copied} copied.`);
+}
+
 function renderClients() {
   const filtered = getFilteredClients();
   clientsTableBody.innerHTML = "";
@@ -733,6 +791,10 @@ searchInput?.addEventListener("input", () => {
 
 reconcileRefreshBtn?.addEventListener("click", async () => {
   await loadReconcilePreview();
+});
+
+copyAllBtn?.addEventListener("click", async () => {
+  await applyCopyAllCandidates();
 });
 
 updateAllBtn?.addEventListener("click", async () => {

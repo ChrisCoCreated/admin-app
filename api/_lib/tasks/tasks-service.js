@@ -160,6 +160,24 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
   const graphClient = createGraphDelegatedClient(graphAccessToken);
   const overlaysBundle = await listOverlaysByUser(graphClient, userUpn);
   const overlays = Array.isArray(overlaysBundle?.overlays) ? overlaysBundle.overlays : [];
+  const totalByProvider = {
+    todo: 0,
+    planner: 0,
+    other: 0,
+  };
+
+  for (const overlay of overlays) {
+    const provider = String(overlay?.provider || "").trim().toLowerCase();
+    if (provider === "todo") {
+      totalByProvider.todo += 1;
+      continue;
+    }
+    if (provider === "planner") {
+      totalByProvider.planner += 1;
+      continue;
+    }
+    totalByProvider.other += 1;
+  }
 
   const tasks = overlays
     .filter((overlay) => overlay?.pinned === true)
@@ -195,11 +213,32 @@ async function getWhiteboardTasks({ graphAccessToken, claims }) {
       };
     });
 
+  const pinnedByProvider = {
+    todo: 0,
+    planner: 0,
+    other: 0,
+  };
+  for (const task of tasks) {
+    const provider = String(task?.provider || "").trim().toLowerCase();
+    if (provider === "todo") {
+      pinnedByProvider.todo += 1;
+      continue;
+    }
+    if (provider === "planner") {
+      pinnedByProvider.planner += 1;
+      continue;
+    }
+    pinnedByProvider.other += 1;
+  }
+
   return {
     tasks,
     meta: {
       total: tasks.length,
       source: "taskoverlay",
+      totalOverlayRows: overlays.length,
+      totalByProvider,
+      pinnedByProvider,
     },
   };
 }

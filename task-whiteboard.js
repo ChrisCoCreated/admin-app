@@ -564,7 +564,20 @@ async function refreshBoard() {
       });
     }
 
-    setStatus(`Loaded ${tasksByKey.size} pinned task(s) from TaskOverlay.`);
+    const meta = payload?.meta || {};
+    const totalOverlayRows = Number(meta?.totalOverlayRows || 0);
+    const totalByProvider = meta?.totalByProvider && typeof meta.totalByProvider === "object"
+      ? meta.totalByProvider
+      : {};
+    const pinnedByProvider = meta?.pinnedByProvider && typeof meta.pinnedByProvider === "object"
+      ? meta.pinnedByProvider
+      : {};
+    setStatus(
+      `TaskOverlay rows: ${totalOverlayRows} ` +
+      `(planner ${totalByProvider.planner || 0}, todo ${totalByProvider.todo || 0}) | ` +
+      `Pinned shown: ${tasksByKey.size} ` +
+      `(planner ${pinnedByProvider.planner || 0}, todo ${pinnedByProvider.todo || 0})`
+    );
     renderBoard();
   } catch (error) {
     console.error("[whiteboard] Refresh failed", error);
