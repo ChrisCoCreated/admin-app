@@ -19,7 +19,6 @@ const tasksOverlayHandler = require("./api/tasks/overlay");
 const tasksWhiteboardHandler = require("./api/tasks/whiteboard");
 const tasksWhiteboardSyncHandler = require("./api/tasks/whiteboard-sync");
 const tasksCreateHandler = require("./api/tasks/create");
-const mapsConfigHandler = require("./api/maps/config");
 const mapsDriveTimeHandler = require("./api/maps/drive-time");
 
 function loadEnvFile(envPath) {
@@ -263,11 +262,6 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await tasksCreateHandler(apiReq, apiRes);
-    return true;
-  }
-
-  if (reqUrl.pathname === "/api/maps/config") {
-    await mapsConfigHandler(apiReq, apiRes);
     return true;
   }
 

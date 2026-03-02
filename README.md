@@ -20,7 +20,6 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)
   - `GET /api/carers`
   - `POST /api/routes/run`
-  - `GET /api/maps/config`
   - `POST /api/maps/drive-time`
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)
   - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
@@ -82,7 +81,6 @@ Optional fallback toggles:
 Google Maps Platform vars (for Time Mapping):
 
 - `GOOGLE_MAPS_API_KEY`
-- `GOOGLE_MAPS_BROWSER_API_KEY` (optional; falls back to `GOOGLE_MAPS_API_KEY`, recommended for browser-restricted key usage)
 - `GOOGLE_MAPS_REGION` (default `gb`)
 
 Run costing vars (for Time Mapping):

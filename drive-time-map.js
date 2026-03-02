@@ -11,13 +11,11 @@ const driveTimeMeta = document.getElementById("driveTimeMeta");
 const driveTimeMapRoot = document.getElementById("driveTimeMap");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
-const MAPS_CONFIG_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/config` : "/api/maps/config";
 const DRIVE_TIME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/drive-time` : "/api/maps/drive-time";
 
 let map = null;
 let centerMarker = null;
 let driveTimePolygon = null;
-let mapsLoadPromise = null;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -55,66 +53,20 @@ async function authedFetch(url, init = {}) {
   });
 }
 
-async function getMapsConfig() {
-  const response = await authedFetch(MAPS_CONFIG_ENDPOINT);
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error || "Could not load map configuration.");
-  }
-  return data;
-}
-
-function loadGoogleMaps(apiKey, region) {
-  if (window.google?.maps) {
-    return Promise.resolve(window.google.maps);
-  }
-
-  if (mapsLoadPromise) {
-    return mapsLoadPromise;
-  }
-
-  mapsLoadPromise = new Promise((resolve, reject) => {
-    const callbackName = "__initDriveTimeMap";
-    window[callbackName] = () => {
-      delete window[callbackName];
-      resolve(window.google.maps);
-    };
-
-    const script = document.createElement("script");
-    const params = new URLSearchParams({
-      key: apiKey,
-      callback: callbackName,
-      loading: "async",
-    });
-    if (region) {
-      params.set("region", region);
-    }
-
-    script.src = `https://maps.googleapis.com/maps/api/js?${params.toString()}`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => {
-      delete window[callbackName];
-      reject(new Error("Failed to load Google Maps JavaScript API."));
-    };
-    document.head.appendChild(script);
-  });
-
-  return mapsLoadPromise;
-}
-
 function initMap() {
-  if (!driveTimeMapRoot || !window.google?.maps) {
+  if (!driveTimeMapRoot || !window.L) {
     return;
   }
 
-  map = new window.google.maps.Map(driveTimeMapRoot, {
-    center: { lat: 51.5072, lng: -0.1276 },
-    zoom: 10,
-    mapTypeControl: false,
-    fullscreenControl: false,
-    streetViewControl: false,
-  });
+  map = window.L.map(driveTimeMapRoot, {
+    zoomControl: true,
+    attributionControl: true,
+  }).setView([51.5072, -0.1276], 10);
+
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
 }
 
 function formatQualityText(quality) {
@@ -130,7 +82,7 @@ function formatQualityText(quality) {
 }
 
 function renderDriveTimeOnMap(payload) {
-  if (!map || !window.google?.maps) {
+  if (!map || !window.L) {
     throw new Error("Map is not available.");
   }
 
@@ -141,37 +93,33 @@ function renderDriveTimeOnMap(payload) {
   }
 
   if (centerMarker) {
-    centerMarker.setMap(null);
+    centerMarker.remove();
   }
   if (driveTimePolygon) {
-    driveTimePolygon.setMap(null);
+    driveTimePolygon.remove();
   }
 
-  centerMarker = new window.google.maps.Marker({
-    map,
-    position: center,
+  centerMarker = window.L.marker([center.lat, center.lng], {
     title: payload?.formattedAddress || "Selected location",
-  });
+  }).addTo(map);
 
-  driveTimePolygon = new window.google.maps.Polygon({
-    map,
-    paths: polygonPoints,
-    strokeColor: "#1f3c88",
-    strokeOpacity: 0.95,
-    strokeWeight: 2,
-    fillColor: "#31b7c8",
-    fillOpacity: 0.22,
-    clickable: false,
-  });
-
-  const bounds = new window.google.maps.LatLngBounds();
-  bounds.extend(center);
-  for (const point of polygonPoints) {
-    if (typeof point?.lat === "number" && typeof point?.lng === "number") {
-      bounds.extend(point);
+  driveTimePolygon = window.L.polygon(
+    polygonPoints.map((point) => [point.lat, point.lng]),
+    {
+      color: "#1f3c88",
+      weight: 2,
+      opacity: 0.95,
+      fillColor: "#31b7c8",
+      fillOpacity: 0.22,
     }
+  ).addTo(map);
+
+  const polygonBounds = driveTimePolygon.getBounds();
+  if (polygonBounds.isValid()) {
+    map.fitBounds(polygonBounds.pad(0.15));
+  } else {
+    map.setView([center.lat, center.lng], 11);
   }
-  map.fitBounds(bounds);
 }
 
 async function drawDriveTimeArea() {
@@ -232,9 +180,10 @@ async function init() {
     }
     renderTopNavigation({ role, currentPathname: window.location.pathname });
 
-    const mapConfig = await getMapsConfig();
-    await loadGoogleMaps(mapConfig.mapsJavaScriptApiKey, mapConfig.region);
     initMap();
+    if (!map) {
+      throw new Error("Could not initialize map renderer.");
+    }
     setStatus("Enter a location to calculate.");
   } catch (error) {
     if (error?.status === 403) {
