@@ -8,7 +8,7 @@ const ANGLE_STEP_DEGREES = 15;
 const BASE_RADIUS_METERS = 30000;
 const MIN_RADIUS_METERS = 2000;
 const MAX_RADIUS_METERS = 50000;
-const ROUTE_CALL_CONCURRENCY = 6;
+const ROUTE_CALL_CONCURRENCY = 2;
 
 function normalizeLocationQuery(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -111,10 +111,11 @@ async function geocodeLocation(query, apiKey, region) {
 
 async function computeDurationsForDestinations(origin, destinations, apiKey, departureTime) {
   if (!Array.isArray(destinations) || destinations.length === 0) {
-    return [];
+    return { durations: [], failures: [] };
   }
 
   const durations = new Array(destinations.length).fill(0);
+  const failures = [];
 
   const runRouteCall = async (destination, index) => {
     const requestBody = {
@@ -178,14 +179,17 @@ async function computeDurationsForDestinations(origin, destinations, apiKey, dep
     const batch = destinations.slice(offset, offset + ROUTE_CALL_CONCURRENCY);
     await Promise.all(
       batch.map((destination, localIndex) =>
-        runRouteCall(destination, offset + localIndex).catch(() => {
+        runRouteCall(destination, offset + localIndex).catch((error) => {
           durations[offset + localIndex] = 0;
+          if (error?.message) {
+            failures.push(error.message);
+          }
         })
       )
     );
   }
 
-  return durations;
+  return { durations, failures };
 }
 
 module.exports = async (req, res) => {
@@ -223,12 +227,13 @@ module.exports = async (req, res) => {
     const center = await geocodeLocation(locationQuery, apiKey, region);
 
     const firstPassDestinations = bearings.map((bearing) => destinationPoint(center, bearing, BASE_RADIUS_METERS));
-    const firstPassDurations = await computeDurationsForDestinations(
+    const firstPass = await computeDurationsForDestinations(
       center,
       firstPassDestinations,
       apiKey,
       departureTime
     );
+    const firstPassDurations = firstPass.durations;
     const firstPassDistances = bearings.map((_, index) => {
       const durationSeconds = Number(firstPassDurations[index] || 0);
       if (!durationSeconds) {
@@ -241,12 +246,13 @@ module.exports = async (req, res) => {
     const secondPassDestinations = bearings.map((bearing, index) =>
       destinationPoint(center, bearing, smoothedFirstPassDistances[index])
     );
-    const secondPassDurations = await computeDurationsForDestinations(
+    const secondPass = await computeDurationsForDestinations(
       center,
       secondPassDestinations,
       apiKey,
       departureTime
     );
+    const secondPassDurations = secondPass.durations;
 
     const finalDistances = bearings.map((_, index) => {
       const durationSeconds = Number(secondPassDurations[index] || 0);
@@ -266,6 +272,15 @@ module.exports = async (req, res) => {
     });
 
     const successfulDurations = secondPassDurations.filter((duration) => Number(duration) > 0);
+    const failedMessages = [...firstPass.failures, ...secondPass.failures];
+    if (successfulDurations.length === 0) {
+      const firstFailure = failedMessages[0] || "No valid routes returned by Google Routes API.";
+      res.status(502).json({
+        error: `Drive-time calculation failed: ${firstFailure}`,
+      });
+      return;
+    }
+
     const minMinutes = successfulDurations.length
       ? Math.round((Math.min(...successfulDurations) / 60) * 10) / 10
       : null;
@@ -286,6 +301,7 @@ module.exports = async (req, res) => {
         successfulDirections: successfulDurations.length,
         minDurationMinutes: minMinutes,
         maxDurationMinutes: maxMinutes,
+        failedDirectionCalls: failedMessages.length,
       },
     });
   } catch (error) {
