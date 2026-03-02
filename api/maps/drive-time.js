@@ -1,13 +1,14 @@
 const { requireApiAuth } = require("../_lib/require-api-auth");
 
 const GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
-const GOOGLE_ROUTE_MATRIX_URL = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix";
+const GOOGLE_ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
 const EARTH_RADIUS_METERS = 6371000;
 const TARGET_MINUTES = 20;
 const ANGLE_STEP_DEGREES = 15;
 const BASE_RADIUS_METERS = 30000;
 const MIN_RADIUS_METERS = 2000;
 const MAX_RADIUS_METERS = 50000;
+const ROUTE_CALL_CONCURRENCY = 6;
 
 function normalizeLocationQuery(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -73,36 +74,6 @@ function smoothDistances(values) {
   });
 }
 
-function parseRouteMatrixResponse(rawBody) {
-  const trimmed = String(rawBody || "").trim();
-  if (!trimmed) {
-    return [];
-  }
-
-  if (trimmed.startsWith("[")) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-
-  const elements = [];
-  for (const line of trimmed.split(/\r?\n/)) {
-    const candidate = line.trim();
-    if (!candidate) {
-      continue;
-    }
-    try {
-      elements.push(JSON.parse(candidate));
-    } catch {
-      // Ignore malformed entries.
-    }
-  }
-  return elements;
-}
-
 async function geocodeLocation(query, apiKey, region) {
   const url = new URL(GOOGLE_GEOCODE_URL);
   url.searchParams.set("address", query);
@@ -143,21 +114,19 @@ async function computeDurationsForDestinations(origin, destinations, apiKey, dep
     return [];
   }
 
-  const requestBody = {
-    origins: [
-      {
-        waypoint: {
-          location: {
-            latLng: {
-              latitude: origin.latitude,
-              longitude: origin.longitude,
-            },
+  const durations = new Array(destinations.length).fill(0);
+
+  const runRouteCall = async (destination, index) => {
+    const requestBody = {
+      origin: {
+        location: {
+          latLng: {
+            latitude: origin.latitude,
+            longitude: origin.longitude,
           },
         },
       },
-    ],
-    destinations: destinations.map((destination) => ({
-      waypoint: {
+      destination: {
         location: {
           latLng: {
             latitude: destination.latitude,
@@ -165,52 +134,55 @@ async function computeDurationsForDestinations(origin, destinations, apiKey, dep
           },
         },
       },
-    })),
-    travelMode: "DRIVE",
-    routingPreference: "TRAFFIC_AWARE",
-    departureTime,
-    languageCode: "en-GB",
-    units: "METRIC",
+      travelMode: "DRIVE",
+      routingPreference: "TRAFFIC_AWARE",
+      departureTime,
+      languageCode: "en-GB",
+      units: "METRIC",
+    };
+
+    const response = await fetch(GOOGLE_ROUTES_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.duration",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const rawBody = await response.text();
+    if (!response.ok) {
+      let detail = `Routes request failed (${response.status}).`;
+      try {
+        const parsed = JSON.parse(rawBody);
+        detail = parsed?.error?.message || detail;
+      } catch {
+        // Keep default detail.
+      }
+      throw new Error(detail);
+    }
+
+    let data = {};
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      data = {};
+    }
+    const route = Array.isArray(data?.routes) ? data.routes[0] : null;
+    durations[index] = parseDurationSeconds(route?.duration);
   };
 
-  const response = await fetch(GOOGLE_ROUTE_MATRIX_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": [
-        "originIndex",
-        "destinationIndex",
-        "duration",
-        "distanceMeters",
-        "status",
-        "condition",
-      ].join(","),
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  const rawBody = await response.text();
-  if (!response.ok) {
-    let detail = `Route matrix request failed (${response.status}).`;
-    try {
-      const parsed = JSON.parse(rawBody);
-      detail = parsed?.error?.message || detail;
-    } catch {
-      // Keep default detail.
-    }
-    throw new Error(detail);
-  }
-
-  const elements = parseRouteMatrixResponse(rawBody);
-  const durations = new Array(destinations.length).fill(0);
-  for (const element of elements) {
-    const index = Number(element?.destinationIndex);
-    if (!Number.isInteger(index) || index < 0 || index >= destinations.length) {
-      continue;
-    }
-    durations[index] = parseDurationSeconds(element?.duration);
+  for (let offset = 0; offset < destinations.length; offset += ROUTE_CALL_CONCURRENCY) {
+    const batch = destinations.slice(offset, offset + ROUTE_CALL_CONCURRENCY);
+    await Promise.all(
+      batch.map((destination, localIndex) =>
+        runRouteCall(destination, offset + localIndex).catch(() => {
+          durations[offset + localIndex] = 0;
+        })
+      )
+    );
   }
 
   return durations;
