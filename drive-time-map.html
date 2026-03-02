@@ -51,8 +51,30 @@
           </label>
           <button id="drawDriveTimeBtn" type="button">Draw 20-min area</button>
         </div>
+        <div class="drive-time-save-controls">
+          <label class="field" for="searchNameInput">
+            Search name (optional)
+            <input
+              id="searchNameInput"
+              type="text"
+              placeholder="e.g. North Team Catchment"
+              autocomplete="off"
+            />
+          </label>
+          <button id="saveSearchBtn" class="secondary" type="button" disabled>Save search</button>
+        </div>
         <p id="driveTimeStatus" class="muted">Enter a location to calculate.</p>
         <p id="driveTimeMeta" class="muted"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Saved Searches</h2>
+        <div class="row">
+          <button id="showAllSearchesBtn" class="secondary" type="button">Show all</button>
+          <button id="hideAllSearchesBtn" class="secondary" type="button">Hide all</button>
+        </div>
+        <ul id="savedSearchesList" class="drive-time-search-list"></ul>
+        <p id="noSavedSearchesMessage" class="muted">No saved searches yet.</p>
       </section>
 
       <section class="panel">
