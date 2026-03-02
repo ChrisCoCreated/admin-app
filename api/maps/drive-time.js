@@ -9,6 +9,7 @@ const BASE_RADIUS_METERS = 30000;
 const MIN_RADIUS_METERS = 2000;
 const MAX_RADIUS_METERS = 50000;
 const ROUTE_CALL_CONCURRENCY = 2;
+const DEPARTURE_LEAD_SECONDS = 120;
 
 function normalizeLocationQuery(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -220,7 +221,7 @@ module.exports = async (req, res) => {
   const targetSeconds = minutes * 60;
   const fallbackSpeedMetersPerSecond = 16.7; // ~60 km/h fallback
   const fallbackDistanceMeters = clamp(targetSeconds * fallbackSpeedMetersPerSecond, MIN_RADIUS_METERS, MAX_RADIUS_METERS);
-  const departureTime = new Date().toISOString();
+  const departureTime = new Date(Date.now() + DEPARTURE_LEAD_SECONDS * 1000).toISOString();
   const bearings = buildBearings();
 
   try {
