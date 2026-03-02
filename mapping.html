@@ -29,16 +29,12 @@
     <main class="container mapping-main">
       <section class="hero compact">
         <h1>Time Mapping</h1>
-        <p>Build a driving run from a staff postcode through clients and back to the start.</p>
+        <p>Build a driving run from a staff start location through clients and back to the start.</p>
       </section>
 
       <section class="mapping-grid">
         <article class="panel staff-panel">
           <h2>Staff Start Point</h2>
-          <label class="field" for="staffPostcodeInput">
-            Staff postcode
-            <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA" autocomplete="postal-code" />
-          </label>
           <label class="field" for="carerSearchInput">
             Search associates
             <input id="carerSearchInput" type="search" placeholder="Search by name, id, or postcode" autocomplete="off" />
@@ -46,6 +42,11 @@
           <div id="associateStatusFilters" class="status-filter-row"></div>
           <ul id="carerSearchResults" class="carer-search-results"></ul>
           <p id="carerSearchStatus" class="muted">Loading associates...</p>
+
+          <label class="field" for="staffPostcodeInput">
+            Add staff start manually (postcode or address)
+            <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA or 10 Downing St, London" autocomplete="street-address" />
+          </label>
         </article>
 
         <article class="panel">
@@ -91,12 +92,17 @@
           <input id="visitDurationInput" type="number" min="0" step="10" value="60" />
         </label>
 
+        <label class="checkbox-row" for="startsFromHomeInput">
+          <input id="startsFromHomeInput" type="checkbox" checked />
+          <span>Starting from home</span>
+        </label>
+
         <div class="row">
           <button id="calculateRunBtn" type="button">Calculate run</button>
           <button id="clearRunBtn" class="secondary" type="button">Clear</button>
         </div>
 
-        <p id="mappingStatus" class="muted">Enter a staff postcode and at least one client stop.</p>
+        <p id="mappingStatus" class="muted">Enter a staff start and at least one client stop.</p>
       </section>
 
       <section id="runResults" class="panel" hidden>
@@ -113,9 +119,6 @@
         <p>
           <a id="mapsDirectionsLink" href="#" target="_blank" rel="noopener noreferrer">Open run in Google Maps</a>
         </p>
-
-        <h2>Run Order</h2>
-        <ol id="runOrderList" class="run-order-list"></ol>
 
         <h2>Legs</h2>
         <div class="table-wrap">

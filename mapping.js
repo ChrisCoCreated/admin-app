@@ -21,6 +21,7 @@ const clearRunBtn = document.getElementById("clearRunBtn");
 const runDateInput = document.getElementById("runDateInput");
 const runStartTimeInput = document.getElementById("runStartTimeInput");
 const visitDurationInput = document.getElementById("visitDurationInput");
+const startsFromHomeInput = document.getElementById("startsFromHomeInput");
 const runNameInput = document.getElementById("runNameInput");
 const saveRunBtn = document.getElementById("saveRunBtn");
 const exportRunsBtn = document.getElementById("exportRunsBtn");
@@ -34,7 +35,6 @@ const runTotals = document.getElementById("runTotals");
 const runCostSummary = document.getElementById("runCostSummary");
 const runCostBreakdown = document.getElementById("runCostBreakdown");
 const runSchedule = document.getElementById("runSchedule");
-const runOrderList = document.getElementById("runOrderList");
 const runLegsBody = document.getElementById("runLegsBody");
 const mapsDirectionsLink = document.getElementById("mapsDirectionsLink");
 
@@ -177,7 +177,6 @@ function hideRun() {
   scheduleRows = [];
   scheduleGapMinutes = [];
   runResults.hidden = true;
-  runOrderList.innerHTML = "";
   runLegsBody.innerHTML = "";
   if (runSchedule) {
     runSchedule.innerHTML = "";
@@ -552,7 +551,7 @@ function renderCarerSearchResults() {
         return;
       }
       staffPostcodeInput.value = postcode;
-      setStatus(`Staff postcode set from ${carer.name || "associate"}.`);
+      setStatus(`Staff start set from ${carer.name || "associate"}.`);
     });
 
     li.append(info, selectBtn);
@@ -726,13 +725,13 @@ function buildDepartureTimeIso() {
 function buildScheduleRows(run) {
   const clients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
   const legs = Array.isArray(run.legs) ? run.legs : [];
-  const staffPostcode = run.staffStart?.postcode || "Staff home";
+  const staffStartLabel = run.staffStart?.label || run.staffStart?.formattedAddress || run.staffStart?.postcode || "Staff home";
 
-  const labels = [`Start - ${staffPostcode}`];
+  const labels = [`Start - ${staffStartLabel}`];
   for (const client of clients) {
     labels.push(client.stopLabel || client.formattedAddress || client.query || "Client");
   }
-  labels.push(`Return - ${staffPostcode}`);
+  labels.push(`Return - ${staffStartLabel}`);
 
   const visitDuration = getVisitDurationMinutes();
   scheduleGapMinutes = [];
@@ -816,27 +815,19 @@ function renderSchedule() {
 
 function renderRun(run) {
   lastRun = run;
-  const staffPostcode = run.staffStart?.postcode || "";
+  const staffStartLabel = run.staffStart?.label || run.staffStart?.formattedAddress || run.staffStart?.postcode || "";
   const orderedClients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
   const legs = Array.isArray(run.legs) ? run.legs : [];
-
-  runTotals.textContent = `Total distance: ${run.totalDistanceMiles || 0} mi | Total time: ${run.totalDurationText || "0 min"}`;
+  const fromHomeLeg = legs[0] || null;
+  const toHomeLeg = legs.length > 1 ? legs[legs.length - 1] : legs[0] || null;
+  const startsFromHome = run.startsFromHome !== false;
+  runTotals.innerHTML = `
+    Total distance: ${escapeHtml(String(run.totalDistanceMiles || 0))} mi | Total time: ${escapeHtml(String(run.totalDurationText || "0 min"))}<br />
+    Starting from home: ${startsFromHome ? "Yes" : "No"}<br />
+    Travel from home: ${escapeHtml(String(fromHomeLeg?.distanceMiles || 0))} mi, ${escapeHtml(String(fromHomeLeg?.durationText || "0 min"))}<br />
+    Travel to home: ${escapeHtml(String(toHomeLeg?.distanceMiles || 0))} mi, ${escapeHtml(String(toHomeLeg?.durationText || "0 min"))}
+  `;
   renderCost(run);
-
-  runOrderList.innerHTML = "";
-  const startItem = document.createElement("li");
-  startItem.textContent = `Start: ${staffPostcode}`;
-  runOrderList.appendChild(startItem);
-
-  for (const client of orderedClients) {
-    const li = document.createElement("li");
-    li.textContent = client.stopLabel || client.formattedAddress || client.query || "";
-    runOrderList.appendChild(li);
-  }
-
-  const endItem = document.createElement("li");
-  endItem.textContent = `Return: ${staffPostcode}`;
-  runOrderList.appendChild(endItem);
 
   runLegsBody.innerHTML = "";
   for (const leg of legs) {
@@ -852,7 +843,7 @@ function renderRun(run) {
   }
 
   mapsDirectionsLink.href = buildMapsDirectionsUrl(
-    staffPostcode,
+    run.staffStart?.query || run.staffStart?.formattedAddress || staffStartLabel,
     orderedClients.map((item) => item.query || item.formattedAddress).filter(Boolean)
   );
   buildScheduleRows(run);
@@ -978,7 +969,7 @@ function collectRunExportRecord(name) {
     savedAt: new Date().toISOString(),
     name,
     runStartTime: startTime,
-    staffStart: String(run.staffStart?.postcode || ""),
+    staffStart: String(run.staffStart?.label || run.staffStart?.formattedAddress || run.staffStart?.postcode || ""),
     clientStopCount: clients.length,
     clientStops: stopsText,
     legCount,
@@ -1103,9 +1094,9 @@ function escapeHtml(value) {
 }
 
 async function calculateRun() {
-  const staffPostcode = normalizePostcode(staffPostcodeInput.value);
-  if (!staffPostcode) {
-    setStatus("Staff postcode is required.", true);
+  const staffStart = normalizeLocationQuery(staffPostcodeInput.value);
+  if (!staffStart) {
+    setStatus("Staff start address is required.", true);
     return;
   }
 
@@ -1128,7 +1119,8 @@ async function calculateRun() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        staffPostcode,
+        staffLocation: staffStart,
+        startsFromHome: Boolean(startsFromHomeInput?.checked),
         departureTime: buildDepartureTimeIso(),
         clientLocations: selectedClientStops.map((stop) => ({
           query: stop.address,
@@ -1250,6 +1242,9 @@ clearRunBtn?.addEventListener("click", () => {
   }
   if (visitDurationInput) {
     visitDurationInput.value = String(DEFAULT_VISIT_DURATION_MINUTES);
+  }
+  if (startsFromHomeInput) {
+    startsFromHomeInput.checked = true;
   }
   staffPostcodeInput.value = "";
   clientPostcodeInput.value = "";

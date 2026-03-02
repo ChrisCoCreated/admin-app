@@ -165,13 +165,15 @@ async function computeRun(staff, clients, apiKey, departureTime) {
   return route;
 }
 
-function buildResponse(staff, clients, route) {
+function buildResponse(staff, clients, route, options = {}) {
+  const startsFromHome = options.startsFromHome !== false;
   const optimizedIndex = Array.isArray(route.optimizedIntermediateWaypointIndex)
     ? route.optimizedIntermediateWaypointIndex
     : clients.map((_, index) => index);
 
   const orderedClients = optimizedIndex.map((index) => clients[index]).filter(Boolean);
-  const stopNames = [staff.normalizedPostcode, ...orderedClients.map((client) => client.stopLabel), staff.normalizedPostcode];
+  const staffLabel = staff.startLabel || staff.normalizedPostcode || staff.formattedAddress || "Staff start";
+  const stopNames = [staffLabel, ...orderedClients.map((client) => client.stopLabel), staffLabel];
 
   const legs = route.legs.map((leg, index) => {
     const from = stopNames[index] || "";
@@ -203,7 +205,9 @@ function buildResponse(staff, clients, route) {
   const distanceThresholdMiles = maxDistanceMiles ?? 0;
   const timeThresholdSeconds = Math.round((maxTimeMinutes ?? 0) * 60);
 
-  const homeLegIndexes = [0, legs.length - 1].filter((index, idx, arr) => index >= 0 && arr.indexOf(index) === idx);
+  const homeLegIndexes = startsFromHome
+    ? [0, legs.length - 1].filter((index, idx, arr) => index >= 0 && arr.indexOf(index) === idx)
+    : [];
   const runLegIndexes = legs
     .map((_, index) => index)
     .filter((index) => !homeLegIndexes.includes(index));
@@ -268,7 +272,10 @@ function buildResponse(staff, clients, route) {
 
   return {
     run: {
+      startsFromHome,
       staffStart: {
+        query: staff.query,
+        label: staffLabel,
         postcode: staff.normalizedPostcode,
         formattedAddress: staff.formattedAddress,
         latitude: staff.latitude,
@@ -342,7 +349,8 @@ module.exports = async (req, res) => {
   }
 
   const region = String(process.env.GOOGLE_MAPS_REGION || "gb").trim().toLowerCase() || "gb";
-  const staffPostcode = normalizePostcode(req.body?.staffPostcode);
+  const staffLocation = normalizeLocationQuery(req.body?.staffLocation || req.body?.staffPostcode);
+  const startsFromHome = req.body?.startsFromHome !== false;
   const departureTime = String(req.body?.departureTime || "").trim();
   const rawClientLocations = Array.isArray(req.body?.clientLocations)
     ? req.body.clientLocations
@@ -350,8 +358,8 @@ module.exports = async (req, res) => {
       ? req.body.clientPostcodes
       : [];
 
-  if (!staffPostcode) {
-    res.status(400).json({ error: "Staff postcode is required." });
+  if (!staffLocation) {
+    res.status(400).json({ error: "Staff start is required." });
     return;
   }
 
@@ -383,9 +391,10 @@ module.exports = async (req, res) => {
 
   try {
     const [staff, ...clients] = await Promise.all([
-      geocodeLocation(staffPostcode, apiKey, region).then((item) => ({
+      geocodeLocation(staffLocation, apiKey, region).then((item) => ({
         ...item,
-        normalizedPostcode: normalizePostcode(staffPostcode),
+        startLabel: staffLocation,
+        normalizedPostcode: normalizePostcode(staffLocation),
       })),
       ...dedupedClients.map((client) =>
         geocodeLocation(client.query, apiKey, region).then((item) => ({
@@ -396,7 +405,7 @@ module.exports = async (req, res) => {
     ]);
 
     const route = await computeRun(staff, clients, apiKey, departureTime);
-    const payload = buildResponse(staff, clients, route);
+    const payload = buildResponse(staff, clients, route, { startsFromHome });
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json(payload);
