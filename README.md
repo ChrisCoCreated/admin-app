@@ -11,6 +11,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Authenticated Tasks (Simple) page (`simple-tasks.html`) with pill view and pinning
 - Authenticated Tasks (Advanced) page (`tasks.html`) for full unified To Do + Planner overlay editing
 - Authenticated Time Mapping page (`mapping.html`) for run planning
+- Authenticated Drive-Time Map page (`drive-time-map.html`) for 20-minute drive-time polygons
 - Secure backend APIs:
   - `GET /api/clients` (original SharePoint/local clients list)
   - `GET /api/clients/:id`
@@ -19,6 +20,8 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)
   - `GET /api/carers`
   - `POST /api/routes/run`
+  - `GET /api/maps/config`
+  - `POST /api/maps/drive-time`
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)
   - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
@@ -43,6 +46,7 @@ npm start
 - `http://127.0.0.1:8081/carers.html`
 - `http://127.0.0.1:8081/task-whiteboard.html`
 - `http://127.0.0.1:8081/mapping.html`
+- `http://127.0.0.1:8081/drive-time-map.html`
 
 ## Frontend config
 
@@ -78,6 +82,7 @@ Optional fallback toggles:
 Google Maps Platform vars (for Time Mapping):
 
 - `GOOGLE_MAPS_API_KEY`
+- `GOOGLE_MAPS_BROWSER_API_KEY` (optional; falls back to `GOOGLE_MAPS_API_KEY`, recommended for browser-restricted key usage)
 - `GOOGLE_MAPS_REGION` (default `gb`)
 
 Run costing vars (for Time Mapping):

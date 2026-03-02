@@ -559,6 +559,10 @@ body.lightbox-open {
   padding-bottom: 40px;
 }
 
+.drive-time-main {
+  padding-bottom: 40px;
+}
+
 .tasks-main {
   padding-bottom: 40px;
 }
@@ -833,6 +837,24 @@ body.lightbox-open {
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
 }
 
+.drive-time-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.drive-time-map {
+  width: 100%;
+  height: clamp(360px, 60vh, 640px);
+  border: 1px solid #d3deef;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(17, 20, 26, 0.03), rgba(17, 20, 26, 0.06)),
+    #f7fafe;
+}
+
 .staff-panel {
   border: 1px solid #bcd2ff;
   background:
@@ -1083,6 +1105,10 @@ body.lightbox-open {
   }
 
   .mapping-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .drive-time-controls {
     grid-template-columns: 1fr;
   }
 

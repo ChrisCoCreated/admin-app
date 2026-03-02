@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Drive-Time Map</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container drive-time-main">
+      <section class="hero compact">
+        <h1>Drive-Time Map</h1>
+        <p>Draw a 20-minute drive-time area around any location using Google APIs.</p>
+      </section>
+
+      <section class="panel">
+        <div class="drive-time-controls">
+          <label class="field" for="locationInput">
+            Location
+            <input
+              id="locationInput"
+              type="text"
+              placeholder="e.g. London Bridge, London"
+              autocomplete="street-address"
+            />
+          </label>
+          <button id="drawDriveTimeBtn" type="button">Draw 20-min area</button>
+        </div>
+        <p id="driveTimeStatus" class="muted">Enter a location to calculate.</p>
+        <p id="driveTimeMeta" class="muted"></p>
+      </section>
+
+      <section class="panel">
+        <div id="driveTimeMap" class="drive-time-map" role="img" aria-label="Drive-time map"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./drive-time-map.js"></script>
+  </body>
+</html>
