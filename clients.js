@@ -381,6 +381,7 @@ async function refreshClientsData() {
   setStatus("Loading clients...");
   const payload = await directoryApi.listOneTouchClients({ limit: 500 });
   allClients = Array.isArray(payload?.clients) ? payload.clients : [];
+  console.log("[Clients Debug] First 5 client records:", allClients.slice(0, 5));
   const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
   warningState.hidden = warnings.length === 0;
   warningState.textContent = warnings.join(" ");
