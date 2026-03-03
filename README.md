@@ -21,6 +21,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `GET /api/carers`
   - `POST /api/routes/run`
   - `POST /api/maps/drive-time`
+  - `POST /api/maps/geocode-batch`
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)
   - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app

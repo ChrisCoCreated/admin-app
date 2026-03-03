@@ -20,6 +20,7 @@ const tasksWhiteboardHandler = require("./api/tasks/whiteboard");
 const tasksWhiteboardSyncHandler = require("./api/tasks/whiteboard-sync");
 const tasksCreateHandler = require("./api/tasks/create");
 const mapsDriveTimeHandler = require("./api/maps/drive-time");
+const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -270,6 +271,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await mapsDriveTimeHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/maps/geocode-batch") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await mapsGeocodeBatchHandler(apiReq, apiRes);
     return true;
   }
 

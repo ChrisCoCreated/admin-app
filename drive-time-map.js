@@ -14,6 +14,12 @@ const hideAllSearchesBtn = document.getElementById("hideAllSearchesBtn");
 const exportSearchesBtn = document.getElementById("exportSearchesBtn");
 const importSearchesBtn = document.getElementById("importSearchesBtn");
 const importSearchesFileInput = document.getElementById("importSearchesFileInput");
+const loadPeopleOverlayBtn = document.getElementById("loadPeopleOverlayBtn");
+const showPeopleOverlayInput = document.getElementById("showPeopleOverlayInput");
+const overlayTypeSelect = document.getElementById("overlayTypeSelect");
+const overlayLocationSelect = document.getElementById("overlayLocationSelect");
+const overlayStatusFilters = document.getElementById("overlayStatusFilters");
+const peopleOverlayStatus = document.getElementById("peopleOverlayStatus");
 const savedSearchesList = document.getElementById("savedSearchesList");
 const noSavedSearchesMessage = document.getElementById("noSavedSearchesMessage");
 const driveTimeStatus = document.getElementById("driveTimeStatus");
@@ -22,10 +28,13 @@ const driveTimeMapRoot = document.getElementById("driveTimeMap");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const DRIVE_TIME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/drive-time` : "/api/maps/drive-time";
+const GEOCODE_BATCH_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/geocode-batch` : "/api/maps/geocode-batch";
 const SAVED_SEARCHES_KEY = "thrive.drivetime.saved.v1";
+const GEOCODE_CACHE_KEY = "thrive.drivetime.geocode.v1";
 const DEFAULT_DRIVE_TIME_MINUTES = 20;
 const MIN_DRIVE_TIME_MINUTES = 1;
 const MAX_DRIVE_TIME_MINUTES = 240;
+const OVERLAY_BATCH_SIZE = 300;
 const AREA_COLORS = [
   { stroke: "#1f3c88", fill: "#31b7c8" },
   { stroke: "#8b2f6e", fill: "#c9439b" },
@@ -41,6 +50,11 @@ let previewPolygon = null;
 let currentResult = null;
 let savedSearches = [];
 const areaLayers = new Map();
+let peopleOverlayData = [];
+const peopleOverlayLayers = new Map();
+let overlayStatusSet = new Set();
+let overlayLoaded = false;
+let geocodeCache = {};
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -167,6 +181,395 @@ function persistSavedSearches() {
     localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(savedSearches));
   } catch {
     setStatus("Could not save searches locally.", true);
+  }
+}
+
+function setPeopleOverlayStatus(message, isError = false) {
+  if (!peopleOverlayStatus) {
+    return;
+  }
+  peopleOverlayStatus.textContent = message;
+  peopleOverlayStatus.classList.toggle("error", isError);
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeLocation(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function normalizeStatus(value) {
+  return normalizeText(value) || "unknown";
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function loadGeocodeCache() {
+  try {
+    const raw = localStorage.getItem(GEOCODE_CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    geocodeCache = parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    geocodeCache = {};
+  }
+}
+
+function persistGeocodeCache() {
+  try {
+    localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(geocodeCache));
+  } catch {
+    // Ignore cache persistence errors.
+  }
+}
+
+function buildClientQuery(client) {
+  const parts = [client?.address, client?.town, client?.county, client?.postcode]
+    .map((part) => normalizeLocation(part))
+    .filter(Boolean);
+  if (parts.length) {
+    return parts.join(", ");
+  }
+  return normalizeLocation(client?.postcode || client?.location || "");
+}
+
+function buildCarerQuery(carer) {
+  return normalizeLocation(carer?.postcode || carer?.location || "");
+}
+
+function buildClientLocationLabel(client) {
+  return (
+    normalizeLocation(client?.area) ||
+    normalizeLocation(client?.location) ||
+    normalizeLocation(client?.town) ||
+    normalizeLocation(client?.postcode) ||
+    "Unassigned"
+  );
+}
+
+function buildCarerLocationLabel(carer) {
+  return normalizeLocation(carer?.location || carer?.postcode) || "Unassigned";
+}
+
+function getOverlayTypeLabel(type) {
+  return type === "companion" ? "Companion" : "Client";
+}
+
+function clearPeopleOverlayLayers() {
+  for (const layer of peopleOverlayLayers.values()) {
+    layer.remove();
+  }
+  peopleOverlayLayers.clear();
+}
+
+function deriveOverlayStatusOptions(items) {
+  const set = new Set(items.map((item) => normalizeStatus(item.status)));
+  const ordered = ["active", "pending", "archived"].filter((status) => set.has(status));
+  const extra = Array.from(set)
+    .filter((status) => !ordered.includes(status))
+    .sort((a, b) => a.localeCompare(b));
+  return [...ordered, ...extra];
+}
+
+function deriveOverlayLocationOptions(items) {
+  const unique = new Set(
+    items
+      .map((item) => normalizeLocation(item.locationLabel))
+      .filter(Boolean)
+  );
+  return Array.from(unique).sort((a, b) => a.localeCompare(b));
+}
+
+function formatStatusLabel(status) {
+  const value = normalizeStatus(status);
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function renderOverlayStatusFilters() {
+  if (!overlayStatusFilters) {
+    return;
+  }
+  const options = deriveOverlayStatusOptions(peopleOverlayData);
+  if (!overlayStatusSet.size) {
+    overlayStatusSet = new Set(options);
+  } else {
+    overlayStatusSet = new Set(Array.from(overlayStatusSet).filter((status) => options.includes(status)));
+    if (!overlayStatusSet.size) {
+      overlayStatusSet = new Set(options);
+    }
+  }
+
+  overlayStatusFilters.innerHTML = "";
+  for (const status of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `status-filter-btn${overlayStatusSet.has(status) ? " active" : ""}`;
+    btn.textContent = formatStatusLabel(status);
+    btn.addEventListener("click", () => {
+      if (overlayStatusSet.has(status)) {
+        overlayStatusSet.delete(status);
+      } else {
+        overlayStatusSet.add(status);
+      }
+      if (!overlayStatusSet.size) {
+        overlayStatusSet.add(status);
+      }
+      renderOverlayStatusFilters();
+      applyPeopleOverlayFilters();
+    });
+    overlayStatusFilters.appendChild(btn);
+  }
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `status-filter-btn${overlayStatusSet.size === options.length ? " active" : ""}`;
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    overlayStatusSet = new Set(options);
+    renderOverlayStatusFilters();
+    applyPeopleOverlayFilters();
+  });
+  overlayStatusFilters.appendChild(allBtn);
+}
+
+function renderOverlayLocationOptions() {
+  if (!overlayLocationSelect) {
+    return;
+  }
+  const current = String(overlayLocationSelect.value || "all");
+  const options = deriveOverlayLocationOptions(peopleOverlayData);
+  overlayLocationSelect.innerHTML = "";
+  const all = document.createElement("option");
+  all.value = "all";
+  all.textContent = "All locations";
+  overlayLocationSelect.appendChild(all);
+  for (const location of options) {
+    const option = document.createElement("option");
+    option.value = location;
+    option.textContent = location;
+    overlayLocationSelect.appendChild(option);
+  }
+  overlayLocationSelect.value = options.includes(current) ? current : "all";
+}
+
+function getFilteredOverlayPeople() {
+  const typeFilter = String(overlayTypeSelect?.value || "all");
+  const locationFilter = String(overlayLocationSelect?.value || "all");
+  return peopleOverlayData.filter((item) => {
+    const matchesType = typeFilter === "all" || item.type === typeFilter;
+    const matchesStatus = overlayStatusSet.has(normalizeStatus(item.status));
+    const matchesLocation = locationFilter === "all" || normalizeLocation(item.locationLabel) === locationFilter;
+    return matchesType && matchesStatus && matchesLocation;
+  });
+}
+
+function ensureOverlayLayer(item) {
+  if (!map || !window.L || !Number.isFinite(item?.lat) || !Number.isFinite(item?.lng)) {
+    return null;
+  }
+  const existing = peopleOverlayLayers.get(item.id);
+  if (existing) {
+    return existing;
+  }
+  const style =
+    item.type === "client"
+      ? { color: "#1f3c88", fillColor: "#31b7c8" }
+      : { color: "#8b2f6e", fillColor: "#c9439b" };
+  const marker = window.L.circleMarker([item.lat, item.lng], {
+    radius: 5,
+    color: style.color,
+    weight: 2,
+    fillColor: style.fillColor,
+    fillOpacity: 0.85,
+  });
+  marker.bindPopup(
+    `<strong>${escapeHtml(item.name)}</strong><br/>${escapeHtml(getOverlayTypeLabel(item.type))}<br/>${escapeHtml(item.locationLabel)}<br/>Status: ${escapeHtml(formatStatusLabel(item.status))}`
+  );
+  peopleOverlayLayers.set(item.id, marker);
+  return marker;
+}
+
+function applyPeopleOverlayFilters() {
+  const shouldShow = Boolean(showPeopleOverlayInput?.checked);
+  const filtered = getFilteredOverlayPeople();
+  const visibleIds = new Set(filtered.map((item) => item.id));
+
+  for (const [id, marker] of peopleOverlayLayers.entries()) {
+    if (!shouldShow || !visibleIds.has(id)) {
+      marker.remove();
+    }
+  }
+
+  if (shouldShow) {
+    for (const item of filtered) {
+      const marker = ensureOverlayLayer(item);
+      if (marker && !map.hasLayer(marker)) {
+        marker.addTo(map);
+      }
+    }
+  }
+
+  const total = peopleOverlayData.length;
+  const typeLabel = String(overlayTypeSelect?.value || "all");
+  setPeopleOverlayStatus(
+    overlayLoaded
+      ? `Showing ${shouldShow ? filtered.length : 0} of ${total} people (${typeLabel}, ${showPeopleOverlayInput?.checked ? "visible" : "hidden"}).`
+      : "Overlay not loaded."
+  );
+}
+
+function buildOverlayItems(clientsPayload, carersPayload) {
+  const clients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
+  const carers = Array.isArray(carersPayload?.carers) ? carersPayload.carers : [];
+  const items = [];
+  let index = 0;
+
+  for (const client of clients) {
+    const query = buildClientQuery(client);
+    if (!query) {
+      continue;
+    }
+    items.push({
+      id: `client-${normalizeText(client.id || client.name || index) || index}-${index}`,
+      type: "client",
+      name: normalizeLocation(client.name || "Unnamed client"),
+      status: normalizeStatus(client.status),
+      locationLabel: buildClientLocationLabel(client),
+      geocodeQuery: query,
+    });
+    index += 1;
+  }
+
+  for (const carer of carers) {
+    const query = buildCarerQuery(carer);
+    if (!query) {
+      continue;
+    }
+    items.push({
+      id: `companion-${normalizeText(carer.id || carer.name || index) || index}-${index}`,
+      type: "companion",
+      name: normalizeLocation(carer.name || "Unnamed companion"),
+      status: normalizeStatus(carer.status),
+      locationLabel: buildCarerLocationLabel(carer),
+      geocodeQuery: query,
+    });
+    index += 1;
+  }
+  return items;
+}
+
+async function geocodeOverlayItems(items) {
+  const queries = [];
+  const queryToKey = new Map();
+  for (const item of items) {
+    const query = normalizeLocation(item.geocodeQuery);
+    if (!query) {
+      continue;
+    }
+    const cacheKey = query.toLowerCase();
+    queryToKey.set(query, cacheKey);
+    if (!geocodeCache[cacheKey]) {
+      queries.push(query);
+    }
+  }
+
+  if (queries.length) {
+    for (let offset = 0; offset < queries.length; offset += OVERLAY_BATCH_SIZE) {
+      const batch = queries.slice(offset, offset + OVERLAY_BATCH_SIZE);
+      setPeopleOverlayStatus(
+        `Resolving map points (${Math.min(offset + batch.length, queries.length)}/${queries.length})...`
+      );
+      const response = await authedFetch(GEOCODE_BATCH_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          queries: batch.map((query) => ({ id: query, query })),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "Could not geocode overlay points.");
+      }
+      const points = Array.isArray(data?.points) ? data.points : [];
+      for (const point of points) {
+        const query = normalizeLocation(point.query);
+        if (!query) {
+          continue;
+        }
+        geocodeCache[query.toLowerCase()] = {
+          lat: Number(point.lat),
+          lng: Number(point.lng),
+          formattedAddress: normalizeLocation(point.formattedAddress),
+        };
+      }
+      persistGeocodeCache();
+    }
+  }
+
+  return items
+    .map((item) => {
+      const cacheKey = normalizeLocation(item.geocodeQuery).toLowerCase();
+      const point = geocodeCache[cacheKey];
+      if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) {
+        return null;
+      }
+      return {
+        ...item,
+        lat: point.lat,
+        lng: point.lng,
+        resolvedAddress: point.formattedAddress || item.geocodeQuery,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function loadPeopleOverlay() {
+  try {
+    if (loadPeopleOverlayBtn) {
+      loadPeopleOverlayBtn.disabled = true;
+    }
+    clearPeopleOverlayLayers();
+    setPeopleOverlayStatus("Loading clients and companions...");
+
+    const [clientsPayload, carersPayload] = await Promise.all([
+      directoryApi.listOneTouchClients({ limit: 500 }),
+      directoryApi.listCarers({ limit: 500 }),
+    ]);
+    const baseItems = buildOverlayItems(clientsPayload, carersPayload);
+    if (!baseItems.length) {
+      peopleOverlayData = [];
+      overlayLoaded = true;
+      renderOverlayStatusFilters();
+      renderOverlayLocationOptions();
+      applyPeopleOverlayFilters();
+      setPeopleOverlayStatus("No mappable people records found.");
+      return;
+    }
+
+    const resolvedItems = await geocodeOverlayItems(baseItems);
+    peopleOverlayData = resolvedItems;
+    overlayLoaded = true;
+    renderOverlayStatusFilters();
+    renderOverlayLocationOptions();
+    applyPeopleOverlayFilters();
+    setPeopleOverlayStatus(`Loaded ${resolvedItems.length} mapped people.`);
+  } catch (error) {
+    console.error(error);
+    setPeopleOverlayStatus(error?.message || "Could not load people overlay.", true);
+  } finally {
+    if (loadPeopleOverlayBtn) {
+      loadPeopleOverlayBtn.disabled = false;
+    }
   }
 }
 
@@ -590,9 +993,11 @@ async function init() {
     if (!map) {
       throw new Error("Could not initialize map renderer.");
     }
+    loadGeocodeCache();
     loadSavedSearches();
     renderSavedSearches();
     syncAllSearchLayers();
+    setPeopleOverlayStatus("Overlay not loaded.");
     setStatus("Enter a location to calculate.");
   } catch (error) {
     if (error?.status === 403) {
@@ -620,6 +1025,22 @@ showAllSearchesBtn?.addEventListener("click", () => {
 
 hideAllSearchesBtn?.addEventListener("click", () => {
   setAllSearchVisibility(false);
+});
+
+loadPeopleOverlayBtn?.addEventListener("click", () => {
+  void loadPeopleOverlay();
+});
+
+showPeopleOverlayInput?.addEventListener("change", () => {
+  applyPeopleOverlayFilters();
+});
+
+overlayTypeSelect?.addEventListener("change", () => {
+  applyPeopleOverlayFilters();
+});
+
+overlayLocationSelect?.addEventListener("change", () => {
+  applyPeopleOverlayFilters();
 });
 
 exportSearchesBtn?.addEventListener("click", () => {

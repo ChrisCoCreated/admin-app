@@ -244,10 +244,17 @@ button:disabled {
 .clients-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .detail-panel {
+  position: fixed;
+  top: 88px;
+  right: 16px;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 104px);
+  overflow: auto;
+  z-index: 40;
   transform: translateX(22px);
   opacity: 0;
   pointer-events: none;
@@ -260,6 +267,10 @@ button:disabled {
   transform: translateX(0);
   opacity: 1;
   pointer-events: auto;
+}
+
+.list-panel {
+  width: 100%;
 }
 
 .reconcile-header {
@@ -884,6 +895,13 @@ body.lightbox-open {
   align-items: end;
 }
 
+.drive-time-overlay-grid {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .drive-time-map {
   width: 100%;
   height: clamp(360px, 60vh, 640px);
@@ -1220,6 +1238,10 @@ body.lightbox-open {
   }
 
   .drive-time-save-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .drive-time-overlay-grid {
     grid-template-columns: 1fr;
   }
 

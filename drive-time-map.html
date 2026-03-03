@@ -85,6 +85,35 @@
       </section>
 
       <section class="panel">
+        <h2>People Overlay</h2>
+        <div class="row">
+          <button id="loadPeopleOverlayBtn" class="secondary" type="button">Load clients & companions</button>
+          <label class="checkbox-row" for="showPeopleOverlayInput">
+            <input id="showPeopleOverlayInput" type="checkbox" checked />
+            <span>Show on map</span>
+          </label>
+        </div>
+        <div class="drive-time-overlay-grid">
+          <label class="field" for="overlayTypeSelect">
+            Type
+            <select id="overlayTypeSelect">
+              <option value="all">All</option>
+              <option value="client">Clients</option>
+              <option value="companion">Companions</option>
+            </select>
+          </label>
+          <label class="field" for="overlayLocationSelect">
+            Location
+            <select id="overlayLocationSelect">
+              <option value="all">All locations</option>
+            </select>
+          </label>
+        </div>
+        <div id="overlayStatusFilters" class="status-filter-row"></div>
+        <p id="peopleOverlayStatus" class="muted">Overlay not loaded.</p>
+      </section>
+
+      <section class="panel">
         <div id="driveTimeMap" class="drive-time-map" role="img" aria-label="Drive-time map"></div>
       </section>
     </main>
