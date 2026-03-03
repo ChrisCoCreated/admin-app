@@ -30,6 +30,7 @@ const savedRunsBody = document.getElementById("savedRunsBody");
 const mappingStatus = document.getElementById("mappingStatus");
 const clientPostcodesList = document.getElementById("clientPostcodesList");
 const noClientsMessage = document.getElementById("noClientsMessage");
+const selectedStaffNameLabel = document.getElementById("selectedStaffName");
 const runResults = document.getElementById("runResults");
 const runTotals = document.getElementById("runTotals");
 const runCostSummary = document.getElementById("runCostSummary");
@@ -56,6 +57,7 @@ let scheduleRows = [];
 let scheduleGapMinutes = [];
 let lastRun = null;
 let savedRuns = [];
+let selectedStaffName = "";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -190,6 +192,19 @@ function hideRun() {
   if (saveRunBtn) {
     saveRunBtn.disabled = true;
   }
+}
+
+function renderSelectedStaffName() {
+  if (!selectedStaffNameLabel) {
+    return;
+  }
+  if (!selectedStaffName) {
+    selectedStaffNameLabel.hidden = true;
+    selectedStaffNameLabel.textContent = "";
+    return;
+  }
+  selectedStaffNameLabel.hidden = false;
+  selectedStaffNameLabel.textContent = `Staff: ${selectedStaffName}`;
 }
 
 function renderClientPostcodes() {
@@ -551,6 +566,11 @@ function renderCarerSearchResults() {
         return;
       }
       staffPostcodeInput.value = postcode;
+      selectedStaffName = normalizeLocationQuery(carer.name || "Associate");
+      if (startsFromHomeInput) {
+        startsFromHomeInput.checked = true;
+      }
+      renderSelectedStaffName();
       setStatus(`Staff start set from ${carer.name || "associate"}.`);
     });
 
@@ -905,9 +925,13 @@ function renderCost(run) {
     metrics.exceptionalTravelPerHour === null ? "n/a" : `£${metrics.exceptionalTravelPerHour.toFixed(2)}`;
   const totalPerHourText =
     metrics.totalTravelPerHour === null ? "n/a" : `£${metrics.totalTravelPerHour.toFixed(2)}`;
+  const exceptionalLabel =
+    run?.startsFromHome === false
+      ? "Exceptional Travel Costs from Home (Not included)"
+      : "Exceptional Travel Costs from Home";
   runCostBreakdown.innerHTML = `
     <section class="cost-section">
-      <h3>Exceptional Travel Costs from Home</h3>
+      <h3>${exceptionalLabel}</h3>
       <p>Paid distance/time: ${Number(cost.homeTravel?.paidDistanceMiles || 0).toFixed(2)} mi, ${formatSecondsAsTime(homeSeconds)}</p>
       <p>Time cost: £${Number(cost.components?.homeTimeCost || 0).toFixed(2)}</p>
       <p>Mileage cost: £${Number(cost.components?.homeMileageCost || 0).toFixed(2)}</p>
@@ -1167,6 +1191,11 @@ async function init() {
     if (runDateInput && !runDateInput.value) {
       runDateInput.value = toDateInputValue(getNextMondayDate());
     }
+    if (startsFromHomeInput) {
+      startsFromHomeInput.checked = false;
+    }
+    selectedStaffName = "";
+    renderSelectedStaffName();
     selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
     selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
     loadSavedRuns();
@@ -1244,8 +1273,10 @@ clearRunBtn?.addEventListener("click", () => {
     visitDurationInput.value = String(DEFAULT_VISIT_DURATION_MINUTES);
   }
   if (startsFromHomeInput) {
-    startsFromHomeInput.checked = true;
+    startsFromHomeInput.checked = false;
   }
+  selectedStaffName = "";
+  renderSelectedStaffName();
   staffPostcodeInput.value = "";
   clientPostcodeInput.value = "";
   if (carerSearchInput) {
@@ -1266,6 +1297,14 @@ clearRunBtn?.addEventListener("click", () => {
   renderClientSearchResults();
   hideRun();
   setStatus("Cleared.");
+});
+
+staffPostcodeInput?.addEventListener("input", () => {
+  selectedStaffName = "";
+  renderSelectedStaffName();
+  if (startsFromHomeInput && startsFromHomeInput.checked) {
+    startsFromHomeInput.checked = false;
+  }
 });
 
 runStartTimeInput?.addEventListener("change", () => {
