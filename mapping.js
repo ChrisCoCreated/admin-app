@@ -215,7 +215,11 @@ function renderClientPostcodes() {
     li.className = "postcode-pill";
 
     const text = document.createElement("span");
-    text.textContent = stop.label ? `${stop.label} - ${stop.address}` : stop.address;
+    if (stop.isManual) {
+      text.textContent = `Manual - ${stop.address}`;
+    } else {
+      text.textContent = stop.label ? `${stop.label} - ${stop.address}` : stop.address;
+    }
 
     const remove = document.createElement("button");
     remove.type = "button";
@@ -273,10 +277,13 @@ function addClientStop(address, label = "") {
     setStatus("Enter a client stop before adding.", true);
     return false;
   }
+  const normalizedLabel = normalizeLocationQuery(label);
+  const isManual = normalizedLabel.toLowerCase() === "manual";
 
   selectedClientStops.push({
-    label: normalizeLocationQuery(label),
+    label: normalizedLabel,
     address: input,
+    isManual,
   });
   renderClientPostcodes();
   hideRun();
