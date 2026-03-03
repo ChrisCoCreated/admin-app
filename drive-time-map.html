@@ -35,7 +35,7 @@
     <main class="container drive-time-main">
       <section class="hero compact">
         <h1>Drive-Time Map</h1>
-        <p>Draw a 20-minute drive-time area around any location using Google APIs.</p>
+        <p>Draw a drive-time area around any location using Google APIs.</p>
       </section>
 
       <section class="panel">
@@ -49,7 +49,11 @@
               autocomplete="street-address"
             />
           </label>
-          <button id="drawDriveTimeBtn" type="button">Draw 20-min area</button>
+          <label class="field" for="driveTimeMinutesInput">
+            Drive time (minutes)
+            <input id="driveTimeMinutesInput" type="number" min="1" max="240" step="1" value="20" />
+          </label>
+          <button id="drawDriveTimeBtn" type="button">Draw area</button>
         </div>
         <div class="drive-time-save-controls">
           <label class="field" for="searchNameInput">
@@ -72,6 +76,9 @@
         <div class="row">
           <button id="showAllSearchesBtn" class="secondary" type="button">Show all</button>
           <button id="hideAllSearchesBtn" class="secondary" type="button">Hide all</button>
+          <button id="exportSearchesBtn" class="secondary" type="button">Export</button>
+          <button id="importSearchesBtn" class="secondary" type="button">Import</button>
+          <input id="importSearchesFileInput" type="file" accept="application/json,.json" hidden />
         </div>
         <ul id="savedSearchesList" class="drive-time-search-list"></ul>
         <p id="noSavedSearchesMessage" class="muted">No saved searches yet.</p>

@@ -5,11 +5,15 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const locationInput = document.getElementById("locationInput");
+const driveTimeMinutesInput = document.getElementById("driveTimeMinutesInput");
 const searchNameInput = document.getElementById("searchNameInput");
 const drawDriveTimeBtn = document.getElementById("drawDriveTimeBtn");
 const saveSearchBtn = document.getElementById("saveSearchBtn");
 const showAllSearchesBtn = document.getElementById("showAllSearchesBtn");
 const hideAllSearchesBtn = document.getElementById("hideAllSearchesBtn");
+const exportSearchesBtn = document.getElementById("exportSearchesBtn");
+const importSearchesBtn = document.getElementById("importSearchesBtn");
+const importSearchesFileInput = document.getElementById("importSearchesFileInput");
 const savedSearchesList = document.getElementById("savedSearchesList");
 const noSavedSearchesMessage = document.getElementById("noSavedSearchesMessage");
 const driveTimeStatus = document.getElementById("driveTimeStatus");
@@ -19,6 +23,9 @@ const driveTimeMapRoot = document.getElementById("driveTimeMap");
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const DRIVE_TIME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/drive-time` : "/api/maps/drive-time";
 const SAVED_SEARCHES_KEY = "thrive.drivetime.saved.v1";
+const DEFAULT_DRIVE_TIME_MINUTES = 20;
+const MIN_DRIVE_TIME_MINUTES = 1;
+const MAX_DRIVE_TIME_MINUTES = 240;
 const AREA_COLORS = [
   { stroke: "#1f3c88", fill: "#31b7c8" },
   { stroke: "#8b2f6e", fill: "#c9439b" },
@@ -78,6 +85,22 @@ function normalizeSearchName(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
+function clampMinutes(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_DRIVE_TIME_MINUTES;
+  }
+  return Math.min(Math.max(Math.round(parsed), MIN_DRIVE_TIME_MINUTES), MAX_DRIVE_TIME_MINUTES);
+}
+
+function resolveDriveTimeMinutes() {
+  const minutes = clampMinutes(driveTimeMinutesInput?.value);
+  if (driveTimeMinutesInput) {
+    driveTimeMinutesInput.value = String(minutes);
+  }
+  return minutes;
+}
+
 function createSearchId() {
   if (window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
@@ -115,7 +138,7 @@ function sanitizeSavedSearch(raw, fallbackIndex = 0) {
     name: normalizeSearchName(raw?.name || raw?.formattedAddress || `Saved area ${fallbackIndex + 1}`),
     query: normalizeSearchName(raw?.query || ""),
     formattedAddress: normalizeSearchName(raw?.formattedAddress || ""),
-    minutes: Number(raw?.minutes || 20),
+    minutes: clampMinutes(raw?.minutes),
     center: { lat: centerLat, lng: centerLng },
     polygon,
     quality: raw?.quality || null,
@@ -145,6 +168,18 @@ function persistSavedSearches() {
   } catch {
     setStatus("Could not save searches locally.", true);
   }
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function initMap() {
@@ -422,15 +457,68 @@ function setAllSearchVisibility(isVisible) {
   setStatus(isVisible ? "Showing all saved searches." : "Hid all saved searches.");
 }
 
+function exportSavedSearches() {
+  if (!savedSearches.length) {
+    setStatus("No saved searches to export.", true);
+    return;
+  }
+  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  downloadJson(`drive-time-searches-${stamp}.json`, {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    searches: savedSearches,
+  });
+  setStatus(`Exported ${savedSearches.length} saved search(es).`);
+}
+
+function importSavedSearchesFromText(rawText) {
+  let parsed = null;
+  try {
+    parsed = JSON.parse(String(rawText || ""));
+  } catch {
+    throw new Error("Import file is not valid JSON.");
+  }
+
+  const incoming = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.searches) ? parsed.searches : null;
+  if (!incoming) {
+    throw new Error("Import JSON must be an array or an object with 'searches'.");
+  }
+
+  const existingIds = new Set(savedSearches.map((search) => search.id));
+  const imported = [];
+  for (let index = 0; index < incoming.length; index += 1) {
+    const item = sanitizeSavedSearch(incoming[index], savedSearches.length + imported.length);
+    if (!item) {
+      continue;
+    }
+    if (existingIds.has(item.id)) {
+      item.id = createSearchId();
+    }
+    existingIds.add(item.id);
+    imported.push(item);
+  }
+
+  if (!imported.length) {
+    throw new Error("No valid searches found in import file.");
+  }
+
+  savedSearches = [...imported, ...savedSearches].slice(0, 100);
+  persistSavedSearches();
+  renderSavedSearches();
+  syncAllSearchLayers();
+  setStatus(`Imported ${imported.length} search(es). Saved locally.`);
+}
+
 async function drawDriveTimeArea() {
   const location = String(locationInput?.value || "").trim();
   if (!location) {
     setStatus("Enter a location first.", true);
     return;
   }
+  const minutes = resolveDriveTimeMinutes();
 
   setBusy(true);
-  setStatus("Calculating 20-minute drive-time area...");
+  setStatus(`Calculating ${minutes}-minute drive-time area...`);
   if (driveTimeMeta) {
     driveTimeMeta.textContent = "";
   }
@@ -443,7 +531,7 @@ async function drawDriveTimeArea() {
       },
       body: JSON.stringify({
         location,
-        minutes: 20,
+        minutes,
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -454,13 +542,16 @@ async function drawDriveTimeArea() {
     currentResult = {
       query: location,
       formattedAddress: String(data.formattedAddress || location),
-      minutes: Number(data.minutes || 20),
+      minutes: clampMinutes(data.minutes || minutes),
       center: data.center,
       polygon: Array.isArray(data.polygon) ? data.polygon : [],
       quality: data.quality || null,
     };
     renderPreview(data);
-    setStatus(`Showing 20-minute drive-time area for ${data.formattedAddress || location}.`);
+    if (searchNameInput) {
+      searchNameInput.value = currentResult.formattedAddress || currentResult.query;
+    }
+    setStatus(`Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location}.`);
     if (driveTimeMeta) {
       driveTimeMeta.textContent = formatQualityText(data.quality);
     }
@@ -531,12 +622,39 @@ hideAllSearchesBtn?.addEventListener("click", () => {
   setAllSearchVisibility(false);
 });
 
+exportSearchesBtn?.addEventListener("click", () => {
+  exportSavedSearches();
+});
+
+importSearchesBtn?.addEventListener("click", () => {
+  importSearchesFileInput?.click();
+});
+
+importSearchesFileInput?.addEventListener("change", async () => {
+  const file = importSearchesFileInput.files?.[0];
+  if (!file) {
+    return;
+  }
+  try {
+    const text = await file.text();
+    importSavedSearchesFromText(text);
+  } catch (error) {
+    setStatus(error?.message || "Could not import searches.", true);
+  } finally {
+    importSearchesFileInput.value = "";
+  }
+});
+
 locationInput?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") {
     return;
   }
   event.preventDefault();
   void drawDriveTimeArea();
+});
+
+driveTimeMinutesInput?.addEventListener("change", () => {
+  resolveDriveTimeMinutes();
 });
 
 signOutBtn?.addEventListener("click", async () => {
