@@ -11,7 +11,11 @@ const clientsTableBody = document.getElementById("clientsTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
 const detailRoot = document.getElementById("clientDetail");
+const detailPanel = document.querySelector(".detail-panel");
 const reconcilePanel = document.getElementById("reconcilePanel");
+const reconcileHeader = document.getElementById("reconcileHeader");
+const reconcileContent = document.getElementById("reconcileContent");
+const reconcileChevron = document.getElementById("reconcileChevron");
 const reconcileRefreshBtn = document.getElementById("reconcileRefreshBtn");
 const reconcileStatus = document.getElementById("reconcileStatus");
 const copyIdBody = document.getElementById("copyIdBody");
@@ -42,6 +46,8 @@ let account = null;
 let currentRole = "";
 let reconcilePreview = null;
 let reconcileBusy = false;
+let isDetailOpen = false;
+let isReconcileCollapsed = true;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -85,6 +91,33 @@ function setDetail(client) {
   detailFields.phone.textContent = client.phone || "-";
   detailFields.status.textContent = formatStatusLabel(client.status);
   detailFields.tags.textContent = formatTags(client.tags);
+}
+
+function getClientLocation(client) {
+  return String(client?.location || client?.area || client?.town || client?.county || "").trim() || "-";
+}
+
+function getClientCareType(client) {
+  return String(client?.careType || "").trim() || "-";
+}
+
+function setDetailOpen(open) {
+  isDetailOpen = Boolean(open);
+  if (detailPanel) {
+    detailPanel.classList.toggle("open", isDetailOpen);
+  }
+}
+
+function closeDetail() {
+  selectedClientId = "";
+  setDetail(null);
+  setDetailOpen(false);
+}
+
+function openDetail(client) {
+  selectedClientId = client?.id || "";
+  setDetail(client || null);
+  setDetailOpen(Boolean(client));
 }
 
 function normalizeStatus(value) {
@@ -301,6 +334,22 @@ function setReconcileBusy(isBusy) {
         control.disabled = isBusy;
       }
     }
+  }
+}
+
+function setReconcileCollapsed(collapsed) {
+  isReconcileCollapsed = Boolean(collapsed);
+  if (reconcilePanel) {
+    reconcilePanel.classList.toggle("collapsed", isReconcileCollapsed);
+  }
+  if (reconcileContent) {
+    reconcileContent.hidden = isReconcileCollapsed;
+  }
+  if (reconcileHeader) {
+    reconcileHeader.setAttribute("aria-expanded", String(!isReconcileCollapsed));
+  }
+  if (reconcileChevron) {
+    reconcileChevron.textContent = isReconcileCollapsed ? "▸" : "▾";
   }
 }
 
@@ -687,22 +736,25 @@ function renderClients() {
 
   if (!filtered.length) {
     emptyState.hidden = false;
-    setDetail(null);
+    closeDetail();
     return;
   }
 
   emptyState.hidden = true;
-
-  const selected = filtered.find((client) => client.id === selectedClientId) || filtered[0];
-  selectedClientId = selected.id;
+  const selected = filtered.find((client) => client.id === selectedClientId) || null;
+  if (!selected) {
+    closeDetail();
+  }
 
   for (const client of filtered) {
     const tr = document.createElement("tr");
-    tr.classList.toggle("selected", client.id === selectedClientId);
+    tr.classList.toggle("selected", isDetailOpen && client.id === selectedClientId);
 
     tr.innerHTML = `
       <td>${escapeHtml(client.id)}</td>
       <td>${escapeHtml(client.name)}</td>
+      <td>${escapeHtml(getClientLocation(client))}</td>
+      <td>${escapeHtml(getClientCareType(client))}</td>
       <td>${escapeHtml(formatStatusLabel(client.status))}</td>
       <td>${escapeHtml(client.postcode || "-")}</td>
       <td>${renderXeroLink(client.xeroId)}</td>
@@ -718,15 +770,16 @@ function renderClients() {
     }
 
     tr.addEventListener("click", () => {
-      selectedClientId = client.id;
-      setDetail(client);
+      if (isDetailOpen && selectedClientId === client.id) {
+        closeDetail();
+      } else {
+        openDetail(client);
+      }
       renderClients();
     });
 
     clientsTableBody.appendChild(tr);
   }
-
-  setDetail(selected);
 }
 
 async function init() {
@@ -752,6 +805,7 @@ async function init() {
     if (reconcilePanel) {
       reconcilePanel.hidden = !canManageReconciliation();
       if (canManageReconciliation()) {
+        setReconcileCollapsed(true);
         await loadReconcilePreview();
       }
     }
@@ -770,6 +824,24 @@ async function init() {
 
 searchInput?.addEventListener("input", () => {
   renderClients();
+});
+
+reconcileHeader?.addEventListener("click", () => {
+  if (!canManageReconciliation()) {
+    return;
+  }
+  setReconcileCollapsed(!isReconcileCollapsed);
+});
+
+reconcileHeader?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  event.preventDefault();
+  if (!canManageReconciliation()) {
+    return;
+  }
+  setReconcileCollapsed(!isReconcileCollapsed);
 });
 
 reconcileRefreshBtn?.addEventListener("click", async () => {

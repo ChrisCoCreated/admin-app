@@ -334,6 +334,55 @@ function buildCombinedPhone(record) {
   return dedupePhones(values).join(" / ");
 }
 
+function resolveCareType(record) {
+  const explicit = collectNonEmptyValues([
+    record?.care_type,
+    record?.careType,
+    record?.service_type,
+    record?.serviceType,
+    record?.support_type,
+    record?.supportType,
+  ])[0];
+  if (explicit) {
+    const normalized = explicit.toLowerCase();
+    if (normalized.includes("companion")) {
+      return "Companionship";
+    }
+    if (normalized.includes("care")) {
+      return "Care";
+    }
+    return explicit;
+  }
+
+  const tags = Array.isArray(record?.tags)
+    ? record.tags.map((tag) => asString(tag?.tag || tag?.name || tag)).filter(Boolean)
+    : [];
+  for (const tag of tags) {
+    const normalized = tag.toLowerCase();
+    if (normalized.includes("companion")) {
+      return "Companionship";
+    }
+    if (normalized.includes("care")) {
+      return "Care";
+    }
+  }
+
+  return "";
+}
+
+function resolveLocation(record) {
+  return (
+    collectNonEmptyValues([
+      record?.location,
+      record?.area,
+      record?.zone,
+      record?.patch,
+      record?.town,
+      record?.county,
+    ])[0] || ""
+  );
+}
+
 function parseDateOfBirth(value) {
   const raw = asString(value);
   if (!raw) {
@@ -414,6 +463,8 @@ function normalizeClient(record) {
     dateOfBirth: parseDateOfBirth(
       record?.date_of_birth || record?.dob || record?.birth_date || record?.birthdate
     ),
+    location: resolveLocation(record),
+    careType: resolveCareType(record),
     address: asString(record?.address || record?.address_1 || record?.address1),
     town: asString(record?.town || record?.city),
     county: asString(record?.county || record?.region),

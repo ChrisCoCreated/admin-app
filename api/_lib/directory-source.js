@@ -99,6 +99,8 @@ async function readLocalClients() {
     id: normalizeString(item.id),
     oneTouchId: normalizeString(item.oneTouchId || item.onetouchId || item.one_touch_id),
     name: normalizeString(item.name),
+    location: normalizeString(item.location || item.area || item.town || item.county),
+    careType: normalizeString(item.careType || item.care_type || item.service_type),
     address: normalizeString(item.address),
     town: normalizeString(item.town),
     county: normalizeString(item.county),

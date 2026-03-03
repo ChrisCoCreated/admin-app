@@ -42,9 +42,13 @@
         <p id="warningState" class="muted" hidden></p>
       </section>
 
-      <section id="reconcilePanel" class="panel" hidden>
-        <div class="row wrap-row">
+      <section id="reconcilePanel" class="panel reconcile-panel collapsed" hidden>
+        <div id="reconcileHeader" class="row wrap-row reconcile-header" role="button" tabindex="0" aria-expanded="false">
           <h2>Reconciliation</h2>
+          <span id="reconcileChevron" class="reconcile-chevron" aria-hidden="true">▸</span>
+        </div>
+        <div id="reconcileContent" hidden>
+        <div class="row wrap-row">
           <button id="reconcileRefreshBtn" class="secondary" type="button">Refresh reconciliation</button>
         </div>
         <p class="muted">OneTouch is the source of truth. Actions write updates into SharePoint clients.</p>
@@ -129,6 +133,7 @@
             <tbody id="errorsBody"></tbody>
           </table>
         </div>
+        </div>
       </section>
 
       <section class="clients-grid">
@@ -140,6 +145,8 @@
                 <tr>
                   <th>ID</th>
                   <th>Name</th>
+                  <th>Location</th>
+                  <th>Care Type</th>
                   <th>Status</th>
                   <th>Postcode</th>
                   <th>Xero</th>

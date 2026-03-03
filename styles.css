@@ -247,6 +247,38 @@ button:disabled {
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
 }
 
+.detail-panel {
+  transform: translateX(22px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
+}
+
+.detail-panel.open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.reconcile-header {
+  cursor: pointer;
+  user-select: none;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reconcile-chevron {
+  font-size: 1.05rem;
+  color: #4a566d;
+  line-height: 1;
+}
+
+.reconcile-panel.collapsed .subheading {
+  margin-top: 0;
+}
+
 .table-wrap {
   margin-top: 12px;
   overflow: auto;

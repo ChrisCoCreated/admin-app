@@ -98,25 +98,25 @@ async function geocodeLocation(query, apiKey, region) {
   };
 }
 
-async function computeRun(staff, clients, apiKey, departureTime) {
+async function computeRun(origin, destination, intermediates, apiKey, departureTime) {
   const requestBody = {
     origin: {
       location: {
         latLng: {
-          latitude: staff.latitude,
-          longitude: staff.longitude,
+          latitude: origin.latitude,
+          longitude: origin.longitude,
         },
       },
     },
     destination: {
       location: {
         latLng: {
-          latitude: staff.latitude,
-          longitude: staff.longitude,
+          latitude: destination.latitude,
+          longitude: destination.longitude,
         },
       },
     },
-    intermediates: clients.map((client) => ({
+    intermediates: intermediates.map((client) => ({
       location: {
         latLng: {
           latitude: client.latitude,
@@ -165,15 +165,11 @@ async function computeRun(staff, clients, apiKey, departureTime) {
   return route;
 }
 
-function buildResponse(staff, clients, route, options = {}) {
-  const startsFromHome = options.startsFromHome !== false;
-  const optimizedIndex = Array.isArray(route.optimizedIntermediateWaypointIndex)
-    ? route.optimizedIntermediateWaypointIndex
-    : clients.map((_, index) => index);
-
-  const orderedClients = optimizedIndex.map((index) => clients[index]).filter(Boolean);
-  const staffLabel = staff.startLabel || staff.normalizedPostcode || staff.formattedAddress || "Staff start";
-  const stopNames = [staffLabel, ...orderedClients.map((client) => client.stopLabel), staffLabel];
+function buildResponse(routeContext, route) {
+  const startsFromHome = routeContext.startsFromHome !== false;
+  const stopPoints = [routeContext.origin, ...routeContext.intermediates, routeContext.destination];
+  const stopNames = stopPoints.map((point) => point.stopLabel || point.formattedAddress || point.query || "");
+  const orderedClients = Array.isArray(routeContext.orderedClients) ? routeContext.orderedClients : [];
 
   const legs = route.legs.map((leg, index) => {
     const from = stopNames[index] || "";
@@ -273,13 +269,26 @@ function buildResponse(staff, clients, route, options = {}) {
   return {
     run: {
       startsFromHome,
-      staffStart: {
-        query: staff.query,
-        label: staffLabel,
-        postcode: staff.normalizedPostcode,
-        formattedAddress: staff.formattedAddress,
-        latitude: staff.latitude,
-        longitude: staff.longitude,
+      staffStart: routeContext.staffStart
+        ? {
+            query: routeContext.staffStart.query,
+            label: routeContext.staffStart.stopLabel || routeContext.staffStart.startLabel || "",
+            postcode: routeContext.staffStart.normalizedPostcode,
+            formattedAddress: routeContext.staffStart.formattedAddress,
+            latitude: routeContext.staffStart.latitude,
+            longitude: routeContext.staffStart.longitude,
+          }
+        : null,
+      route: {
+        startLabel: stopNames[0] || "Start",
+        endLabel: stopNames[stopNames.length - 1] || "End",
+        startQuery: routeContext.origin.query || "",
+        endQuery: routeContext.destination.query || "",
+      },
+      maps: {
+        origin: routeContext.origin.query || "",
+        destination: routeContext.destination.query || "",
+        waypoints: routeContext.intermediates.map((point) => point.query).filter(Boolean),
       },
       orderedClients: orderedClients.map((client) => ({
         query: client.query,
@@ -350,18 +359,13 @@ module.exports = async (req, res) => {
 
   const region = String(process.env.GOOGLE_MAPS_REGION || "gb").trim().toLowerCase() || "gb";
   const staffLocation = normalizeLocationQuery(req.body?.staffLocation || req.body?.staffPostcode);
-  const startsFromHome = req.body?.startsFromHome !== false;
+  const startsFromHomeRequested = req.body?.startsFromHome !== false;
   const departureTime = String(req.body?.departureTime || "").trim();
   const rawClientLocations = Array.isArray(req.body?.clientLocations)
     ? req.body.clientLocations
     : Array.isArray(req.body?.clientPostcodes)
       ? req.body.clientPostcodes
       : [];
-
-  if (!staffLocation) {
-    res.status(400).json({ error: "Staff start is required." });
-    return;
-  }
 
   const dedupedClients = [];
   const seen = new Set();
@@ -390,22 +394,53 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const [staff, ...clients] = await Promise.all([
-      geocodeLocation(staffLocation, apiKey, region).then((item) => ({
-        ...item,
-        startLabel: staffLocation,
-        normalizedPostcode: normalizePostcode(staffLocation),
-      })),
-      ...dedupedClients.map((client) =>
+    const clients = await Promise.all(
+      dedupedClients.map((client) =>
         geocodeLocation(client.query, apiKey, region).then((item) => ({
           ...item,
           stopLabel: client.stopLabel,
         }))
-      ),
-    ]);
+      )
+    );
 
-    const route = await computeRun(staff, clients, apiKey, departureTime);
-    const payload = buildResponse(staff, clients, route, { startsFromHome });
+    let routeContext;
+    if (staffLocation) {
+      const staff = await geocodeLocation(staffLocation, apiKey, region).then((item) => ({
+        ...item,
+        startLabel: staffLocation,
+        stopLabel: staffLocation,
+        normalizedPostcode: normalizePostcode(staffLocation),
+      }));
+      routeContext = {
+        startsFromHome: startsFromHomeRequested,
+        staffStart: staff,
+        origin: staff,
+        destination: staff,
+        intermediates: clients,
+        orderedClients: clients,
+      };
+    } else {
+      const origin = clients[0];
+      const destination = clients[clients.length - 1] || clients[0];
+      const intermediates = clients.slice(1, -1);
+      routeContext = {
+        startsFromHome: false,
+        staffStart: null,
+        origin,
+        destination,
+        intermediates,
+        orderedClients: clients,
+      };
+    }
+
+    const route = await computeRun(
+      routeContext.origin,
+      routeContext.destination,
+      routeContext.intermediates,
+      apiKey,
+      departureTime
+    );
+    const payload = buildResponse(routeContext, route);
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json(payload);

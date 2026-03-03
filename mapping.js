@@ -194,6 +194,17 @@ function hideRun() {
   }
 }
 
+function syncStartsFromHomeAvailability() {
+  if (!startsFromHomeInput) {
+    return;
+  }
+  const hasStaffStart = Boolean(normalizeLocationQuery(staffPostcodeInput?.value || ""));
+  startsFromHomeInput.disabled = !hasStaffStart;
+  if (!hasStaffStart) {
+    startsFromHomeInput.checked = false;
+  }
+}
+
 function renderSelectedStaffName() {
   if (!selectedStaffNameLabel) {
     return;
@@ -216,7 +227,7 @@ function renderClientPostcodes() {
 
     const text = document.createElement("span");
     if (stop.isManual) {
-      text.textContent = `Manual - ${stop.address}`;
+      text.textContent = `${stop.address} (Manual)`;
     } else {
       text.textContent = stop.label ? `${stop.label} - ${stop.address}` : stop.address;
     }
@@ -577,6 +588,7 @@ function renderCarerSearchResults() {
       if (startsFromHomeInput) {
         startsFromHomeInput.checked = true;
       }
+      syncStartsFromHomeAvailability();
       renderSelectedStaffName();
       setStatus(`Staff start set from ${carer.name || "associate"}.`);
     });
@@ -629,14 +641,14 @@ function renderClientSearchResults() {
   }
 }
 
-function buildMapsDirectionsUrl(staffPostcode, orderedClients) {
+function buildMapsDirectionsUrl(origin, destination, waypoints) {
   const url = new URL("https://www.google.com/maps/dir/");
   url.searchParams.set("api", "1");
   url.searchParams.set("travelmode", "driving");
-  url.searchParams.set("origin", staffPostcode);
-  url.searchParams.set("destination", staffPostcode);
-  if (orderedClients.length) {
-    url.searchParams.set("waypoints", orderedClients.join("|"));
+  url.searchParams.set("origin", origin);
+  url.searchParams.set("destination", destination);
+  if (waypoints.length) {
+    url.searchParams.set("waypoints", waypoints.join("|"));
   }
   return url.toString();
 }
@@ -750,15 +762,18 @@ function buildDepartureTimeIso() {
 }
 
 function buildScheduleRows(run) {
-  const clients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
   const legs = Array.isArray(run.legs) ? run.legs : [];
-  const staffStartLabel = run.staffStart?.label || run.staffStart?.formattedAddress || run.staffStart?.postcode || "Staff home";
-
-  const labels = [`Start - ${staffStartLabel}`];
-  for (const client of clients) {
-    labels.push(client.stopLabel || client.formattedAddress || client.query || "Client");
+  if (!legs.length) {
+    scheduleRows = [];
+    scheduleGapMinutes = [];
+    return;
   }
-  labels.push(`Return - ${staffStartLabel}`);
+  const labels = [`Start - ${legs[0].from || "Start"}`];
+  for (let i = 0; i < legs.length; i += 1) {
+    const isLast = i === legs.length - 1;
+    const toLabel = legs[i]?.to || "Stop";
+    labels.push(isLast ? `End - ${toLabel}` : toLabel);
+  }
 
   const visitDuration = getVisitDurationMinutes();
   scheduleGapMinutes = [];
@@ -842,17 +857,20 @@ function renderSchedule() {
 
 function renderRun(run) {
   lastRun = run;
-  const staffStartLabel = run.staffStart?.label || run.staffStart?.formattedAddress || run.staffStart?.postcode || "";
   const orderedClients = Array.isArray(run.orderedClients) ? run.orderedClients : [];
   const legs = Array.isArray(run.legs) ? run.legs : [];
   const fromHomeLeg = legs[0] || null;
   const toHomeLeg = legs.length > 1 ? legs[legs.length - 1] : legs[0] || null;
   const startsFromHome = run.startsFromHome !== false;
+  const fromHomeDistance = startsFromHome ? String(fromHomeLeg?.distanceMiles || 0) : "0";
+  const fromHomeDuration = startsFromHome ? String(fromHomeLeg?.durationText || "0 min") : "0 min";
+  const toHomeDistance = startsFromHome ? String(toHomeLeg?.distanceMiles || 0) : "0";
+  const toHomeDuration = startsFromHome ? String(toHomeLeg?.durationText || "0 min") : "0 min";
   runTotals.innerHTML = `
     Total distance: ${escapeHtml(String(run.totalDistanceMiles || 0))} mi | Total time: ${escapeHtml(String(run.totalDurationText || "0 min"))}<br />
     Starting from home: ${startsFromHome ? "Yes" : "No"}<br />
-    Travel from home: ${escapeHtml(String(fromHomeLeg?.distanceMiles || 0))} mi, ${escapeHtml(String(fromHomeLeg?.durationText || "0 min"))}<br />
-    Travel to home: ${escapeHtml(String(toHomeLeg?.distanceMiles || 0))} mi, ${escapeHtml(String(toHomeLeg?.durationText || "0 min"))}
+    Travel from home: ${escapeHtml(fromHomeDistance)} mi, ${escapeHtml(fromHomeDuration)}<br />
+    Travel to home: ${escapeHtml(toHomeDistance)} mi, ${escapeHtml(toHomeDuration)}
   `;
   renderCost(run);
 
@@ -869,10 +887,12 @@ function renderRun(run) {
     runLegsBody.appendChild(tr);
   }
 
-  mapsDirectionsLink.href = buildMapsDirectionsUrl(
-    run.staffStart?.query || run.staffStart?.formattedAddress || staffStartLabel,
-    orderedClients.map((item) => item.query || item.formattedAddress).filter(Boolean)
-  );
+  const mapsOrigin = run.maps?.origin || run.route?.startQuery || run.staffStart?.query || run.staffStart?.formattedAddress;
+  const mapsDestination = run.maps?.destination || run.route?.endQuery || mapsOrigin;
+  const mapsWaypoints = Array.isArray(run.maps?.waypoints)
+    ? run.maps.waypoints
+    : orderedClients.map((item) => item.query || item.formattedAddress).filter(Boolean);
+  mapsDirectionsLink.href = buildMapsDirectionsUrl(mapsOrigin || "", mapsDestination || mapsOrigin || "", mapsWaypoints);
   buildScheduleRows(run);
   renderSchedule();
   if (saveRunBtn) {
@@ -1126,15 +1146,11 @@ function escapeHtml(value) {
 
 async function calculateRun() {
   const staffStart = normalizeLocationQuery(staffPostcodeInput.value);
-  if (!staffStart) {
-    setStatus("Staff start address is required.", true);
-    return;
-  }
-
   if (!selectedClientStops.length) {
     setStatus("Add at least one client stop.", true);
     return;
   }
+  const startsFromHome = staffStart ? Boolean(startsFromHomeInput?.checked) : false;
 
   setBusy(true);
   hideRun();
@@ -1150,8 +1166,8 @@ async function calculateRun() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        staffLocation: staffStart,
-        startsFromHome: Boolean(startsFromHomeInput?.checked),
+        ...(staffStart ? { staffLocation: staffStart } : {}),
+        startsFromHome,
         departureTime: buildDepartureTimeIso(),
         clientLocations: selectedClientStops.map((stop) => ({
           query: stop.address,
@@ -1201,6 +1217,7 @@ async function init() {
     if (startsFromHomeInput) {
       startsFromHomeInput.checked = false;
     }
+    syncStartsFromHomeAvailability();
     selectedStaffName = "";
     renderSelectedStaffName();
     selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
@@ -1282,6 +1299,7 @@ clearRunBtn?.addEventListener("click", () => {
   if (startsFromHomeInput) {
     startsFromHomeInput.checked = false;
   }
+  syncStartsFromHomeAvailability();
   selectedStaffName = "";
   renderSelectedStaffName();
   staffPostcodeInput.value = "";
@@ -1309,9 +1327,7 @@ clearRunBtn?.addEventListener("click", () => {
 staffPostcodeInput?.addEventListener("input", () => {
   selectedStaffName = "";
   renderSelectedStaffName();
-  if (startsFromHomeInput && startsFromHomeInput.checked) {
-    startsFromHomeInput.checked = false;
-  }
+  syncStartsFromHomeAvailability();
 });
 
 runStartTimeInput?.addEventListener("change", () => {
