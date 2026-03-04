@@ -6,6 +6,8 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const signOutBtn = document.getElementById("signOutBtn");
 const locationInput = document.getElementById("locationInput");
 const driveTimeMinutesInput = document.getElementById("driveTimeMinutesInput");
+const useSeaHandleInput = document.getElementById("useSeaHandleInput");
+const seaClipStrengthInput = document.getElementById("seaClipStrengthInput");
 const drawSecondaryInput = document.getElementById("drawSecondaryInput");
 const searchNameInput = document.getElementById("searchNameInput");
 const drawDriveTimeBtn = document.getElementById("drawDriveTimeBtn");
@@ -35,6 +37,9 @@ const GEOCODE_CACHE_KEY = "thrive.drivetime.geocode.v1";
 const DEFAULT_DRIVE_TIME_MINUTES = 20;
 const MIN_DRIVE_TIME_MINUTES = 1;
 const MAX_DRIVE_TIME_MINUTES = 240;
+const DEFAULT_SEA_BEARING_DEGREES = 270;
+const DEFAULT_SEA_STRENGTH = 0.55;
+const MIN_SEA_FACTOR = 0.35;
 const OVERLAY_BATCH_SIZE = 300;
 const AREA_COLORS = [
   { stroke: "#1f3c88", fill: "#31b7c8" },
@@ -48,6 +53,7 @@ const AREA_COLORS = [
 let map = null;
 let previewMarker = null;
 let previewPolygon = null;
+let seaHandleMarker = null;
 let currentResult = null;
 let savedSearches = [];
 const areaLayers = new Map();
@@ -114,6 +120,22 @@ function resolveDriveTimeMinutes() {
     driveTimeMinutesInput.value = String(minutes);
   }
   return minutes;
+}
+
+function clampSeaStrength(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_SEA_STRENGTH;
+  }
+  return Math.min(Math.max(parsed / 100, 0), 1);
+}
+
+function resolveSeaStrength() {
+  const strength = clampSeaStrength(seaClipStrengthInput?.value);
+  if (seaClipStrengthInput) {
+    seaClipStrengthInput.value = String(Math.round(strength * 100));
+  }
+  return strength;
 }
 
 function createSearchId() {
@@ -311,6 +333,104 @@ function buildSecondaryPolygonWithoutOverlap(candidatePolygon, center, existingP
   }
 
   return null;
+}
+
+function normalizeBearingDegrees(value) {
+  const normalized = Number(value) % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
+function smallestAngleDifferenceDegrees(a, b) {
+  const diff = Math.abs(normalizeBearingDegrees(a) - normalizeBearingDegrees(b));
+  return diff > 180 ? 360 - diff : diff;
+}
+
+function offsetLatLngByBearing(center, bearingDegrees, offsetDegrees = 0.06) {
+  const bearingRad = (normalizeBearingDegrees(bearingDegrees) * Math.PI) / 180;
+  const latOffset = Math.cos(bearingRad) * offsetDegrees;
+  const lngScale = Math.max(Math.cos((center.lat * Math.PI) / 180), 0.2);
+  const lngOffset = (Math.sin(bearingRad) * offsetDegrees) / lngScale;
+  return {
+    lat: center.lat + latOffset,
+    lng: center.lng + lngOffset,
+  };
+}
+
+function bearingFromCenter(center, point) {
+  const dx = point.lng - center.lng;
+  const dy = point.lat - center.lat;
+  const radians = Math.atan2(dx, dy);
+  return normalizeBearingDegrees((radians * 180) / Math.PI);
+}
+
+function applySeaAvoidanceToPolygon(basePolygon, center, inlandBearingDegrees, strength) {
+  return basePolygon.map((point) => {
+    const bearing = bearingFromCenter(center, point);
+    const delta = smallestAngleDifferenceDegrees(bearing, inlandBearingDegrees);
+    const seaExposure = (1 - Math.cos((delta * Math.PI) / 180)) / 2;
+    const factor = Math.max(MIN_SEA_FACTOR, 1 - strength * seaExposure);
+    return {
+      lat: center.lat + (point.lat - center.lat) * factor,
+      lng: center.lng + (point.lng - center.lng) * factor,
+    };
+  });
+}
+
+function removeSeaHandle() {
+  if (seaHandleMarker) {
+    seaHandleMarker.remove();
+    seaHandleMarker = null;
+  }
+}
+
+function ensureSeaHandle(center, inlandBearingDegrees = DEFAULT_SEA_BEARING_DEGREES) {
+  if (!map || !window.L || !useSeaHandleInput?.checked) {
+    removeSeaHandle();
+    return;
+  }
+
+  const latLng = offsetLatLngByBearing(center, inlandBearingDegrees);
+  if (!seaHandleMarker) {
+    seaHandleMarker = window.L.marker([latLng.lat, latLng.lng], {
+      draggable: true,
+      title: "Sea-avoidance handle (drag inland)",
+    }).addTo(map);
+    seaHandleMarker.bindPopup("Sea-avoidance handle: drag inland direction.");
+    seaHandleMarker.on("drag", () => {
+      recomputeCurrentPolygonFromModes();
+    });
+  } else {
+    seaHandleMarker.setLatLng([latLng.lat, latLng.lng]);
+  }
+}
+
+function getSeaInlandBearing(center) {
+  if (!seaHandleMarker) {
+    return DEFAULT_SEA_BEARING_DEGREES;
+  }
+  const latLng = seaHandleMarker.getLatLng();
+  return bearingFromCenter(center, { lat: latLng.lat, lng: latLng.lng });
+}
+
+function recomputeCurrentPolygonFromModes() {
+  if (!currentResult || !currentResult.center || !Array.isArray(currentResult.basePolygon)) {
+    return;
+  }
+
+  let polygon = currentResult.basePolygon;
+
+  if (useSeaHandleInput?.checked) {
+    const inlandBearing = getSeaInlandBearing(currentResult.center);
+    polygon = applySeaAvoidanceToPolygon(polygon, currentResult.center, inlandBearing, resolveSeaStrength());
+  }
+
+  currentResult.polygon = polygon;
+  renderPreview({
+    center: currentResult.center,
+    polygon: currentResult.polygon,
+    formattedAddress: currentResult.formattedAddress,
+    secondary: currentResult.secondary === true,
+  });
 }
 
 function loadSavedSearches() {
@@ -745,6 +865,8 @@ function initMap() {
     zoomControl: true,
     attributionControl: true,
   }).setView([51.2802, 1.0789], 11);
+  map.createPane("secondaryAreaPane");
+  map.getPane("secondaryAreaPane").style.zIndex = "360";
 
   window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
@@ -796,7 +918,8 @@ function renderPreview(payload) {
       opacity: isSecondary ? 0.8 : 0.85,
       dashArray: isSecondary ? "8 6" : "5 5",
       fillColor: isSecondary ? "#c9b176" : "#9db3df",
-      fillOpacity: isSecondary ? 0.16 : 0.2,
+      fillOpacity: isSecondary ? 0 : 0.2,
+      pane: isSecondary ? "secondaryAreaPane" : "overlayPane",
     }
   ).addTo(map);
 
@@ -846,7 +969,8 @@ function syncSearchLayer(search) {
       opacity: search.secondary ? 0.85 : 0.95,
       dashArray: search.secondary ? "7 6" : null,
       fillColor: color.fill,
-      fillOpacity: search.secondary ? 0.12 : 0.2,
+      fillOpacity: search.secondary ? 0 : 0.2,
+      pane: search.secondary ? "secondaryAreaPane" : "overlayPane",
     }
   ).addTo(map);
   polygon.bindPopup(`${search.name} (${search.minutes} mins${search.secondary ? ", secondary" : ""})`);
@@ -991,6 +1115,7 @@ function saveCurrentSearch() {
     previewPolygon.remove();
     previewPolygon = null;
   }
+  removeSeaHandle();
 
   if (searchNameInput) {
     searchNameInput.value = "";
@@ -1103,28 +1228,23 @@ async function drawDriveTimeArea() {
       minutes: clampMinutes(data.minutes || minutes),
       center: data.center,
       polygon: sanitizePolygon(data.polygon),
+      basePolygon: sanitizePolygon(data.polygon),
       quality: data.quality || null,
       secondary: drawAsSecondary,
     };
-    let secondaryAdjusted = false;
-    if (drawAsSecondary) {
-      const existingVisiblePolygons = getVisibleAreaPolygons();
-      const adjusted = buildSecondaryPolygonWithoutOverlap(
-        currentResult.polygon,
+
+    if (useSeaHandleInput?.checked) {
+      ensureSeaHandle(currentResult.center, DEFAULT_SEA_BEARING_DEGREES);
+      currentResult.polygon = applySeaAvoidanceToPolygon(
+        currentResult.basePolygon,
         currentResult.center,
-        existingVisiblePolygons
+        getSeaInlandBearing(currentResult.center),
+        resolveSeaStrength()
       );
-      if (!adjusted) {
-        throw new Error("Secondary area still overlaps visible areas. Move location or lower minutes.");
-      }
-      currentResult.polygon = adjusted.polygon;
-      if (adjusted.wasAdjusted) {
-        secondaryAdjusted = true;
-        setStatus(
-          `Secondary area adjusted (${Math.round(adjusted.factor * 100)}%) to avoid overlap for ${currentResult.formattedAddress || location}.`
-        );
-      }
+    } else {
+      removeSeaHandle();
     }
+
     renderPreview({
       ...data,
       polygon: currentResult.polygon,
@@ -1134,11 +1254,9 @@ async function drawDriveTimeArea() {
       searchNameInput.value = currentResult.formattedAddress || currentResult.query;
     }
     if (drawAsSecondary) {
-      if (!secondaryAdjusted) {
-        setStatus(
-          `Showing ${currentResult.minutes}-minute secondary area for ${currentResult.formattedAddress || location}.`
-        );
-      }
+      setStatus(
+        `Showing ${currentResult.minutes}-minute secondary area for ${currentResult.formattedAddress || location}.`
+      );
     } else {
       setStatus(`Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location}.`);
     }
@@ -1263,6 +1381,26 @@ locationInput?.addEventListener("keydown", (event) => {
 
 driveTimeMinutesInput?.addEventListener("change", () => {
   resolveDriveTimeMinutes();
+});
+
+drawSecondaryInput?.addEventListener("change", () => {
+  recomputeCurrentPolygonFromModes();
+});
+
+useSeaHandleInput?.addEventListener("change", () => {
+  if (!currentResult?.center) {
+    return;
+  }
+  if (useSeaHandleInput.checked) {
+    ensureSeaHandle(currentResult.center, getSeaInlandBearing(currentResult.center));
+  } else {
+    removeSeaHandle();
+  }
+  recomputeCurrentPolygonFromModes();
+});
+
+seaClipStrengthInput?.addEventListener("input", () => {
+  recomputeCurrentPolygonFromModes();
 });
 
 signOutBtn?.addEventListener("click", async () => {
