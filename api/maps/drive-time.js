@@ -12,7 +12,7 @@ const ROUTE_CALL_CONCURRENCY = 2;
 const DEPARTURE_LEAD_SECONDS = 120;
 const DEFAULT_DEPARTURE_WEEKDAY = 3; // Wednesday
 const DEFAULT_DEPARTURE_HOUR = 10;
-const ISOCHRONE_SOLVER_PASSES = 4;
+const ISOCHRONE_SOLVER_PASSES = 8;
 
 function normalizeLocationQuery(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -234,56 +234,69 @@ async function computeDurationsForDestinations(origin, destinations, apiKey, dep
 async function solveDirectionalDistances({
   center,
   bearings,
-  targetSeconds,
+  bandMinSeconds,
+  bandMaxSeconds,
+  bandTargetSeconds,
   minRadiusMeters,
   maxRadiusMeters,
   initialRadiusMeters,
-  fallbackDistanceMeters,
   apiKey,
   departureTime,
 }) {
   let distances = bearings.map(() => clamp(initialRadiusMeters, minRadiusMeters, maxRadiusMeters));
-  const failures = [];
+  const failuresByDirection = new Array(bearings.length).fill(false);
+  const inBandByDirection = new Array(bearings.length).fill(false);
   let latestDurations = new Array(bearings.length).fill(0);
 
   for (let pass = 0; pass < ISOCHRONE_SOLVER_PASSES; pass += 1) {
     const destinations = bearings.map((bearing, index) => destinationPoint(center, bearing, distances[index]));
     const sample = await computeDurationsForDestinations(center, destinations, apiKey, departureTime);
     latestDurations = sample.durations;
-    failures.push(...sample.failures);
 
     const nextDistances = bearings.map((_, index) => {
       const durationSeconds = Number(latestDurations[index] || 0);
       const currentDistance = distances[index];
       if (!durationSeconds) {
-        // If no route came back, cautiously expand.
-        return clamp(currentDistance * 1.12, minRadiusMeters, maxRadiusMeters);
+        failuresByDirection[index] = true;
+        inBandByDirection[index] = false;
+        // Expand cautiously for another attempt next pass.
+        return clamp(currentDistance * 1.18, minRadiusMeters, maxRadiusMeters);
       }
 
-      const ratio = targetSeconds / Math.max(durationSeconds, 1);
-      // Damp updates to avoid wild oscillation between passes.
-      const scaledRatio = pass === ISOCHRONE_SOLVER_PASSES - 1 ? ratio : 1 + (ratio - 1) * 0.72;
+      failuresByDirection[index] = false;
+      if (durationSeconds >= bandMinSeconds && durationSeconds <= bandMaxSeconds) {
+        inBandByDirection[index] = true;
+        return currentDistance;
+      }
+
+      inBandByDirection[index] = false;
+      const ratio = bandTargetSeconds / Math.max(durationSeconds, 1);
+      const damp = pass < ISOCHRONE_SOLVER_PASSES - 2 ? 0.72 : 0.9;
+      const scaledRatio = 1 + (ratio - 1) * damp;
       return clamp(currentDistance * scaledRatio, minRadiusMeters, maxRadiusMeters);
     });
 
     distances = smoothDistances(nextDistances).map((distance) =>
       clamp(distance, minRadiusMeters, maxRadiusMeters)
     );
+
+    if (inBandByDirection.every(Boolean)) {
+      break;
+    }
   }
 
-  // Final fallback if any direction still has no resolved duration.
-  distances = distances.map((distance, index) => {
+  // Final in-band check using last sampled durations.
+  const finalInBandByDirection = inBandByDirection.map((isInBand, index) => {
     const durationSeconds = Number(latestDurations[index] || 0);
-    if (durationSeconds > 0) {
-      return distance;
-    }
-    return clamp(Math.max(distance, fallbackDistanceMeters), minRadiusMeters, maxRadiusMeters);
+    return durationSeconds > 0 && durationSeconds >= bandMinSeconds && durationSeconds <= bandMaxSeconds && isInBand;
   });
+  const unresolvedByDirection = failuresByDirection.map((failed, index) => failed || !Number(latestDurations[index] || 0));
 
   return {
     distances,
     durations: latestDurations,
-    failures,
+    inBandByDirection: finalInBandByDirection,
+    unresolvedByDirection,
   };
 }
 
@@ -312,13 +325,17 @@ module.exports = async (req, res) => {
 
   const requestedMinutes = Number(req.body?.minutes || TARGET_MINUTES);
   const minutes = Number.isFinite(requestedMinutes) && requestedMinutes > 0 ? Math.round(requestedMinutes) : TARGET_MINUTES;
-  const targetSeconds = minutes * 60;
+  const bandMaxMinutes = minutes;
+  const bandMinMinutes = Number((minutes * 0.9).toFixed(1));
+  const bandTargetMinutes = (bandMinMinutes + bandMaxMinutes) / 2;
+  const bandMinSeconds = Math.round(bandMinMinutes * 60);
+  const bandMaxSeconds = Math.round(bandMaxMinutes * 60);
+  const bandTargetSeconds = Math.round(bandTargetMinutes * 60);
   const fallbackSpeedMetersPerSecond = 16.7; // ~60 km/h fallback
   const dynamicMaxRadiusMeters = Math.max(
     BASE_MAX_RADIUS_METERS,
-    Math.round(targetSeconds * fallbackSpeedMetersPerSecond * 1.35)
+    Math.round(bandMaxSeconds * fallbackSpeedMetersPerSecond * 1.35)
   );
-  const fallbackDistanceMeters = clamp(targetSeconds * fallbackSpeedMetersPerSecond, MIN_RADIUS_METERS, dynamicMaxRadiusMeters);
   let departureTime = "";
   try {
     departureTime = resolveDepartureTime(req.body?.departureTime);
@@ -333,38 +350,46 @@ module.exports = async (req, res) => {
     const solved = await solveDirectionalDistances({
       center,
       bearings,
-      targetSeconds,
+      bandMinSeconds,
+      bandMaxSeconds,
+      bandTargetSeconds,
       minRadiusMeters: MIN_RADIUS_METERS,
       maxRadiusMeters: dynamicMaxRadiusMeters,
       initialRadiusMeters: BASE_RADIUS_METERS,
-      fallbackDistanceMeters,
       apiKey,
       departureTime,
     });
     const smoothedFinalDistances = solved.distances;
-    const polygon = bearings.map((bearing, index) => {
-      const point = destinationPoint(center, bearing, smoothedFinalDistances[index]);
-      return {
-        lat: Number(point.latitude.toFixed(6)),
-        lng: Number(point.longitude.toFixed(6)),
-      };
-    });
+    const polygon = bearings
+      .map((bearing, index) => {
+        if (!solved.inBandByDirection[index]) {
+          return null;
+        }
+        const point = destinationPoint(center, bearing, smoothedFinalDistances[index]);
+        return {
+          lat: Number(point.latitude.toFixed(6)),
+          lng: Number(point.longitude.toFixed(6)),
+        };
+      })
+      .filter(Boolean);
 
-    const successfulDurations = solved.durations.filter((duration) => Number(duration) > 0);
-    const failedMessages = solved.failures;
-    if (successfulDurations.length === 0) {
-      const firstFailure = failedMessages[0] || "No valid routes returned by Google Routes API.";
-      res.status(502).json({
-        error: `Drive-time calculation failed: ${firstFailure}`,
+    if (polygon.length < 3) {
+      res.status(422).json({
+        error: "Insufficient resolved directions in the requested drive-time band.",
       });
       return;
     }
 
-    const minMinutes = successfulDurations.length
-      ? Math.round((Math.min(...successfulDurations) / 60) * 10) / 10
+    const successfulDurations = solved.durations.filter((duration) => Number(duration) > 0);
+    const inBandDurations = solved.durations.filter((duration, index) => solved.inBandByDirection[index] && Number(duration) > 0);
+    const unresolvedDirections = solved.unresolvedByDirection.filter(Boolean).length;
+    const inBandDirections = solved.inBandByDirection.filter(Boolean).length;
+
+    const minMinutes = inBandDurations.length
+      ? Math.round((Math.min(...inBandDurations) / 60) * 10) / 10
       : null;
-    const maxMinutes = successfulDurations.length
-      ? Math.round((Math.max(...successfulDurations) / 60) * 10) / 10
+    const maxMinutes = inBandDurations.length
+      ? Math.round((Math.max(...inBandDurations) / 60) * 10) / 10
       : null;
 
     res.status(200).json({
@@ -378,9 +403,12 @@ module.exports = async (req, res) => {
       quality: {
         sampledDirections: bearings.length,
         successfulDirections: successfulDurations.length,
+        inBandDirections,
+        unresolvedDirections,
         minDurationMinutes: minMinutes,
         maxDurationMinutes: maxMinutes,
-        failedDirectionCalls: failedMessages.length,
+        bandMinMinutes,
+        bandMaxMinutes,
       },
     });
   } catch (error) {

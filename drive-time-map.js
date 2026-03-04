@@ -722,15 +722,25 @@ function initMap() {
 }
 
 function formatQualityText(quality) {
+  const inBandDirections = Number(quality?.inBandDirections || 0);
+  const unresolvedDirections = Number(quality?.unresolvedDirections || 0);
   const successfulDirections = Number(quality?.successfulDirections || 0);
   const sampledDirections = Number(quality?.sampledDirections || 0);
   const minMinutes = quality?.minDurationMinutes;
   const maxMinutes = quality?.maxDurationMinutes;
-  const durationRange =
+  const bandMin = Number(quality?.bandMinMinutes);
+  const bandMax = Number(quality?.bandMaxMinutes);
+  const bandText =
+    Number.isFinite(bandMin) && Number.isFinite(bandMax) ? `${bandMin}-${bandMax} min band` : "target band";
+  const rangeText =
     Number.isFinite(minMinutes) && Number.isFinite(maxMinutes)
-      ? `sampled drive times: ${minMinutes}-${maxMinutes} mins`
-      : "sampled drive times unavailable";
-  return `${successfulDirections}/${sampledDirections} directions resolved, ${durationRange}.`;
+      ? `resolved range: ${minMinutes}-${maxMinutes} mins`
+      : "resolved range unavailable";
+
+  if (inBandDirections > 0 || unresolvedDirections > 0) {
+    return `${inBandDirections}/${sampledDirections} directions in ${bandText}, ${unresolvedDirections} unresolved hidden, ${rangeText}.`;
+  }
+  return `${successfulDirections}/${sampledDirections} directions resolved, ${rangeText}.`;
 }
 
 function renderPreview(payload) {
