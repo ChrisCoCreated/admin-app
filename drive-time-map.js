@@ -35,6 +35,7 @@ const noSavedSearchesMessage = document.getElementById("noSavedSearchesMessage")
 const driveTimeStatus = document.getElementById("driveTimeStatus");
 const driveTimeMeta = document.getElementById("driveTimeMeta");
 const driveTimeMapRoot = document.getElementById("driveTimeMap");
+const mapClickFeedback = document.getElementById("mapClickFeedback");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const OFFICE_CATCHMENT_ENDPOINT = API_BASE_URL
@@ -86,6 +87,7 @@ let overlayLoaded = false;
 let geocodeCache = {};
 let useCustomDepartureTime = false;
 let currentCatchment = createEmptyCatchment();
+let clickFeedbackTimer = null;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -110,6 +112,27 @@ function setStatus(message, isError = false) {
   }
   driveTimeStatus.textContent = message;
   driveTimeStatus.classList.toggle("error", isError);
+}
+
+function showClickFeedback(message, tone = "info") {
+  if (!mapClickFeedback) {
+    return;
+  }
+  if (clickFeedbackTimer) {
+    window.clearTimeout(clickFeedbackTimer);
+    clickFeedbackTimer = null;
+  }
+  mapClickFeedback.hidden = false;
+  mapClickFeedback.textContent = String(message || "");
+  mapClickFeedback.classList.remove("is-success", "is-error", "is-info", "is-visible");
+  mapClickFeedback.classList.add(`is-${tone}`, "is-visible");
+  clickFeedbackTimer = window.setTimeout(() => {
+    mapClickFeedback.classList.remove("is-visible");
+    window.setTimeout(() => {
+      mapClickFeedback.hidden = true;
+    }, 220);
+    clickFeedbackTimer = null;
+  }, 3000);
 }
 
 function setBusy(isBusy) {
@@ -1616,11 +1639,19 @@ async function handleMapClickForCatchment(latlng) {
       setStatus(
         `Accepted ${resolved.name || resolved.formattedAddress} (${Number.isFinite(travelMinutes) ? `${travelMinutes} mins` : "time unavailable"}).`
       );
+      const travelDistanceMiles = Number(data?.travel?.distanceMiles);
+      showClickFeedback(
+        `Accepted: ${resolved.name || resolved.formattedAddress} (${Number.isFinite(travelMinutes) ? `${travelMinutes} mins` : "time unavailable"}${
+          Number.isFinite(travelDistanceMiles) ? `, ${travelDistanceMiles} mi` : ""
+        })`,
+        "success"
+      );
       if (driveTimeMeta) {
         driveTimeMeta.textContent = formatTravelMetaText();
       }
     } else if (duplicateLocal || data?.duplicate) {
       setStatus("Already added.");
+      showClickFeedback("Already added.", "info");
     } else {
       const reasonText = formatReasonMessage(data?.reason, thresholdMinutes);
       setStatus(
@@ -1629,10 +1660,15 @@ async function handleMapClickForCatchment(latlng) {
         }. ${reasonText}`,
         true
       );
+      showClickFeedback(
+        `Rejected: ${resolved.name || resolved.formattedAddress || "location"}${Number.isFinite(travelMinutes) ? ` (${travelMinutes} mins)` : ""}`,
+        "error"
+      );
     }
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not evaluate clicked location.", true);
+    showClickFeedback("Could not evaluate clicked location.", "error");
   } finally {
     setBusy(false);
   }
@@ -1762,6 +1798,7 @@ async function init() {
     updateClearAcceptedButtonState();
     setPeopleOverlayStatus("Overlay not loaded.");
     setStatus("Click map to test a town/village from office.");
+    document.body.classList.toggle("office-click-mode", USE_OFFICE_CATCHMENT_MODE);
     if (!USE_OFFICE_CATCHMENT_MODE) {
       setStatus("Office catchment mode is disabled in config.", true);
     }

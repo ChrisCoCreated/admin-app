@@ -1001,6 +1001,47 @@ body.lightbox-open {
     #f7fafe;
 }
 
+.map-click-feedback {
+  margin-bottom: 10px;
+  border: 1px solid #cad4e6;
+  border-radius: 10px;
+  background: #f6f8fd;
+  color: #1f2c45;
+  font-weight: 700;
+  padding: 8px 10px;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.map-click-feedback.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.map-click-feedback.is-success {
+  border-color: #82d2bc;
+  background: #ecf9f4;
+  color: #165f49;
+}
+
+.map-click-feedback.is-error {
+  border-color: #e8b8b8;
+  background: #fff1f1;
+  color: #7b2d2d;
+}
+
+.map-click-feedback.is-info {
+  border-color: #c9d6ec;
+  background: #f2f6fd;
+  color: #243b66;
+}
+
+.office-click-mode .drive-time-map.leaflet-container,
+.office-click-mode .drive-time-map.leaflet-container .leaflet-interactive {
+  cursor: crosshair;
+}
+
 .drive-time-search-list {
   list-style: none;
   margin: 12px 0 0;
