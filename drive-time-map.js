@@ -5,6 +5,7 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const locationInput = document.getElementById("locationInput");
+const setOfficeBtn = document.getElementById("setOfficeBtn");
 const driveTimeMinutesInput = document.getElementById("driveTimeMinutesInput");
 const customDepartureBtn = document.getElementById("customDepartureBtn");
 const customDepartureWrap = document.getElementById("customDepartureWrap");
@@ -16,6 +17,8 @@ const saveSearchBtn = document.getElementById("saveSearchBtn");
 const clearAcceptedPlacesBtn = document.getElementById("clearAcceptedPlacesBtn");
 const acceptedPlacesList = document.getElementById("acceptedPlacesList");
 const noAcceptedPlacesMessage = document.getElementById("noAcceptedPlacesMessage");
+const toggleSavedSearchesBtn = document.getElementById("toggleSavedSearchesBtn");
+const savedSearchesContent = document.getElementById("savedSearchesContent");
 const showAllSearchesBtn = document.getElementById("showAllSearchesBtn");
 const hideAllSearchesBtn = document.getElementById("hideAllSearchesBtn");
 const exportSearchesBtn = document.getElementById("exportSearchesBtn");
@@ -66,6 +69,7 @@ const OFFICE = {
   lat: Number(FRONTEND_CONFIG.mapOffice?.lat ?? 51.2802),
   lng: Number(FRONTEND_CONFIG.mapOffice?.lng ?? 1.0789),
 };
+let activeOffice = { ...OFFICE };
 
 let map = null;
 let officeMarker = null;
@@ -91,7 +95,7 @@ const directoryApi = createDirectoryApi(authController);
 
 function createEmptyCatchment() {
   return {
-    office: { ...OFFICE },
+    office: { ...activeOffice },
     thresholdMinutes: DEFAULT_DRIVE_TIME_MINUTES,
     acceptedPlaces: [],
     polygon: [],
@@ -109,6 +113,9 @@ function setStatus(message, isError = false) {
 }
 
 function setBusy(isBusy) {
+  if (setOfficeBtn) {
+    setOfficeBtn.disabled = isBusy;
+  }
   if (saveSearchBtn) {
     saveSearchBtn.disabled = isBusy || !canSaveCurrentCatchment();
   }
@@ -124,6 +131,16 @@ function updateSaveButtonState() {
   }
   saveSearchBtn.disabled = !canSaveCurrentCatchment();
   saveSearchBtn.textContent = editingSearchId ? "Update area" : "Save search";
+}
+
+function setSavedSearchesCollapsed(isCollapsed) {
+  if (savedSearchesContent) {
+    savedSearchesContent.hidden = isCollapsed;
+  }
+  if (toggleSavedSearchesBtn) {
+    toggleSavedSearchesBtn.textContent = isCollapsed ? "Show saved searches" : "Hide saved searches";
+    toggleSavedSearchesBtn.setAttribute("aria-expanded", String(!isCollapsed));
+  }
 }
 
 function updateClearAcceptedButtonState() {
@@ -823,7 +840,7 @@ function initMap() {
   map = window.L.map(driveTimeMapRoot, {
     zoomControl: true,
     attributionControl: true,
-  }).setView([OFFICE.lat, OFFICE.lng], 11);
+  }).setView([activeOffice.lat, activeOffice.lng], 11);
 
   window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
@@ -831,11 +848,11 @@ function initMap() {
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(map);
 
-  officeMarker = window.L.marker([OFFICE.lat, OFFICE.lng], {
-    title: `${OFFICE.name}${OFFICE.postcode ? ` (${OFFICE.postcode})` : ""}`,
+  officeMarker = window.L.marker([activeOffice.lat, activeOffice.lng], {
+    title: `${activeOffice.name}${activeOffice.postcode ? ` (${activeOffice.postcode})` : ""}`,
     keyboard: false,
   }).addTo(map);
-  officeMarker.bindPopup(`<strong>${escapeHtml(OFFICE.name)}</strong><br/>${escapeHtml(OFFICE.postcode)}`);
+  officeMarker.bindPopup(`<strong>${escapeHtml(activeOffice.name)}</strong><br/>${escapeHtml(activeOffice.postcode)}`);
 
   map.on("click", (event) => {
     if (!USE_OFFICE_CATCHMENT_MODE) {
@@ -1213,12 +1230,16 @@ function beginEditingSavedSearch(search) {
     departureTimeMode: search.departureTimeMode === "custom" ? "custom" : "default",
     departureTime: search.departureTime || null,
   };
+  activeOffice = { ...currentCatchment.office };
 
   if (!currentCatchment.polygon.length) {
     recomputeCurrentHullFromAccepted();
   }
   if (driveTimeMinutesInput) {
     driveTimeMinutesInput.value = String(currentCatchment.thresholdMinutes);
+  }
+  if (locationInput) {
+    locationInput.value = `${currentCatchment.office.name}${currentCatchment.office.postcode ? ` (${currentCatchment.office.postcode})` : ""}`;
   }
   if (searchNameInput) {
     searchNameInput.value = search.name || currentCatchment.office.name;
@@ -1238,6 +1259,7 @@ function beginEditingSavedSearch(search) {
   }
 
   refreshCurrentCatchmentMapAndList();
+  updateOfficeMarker();
   updateSaveButtonState();
   if (map) {
     if (currentCatchment.polygon.length >= MIN_POLYGON_POINTS) {
@@ -1369,7 +1391,7 @@ function resetCurrentCatchment() {
   currentCatchment = createEmptyCatchment();
   currentCatchment.thresholdMinutes = resolveDriveTimeMinutes();
   if (searchNameInput) {
-    searchNameInput.value = `${OFFICE.name} catchment`;
+    searchNameInput.value = `${activeOffice.name} catchment`;
   }
   clearPreviewVertexMarkers();
   if (previewPolygon) {
@@ -1626,6 +1648,75 @@ function clearAcceptedPlaces() {
   }
 }
 
+function updateOfficeMarker() {
+  if (!officeMarker || !map || !window.L) {
+    return;
+  }
+  officeMarker.setLatLng([currentCatchment.office.lat, currentCatchment.office.lng]);
+  officeMarker.setPopupContent(
+    `<strong>${escapeHtml(currentCatchment.office.name)}</strong><br/>${escapeHtml(currentCatchment.office.postcode || "")}`
+  );
+}
+
+async function setOfficeFromInput() {
+  const query = normalizeSearchName(locationInput?.value || "");
+  if (!query) {
+    setStatus("Enter an office location first.", true);
+    return;
+  }
+
+  setBusy(true);
+  setStatus("Resolving office location...");
+  try {
+    const response = await authedFetch(GEOCODE_BATCH_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        queries: [{ id: "office", query }],
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || "Could not set office location.");
+    }
+
+    const points = Array.isArray(data?.points) ? data.points : [];
+    const officePoint = points.find((point) => Number.isFinite(Number(point?.lat)) && Number.isFinite(Number(point?.lng)));
+    if (!officePoint) {
+      throw new Error("Could not find that office location.");
+    }
+
+    const formatted = normalizeSearchName(officePoint.formattedAddress || query);
+    currentCatchment.office = {
+      name: formatted,
+      postcode: "",
+      lat: Number(officePoint.lat),
+      lng: Number(officePoint.lng),
+    };
+    activeOffice = { ...currentCatchment.office };
+
+    editingSearchId = null;
+    clearAcceptedPlaces();
+    updateOfficeMarker();
+    map.setView([currentCatchment.office.lat, currentCatchment.office.lng], 11);
+
+    if (locationInput) {
+      locationInput.value = formatted;
+    }
+    if (searchNameInput) {
+      searchNameInput.value = `${formatted} catchment`;
+    }
+    setStatus(`Office set to ${formatted}. Click map to build catchment.`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not set office location.", true);
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
@@ -1648,7 +1739,7 @@ async function init() {
     }
 
     if (locationInput) {
-      locationInput.value = `${OFFICE.name}${OFFICE.postcode ? ` (${OFFICE.postcode})` : ""}`;
+      locationInput.value = `${activeOffice.name}${activeOffice.postcode ? ` (${activeOffice.postcode})` : ""}`;
     }
 
     loadGeocodeCache();
@@ -1660,10 +1751,11 @@ async function init() {
     currentCatchment.thresholdMinutes = resolveDriveTimeMinutes();
     renderAcceptedPlacesList();
     renderSavedSearches();
+    setSavedSearchesCollapsed(true);
     syncAllSearchLayers();
 
     if (searchNameInput) {
-      searchNameInput.value = `${OFFICE.name} catchment`;
+      searchNameInput.value = `${activeOffice.name} catchment`;
     }
 
     updateSaveButtonState();
@@ -1687,6 +1779,10 @@ async function init() {
 
 saveSearchBtn?.addEventListener("click", () => {
   saveCurrentSearch();
+});
+
+setOfficeBtn?.addEventListener("click", () => {
+  void setOfficeFromInput();
 });
 
 clearAcceptedPlacesBtn?.addEventListener("click", () => {
@@ -1740,11 +1836,24 @@ importSearchesFileInput?.addEventListener("change", async () => {
   }
 });
 
+toggleSavedSearchesBtn?.addEventListener("click", () => {
+  const isCollapsed = Boolean(savedSearchesContent?.hidden);
+  setSavedSearchesCollapsed(!isCollapsed);
+});
+
 driveTimeMinutesInput?.addEventListener("change", () => {
   resolveDriveTimeMinutes();
   if (driveTimeMeta) {
     driveTimeMeta.textContent = formatTravelMetaText();
   }
+});
+
+locationInput?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  void setOfficeFromInput();
 });
 
 customDepartureBtn?.addEventListener("click", () => {

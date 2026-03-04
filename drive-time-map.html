@@ -42,13 +42,14 @@
         <div class="drive-time-controls office-catchment-controls">
           <label class="field" for="locationInput">
             Office location
-            <input id="locationInput" type="text" readonly />
+            <input id="locationInput" type="text" placeholder="e.g. Canterbury, Kent" autocomplete="street-address" />
           </label>
           <label class="field" for="driveTimeMinutesInput">
             Threshold (minutes)
             <input id="driveTimeMinutesInput" type="number" min="1" max="240" step="1" value="20" />
           </label>
           <div class="drive-time-action-group">
+            <button id="setOfficeBtn" class="secondary drive-time-small-btn" type="button">Set office</button>
             <button id="customDepartureBtn" class="secondary drive-time-small-btn" type="button">Custom time</button>
           </div>
         </div>
@@ -87,16 +88,23 @@
       </section>
 
       <section class="panel">
-        <h2>Saved Searches</h2>
-        <div class="row">
-          <button id="showAllSearchesBtn" class="secondary" type="button">Show all</button>
-          <button id="hideAllSearchesBtn" class="secondary" type="button">Hide all</button>
-          <button id="exportSearchesBtn" class="secondary" type="button">Export</button>
-          <button id="importSearchesBtn" class="secondary" type="button">Import</button>
-          <input id="importSearchesFileInput" type="file" accept="application/json,.json" hidden />
+        <div class="row saved-searches-header">
+          <h2>Saved Searches</h2>
+          <button id="toggleSavedSearchesBtn" class="secondary drive-time-small-btn" type="button" aria-expanded="false">
+            Show saved searches
+          </button>
         </div>
-        <ul id="savedSearchesList" class="drive-time-search-list"></ul>
-        <p id="noSavedSearchesMessage" class="muted">No saved searches yet.</p>
+        <div id="savedSearchesContent" hidden>
+          <div class="row">
+            <button id="showAllSearchesBtn" class="secondary" type="button">Show all</button>
+            <button id="hideAllSearchesBtn" class="secondary" type="button">Hide all</button>
+            <button id="exportSearchesBtn" class="secondary" type="button">Export</button>
+            <button id="importSearchesBtn" class="secondary" type="button">Import</button>
+            <input id="importSearchesFileInput" type="file" accept="application/json,.json" hidden />
+          </div>
+          <ul id="savedSearchesList" class="drive-time-search-list"></ul>
+          <p id="noSavedSearchesMessage" class="muted">No saved searches yet.</p>
+        </div>
       </section>
 
       <section class="panel">

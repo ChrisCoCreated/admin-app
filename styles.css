@@ -979,6 +979,10 @@ body.lightbox-open {
   margin: 0;
 }
 
+.saved-searches-header {
+  justify-content: space-between;
+}
+
 .drive-time-overlay-grid {
   margin-top: 10px;
   display: grid;
