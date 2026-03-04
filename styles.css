@@ -891,8 +891,28 @@ body.lightbox-open {
   margin-top: 10px;
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
+}
+
+.drive-time-option-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: end;
+}
+
+.drive-time-strength-field {
+  min-width: 220px;
+}
+
+.drive-time-name-field {
+  min-width: 0;
+}
+
+.drive-time-save-btn {
+  white-space: nowrap;
 }
 
 .drive-time-overlay-grid {
@@ -1239,6 +1259,10 @@ body.lightbox-open {
 
   .drive-time-save-controls {
     grid-template-columns: 1fr;
+  }
+
+  .drive-time-save-btn {
+    width: 100%;
   }
 
   .drive-time-overlay-grid {

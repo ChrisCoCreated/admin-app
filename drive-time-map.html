@@ -56,19 +56,21 @@
           <button id="drawDriveTimeBtn" type="button">Draw area</button>
         </div>
         <div class="drive-time-save-controls">
-          <label class="checkbox-row" for="useSeaHandleInput">
-            <input id="useSeaHandleInput" type="checkbox" checked />
-            <span>Use sea-avoidance handle</span>
-          </label>
-          <label class="field" for="seaClipStrengthInput">
-            Sea avoidance strength
-            <input id="seaClipStrengthInput" type="range" min="0" max="100" step="5" value="55" />
-          </label>
-          <label class="checkbox-row" for="drawSecondaryInput">
-            <input id="drawSecondaryInput" type="checkbox" />
-            <span>Draw as secondary (avoid overlap with visible areas)</span>
-          </label>
-          <label class="field" for="searchNameInput">
+          <div class="drive-time-option-row">
+            <label class="checkbox-row" for="useSeaHandleInput">
+              <input id="useSeaHandleInput" type="checkbox" checked />
+              <span>Use sea-avoidance handle</span>
+            </label>
+            <label class="field drive-time-strength-field" for="seaClipStrengthInput">
+              Sea avoidance strength
+              <input id="seaClipStrengthInput" type="range" min="0" max="100" step="5" value="55" />
+            </label>
+            <label class="checkbox-row" for="drawSecondaryInput">
+              <input id="drawSecondaryInput" type="checkbox" />
+              <span>Draw as secondary (avoid overlap with visible areas)</span>
+            </label>
+          </div>
+          <label class="field drive-time-name-field" for="searchNameInput">
             Search name (optional)
             <input
               id="searchNameInput"
@@ -77,7 +79,7 @@
               autocomplete="off"
             />
           </label>
-          <button id="saveSearchBtn" class="secondary" type="button" disabled>Save search</button>
+          <button id="saveSearchBtn" class="secondary drive-time-save-btn" type="button" disabled>Save search</button>
         </div>
         <p id="driveTimeStatus" class="muted">Enter a location to calculate.</p>
         <p id="driveTimeMeta" class="muted"></p>
