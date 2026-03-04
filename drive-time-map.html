@@ -53,7 +53,21 @@
             Drive time (minutes)
             <input id="driveTimeMinutesInput" type="number" min="1" max="240" step="1" value="20" />
           </label>
-          <button id="drawDriveTimeBtn" type="button">Draw area</button>
+          <div class="drive-time-action-group">
+            <button id="drawDriveTimeBtn" type="button">Draw area</button>
+            <button id="customDepartureBtn" class="secondary drive-time-small-btn" type="button">Custom time</button>
+          </div>
+        </div>
+        <div id="customDepartureWrap" class="drive-time-custom-time" hidden>
+          <label class="field" for="departureDateInput">
+            Date
+            <input id="departureDateInput" type="date" />
+          </label>
+          <label class="field" for="departureTimeInput">
+            Time
+            <input id="departureTimeInput" type="time" step="600" />
+          </label>
+          <button id="useDefaultDepartureBtn" class="secondary drive-time-small-btn" type="button">Use default (Wed 10:00)</button>
         </div>
         <div class="drive-time-save-controls">
           <div class="drive-time-option-row">

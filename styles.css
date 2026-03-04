@@ -887,6 +887,26 @@ body.lightbox-open {
   align-items: end;
 }
 
+.drive-time-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.drive-time-small-btn {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+}
+
+.drive-time-custom-time {
+  margin-top: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 180px 150px auto;
+  align-items: end;
+}
+
 .drive-time-save-controls {
   margin-top: 10px;
   display: grid;
@@ -1269,6 +1289,15 @@ body.lightbox-open {
   }
 
   .drive-time-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .drive-time-action-group {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .drive-time-custom-time {
     grid-template-columns: 1fr;
   }
 

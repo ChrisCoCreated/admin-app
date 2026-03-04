@@ -10,6 +10,8 @@ const MIN_RADIUS_METERS = 2000;
 const MAX_RADIUS_METERS = 50000;
 const ROUTE_CALL_CONCURRENCY = 2;
 const DEPARTURE_LEAD_SECONDS = 120;
+const DEFAULT_DEPARTURE_WEEKDAY = 3; // Wednesday
+const DEFAULT_DEPARTURE_HOUR = 10;
 
 function normalizeLocationQuery(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -30,6 +32,41 @@ function toDegrees(radians) {
 function parseDurationSeconds(durationValue) {
   const seconds = Number.parseInt(String(durationValue || "").replace("s", ""), 10);
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
+
+function getDefaultDepartureTimeIso() {
+  const now = new Date();
+  const nowMs = now.getTime();
+  const weekday = now.getDay();
+  const dayOffset = (DEFAULT_DEPARTURE_WEEKDAY - weekday + 7) % 7;
+  let candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, DEFAULT_DEPARTURE_HOUR, 0, 0, 0);
+  if (candidate.getTime() <= nowMs + DEPARTURE_LEAD_SECONDS * 1000) {
+    candidate = new Date(
+      candidate.getFullYear(),
+      candidate.getMonth(),
+      candidate.getDate() + 7,
+      DEFAULT_DEPARTURE_HOUR,
+      0,
+      0,
+      0
+    );
+  }
+  return candidate.toISOString();
+}
+
+function resolveDepartureTime(requestedValue) {
+  const requested = String(requestedValue || "").trim();
+  if (!requested) {
+    return getDefaultDepartureTimeIso();
+  }
+  const date = new Date(requested);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid departureTime.");
+  }
+  if (date.getTime() <= Date.now() + DEPARTURE_LEAD_SECONDS * 1000) {
+    throw new Error("departureTime must be set in the future.");
+  }
+  return date.toISOString();
 }
 
 function buildBearings() {
@@ -221,7 +258,13 @@ module.exports = async (req, res) => {
   const targetSeconds = minutes * 60;
   const fallbackSpeedMetersPerSecond = 16.7; // ~60 km/h fallback
   const fallbackDistanceMeters = clamp(targetSeconds * fallbackSpeedMetersPerSecond, MIN_RADIUS_METERS, MAX_RADIUS_METERS);
-  const departureTime = new Date(Date.now() + DEPARTURE_LEAD_SECONDS * 1000).toISOString();
+  let departureTime = "";
+  try {
+    departureTime = resolveDepartureTime(req.body?.departureTime);
+  } catch (error) {
+    res.status(400).json({ error: error?.message || "Invalid departureTime." });
+    return;
+  }
   const bearings = buildBearings();
 
   try {

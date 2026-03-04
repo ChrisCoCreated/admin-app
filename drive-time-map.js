@@ -6,6 +6,11 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const signOutBtn = document.getElementById("signOutBtn");
 const locationInput = document.getElementById("locationInput");
 const driveTimeMinutesInput = document.getElementById("driveTimeMinutesInput");
+const customDepartureBtn = document.getElementById("customDepartureBtn");
+const customDepartureWrap = document.getElementById("customDepartureWrap");
+const departureDateInput = document.getElementById("departureDateInput");
+const departureTimeInput = document.getElementById("departureTimeInput");
+const useDefaultDepartureBtn = document.getElementById("useDefaultDepartureBtn");
 const searchNameInput = document.getElementById("searchNameInput");
 const drawDriveTimeBtn = document.getElementById("drawDriveTimeBtn");
 const saveSearchBtn = document.getElementById("saveSearchBtn");
@@ -34,6 +39,9 @@ const GEOCODE_CACHE_KEY = "thrive.drivetime.geocode.v1";
 const DEFAULT_DRIVE_TIME_MINUTES = 20;
 const MIN_DRIVE_TIME_MINUTES = 1;
 const MAX_DRIVE_TIME_MINUTES = 240;
+const DEPARTURE_LEAD_MS = 120 * 1000;
+const DEFAULT_DEPARTURE_WEEKDAY = 3; // Wednesday
+const DEFAULT_DEPARTURE_HOUR = 10;
 const OVERLAY_BATCH_SIZE = 300;
 const MIN_POLYGON_POINTS = 3;
 const AREA_COLORS = [
@@ -59,6 +67,7 @@ const peopleOverlayLayers = new Map();
 let overlayStatusSet = new Set();
 let overlayLoaded = false;
 let geocodeCache = {};
+let useCustomDepartureTime = false;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -124,6 +133,100 @@ function resolveDriveTimeMinutes() {
     driveTimeMinutesInput.value = String(minutes);
   }
   return minutes;
+}
+
+function toDateInputValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toTimeInputValue(date) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const mins = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${mins}`;
+}
+
+function getDefaultDepartureDate() {
+  const now = new Date();
+  const nowMs = now.getTime();
+  const currentWeekday = now.getDay();
+  let dayOffset = (DEFAULT_DEPARTURE_WEEKDAY - currentWeekday + 7) % 7;
+  let candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, DEFAULT_DEPARTURE_HOUR, 0, 0, 0);
+  if (candidate.getTime() <= nowMs + DEPARTURE_LEAD_MS) {
+    candidate = new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate() + 7, DEFAULT_DEPARTURE_HOUR, 0, 0, 0);
+  }
+  return candidate;
+}
+
+function ensureDefaultDepartureInputs() {
+  const candidate = getDefaultDepartureDate();
+  if (departureDateInput) {
+    departureDateInput.value = toDateInputValue(candidate);
+  }
+  if (departureTimeInput) {
+    departureTimeInput.value = toTimeInputValue(candidate);
+  }
+}
+
+function parseCustomDepartureDate() {
+  const rawDate = String(departureDateInput?.value || "").trim();
+  const rawTime = String(departureTimeInput?.value || "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(rawDate);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(rawTime);
+  if (!match || !timeMatch) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const hours = Number(timeMatch[1]);
+  const mins = Number(timeMatch[2]);
+  const date = new Date(year, month, day, hours, mins, 0, 0);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDepartureLabel(date) {
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function setCustomDepartureVisibility(isVisible) {
+  useCustomDepartureTime = isVisible;
+  if (customDepartureWrap) {
+    customDepartureWrap.hidden = !isVisible;
+  }
+  if (customDepartureBtn) {
+    customDepartureBtn.textContent = isVisible ? "Hide custom" : "Custom time";
+  }
+}
+
+function resolveDepartureTime() {
+  if (useCustomDepartureTime) {
+    const custom = parseCustomDepartureDate();
+    if (!custom) {
+      throw new Error("Enter a valid custom date and time.");
+    }
+    if (custom.getTime() <= Date.now() + DEPARTURE_LEAD_MS) {
+      throw new Error("Custom time must be in the future.");
+    }
+    return {
+      iso: custom.toISOString(),
+      label: formatDepartureLabel(custom),
+    };
+  }
+
+  const defaultDeparture = getDefaultDepartureDate();
+  return {
+    iso: defaultDeparture.toISOString(),
+    label: formatDepartureLabel(defaultDeparture),
+  };
 }
 
 function createSearchId() {
@@ -1148,8 +1251,15 @@ async function drawDriveTimeArea() {
     return;
   }
   const minutes = resolveDriveTimeMinutes();
+  let departure = null;
+  try {
+    departure = resolveDepartureTime();
+  } catch (error) {
+    setStatus(error?.message || "Invalid departure time.", true);
+    return;
+  }
   setBusy(true);
-  setStatus(`Calculating ${minutes}-minute drive-time area...`);
+  setStatus(`Calculating ${minutes}-minute drive-time area (${departure.label})...`);
   if (driveTimeMeta) {
     driveTimeMeta.textContent = "";
   }
@@ -1163,6 +1273,7 @@ async function drawDriveTimeArea() {
       body: JSON.stringify({
         location,
         minutes,
+        departureTime: departure.iso,
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -1188,7 +1299,9 @@ async function drawDriveTimeArea() {
     if (searchNameInput) {
       searchNameInput.value = currentResult.formattedAddress || currentResult.query;
     }
-    setStatus(`Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location}.`);
+    setStatus(
+      `Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location} (${departure.label}).`
+    );
     if (driveTimeMeta) {
       driveTimeMeta.textContent = formatQualityText(data.quality);
     }
@@ -1231,6 +1344,8 @@ async function init() {
     }
     loadGeocodeCache();
     loadSavedSearches();
+    ensureDefaultDepartureInputs();
+    setCustomDepartureVisibility(false);
     updateSaveButtonLabel();
     renderSavedSearches();
     syncAllSearchLayers();
@@ -1313,6 +1428,20 @@ locationInput?.addEventListener("keydown", (event) => {
 
 driveTimeMinutesInput?.addEventListener("change", () => {
   resolveDriveTimeMinutes();
+});
+
+customDepartureBtn?.addEventListener("click", () => {
+  const nextVisible = !useCustomDepartureTime;
+  setCustomDepartureVisibility(nextVisible);
+  if (nextVisible && (!departureDateInput?.value || !departureTimeInput?.value)) {
+    ensureDefaultDepartureInputs();
+  }
+});
+
+useDefaultDepartureBtn?.addEventListener("click", () => {
+  ensureDefaultDepartureInputs();
+  setCustomDepartureVisibility(false);
+  setStatus("Using default measurement time: Wednesday 10:00.");
 });
 
 signOutBtn?.addEventListener("click", async () => {
