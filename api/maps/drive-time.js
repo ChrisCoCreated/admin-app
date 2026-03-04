@@ -5,14 +5,14 @@ const GOOGLE_ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRo
 const EARTH_RADIUS_METERS = 6371000;
 const TARGET_MINUTES = 20;
 const ANGLE_STEP_DEGREES = 15;
-const BASE_RADIUS_METERS = 30000;
 const MIN_RADIUS_METERS = 2000;
 const BASE_MAX_RADIUS_METERS = 50000;
 const ROUTE_CALL_CONCURRENCY = 2;
 const DEPARTURE_LEAD_SECONDS = 120;
 const DEFAULT_DEPARTURE_WEEKDAY = 3; // Wednesday
 const DEFAULT_DEPARTURE_HOUR = 10;
-const ISOCHRONE_SOLVER_PASSES = 8;
+const RADIAL_MAX_ATTEMPTS = 3;
+const RADIAL_SEED_DISTANCE_METERS = 16093.4; // 10 miles
 
 function normalizeLocationQuery(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -99,18 +99,6 @@ function destinationPoint(origin, bearingDegrees, distanceMeters) {
     latitude: toDegrees(lat2),
     longitude: toDegrees(lon2),
   };
-}
-
-function smoothDistances(values) {
-  if (!Array.isArray(values) || values.length < 3) {
-    return values;
-  }
-
-  return values.map((value, index) => {
-    const prev = values[(index - 1 + values.length) % values.length];
-    const next = values[(index + 1) % values.length];
-    return (prev + value + next) / 3;
-  });
 }
 
 async function geocodeLocation(query, apiKey, region) {
@@ -243,60 +231,71 @@ async function solveDirectionalDistances({
   apiKey,
   departureTime,
 }) {
-  let distances = bearings.map(() => clamp(initialRadiusMeters, minRadiusMeters, maxRadiusMeters));
-  const failuresByDirection = new Array(bearings.length).fill(false);
-  const inBandByDirection = new Array(bearings.length).fill(false);
-  let latestDurations = new Array(bearings.length).fill(0);
+  const distances = new Array(bearings.length).fill(0);
+  const latestDurations = new Array(bearings.length).fill(0);
+  const finalInBandByDirection = new Array(bearings.length).fill(false);
+  const unresolvedByDirection = new Array(bearings.length).fill(true);
+  const attemptsByDirection = new Array(bearings.length).fill(0);
+  const statusByDirection = new Array(bearings.length).fill("unresolved");
 
-  for (let pass = 0; pass < ISOCHRONE_SOLVER_PASSES; pass += 1) {
-    const destinations = bearings.map((bearing, index) => destinationPoint(center, bearing, distances[index]));
-    const sample = await computeDurationsForDestinations(center, destinations, apiKey, departureTime);
-    latestDurations = sample.durations;
+  async function solveRadial(index) {
+    const bearing = bearings[index];
+    let distance = clamp(initialRadiusMeters, minRadiusMeters, maxRadiusMeters);
+    let bestDuration = 0;
+    let bestDistance = distance;
+    let attemptCount = 0;
 
-    const nextDistances = bearings.map((_, index) => {
-      const durationSeconds = Number(latestDurations[index] || 0);
-      const currentDistance = distances[index];
+    for (let attempt = 0; attempt < RADIAL_MAX_ATTEMPTS; attempt += 1) {
+      attemptCount = attempt + 1;
+      const destination = destinationPoint(center, bearing, distance);
+      const sample = await computeDurationsForDestinations(center, [destination], apiKey, departureTime);
+      const durationSeconds = Number(sample.durations?.[0] || 0);
       if (!durationSeconds) {
-        failuresByDirection[index] = true;
-        inBandByDirection[index] = false;
-        // Expand cautiously for another attempt next pass.
-        return clamp(currentDistance * 1.18, minRadiusMeters, maxRadiusMeters);
+        distance = clamp(distance * 1.2, minRadiusMeters, maxRadiusMeters);
+        continue;
       }
 
-      failuresByDirection[index] = false;
+      bestDuration = durationSeconds;
+      bestDistance = distance;
       if (durationSeconds >= bandMinSeconds && durationSeconds <= bandMaxSeconds) {
-        inBandByDirection[index] = true;
-        return currentDistance;
+        attemptsByDirection[index] = attemptCount;
+        latestDurations[index] = durationSeconds;
+        distances[index] = distance;
+        finalInBandByDirection[index] = true;
+        unresolvedByDirection[index] = false;
+        statusByDirection[index] = "in_band";
+        return;
       }
 
-      inBandByDirection[index] = false;
       const ratio = bandTargetSeconds / Math.max(durationSeconds, 1);
-      const damp = pass < ISOCHRONE_SOLVER_PASSES - 2 ? 0.72 : 0.9;
-      const scaledRatio = 1 + (ratio - 1) * damp;
-      return clamp(currentDistance * scaledRatio, minRadiusMeters, maxRadiusMeters);
-    });
+      const scaledRatio = 1 + (ratio - 1) * 0.8;
+      distance = clamp(distance * scaledRatio, minRadiusMeters, maxRadiusMeters);
+    }
 
-    distances = smoothDistances(nextDistances).map((distance) =>
-      clamp(distance, minRadiusMeters, maxRadiusMeters)
-    );
-
-    if (inBandByDirection.every(Boolean)) {
-      break;
+    // Keep last valid sample as diagnostic, but mark as out-of-band.
+    attemptsByDirection[index] = attemptCount;
+    if (bestDuration > 0) {
+      latestDurations[index] = bestDuration;
+      distances[index] = bestDistance;
+      unresolvedByDirection[index] = false;
+      statusByDirection[index] = bestDuration < bandMinSeconds ? "below_band" : "above_band";
+    } else {
+      statusByDirection[index] = "unresolved";
     }
   }
 
-  // Final in-band check using last sampled durations.
-  const finalInBandByDirection = inBandByDirection.map((isInBand, index) => {
-    const durationSeconds = Number(latestDurations[index] || 0);
-    return durationSeconds > 0 && durationSeconds >= bandMinSeconds && durationSeconds <= bandMaxSeconds && isInBand;
-  });
-  const unresolvedByDirection = failuresByDirection.map((failed, index) => failed || !Number(latestDurations[index] || 0));
+  for (let offset = 0; offset < bearings.length; offset += ROUTE_CALL_CONCURRENCY) {
+    const batch = bearings.slice(offset, offset + ROUTE_CALL_CONCURRENCY);
+    await Promise.all(batch.map((_, localIndex) => solveRadial(offset + localIndex)));
+  }
 
   return {
     distances,
     durations: latestDurations,
     inBandByDirection: finalInBandByDirection,
     unresolvedByDirection,
+    attemptsByDirection,
+    statusByDirection,
   };
 }
 
@@ -355,7 +354,7 @@ module.exports = async (req, res) => {
       bandTargetSeconds,
       minRadiusMeters: MIN_RADIUS_METERS,
       maxRadiusMeters: dynamicMaxRadiusMeters,
-      initialRadiusMeters: BASE_RADIUS_METERS,
+      initialRadiusMeters: RADIAL_SEED_DISTANCE_METERS,
       apiKey,
       departureTime,
     });
@@ -384,6 +383,24 @@ module.exports = async (req, res) => {
     const inBandDurations = solved.durations.filter((duration, index) => solved.inBandByDirection[index] && Number(duration) > 0);
     const unresolvedDirections = solved.unresolvedByDirection.filter(Boolean).length;
     const inBandDirections = solved.inBandByDirection.filter(Boolean).length;
+    const attemptsHistogram = { "0": 0, "1": 0, "2": 0, "3": 0 };
+    for (const attempts of solved.attemptsByDirection) {
+      const key = String(Math.max(0, Math.min(RADIAL_MAX_ATTEMPTS, Number(attempts) || 0)));
+      attemptsHistogram[key] = (attemptsHistogram[key] || 0) + 1;
+    }
+    const radialDiagnostics = bearings.map((bearing, index) => ({
+      bearingDegrees: bearing,
+      attempts: Number(solved.attemptsByDirection[index] || 0),
+      status: solved.statusByDirection[index],
+      durationMinutes:
+        Number(solved.durations[index] || 0) > 0
+          ? Math.round((Number(solved.durations[index]) / 60) * 10) / 10
+          : null,
+      distanceMiles:
+        Number(solved.distances[index] || 0) > 0
+          ? Math.round((Number(solved.distances[index]) * 0.000621371) * 100) / 100
+          : null,
+    }));
 
     const minMinutes = inBandDurations.length
       ? Math.round((Math.min(...inBandDurations) / 60) * 10) / 10
@@ -409,6 +426,8 @@ module.exports = async (req, res) => {
         maxDurationMinutes: maxMinutes,
         bandMinMinutes,
         bandMaxMinutes,
+        radialAttemptsHistogram: attemptsHistogram,
+        radialDiagnostics,
       },
     });
   } catch (error) {
