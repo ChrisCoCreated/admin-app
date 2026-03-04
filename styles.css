@@ -996,6 +996,16 @@ body.lightbox-open {
   font-size: 0.82rem;
 }
 
+.drive-time-color-select {
+  min-height: 30px;
+  border-radius: 8px;
+  border: 1px solid #c8d2e4;
+  background: #fff;
+  color: #1d2a42;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+
 .drive-time-vertex-icon {
   width: 12px;
   height: 12px;

@@ -44,6 +44,7 @@ const AREA_COLORS = [
   { stroke: "#4a4f9a", fill: "#8ea1ff" },
   { stroke: "#2f6b2a", fill: "#89c46b" },
 ];
+const AREA_COLOR_LABELS = ["Brand Cyan", "Brand Pink", "Brand Mint", "Warm Sand", "Soft Indigo", "Leaf Green"];
 
 let map = null;
 let previewMarker = null;
@@ -134,6 +135,10 @@ function createSearchId() {
 
 function getColorByIndex(index) {
   return AREA_COLORS[index % AREA_COLORS.length];
+}
+
+function getColorLabel(index) {
+  return AREA_COLOR_LABELS[index] || `Colour ${index + 1}`;
 }
 
 function sanitizePolygon(points) {
@@ -924,6 +929,24 @@ function renderSavedSearches() {
     const actions = document.createElement("div");
     actions.className = "drive-time-search-actions";
 
+    const colourSelect = document.createElement("select");
+    colourSelect.className = "drive-time-color-select";
+    colourSelect.setAttribute("aria-label", `Colour for ${search.name}`);
+    for (let i = 0; i < AREA_COLORS.length; i += 1) {
+      const option = document.createElement("option");
+      option.value = String(i);
+      option.textContent = getColorLabel(i);
+      colourSelect.appendChild(option);
+    }
+    colourSelect.value = String(Math.max(0, Number(search.colorIndex || 0) % AREA_COLORS.length));
+    colourSelect.addEventListener("change", () => {
+      search.colorIndex = Number(colourSelect.value);
+      persistSavedSearches();
+      syncSearchLayer(search);
+      renderSavedSearches();
+      setStatus(`Updated colour for '${search.name}'.`);
+    });
+
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.className = "secondary";
@@ -979,7 +1002,7 @@ function renderSavedSearches() {
       setStatus(`Removed '${search.name}'.`);
     });
 
-    actions.append(editBtn, focusBtn, removeBtn);
+    actions.append(colourSelect, editBtn, focusBtn, removeBtn);
     li.append(visibilityLabel, actions);
     savedSearchesList.appendChild(li);
   }
