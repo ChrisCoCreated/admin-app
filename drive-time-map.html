@@ -34,27 +34,21 @@
 
     <main class="container drive-time-main">
       <section class="hero compact">
-        <h1>Drive-Time Map</h1>
-        <p>Draw a drive-time area around any location using Google APIs.</p>
+        <h1>Drive-Time Catchment</h1>
+        <p>Office-centric mode: click towns/villages to test and grow the catchment.</p>
       </section>
 
       <section class="panel">
-        <div class="drive-time-controls">
+        <div class="drive-time-controls office-catchment-controls">
           <label class="field" for="locationInput">
-            Location
-            <input
-              id="locationInput"
-              type="text"
-              placeholder="e.g. London Bridge, London"
-              autocomplete="street-address"
-            />
+            Office location
+            <input id="locationInput" type="text" readonly />
           </label>
           <label class="field" for="driveTimeMinutesInput">
-            Drive time (minutes)
+            Threshold (minutes)
             <input id="driveTimeMinutesInput" type="number" min="1" max="240" step="1" value="20" />
           </label>
           <div class="drive-time-action-group">
-            <button id="drawDriveTimeBtn" type="button">Draw area</button>
             <button id="customDepartureBtn" class="secondary drive-time-small-btn" type="button">Custom time</button>
           </div>
         </div>
@@ -69,23 +63,27 @@
           </label>
           <button id="useDefaultDepartureBtn" class="secondary drive-time-small-btn" type="button">Use default (Wed 10:00)</button>
         </div>
-        <div class="drive-time-save-controls">
+        <div class="drive-time-save-controls office-catchment-save-controls">
           <div class="drive-time-option-row">
-            <span class="muted">Edit area before save: drag points, click area to add point, right-click point to delete.</span>
+            <span class="muted">Click the map to test travel time from office. If accepted, the catchment grows. Polygon points are editable before save.</span>
           </div>
           <label class="field drive-time-name-field" for="searchNameInput">
             Search name (optional)
-            <input
-              id="searchNameInput"
-              type="text"
-              placeholder="e.g. North Team Catchment"
-              autocomplete="off"
-            />
+            <input id="searchNameInput" type="text" placeholder="e.g. Canterbury 20-min coverage" autocomplete="off" />
           </label>
           <button id="saveSearchBtn" class="secondary drive-time-save-btn" type="button" disabled>Save search</button>
         </div>
-        <p id="driveTimeStatus" class="muted">Enter a location to calculate.</p>
+        <p id="driveTimeStatus" class="muted">Click map to test a town/village from office.</p>
         <p id="driveTimeMeta" class="muted"></p>
+      </section>
+
+      <section class="panel">
+        <div class="row">
+          <h2>Accepted Places</h2>
+          <button id="clearAcceptedPlacesBtn" class="secondary" type="button" disabled>Clear all</button>
+        </div>
+        <ul id="acceptedPlacesList" class="drive-time-search-list"></ul>
+        <p id="noAcceptedPlacesMessage" class="muted">No accepted places yet.</p>
       </section>
 
       <section class="panel">

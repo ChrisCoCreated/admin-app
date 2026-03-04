@@ -12,8 +12,10 @@ const departureDateInput = document.getElementById("departureDateInput");
 const departureTimeInput = document.getElementById("departureTimeInput");
 const useDefaultDepartureBtn = document.getElementById("useDefaultDepartureBtn");
 const searchNameInput = document.getElementById("searchNameInput");
-const drawDriveTimeBtn = document.getElementById("drawDriveTimeBtn");
 const saveSearchBtn = document.getElementById("saveSearchBtn");
+const clearAcceptedPlacesBtn = document.getElementById("clearAcceptedPlacesBtn");
+const acceptedPlacesList = document.getElementById("acceptedPlacesList");
+const noAcceptedPlacesMessage = document.getElementById("noAcceptedPlacesMessage");
 const showAllSearchesBtn = document.getElementById("showAllSearchesBtn");
 const hideAllSearchesBtn = document.getElementById("hideAllSearchesBtn");
 const exportSearchesBtn = document.getElementById("exportSearchesBtn");
@@ -32,9 +34,13 @@ const driveTimeMeta = document.getElementById("driveTimeMeta");
 const driveTimeMapRoot = document.getElementById("driveTimeMap");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
-const DRIVE_TIME_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/drive-time` : "/api/maps/drive-time";
+const OFFICE_CATCHMENT_ENDPOINT = API_BASE_URL
+  ? `${API_BASE_URL}/api/maps/office-catchment/check-click`
+  : "/api/maps/office-catchment/check-click";
 const GEOCODE_BATCH_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/geocode-batch` : "/api/maps/geocode-batch";
-const SAVED_SEARCHES_KEY = "thrive.drivetime.saved.v1";
+const USE_OFFICE_CATCHMENT_MODE = FRONTEND_CONFIG.useOfficeCatchmentMode !== false;
+const SAVED_SEARCHES_KEY = "thrive.drivetime.saved.v2";
+const LEGACY_SAVED_SEARCHES_KEY = "thrive.drivetime.saved.v1";
 const GEOCODE_CACHE_KEY = "thrive.drivetime.geocode.v1";
 const DEFAULT_DRIVE_TIME_MINUTES = 20;
 const MIN_DRIVE_TIME_MINUTES = 1;
@@ -54,11 +60,18 @@ const AREA_COLORS = [
 ];
 const AREA_COLOR_LABELS = ["Brand Cyan", "Brand Pink", "Brand Mint", "Warm Sand", "Soft Indigo", "Leaf Green"];
 
+const OFFICE = {
+  name: String(FRONTEND_CONFIG.mapOffice?.name || "Canterbury Office"),
+  postcode: String(FRONTEND_CONFIG.mapOffice?.postcode || "CT1"),
+  lat: Number(FRONTEND_CONFIG.mapOffice?.lat ?? 51.2802),
+  lng: Number(FRONTEND_CONFIG.mapOffice?.lng ?? 1.0789),
+};
+
 let map = null;
-let previewMarker = null;
+let officeMarker = null;
 let previewPolygon = null;
 let previewVertexMarkers = [];
-let currentResult = null;
+let currentAcceptedMarkers = [];
 let editingSearchId = null;
 let savedSearches = [];
 const areaLayers = new Map();
@@ -68,12 +81,24 @@ let overlayStatusSet = new Set();
 let overlayLoaded = false;
 let geocodeCache = {};
 let useCustomDepartureTime = false;
+let currentCatchment = createEmptyCatchment();
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
 });
 const directoryApi = createDirectoryApi(authController);
+
+function createEmptyCatchment() {
+  return {
+    office: { ...OFFICE },
+    thresholdMinutes: DEFAULT_DRIVE_TIME_MINUTES,
+    acceptedPlaces: [],
+    polygon: [],
+    departureTimeMode: "default",
+    departureTime: null,
+  };
+}
 
 function setStatus(message, isError = false) {
   if (!driveTimeStatus) {
@@ -84,19 +109,28 @@ function setStatus(message, isError = false) {
 }
 
 function setBusy(isBusy) {
-  if (drawDriveTimeBtn) {
-    drawDriveTimeBtn.disabled = isBusy;
-  }
   if (saveSearchBtn) {
-    saveSearchBtn.disabled = isBusy || !currentResult;
+    saveSearchBtn.disabled = isBusy || !canSaveCurrentCatchment();
   }
 }
 
-function updateSaveButtonLabel() {
+function canSaveCurrentCatchment() {
+  return Array.isArray(currentCatchment?.acceptedPlaces) && currentCatchment.acceptedPlaces.length > 0;
+}
+
+function updateSaveButtonState() {
   if (!saveSearchBtn) {
     return;
   }
+  saveSearchBtn.disabled = !canSaveCurrentCatchment();
   saveSearchBtn.textContent = editingSearchId ? "Update area" : "Save search";
+}
+
+function updateClearAcceptedButtonState() {
+  if (!clearAcceptedPlacesBtn) {
+    return;
+  }
+  clearAcceptedPlacesBtn.disabled = !(currentCatchment?.acceptedPlaces?.length > 0);
 }
 
 function redirectToUnauthorized(pageKey) {
@@ -132,6 +166,7 @@ function resolveDriveTimeMinutes() {
   if (driveTimeMinutesInput) {
     driveTimeMinutesInput.value = String(minutes);
   }
+  currentCatchment.thresholdMinutes = minutes;
   return minutes;
 }
 
@@ -219,6 +254,7 @@ function resolveDepartureTime() {
     return {
       iso: custom.toISOString(),
       label: formatDepartureLabel(custom),
+      mode: "custom",
     };
   }
 
@@ -226,6 +262,7 @@ function resolveDepartureTime() {
   return {
     iso: defaultDeparture.toISOString(),
     label: formatDepartureLabel(defaultDeparture),
+    mode: "default",
   };
 }
 
@@ -256,30 +293,95 @@ function sanitizePolygon(points) {
     .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
 }
 
-function sanitizeSavedSearch(raw, fallbackIndex = 0) {
-  const polygon = sanitizePolygon(raw?.polygon);
-  const centerLat = Number(raw?.center?.lat);
-  const centerLng = Number(raw?.center?.lng);
-  if (!polygon.length || !Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
-    return null;
+function sanitizeAcceptedPlaces(points) {
+  if (!Array.isArray(points)) {
+    return [];
   }
+  return points
+    .map((point) => ({
+      key: normalizeSearchName(point?.key || ""),
+      name: normalizeSearchName(point?.name || point?.formattedAddress || "Unknown location"),
+      postcode: normalizeSearchName(point?.postcode || ""),
+      formattedAddress: normalizeSearchName(point?.formattedAddress || point?.name || ""),
+      lat: Number(point?.lat),
+      lng: Number(point?.lng),
+      durationMinutes: Number(point?.durationMinutes),
+      distanceMiles: Number(point?.distanceMiles),
+    }))
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng) && point.key);
+}
 
-  const colorIndex = Number(raw?.colorIndex);
+function sanitizeOffice(rawOffice) {
+  const lat = Number(rawOffice?.lat);
+  const lng = Number(rawOffice?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return { ...OFFICE };
+  }
   return {
-    id: String(raw?.id || createSearchId()),
-    name: normalizeSearchName(raw?.name || raw?.formattedAddress || `Saved area ${fallbackIndex + 1}`),
-    query: normalizeSearchName(raw?.query || ""),
-    formattedAddress: normalizeSearchName(raw?.formattedAddress || ""),
-    minutes: clampMinutes(raw?.minutes),
-    center: { lat: centerLat, lng: centerLng },
-    polygon,
-    quality: raw?.quality || null,
-    createdAt: String(raw?.createdAt || new Date().toISOString()),
-    visible: raw?.visible !== false,
-    colorIndex: Number.isInteger(colorIndex) && colorIndex >= 0 ? colorIndex : fallbackIndex,
+    name: normalizeSearchName(rawOffice?.name || OFFICE.name),
+    postcode: normalizeSearchName(rawOffice?.postcode || ""),
+    lat,
+    lng,
   };
 }
 
+function sanitizeSavedSearch(raw, fallbackIndex = 0) {
+  const colorIndex = Number(raw?.colorIndex);
+  const common = {
+    id: String(raw?.id || createSearchId()),
+    name: normalizeSearchName(raw?.name || "") || `Saved area ${fallbackIndex + 1}`,
+    savedAt: String(raw?.savedAt || raw?.createdAt || new Date().toISOString()),
+    visible: raw?.visible !== false,
+    colorIndex: Number.isInteger(colorIndex) && colorIndex >= 0 ? colorIndex : fallbackIndex,
+  };
+
+  const office = raw?.office ? sanitizeOffice(raw.office) : null;
+  const acceptedPlaces = sanitizeAcceptedPlaces(raw?.acceptedPlaces);
+  const polygon = sanitizePolygon(raw?.polygon);
+  const thresholdMinutes = clampMinutes(raw?.thresholdMinutes ?? raw?.minutes);
+
+  if (office) {
+    return {
+      ...common,
+      mode: "office",
+      office,
+      thresholdMinutes,
+      departureTimeMode: raw?.departureTimeMode === "custom" ? "custom" : "default",
+      departureTime: normalizeSearchName(raw?.departureTime || "") || null,
+      acceptedPlaces,
+      polygon,
+      qualitySummary: raw?.qualitySummary || null,
+      formattedAddress: normalizeSearchName(raw?.formattedAddress || office.name),
+      query: normalizeSearchName(raw?.query || office.name),
+    };
+  }
+
+  // Legacy radial shape support in read/edit mode.
+  const legacyCenterLat = Number(raw?.center?.lat);
+  const legacyCenterLng = Number(raw?.center?.lng);
+  if (!polygon.length || !Number.isFinite(legacyCenterLat) || !Number.isFinite(legacyCenterLng)) {
+    return null;
+  }
+
+  return {
+    ...common,
+    mode: "legacy",
+    office: {
+      name: normalizeSearchName(raw?.formattedAddress || raw?.query || "Legacy area center"),
+      postcode: "",
+      lat: legacyCenterLat,
+      lng: legacyCenterLng,
+    },
+    thresholdMinutes,
+    departureTimeMode: "default",
+    departureTime: null,
+    acceptedPlaces: [],
+    polygon,
+    qualitySummary: raw?.quality || null,
+    formattedAddress: normalizeSearchName(raw?.formattedAddress || ""),
+    query: normalizeSearchName(raw?.query || ""),
+  };
+}
 
 function loadSavedSearches() {
   try {
@@ -290,6 +392,17 @@ function loadSavedSearches() {
       .map((entry, index) => sanitizeSavedSearch(entry, index))
       .filter(Boolean)
       .slice(0, 100);
+
+    if (!savedSearches.length) {
+      const legacyRaw = localStorage.getItem(LEGACY_SAVED_SEARCHES_KEY);
+      const legacyParsed = legacyRaw ? JSON.parse(legacyRaw) : [];
+      const legacyItems = Array.isArray(legacyParsed) ? legacyParsed : [];
+      savedSearches = legacyItems
+        .map((entry, index) => sanitizeSavedSearch(entry, index))
+        .filter(Boolean)
+        .slice(0, 100);
+      persistSavedSearches();
+    }
   } catch {
     savedSearches = [];
   }
@@ -587,14 +700,12 @@ function buildOverlayItems(clientsPayload, carersPayload) {
 
 async function geocodeOverlayItems(items) {
   const queries = [];
-  const queryToKey = new Map();
   for (const item of items) {
     const query = normalizeLocation(item.geocodeQuery);
     if (!query) {
       continue;
     }
     const cacheKey = query.toLowerCase();
-    queryToKey.set(query, cacheKey);
     if (!geocodeCache[cacheKey]) {
       queries.push(query);
     }
@@ -712,100 +823,85 @@ function initMap() {
   map = window.L.map(driveTimeMapRoot, {
     zoomControl: true,
     attributionControl: true,
-  }).setView([51.2802, 1.0789], 11);
+  }).setView([OFFICE.lat, OFFICE.lng], 11);
 
   window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(map);
-}
 
-function formatQualityText(quality) {
-  const inBandDirections = Number(quality?.inBandDirections || 0);
-  const unresolvedDirections = Number(quality?.unresolvedDirections || 0);
-  const successfulDirections = Number(quality?.successfulDirections || 0);
-  const sampledDirections = Number(quality?.sampledDirections || 0);
-  const minMinutes = quality?.minDurationMinutes;
-  const maxMinutes = quality?.maxDurationMinutes;
-  const bandMin = Number(quality?.bandMinMinutes);
-  const bandMax = Number(quality?.bandMaxMinutes);
-  const bandText =
-    Number.isFinite(bandMin) && Number.isFinite(bandMax) ? `${bandMin}-${bandMax} min band` : "target band";
-  const rangeText =
-    Number.isFinite(minMinutes) && Number.isFinite(maxMinutes)
-      ? `resolved range: ${minMinutes}-${maxMinutes} mins`
-      : "resolved range unavailable";
-
-  if (inBandDirections > 0 || unresolvedDirections > 0) {
-    return `${inBandDirections}/${sampledDirections} directions in ${bandText}, ${unresolvedDirections} unresolved hidden, ${rangeText}.`;
-  }
-  return `${successfulDirections}/${sampledDirections} directions resolved, ${rangeText}.`;
-}
-
-function renderPreview(payload) {
-  if (!map || !window.L) {
-    throw new Error("Map is not available.");
-  }
-
-  const center = payload?.center;
-  const polygonPoints = Array.isArray(payload?.polygon) ? payload.polygon : [];
-  if (!center || typeof center.lat !== "number" || typeof center.lng !== "number" || !polygonPoints.length) {
-    throw new Error("Drive-time response was missing map coordinates.");
-  }
-
-  if (previewMarker) {
-    previewMarker.remove();
-  }
-  if (previewPolygon) {
-    previewPolygon.remove();
-  }
-
-  previewMarker = window.L.marker([center.lat, center.lng], {
-    draggable: true,
-    title: payload?.formattedAddress || "Selected location",
+  officeMarker = window.L.marker([OFFICE.lat, OFFICE.lng], {
+    title: `${OFFICE.name}${OFFICE.postcode ? ` (${OFFICE.postcode})` : ""}`,
+    keyboard: false,
   }).addTo(map);
-  previewMarker.on("drag", (event) => {
-    if (!currentResult || !Array.isArray(currentResult.polygon) || !currentResult.polygon.length) {
+  officeMarker.bindPopup(`<strong>${escapeHtml(OFFICE.name)}</strong><br/>${escapeHtml(OFFICE.postcode)}`);
+
+  map.on("click", (event) => {
+    if (!USE_OFFICE_CATCHMENT_MODE) {
       return;
     }
-    const next = event.target.getLatLng();
-    const prevCenter = currentResult.center;
-    const latDelta = next.lat - prevCenter.lat;
-    const lngDelta = next.lng - prevCenter.lng;
-    currentResult.center = { lat: next.lat, lng: next.lng };
-    currentResult.polygon = currentResult.polygon.map((point) => ({
-      lat: point.lat + latDelta,
-      lng: point.lng + lngDelta,
-    }));
-    if (previewPolygon) {
-      previewPolygon.setLatLngs(currentResult.polygon.map((point) => [point.lat, point.lng]));
-    }
-    syncPreviewVertexMarkers();
+    void handleMapClickForCatchment(event.latlng);
   });
+}
 
-  previewPolygon = window.L.polygon(
-    polygonPoints.map((point) => [point.lat, point.lng]),
-    {
-      color: "#1d2a42",
-      weight: 2,
-      opacity: 0.85,
-      dashArray: "5 5",
-      fillColor: "#9db3df",
-      fillOpacity: 0.2,
+function uniqueCoordinatePoints(points) {
+  const seen = new Set();
+  const result = [];
+  for (const point of points) {
+    const lat = Number(point?.lat);
+    const lng = Number(point?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      continue;
     }
-  ).addTo(map);
-  previewPolygon.on("click", (event) => {
-    addPreviewPoint(event.latlng);
-  });
-
-  const polygonBounds = previewPolygon.getBounds();
-  if (polygonBounds.isValid()) {
-    map.fitBounds(polygonBounds.pad(0.15));
-  } else {
-    map.setView([center.lat, center.lng], 11);
+    const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push({ lat, lng });
   }
-  syncPreviewVertexMarkers();
+  return result;
+}
+
+function convexHull(points) {
+  const unique = uniqueCoordinatePoints(points);
+  if (unique.length < 3) {
+    return unique;
+  }
+
+  const sorted = unique.sort((a, b) => (a.lng === b.lng ? a.lat - b.lat : a.lng - b.lng));
+  const cross = (o, a, b) => (a.lng - o.lng) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lng - o.lng);
+
+  const lower = [];
+  for (const point of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+
+  const upper = [];
+  for (let i = sorted.length - 1; i >= 0; i -= 1) {
+    const point = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+
+  lower.pop();
+  upper.pop();
+  return [...lower, ...upper];
+}
+
+function recomputeCurrentHullFromAccepted() {
+  const source = [
+    { lat: currentCatchment.office.lat, lng: currentCatchment.office.lng },
+    ...currentCatchment.acceptedPlaces.map((place) => ({ lat: place.lat, lng: place.lng })),
+  ];
+  const hull = convexHull(source);
+  currentCatchment.polygon = hull.length >= MIN_POLYGON_POINTS ? hull : [];
 }
 
 function clearPreviewVertexMarkers() {
@@ -813,6 +909,58 @@ function clearPreviewVertexMarkers() {
     marker.remove();
   }
   previewVertexMarkers = [];
+}
+
+function clearCurrentAcceptedMarkers() {
+  for (const marker of currentAcceptedMarkers) {
+    marker.remove();
+  }
+  currentAcceptedMarkers = [];
+}
+
+function updatePreviewPolygonShape() {
+  if (!previewPolygon) {
+    return;
+  }
+  previewPolygon.setLatLngs(currentCatchment.polygon.map((point) => [point.lat, point.lng]));
+}
+
+function syncPreviewVertexMarkers() {
+  clearPreviewVertexMarkers();
+  if (!map || !window.L || !Array.isArray(currentCatchment.polygon) || currentCatchment.polygon.length < MIN_POLYGON_POINTS) {
+    return;
+  }
+
+  currentCatchment.polygon.forEach((point, index) => {
+    const marker = window.L.marker([point.lat, point.lng], {
+      draggable: true,
+      keyboard: false,
+      icon: window.L.divIcon({
+        className: "drive-time-vertex-icon",
+        iconSize: [12, 12],
+      }),
+      title: "Drag to reshape. Right-click to delete.",
+    }).addTo(map);
+
+    marker.on("drag", (event) => {
+      const latLng = event.target.getLatLng();
+      currentCatchment.polygon[index] = { lat: latLng.lat, lng: latLng.lng };
+      updatePreviewPolygonShape();
+    });
+
+    marker.on("contextmenu", () => {
+      if (currentCatchment.polygon.length <= MIN_POLYGON_POINTS) {
+        setStatus("Area needs at least 3 points.", true);
+        return;
+      }
+      currentCatchment.polygon.splice(index, 1);
+      updatePreviewPolygonShape();
+      syncPreviewVertexMarkers();
+      setStatus("Point deleted.");
+    });
+
+    previewVertexMarkers.push(marker);
+  });
 }
 
 function findClosestSegmentInsertIndex(points, latlng) {
@@ -849,91 +997,85 @@ function findClosestSegmentInsertIndex(points, latlng) {
   return bestIndex;
 }
 
-function updatePreviewPolygonShape() {
-  if (!currentResult || !previewPolygon) {
-    return;
-  }
-  previewPolygon.setLatLngs(currentResult.polygon.map((point) => [point.lat, point.lng]));
-}
-
-function syncPreviewVertexMarkers() {
-  clearPreviewVertexMarkers();
-  if (!map || !window.L || !currentResult || !Array.isArray(currentResult.polygon)) {
-    return;
-  }
-
-  currentResult.polygon.forEach((point, index) => {
-    const marker = window.L.marker([point.lat, point.lng], {
-      draggable: true,
-      keyboard: false,
-      icon: window.L.divIcon({
-        className: "drive-time-vertex-icon",
-        iconSize: [12, 12],
-      }),
-      title: "Drag to reshape. Right-click to delete.",
-    }).addTo(map);
-
-    marker.on("drag", (event) => {
-      const latLng = event.target.getLatLng();
-      currentResult.polygon[index] = { lat: latLng.lat, lng: latLng.lng };
-      updatePreviewPolygonShape();
-    });
-
-    marker.on("contextmenu", () => {
-      if (!currentResult || currentResult.polygon.length <= MIN_POLYGON_POINTS) {
-        setStatus("Area needs at least 3 points.", true);
-        return;
-      }
-      currentResult.polygon.splice(index, 1);
-      updatePreviewPolygonShape();
-      syncPreviewVertexMarkers();
-      setStatus("Point deleted.");
-    });
-
-    previewVertexMarkers.push(marker);
-  });
-}
-
 function addPreviewPoint(latlng) {
-  if (!currentResult || !Array.isArray(currentResult.polygon) || !currentResult.polygon.length) {
+  if (!Array.isArray(currentCatchment.polygon) || currentCatchment.polygon.length < MIN_POLYGON_POINTS) {
     return;
   }
-  const insertIndex = findClosestSegmentInsertIndex(currentResult.polygon, latlng);
-  currentResult.polygon.splice(insertIndex, 0, { lat: latlng.lat, lng: latlng.lng });
+  const insertIndex = findClosestSegmentInsertIndex(currentCatchment.polygon, latlng);
+  currentCatchment.polygon.splice(insertIndex, 0, { lat: latlng.lat, lng: latlng.lng });
   updatePreviewPolygonShape();
   syncPreviewVertexMarkers();
   setStatus("Point added.");
 }
 
-function beginEditingSavedSearch(search) {
-  if (!search) {
+function renderCurrentCatchmentShape() {
+  clearCurrentAcceptedMarkers();
+  if (!map || !window.L) {
     return;
   }
-  editingSearchId = search.id;
-  currentResult = {
-    query: search.query || search.formattedAddress || "",
-    formattedAddress: search.formattedAddress || search.query || search.name || "Saved area",
-    minutes: clampMinutes(search.minutes),
-    center: { lat: Number(search.center?.lat), lng: Number(search.center?.lng) },
-    polygon: sanitizePolygon(search.polygon),
-    quality: search.quality || null,
-  };
-  if (driveTimeMinutesInput) {
-    driveTimeMinutesInput.value = String(currentResult.minutes);
+
+  for (const place of currentCatchment.acceptedPlaces) {
+    const marker = window.L.circleMarker([place.lat, place.lng], {
+      radius: 5,
+      color: "#1f3c88",
+      weight: 2,
+      fillColor: "#31b7c8",
+      fillOpacity: 0.9,
+    }).addTo(map);
+    marker.bindPopup(
+      `<strong>${escapeHtml(place.name)}</strong><br/>${escapeHtml(place.postcode || "No postcode")}<br/>${escapeHtml(
+        place.durationMinutes
+      )} mins`
+    );
+    currentAcceptedMarkers.push(marker);
   }
-  if (searchNameInput) {
-    searchNameInput.value = search.name || currentResult.formattedAddress;
+
+  if (previewPolygon) {
+    previewPolygon.remove();
+    previewPolygon = null;
   }
-  renderPreview({
-    center: currentResult.center,
-    polygon: currentResult.polygon,
-    formattedAddress: currentResult.formattedAddress,
-  });
-  if (saveSearchBtn) {
-    saveSearchBtn.disabled = false;
+
+  if (Array.isArray(currentCatchment.polygon) && currentCatchment.polygon.length >= MIN_POLYGON_POINTS) {
+    previewPolygon = window.L.polygon(
+      currentCatchment.polygon.map((point) => [point.lat, point.lng]),
+      {
+        color: "#1d2a42",
+        weight: 2,
+        opacity: 0.85,
+        dashArray: "5 5",
+        fillColor: "#9db3df",
+        fillOpacity: 0.2,
+      }
+    ).addTo(map);
+    previewPolygon.on("click", (event) => {
+      addPreviewPoint(event.latlng);
+    });
   }
-  updateSaveButtonLabel();
-  setStatus(`Editing '${search.name}'. Adjust points then click Update area.`);
+
+  syncPreviewVertexMarkers();
+  updateSaveButtonState();
+  updateClearAcceptedButtonState();
+}
+
+function refreshCurrentCatchmentMapAndList() {
+  renderCurrentCatchmentShape();
+  renderAcceptedPlacesList();
+}
+
+function formatTravelMetaText() {
+  const acceptedCount = Number(currentCatchment.acceptedPlaces?.length || 0);
+  if (!acceptedCount) {
+    return "No accepted places yet.";
+  }
+  const durations = currentCatchment.acceptedPlaces
+    .map((place) => Number(place.durationMinutes))
+    .filter((value) => Number.isFinite(value));
+  if (!durations.length) {
+    return `${acceptedCount} accepted place(s).`;
+  }
+  const min = Math.min(...durations);
+  const max = Math.max(...durations);
+  return `${acceptedCount} accepted place(s), travel-time range ${min}-${max} mins.`;
 }
 
 function removeAreaLayers(searchId) {
@@ -941,8 +1083,8 @@ function removeAreaLayers(searchId) {
   if (!layers) {
     return;
   }
-  if (layers.marker) {
-    layers.marker.remove();
+  if (layers.officeMarker) {
+    layers.officeMarker.remove();
   }
   if (layers.polygon) {
     layers.polygon.remove();
@@ -957,27 +1099,32 @@ function syncSearchLayer(search) {
   }
 
   const color = getColorByIndex(search.colorIndex);
-  const marker = window.L.circleMarker([search.center.lat, search.center.lng], {
+  const office = sanitizeOffice(search.office);
+  const officeLayer = window.L.circleMarker([office.lat, office.lng], {
     radius: 6,
     color: color.stroke,
     weight: 2,
     fillColor: "#fff",
     fillOpacity: 1,
   }).addTo(map);
-  marker.bindPopup(search.name);
+  officeLayer.bindPopup(`${escapeHtml(search.name)}<br/>Office: ${escapeHtml(office.name)}`);
 
-  const polygon = window.L.polygon(
-    search.polygon.map((point) => [point.lat, point.lng]),
-    {
-      color: color.stroke,
-      weight: 2,
-      opacity: 0.95,
-      fillColor: color.fill,
-      fillOpacity: 0.2,
-    }
-  ).addTo(map);
-  polygon.bindPopup(`${search.name} (${search.minutes} mins)`);
-  areaLayers.set(search.id, { marker, polygon });
+  let polygonLayer = null;
+  if (Array.isArray(search.polygon) && search.polygon.length >= MIN_POLYGON_POINTS) {
+    polygonLayer = window.L.polygon(
+      search.polygon.map((point) => [point.lat, point.lng]),
+      {
+        color: color.stroke,
+        weight: 2,
+        opacity: 0.95,
+        fillColor: color.fill,
+        fillOpacity: 0.2,
+      }
+    ).addTo(map);
+    polygonLayer.bindPopup(`${escapeHtml(search.name)} (${search.thresholdMinutes} mins)`);
+  }
+
+  areaLayers.set(search.id, { officeMarker: officeLayer, polygon: polygonLayer });
 }
 
 function syncAllSearchLayers() {
@@ -995,7 +1142,118 @@ function fitToSearch(search) {
       return;
     }
   }
-  map.setView([search.center.lat, search.center.lng], 11);
+  map.setView([search.office.lat, search.office.lng], 11);
+}
+
+function normalizePlaceKey(value) {
+  return normalizeSearchName(value).toLowerCase();
+}
+
+function renderAcceptedPlacesList() {
+  if (!acceptedPlacesList || !noAcceptedPlacesMessage) {
+    return;
+  }
+
+  acceptedPlacesList.innerHTML = "";
+  for (const place of currentCatchment.acceptedPlaces) {
+    const li = document.createElement("li");
+    li.className = "drive-time-search-item";
+
+    const info = document.createElement("div");
+    info.className = "drive-time-search-title-wrap";
+
+    const title = document.createElement("span");
+    title.className = "drive-time-search-title";
+    title.textContent = place.name;
+
+    const subtitle = document.createElement("span");
+    subtitle.className = "drive-time-search-subtitle";
+    subtitle.textContent = `${place.postcode || "No postcode"} | ${place.durationMinutes} mins${
+      Number.isFinite(place.distanceMiles) ? ` | ${place.distanceMiles} mi` : ""
+    }`;
+
+    info.append(title, subtitle);
+
+    const actions = document.createElement("div");
+    actions.className = "drive-time-search-actions";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "secondary";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      currentCatchment.acceptedPlaces = currentCatchment.acceptedPlaces.filter((item) => item.key !== place.key);
+      recomputeCurrentHullFromAccepted();
+      refreshCurrentCatchmentMapAndList();
+      if (driveTimeMeta) {
+        driveTimeMeta.textContent = formatTravelMetaText();
+      }
+      setStatus(`Removed ${place.name}.`);
+    });
+
+    actions.append(removeBtn);
+    li.append(info, actions);
+    acceptedPlacesList.appendChild(li);
+  }
+
+  noAcceptedPlacesMessage.hidden = currentCatchment.acceptedPlaces.length > 0;
+}
+
+function beginEditingSavedSearch(search) {
+  if (!search) {
+    return;
+  }
+
+  editingSearchId = search.id;
+  currentCatchment = {
+    office: sanitizeOffice(search.office),
+    thresholdMinutes: clampMinutes(search.thresholdMinutes),
+    acceptedPlaces: sanitizeAcceptedPlaces(search.acceptedPlaces),
+    polygon: sanitizePolygon(search.polygon),
+    departureTimeMode: search.departureTimeMode === "custom" ? "custom" : "default",
+    departureTime: search.departureTime || null,
+  };
+
+  if (!currentCatchment.polygon.length) {
+    recomputeCurrentHullFromAccepted();
+  }
+  if (driveTimeMinutesInput) {
+    driveTimeMinutesInput.value = String(currentCatchment.thresholdMinutes);
+  }
+  if (searchNameInput) {
+    searchNameInput.value = search.name || currentCatchment.office.name;
+  }
+
+  if (currentCatchment.departureTimeMode === "custom" && currentCatchment.departureTime) {
+    const custom = new Date(currentCatchment.departureTime);
+    if (!Number.isNaN(custom.getTime())) {
+      if (departureDateInput) {
+        departureDateInput.value = toDateInputValue(custom);
+      }
+      if (departureTimeInput) {
+        departureTimeInput.value = toTimeInputValue(custom);
+      }
+      setCustomDepartureVisibility(true);
+    }
+  }
+
+  refreshCurrentCatchmentMapAndList();
+  updateSaveButtonState();
+  if (map) {
+    if (currentCatchment.polygon.length >= MIN_POLYGON_POINTS) {
+      const bounds = window.L.latLngBounds(currentCatchment.polygon.map((point) => [point.lat, point.lng]));
+      if (bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.15));
+      }
+    } else {
+      map.setView([currentCatchment.office.lat, currentCatchment.office.lng], 11);
+    }
+  }
+
+  setStatus(`Editing '${search.name}'. Click map to add more places or reshape polygon points.`);
+  if (driveTimeMeta) {
+    driveTimeMeta.textContent = formatTravelMetaText();
+  }
 }
 
 function renderSavedSearches() {
@@ -1034,7 +1292,7 @@ function renderSavedSearches() {
     title.textContent = search.name;
     const subtitle = document.createElement("span");
     subtitle.className = "drive-time-search-subtitle";
-    subtitle.textContent = search.formattedAddress || search.query || "Unknown address";
+    subtitle.textContent = `${search.office.name} | ${search.thresholdMinutes} mins | ${search.acceptedPlaces.length} places`;
     titleWrap.append(title, subtitle);
 
     visibilityLabel.append(checkbox, colorDot, titleWrap);
@@ -1093,24 +1351,7 @@ function renderSavedSearches() {
       persistSavedSearches();
       renderSavedSearches();
       if (wasEditing) {
-        editingSearchId = null;
-        currentResult = null;
-        if (previewMarker) {
-          previewMarker.remove();
-          previewMarker = null;
-        }
-        if (previewPolygon) {
-          previewPolygon.remove();
-          previewPolygon = null;
-        }
-        clearPreviewVertexMarkers();
-        if (saveSearchBtn) {
-          saveSearchBtn.disabled = true;
-        }
-        if (searchNameInput) {
-          searchNameInput.value = "";
-        }
-        updateSaveButtonLabel();
+        resetCurrentCatchment();
       }
       setStatus(`Removed '${search.name}'.`);
     });
@@ -1123,33 +1364,62 @@ function renderSavedSearches() {
   noSavedSearchesMessage.hidden = savedSearches.length > 0;
 }
 
+function resetCurrentCatchment() {
+  editingSearchId = null;
+  currentCatchment = createEmptyCatchment();
+  currentCatchment.thresholdMinutes = resolveDriveTimeMinutes();
+  if (searchNameInput) {
+    searchNameInput.value = `${OFFICE.name} catchment`;
+  }
+  clearPreviewVertexMarkers();
+  if (previewPolygon) {
+    previewPolygon.remove();
+    previewPolygon = null;
+  }
+  clearCurrentAcceptedMarkers();
+  renderAcceptedPlacesList();
+  updateSaveButtonState();
+  updateClearAcceptedButtonState();
+}
+
 function saveCurrentSearch() {
-  if (!currentResult) {
-    setStatus("Draw an area first, then save it.", true);
+  if (!canSaveCurrentCatchment()) {
+    setStatus("Add at least one accepted place before saving.", true);
     return;
   }
 
   const explicitName = normalizeSearchName(searchNameInput?.value || "");
-  const fallbackName = normalizeSearchName(currentResult.formattedAddress || currentResult.query || "Saved area");
+  const fallbackName = `${currentCatchment.office.name} ${currentCatchment.thresholdMinutes}-min catchment`;
   const editingTarget = editingSearchId ? savedSearches.find((item) => item.id === editingSearchId) : null;
-  const area = sanitizeSavedSearch(
+
+  const departure = resolveDepartureTime();
+  currentCatchment.departureTimeMode = departure.mode;
+  currentCatchment.departureTime = departure.mode === "custom" ? departure.iso : null;
+
+  const saved = sanitizeSavedSearch(
     {
       id: editingTarget?.id || createSearchId(),
       name: explicitName || fallbackName,
-      query: currentResult.query,
-      formattedAddress: currentResult.formattedAddress,
-      minutes: currentResult.minutes,
-      center: currentResult.center,
-      polygon: currentResult.polygon,
-      quality: currentResult.quality,
-      createdAt: new Date().toISOString(),
+      office: currentCatchment.office,
+      thresholdMinutes: currentCatchment.thresholdMinutes,
+      departureTimeMode: currentCatchment.departureTimeMode,
+      departureTime: currentCatchment.departureTime,
+      acceptedPlaces: currentCatchment.acceptedPlaces,
+      polygon: currentCatchment.polygon,
+      qualitySummary: {
+        acceptedPlaces: currentCatchment.acceptedPlaces.length,
+      },
+      savedAt: new Date().toISOString(),
       visible: true,
-      colorIndex: savedSearches.length,
+      colorIndex: editingTarget?.colorIndex ?? savedSearches.length,
+      formattedAddress: currentCatchment.office.name,
+      query: currentCatchment.office.name,
     },
     savedSearches.length
   );
-  if (!area) {
-    setStatus("Current result cannot be saved.", true);
+
+  if (!saved) {
+    setStatus("Current catchment cannot be saved.", true);
     return;
   }
 
@@ -1158,35 +1428,21 @@ function saveCurrentSearch() {
     if (index >= 0) {
       savedSearches[index] = {
         ...savedSearches[index],
-        ...area,
+        ...saved,
       };
     }
   } else {
-    savedSearches.unshift(area);
+    savedSearches.unshift(saved);
   }
-  persistSavedSearches();
-  syncSearchLayer(area);
-  renderSavedSearches();
-  if (previewMarker) {
-    previewMarker.remove();
-    previewMarker = null;
-  }
-  if (previewPolygon) {
-    previewPolygon.remove();
-    previewPolygon = null;
-  }
-  clearPreviewVertexMarkers();
 
-  if (searchNameInput) {
-    searchNameInput.value = "";
+  persistSavedSearches();
+  syncSearchLayer(saved);
+  renderSavedSearches();
+  resetCurrentCatchment();
+  setStatus(editingTarget ? `Updated '${saved.name}'.` : `Saved '${saved.name}'.`);
+  if (driveTimeMeta) {
+    driveTimeMeta.textContent = "";
   }
-  currentResult = null;
-  editingSearchId = null;
-  updateSaveButtonLabel();
-  if (saveSearchBtn) {
-    saveSearchBtn.disabled = true;
-  }
-  setStatus(editingTarget ? `Updated '${area.name}'.` : `Saved '${area.name}'.`);
 }
 
 function setAllSearchVisibility(isVisible) {
@@ -1209,7 +1465,7 @@ function exportSavedSearches() {
   }
   const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
   downloadJson(`drive-time-searches-${stamp}.json`, {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     searches: savedSearches,
   });
@@ -1254,13 +1510,25 @@ function importSavedSearchesFromText(rawText) {
   setStatus(`Imported ${imported.length} search(es). Saved locally.`);
 }
 
-async function drawDriveTimeArea() {
-  const location = String(locationInput?.value || "").trim();
-  if (!location) {
-    setStatus("Enter a location first.", true);
+function formatReasonMessage(reason, threshold) {
+  if (reason === "exceeds_threshold") {
+    return `Outside ${threshold}-minute threshold.`;
+  }
+  if (reason === "missing_route") {
+    return "No drivable route found for that point.";
+  }
+  if (reason === "geocode_failed") {
+    return "Could not resolve location details for the clicked point.";
+  }
+  return "Within threshold.";
+}
+
+async function handleMapClickForCatchment(latlng) {
+  if (!map || !USE_OFFICE_CATCHMENT_MODE) {
     return;
   }
-  const minutes = resolveDriveTimeMinutes();
+
+  const thresholdMinutes = resolveDriveTimeMinutes();
   let departure = null;
   try {
     departure = resolveDepartureTime();
@@ -1268,67 +1536,93 @@ async function drawDriveTimeArea() {
     setStatus(error?.message || "Invalid departure time.", true);
     return;
   }
+
+  const existingKeys = currentCatchment.acceptedPlaces.map((place) => place.key);
   setBusy(true);
-  setStatus(`Calculating ${minutes}-minute drive-time area (${departure.label})...`);
-  if (driveTimeMeta) {
-    driveTimeMeta.textContent = "";
-  }
+  setStatus(`Checking drive time (${thresholdMinutes} mins max, ${departure.label})...`);
 
   try {
-    const response = await authedFetch(DRIVE_TIME_ENDPOINT, {
+    const response = await authedFetch(OFFICE_CATCHMENT_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        location,
-        minutes,
+        office: currentCatchment.office,
+        clicked: {
+          lat: Number(latlng.lat),
+          lng: Number(latlng.lng),
+        },
+        thresholdMinutes,
         departureTime: departure.iso,
+        existingKeys,
       }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(data?.error || "Could not calculate drive-time area.");
+      throw new Error(data?.error || "Could not check clicked location.");
     }
 
-    currentResult = {
-      query: location,
-      formattedAddress: String(data.formattedAddress || location),
-      minutes: clampMinutes(data.minutes || minutes),
-      center: data.center,
-      polygon: sanitizePolygon(data.polygon),
-      quality: data.quality || null,
-    };
-    editingSearchId = null;
-    updateSaveButtonLabel();
+    const resolved = data?.clickedResolved || {};
+    const key = normalizeSearchName(resolved.key || "");
+    if (!key) {
+      throw new Error("Clicked location response was missing a key.");
+    }
 
-    renderPreview({
-      ...data,
-      polygon: currentResult.polygon,
-    });
-    if (searchNameInput) {
-      searchNameInput.value = currentResult.formattedAddress || currentResult.query;
-    }
-    setStatus(
-      `Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location} (${departure.label}).`
-    );
-    if (driveTimeMeta) {
-      driveTimeMeta.textContent = formatQualityText(data.quality);
-    }
-    if (saveSearchBtn) {
-      saveSearchBtn.disabled = false;
+    const duplicateLocal = currentCatchment.acceptedPlaces.some((place) => normalizePlaceKey(place.key) === normalizePlaceKey(key));
+    const travelMinutes = Number(data?.travel?.durationMinutes);
+    const isAccepted = Boolean(data?.accepted) && !duplicateLocal && !Boolean(data?.duplicate);
+
+    if (isAccepted) {
+      currentCatchment.acceptedPlaces.push({
+        key,
+        name: normalizeSearchName(resolved.name || resolved.formattedAddress || "Unknown location"),
+        postcode: normalizeSearchName(resolved.postcode || ""),
+        formattedAddress: normalizeSearchName(resolved.formattedAddress || ""),
+        lat: Number(resolved.lat),
+        lng: Number(resolved.lng),
+        durationMinutes: Number.isFinite(travelMinutes) ? travelMinutes : null,
+        distanceMiles: Number(data?.travel?.distanceMiles),
+      });
+      recomputeCurrentHullFromAccepted();
+      refreshCurrentCatchmentMapAndList();
+
+      if (searchNameInput && !normalizeSearchName(searchNameInput.value)) {
+        searchNameInput.value = `${currentCatchment.office.name} catchment`;
+      }
+
+      setStatus(
+        `Accepted ${resolved.name || resolved.formattedAddress} (${Number.isFinite(travelMinutes) ? `${travelMinutes} mins` : "time unavailable"}).`
+      );
+      if (driveTimeMeta) {
+        driveTimeMeta.textContent = formatTravelMetaText();
+      }
+    } else if (duplicateLocal || data?.duplicate) {
+      setStatus("Already added.");
+    } else {
+      const reasonText = formatReasonMessage(data?.reason, thresholdMinutes);
+      setStatus(
+        `Rejected ${resolved.name || resolved.formattedAddress || "location"}${
+          Number.isFinite(travelMinutes) ? ` (${travelMinutes} mins)` : ""
+        }. ${reasonText}`,
+        true
+      );
     }
   } catch (error) {
     console.error(error);
-    currentResult = null;
-    editingSearchId = null;
-    updateSaveButtonLabel();
-    if (saveSearchBtn) {
-      saveSearchBtn.disabled = true;
-    }
-    setStatus(error?.message || "Could not draw drive-time area.", true);
+    setStatus(error?.message || "Could not evaluate clicked location.", true);
   } finally {
     setBusy(false);
+  }
+}
+
+function clearAcceptedPlaces() {
+  currentCatchment.acceptedPlaces = [];
+  currentCatchment.polygon = [];
+  refreshCurrentCatchmentMapAndList();
+  setStatus("Cleared accepted places.");
+  if (driveTimeMeta) {
+    driveTimeMeta.textContent = "";
   }
 }
 
@@ -1352,15 +1646,33 @@ async function init() {
     if (!map) {
       throw new Error("Could not initialize map renderer.");
     }
+
+    if (locationInput) {
+      locationInput.value = `${OFFICE.name}${OFFICE.postcode ? ` (${OFFICE.postcode})` : ""}`;
+    }
+
     loadGeocodeCache();
     loadSavedSearches();
     ensureDefaultDepartureInputs();
     setCustomDepartureVisibility(false);
-    updateSaveButtonLabel();
+
+    currentCatchment = createEmptyCatchment();
+    currentCatchment.thresholdMinutes = resolveDriveTimeMinutes();
+    renderAcceptedPlacesList();
     renderSavedSearches();
     syncAllSearchLayers();
+
+    if (searchNameInput) {
+      searchNameInput.value = `${OFFICE.name} catchment`;
+    }
+
+    updateSaveButtonState();
+    updateClearAcceptedButtonState();
     setPeopleOverlayStatus("Overlay not loaded.");
-    setStatus("Enter a location to calculate.");
+    setStatus("Click map to test a town/village from office.");
+    if (!USE_OFFICE_CATCHMENT_MODE) {
+      setStatus("Office catchment mode is disabled in config.", true);
+    }
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("drivetime");
@@ -1373,12 +1685,12 @@ async function init() {
   }
 }
 
-drawDriveTimeBtn?.addEventListener("click", () => {
-  void drawDriveTimeArea();
-});
-
 saveSearchBtn?.addEventListener("click", () => {
   saveCurrentSearch();
+});
+
+clearAcceptedPlacesBtn?.addEventListener("click", () => {
+  clearAcceptedPlaces();
 });
 
 showAllSearchesBtn?.addEventListener("click", () => {
@@ -1428,16 +1740,11 @@ importSearchesFileInput?.addEventListener("change", async () => {
   }
 });
 
-locationInput?.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter") {
-    return;
-  }
-  event.preventDefault();
-  void drawDriveTimeArea();
-});
-
 driveTimeMinutesInput?.addEventListener("change", () => {
   resolveDriveTimeMinutes();
+  if (driveTimeMeta) {
+    driveTimeMeta.textContent = formatTravelMetaText();
+  }
 });
 
 customDepartureBtn?.addEventListener("click", () => {

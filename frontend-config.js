@@ -5,4 +5,11 @@ export const FRONTEND_CONFIG = {
   graphTaskScopes: ["User.Read", "Tasks.ReadWrite", "Group.Read.All", "Sites.ReadWrite.All"],
   // Keep empty for same-origin hosting. Set to backend origin for split deployments.
   apiBaseUrl: "",
+  useOfficeCatchmentMode: true,
+  mapOffice: {
+    name: "Canterbury Office",
+    postcode: "CT1",
+    lat: 51.2802,
+    lng: 1.0789,
+  },
 };

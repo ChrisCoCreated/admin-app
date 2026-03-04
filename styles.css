@@ -923,6 +923,10 @@ body.lightbox-open {
   align-items: end;
 }
 
+.office-catchment-controls {
+  grid-template-columns: minmax(0, 1fr) 200px auto;
+}
+
 .drive-time-action-group {
   display: inline-flex;
   align-items: center;
@@ -951,6 +955,10 @@ body.lightbox-open {
   align-items: end;
 }
 
+.office-catchment-save-controls {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .drive-time-option-row {
   grid-column: 1 / -1;
   display: flex;
@@ -965,6 +973,10 @@ body.lightbox-open {
 
 .drive-time-save-btn {
   white-space: nowrap;
+}
+
+.drive-time-main .row > h2 {
+  margin: 0;
 }
 
 .drive-time-overlay-grid {
@@ -1328,6 +1340,10 @@ body.lightbox-open {
     grid-template-columns: 1fr;
   }
 
+  .office-catchment-controls {
+    grid-template-columns: 1fr;
+  }
+
   .drive-time-action-group {
     display: grid;
     grid-template-columns: 1fr;
@@ -1338,6 +1354,10 @@ body.lightbox-open {
   }
 
   .drive-time-save-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .office-catchment-save-controls {
     grid-template-columns: 1fr;
   }
 
