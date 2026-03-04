@@ -903,10 +903,6 @@ body.lightbox-open {
   align-items: end;
 }
 
-.drive-time-strength-field {
-  min-width: 220px;
-}
-
 .drive-time-name-field {
   min-width: 0;
 }
@@ -998,6 +994,15 @@ body.lightbox-open {
   min-height: 30px;
   padding: 6px 10px;
   font-size: 0.82rem;
+}
+
+.drive-time-vertex-icon {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #1d2a42;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
 .staff-panel {

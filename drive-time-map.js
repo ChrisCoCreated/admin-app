@@ -6,9 +6,6 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const signOutBtn = document.getElementById("signOutBtn");
 const locationInput = document.getElementById("locationInput");
 const driveTimeMinutesInput = document.getElementById("driveTimeMinutesInput");
-const useSeaHandleInput = document.getElementById("useSeaHandleInput");
-const seaClipStrengthInput = document.getElementById("seaClipStrengthInput");
-const drawSecondaryInput = document.getElementById("drawSecondaryInput");
 const searchNameInput = document.getElementById("searchNameInput");
 const drawDriveTimeBtn = document.getElementById("drawDriveTimeBtn");
 const saveSearchBtn = document.getElementById("saveSearchBtn");
@@ -37,10 +34,8 @@ const GEOCODE_CACHE_KEY = "thrive.drivetime.geocode.v1";
 const DEFAULT_DRIVE_TIME_MINUTES = 20;
 const MIN_DRIVE_TIME_MINUTES = 1;
 const MAX_DRIVE_TIME_MINUTES = 240;
-const DEFAULT_SEA_BEARING_DEGREES = 270;
-const DEFAULT_SEA_STRENGTH = 0.55;
-const MIN_SEA_FACTOR = 0.35;
 const OVERLAY_BATCH_SIZE = 300;
+const MIN_POLYGON_POINTS = 3;
 const AREA_COLORS = [
   { stroke: "#1f3c88", fill: "#31b7c8" },
   { stroke: "#8b2f6e", fill: "#c9439b" },
@@ -53,7 +48,7 @@ const AREA_COLORS = [
 let map = null;
 let previewMarker = null;
 let previewPolygon = null;
-let seaHandleMarker = null;
+let previewVertexMarkers = [];
 let currentResult = null;
 let savedSearches = [];
 const areaLayers = new Map();
@@ -122,22 +117,6 @@ function resolveDriveTimeMinutes() {
   return minutes;
 }
 
-function clampSeaStrength(value) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return DEFAULT_SEA_STRENGTH;
-  }
-  return Math.min(Math.max(parsed / 100, 0), 1);
-}
-
-function resolveSeaStrength() {
-  const strength = clampSeaStrength(seaClipStrengthInput?.value);
-  if (seaClipStrengthInput) {
-    seaClipStrengthInput.value = String(Math.round(strength * 100));
-  }
-  return strength;
-}
-
 function createSearchId() {
   if (window.crypto?.randomUUID) {
     return window.crypto.randomUUID();
@@ -181,257 +160,10 @@ function sanitizeSavedSearch(raw, fallbackIndex = 0) {
     quality: raw?.quality || null,
     createdAt: String(raw?.createdAt || new Date().toISOString()),
     visible: raw?.visible !== false,
-    secondary: raw?.secondary === true,
     colorIndex: Number.isInteger(colorIndex) && colorIndex >= 0 ? colorIndex : fallbackIndex,
   };
 }
 
-function getVisibleAreaPolygons(excludeId = "") {
-  return savedSearches
-    .filter((search) => search.visible && Array.isArray(search.polygon) && search.polygon.length >= 3)
-    .filter((search) => !excludeId || search.id !== excludeId)
-    .map((search) => search.polygon);
-}
-
-function signedArea(points) {
-  let area = 0;
-  for (let i = 0; i < points.length; i += 1) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    area += a.lng * b.lat - b.lng * a.lat;
-  }
-  return area / 2;
-}
-
-function isPointOnSegment(p, a, b) {
-  const cross = (p.lat - a.lat) * (b.lng - a.lng) - (p.lng - a.lng) * (b.lat - a.lat);
-  if (Math.abs(cross) > 1e-9) {
-    return false;
-  }
-  const dot = (p.lng - a.lng) * (b.lng - a.lng) + (p.lat - a.lat) * (b.lat - a.lat);
-  if (dot < 0) {
-    return false;
-  }
-  const lenSq = (b.lng - a.lng) ** 2 + (b.lat - a.lat) ** 2;
-  return dot <= lenSq;
-}
-
-function segmentsIntersect(a1, a2, b1, b2) {
-  const orient = (p, q, r) => {
-    const value = (q.lng - p.lng) * (r.lat - p.lat) - (q.lat - p.lat) * (r.lng - p.lng);
-    if (Math.abs(value) < 1e-10) {
-      return 0;
-    }
-    return value > 0 ? 1 : -1;
-  };
-
-  const o1 = orient(a1, a2, b1);
-  const o2 = orient(a1, a2, b2);
-  const o3 = orient(b1, b2, a1);
-  const o4 = orient(b1, b2, a2);
-
-  if (o1 !== o2 && o3 !== o4) {
-    return true;
-  }
-
-  if (o1 === 0 && isPointOnSegment(b1, a1, a2)) {
-    return true;
-  }
-  if (o2 === 0 && isPointOnSegment(b2, a1, a2)) {
-    return true;
-  }
-  if (o3 === 0 && isPointOnSegment(a1, b1, b2)) {
-    return true;
-  }
-  if (o4 === 0 && isPointOnSegment(a2, b1, b2)) {
-    return true;
-  }
-  return false;
-}
-
-function pointInPolygon(point, polygon) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const a = polygon[i];
-    const b = polygon[j];
-    const intersects =
-      a.lat > point.lat !== b.lat > point.lat &&
-      point.lng < ((b.lng - a.lng) * (point.lat - a.lat)) / (b.lat - a.lat + Number.EPSILON) + a.lng;
-    if (intersects) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
-function polygonsOverlap(polyA, polyB) {
-  if (!Array.isArray(polyA) || !Array.isArray(polyB) || polyA.length < 3 || polyB.length < 3) {
-    return false;
-  }
-
-  const areaA = Math.abs(signedArea(polyA));
-  const areaB = Math.abs(signedArea(polyB));
-  if (areaA < 1e-10 || areaB < 1e-10) {
-    return false;
-  }
-
-  for (let i = 0; i < polyA.length; i += 1) {
-    const a1 = polyA[i];
-    const a2 = polyA[(i + 1) % polyA.length];
-    for (let j = 0; j < polyB.length; j += 1) {
-      const b1 = polyB[j];
-      const b2 = polyB[(j + 1) % polyB.length];
-      if (segmentsIntersect(a1, a2, b1, b2)) {
-        return true;
-      }
-    }
-  }
-
-  if (pointInPolygon(polyA[0], polyB)) {
-    return true;
-  }
-  if (pointInPolygon(polyB[0], polyA)) {
-    return true;
-  }
-  return false;
-}
-
-function overlapsAnyPolygon(candidatePolygon, existingPolygons) {
-  for (const polygon of existingPolygons) {
-    if (polygonsOverlap(candidatePolygon, polygon)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function scalePolygonAroundCenter(points, center, factor) {
-  return points.map((point) => ({
-    lat: center.lat + (point.lat - center.lat) * factor,
-    lng: center.lng + (point.lng - center.lng) * factor,
-  }));
-}
-
-function buildSecondaryPolygonWithoutOverlap(candidatePolygon, center, existingPolygons) {
-  if (!overlapsAnyPolygon(candidatePolygon, existingPolygons)) {
-    return {
-      polygon: candidatePolygon,
-      wasAdjusted: false,
-      factor: 1,
-    };
-  }
-
-  for (let factor = 0.95; factor >= 0.35; factor -= 0.05) {
-    const scaled = scalePolygonAroundCenter(candidatePolygon, center, factor);
-    if (!overlapsAnyPolygon(scaled, existingPolygons)) {
-      return {
-        polygon: scaled,
-        wasAdjusted: true,
-        factor: Number(factor.toFixed(2)),
-      };
-    }
-  }
-
-  return null;
-}
-
-function normalizeBearingDegrees(value) {
-  const normalized = Number(value) % 360;
-  return normalized < 0 ? normalized + 360 : normalized;
-}
-
-function smallestAngleDifferenceDegrees(a, b) {
-  const diff = Math.abs(normalizeBearingDegrees(a) - normalizeBearingDegrees(b));
-  return diff > 180 ? 360 - diff : diff;
-}
-
-function offsetLatLngByBearing(center, bearingDegrees, offsetDegrees = 0.06) {
-  const bearingRad = (normalizeBearingDegrees(bearingDegrees) * Math.PI) / 180;
-  const latOffset = Math.cos(bearingRad) * offsetDegrees;
-  const lngScale = Math.max(Math.cos((center.lat * Math.PI) / 180), 0.2);
-  const lngOffset = (Math.sin(bearingRad) * offsetDegrees) / lngScale;
-  return {
-    lat: center.lat + latOffset,
-    lng: center.lng + lngOffset,
-  };
-}
-
-function bearingFromCenter(center, point) {
-  const dx = point.lng - center.lng;
-  const dy = point.lat - center.lat;
-  const radians = Math.atan2(dx, dy);
-  return normalizeBearingDegrees((radians * 180) / Math.PI);
-}
-
-function applySeaAvoidanceToPolygon(basePolygon, center, inlandBearingDegrees, strength) {
-  return basePolygon.map((point) => {
-    const bearing = bearingFromCenter(center, point);
-    const delta = smallestAngleDifferenceDegrees(bearing, inlandBearingDegrees);
-    const seaExposure = (1 - Math.cos((delta * Math.PI) / 180)) / 2;
-    const factor = Math.max(MIN_SEA_FACTOR, 1 - strength * seaExposure);
-    return {
-      lat: center.lat + (point.lat - center.lat) * factor,
-      lng: center.lng + (point.lng - center.lng) * factor,
-    };
-  });
-}
-
-function removeSeaHandle() {
-  if (seaHandleMarker) {
-    seaHandleMarker.remove();
-    seaHandleMarker = null;
-  }
-}
-
-function ensureSeaHandle(center, inlandBearingDegrees = DEFAULT_SEA_BEARING_DEGREES) {
-  if (!map || !window.L || !useSeaHandleInput?.checked) {
-    removeSeaHandle();
-    return;
-  }
-
-  const latLng = offsetLatLngByBearing(center, inlandBearingDegrees);
-  if (!seaHandleMarker) {
-    seaHandleMarker = window.L.marker([latLng.lat, latLng.lng], {
-      draggable: true,
-      title: "Sea-avoidance handle (drag inland)",
-    }).addTo(map);
-    seaHandleMarker.bindPopup("Sea-avoidance handle: drag inland direction.");
-    seaHandleMarker.on("drag", () => {
-      recomputeCurrentPolygonFromModes();
-    });
-  } else {
-    seaHandleMarker.setLatLng([latLng.lat, latLng.lng]);
-  }
-}
-
-function getSeaInlandBearing(center) {
-  if (!seaHandleMarker) {
-    return DEFAULT_SEA_BEARING_DEGREES;
-  }
-  const latLng = seaHandleMarker.getLatLng();
-  return bearingFromCenter(center, { lat: latLng.lat, lng: latLng.lng });
-}
-
-function recomputeCurrentPolygonFromModes() {
-  if (!currentResult || !currentResult.center || !Array.isArray(currentResult.basePolygon)) {
-    return;
-  }
-
-  let polygon = currentResult.basePolygon;
-
-  if (useSeaHandleInput?.checked) {
-    const inlandBearing = getSeaInlandBearing(currentResult.center);
-    polygon = applySeaAvoidanceToPolygon(polygon, currentResult.center, inlandBearing, resolveSeaStrength());
-  }
-
-  currentResult.polygon = polygon;
-  renderPreview({
-    center: currentResult.center,
-    polygon: currentResult.polygon,
-    formattedAddress: currentResult.formattedAddress,
-    secondary: currentResult.secondary === true,
-  });
-}
 
 function loadSavedSearches() {
   try {
@@ -865,8 +597,6 @@ function initMap() {
     zoomControl: true,
     attributionControl: true,
   }).setView([51.2802, 1.0789], 11);
-  map.createPane("secondaryAreaPane");
-  map.getPane("secondaryAreaPane").style.zIndex = "360";
 
   window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
@@ -894,7 +624,6 @@ function renderPreview(payload) {
 
   const center = payload?.center;
   const polygonPoints = Array.isArray(payload?.polygon) ? payload.polygon : [];
-  const isSecondary = payload?.secondary === true;
   if (!center || typeof center.lat !== "number" || typeof center.lng !== "number" || !polygonPoints.length) {
     throw new Error("Drive-time response was missing map coordinates.");
   }
@@ -907,21 +636,42 @@ function renderPreview(payload) {
   }
 
   previewMarker = window.L.marker([center.lat, center.lng], {
+    draggable: true,
     title: payload?.formattedAddress || "Selected location",
   }).addTo(map);
+  previewMarker.on("drag", (event) => {
+    if (!currentResult || !Array.isArray(currentResult.polygon) || !currentResult.polygon.length) {
+      return;
+    }
+    const next = event.target.getLatLng();
+    const prevCenter = currentResult.center;
+    const latDelta = next.lat - prevCenter.lat;
+    const lngDelta = next.lng - prevCenter.lng;
+    currentResult.center = { lat: next.lat, lng: next.lng };
+    currentResult.polygon = currentResult.polygon.map((point) => ({
+      lat: point.lat + latDelta,
+      lng: point.lng + lngDelta,
+    }));
+    if (previewPolygon) {
+      previewPolygon.setLatLngs(currentResult.polygon.map((point) => [point.lat, point.lng]));
+    }
+    syncPreviewVertexMarkers();
+  });
 
   previewPolygon = window.L.polygon(
     polygonPoints.map((point) => [point.lat, point.lng]),
     {
-      color: isSecondary ? "#5c4a1d" : "#1d2a42",
+      color: "#1d2a42",
       weight: 2,
-      opacity: isSecondary ? 0.8 : 0.85,
-      dashArray: isSecondary ? "8 6" : "5 5",
-      fillColor: isSecondary ? "#c9b176" : "#9db3df",
-      fillOpacity: isSecondary ? 0 : 0.2,
-      pane: isSecondary ? "secondaryAreaPane" : "overlayPane",
+      opacity: 0.85,
+      dashArray: "5 5",
+      fillColor: "#9db3df",
+      fillOpacity: 0.2,
     }
   ).addTo(map);
+  previewPolygon.on("click", (event) => {
+    addPreviewPoint(event.latlng);
+  });
 
   const polygonBounds = previewPolygon.getBounds();
   if (polygonBounds.isValid()) {
@@ -929,6 +679,104 @@ function renderPreview(payload) {
   } else {
     map.setView([center.lat, center.lng], 11);
   }
+  syncPreviewVertexMarkers();
+}
+
+function clearPreviewVertexMarkers() {
+  for (const marker of previewVertexMarkers) {
+    marker.remove();
+  }
+  previewVertexMarkers = [];
+}
+
+function findClosestSegmentInsertIndex(points, latlng) {
+  if (!Array.isArray(points) || points.length < 2) {
+    return points.length;
+  }
+  const point = { lat: Number(latlng.lat), lng: Number(latlng.lng) };
+  let bestIndex = points.length;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    const ax = a.lng;
+    const ay = a.lat;
+    const bx = b.lng;
+    const by = b.lat;
+    const px = point.lng;
+    const py = point.lat;
+    const abx = bx - ax;
+    const aby = by - ay;
+    const abLenSq = abx * abx + aby * aby || 1;
+    const t = Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / abLenSq));
+    const cx = ax + abx * t;
+    const cy = ay + aby * t;
+    const dx = px - cx;
+    const dy = py - cy;
+    const distSq = dx * dx + dy * dy;
+    if (distSq < bestDistance) {
+      bestDistance = distSq;
+      bestIndex = i + 1;
+    }
+  }
+  return bestIndex;
+}
+
+function updatePreviewPolygonShape() {
+  if (!currentResult || !previewPolygon) {
+    return;
+  }
+  previewPolygon.setLatLngs(currentResult.polygon.map((point) => [point.lat, point.lng]));
+}
+
+function syncPreviewVertexMarkers() {
+  clearPreviewVertexMarkers();
+  if (!map || !window.L || !currentResult || !Array.isArray(currentResult.polygon)) {
+    return;
+  }
+
+  currentResult.polygon.forEach((point, index) => {
+    const marker = window.L.marker([point.lat, point.lng], {
+      draggable: true,
+      keyboard: false,
+      icon: window.L.divIcon({
+        className: "drive-time-vertex-icon",
+        iconSize: [12, 12],
+      }),
+      title: "Drag to reshape. Right-click to delete.",
+    }).addTo(map);
+
+    marker.on("drag", (event) => {
+      const latLng = event.target.getLatLng();
+      currentResult.polygon[index] = { lat: latLng.lat, lng: latLng.lng };
+      updatePreviewPolygonShape();
+    });
+
+    marker.on("contextmenu", () => {
+      if (!currentResult || currentResult.polygon.length <= MIN_POLYGON_POINTS) {
+        setStatus("Area needs at least 3 points.", true);
+        return;
+      }
+      currentResult.polygon.splice(index, 1);
+      updatePreviewPolygonShape();
+      syncPreviewVertexMarkers();
+      setStatus("Point deleted.");
+    });
+
+    previewVertexMarkers.push(marker);
+  });
+}
+
+function addPreviewPoint(latlng) {
+  if (!currentResult || !Array.isArray(currentResult.polygon) || !currentResult.polygon.length) {
+    return;
+  }
+  const insertIndex = findClosestSegmentInsertIndex(currentResult.polygon, latlng);
+  currentResult.polygon.splice(insertIndex, 0, { lat: latlng.lat, lng: latlng.lng });
+  updatePreviewPolygonShape();
+  syncPreviewVertexMarkers();
+  setStatus("Point added.");
 }
 
 function removeAreaLayers(searchId) {
@@ -966,14 +814,12 @@ function syncSearchLayer(search) {
     {
       color: color.stroke,
       weight: 2,
-      opacity: search.secondary ? 0.85 : 0.95,
-      dashArray: search.secondary ? "7 6" : null,
+      opacity: 0.95,
       fillColor: color.fill,
-      fillOpacity: search.secondary ? 0 : 0.2,
-      pane: search.secondary ? "secondaryAreaPane" : "overlayPane",
+      fillOpacity: 0.2,
     }
   ).addTo(map);
-  polygon.bindPopup(`${search.name} (${search.minutes} mins${search.secondary ? ", secondary" : ""})`);
+  polygon.bindPopup(`${search.name} (${search.minutes} mins)`);
   areaLayers.set(search.id, { marker, polygon });
 }
 
@@ -1031,7 +877,7 @@ function renderSavedSearches() {
     title.textContent = search.name;
     const subtitle = document.createElement("span");
     subtitle.className = "drive-time-search-subtitle";
-    subtitle.textContent = `${search.formattedAddress || search.query || "Unknown address"}${search.secondary ? " • Secondary" : ""}`;
+    subtitle.textContent = search.formattedAddress || search.query || "Unknown address";
     titleWrap.append(title, subtitle);
 
     visibilityLabel.append(checkbox, colorDot, titleWrap);
@@ -1093,7 +939,6 @@ function saveCurrentSearch() {
       quality: currentResult.quality,
       createdAt: new Date().toISOString(),
       visible: true,
-      secondary: currentResult.secondary === true,
       colorIndex: savedSearches.length,
     },
     savedSearches.length
@@ -1115,7 +960,7 @@ function saveCurrentSearch() {
     previewPolygon.remove();
     previewPolygon = null;
   }
-  removeSeaHandle();
+  clearPreviewVertexMarkers();
 
   if (searchNameInput) {
     searchNameInput.value = "";
@@ -1198,8 +1043,6 @@ async function drawDriveTimeArea() {
     return;
   }
   const minutes = resolveDriveTimeMinutes();
-  const drawAsSecondary = Boolean(drawSecondaryInput?.checked);
-
   setBusy(true);
   setStatus(`Calculating ${minutes}-minute drive-time area...`);
   if (driveTimeMeta) {
@@ -1228,38 +1071,17 @@ async function drawDriveTimeArea() {
       minutes: clampMinutes(data.minutes || minutes),
       center: data.center,
       polygon: sanitizePolygon(data.polygon),
-      basePolygon: sanitizePolygon(data.polygon),
       quality: data.quality || null,
-      secondary: drawAsSecondary,
     };
-
-    if (useSeaHandleInput?.checked) {
-      ensureSeaHandle(currentResult.center, DEFAULT_SEA_BEARING_DEGREES);
-      currentResult.polygon = applySeaAvoidanceToPolygon(
-        currentResult.basePolygon,
-        currentResult.center,
-        getSeaInlandBearing(currentResult.center),
-        resolveSeaStrength()
-      );
-    } else {
-      removeSeaHandle();
-    }
 
     renderPreview({
       ...data,
       polygon: currentResult.polygon,
-      secondary: drawAsSecondary,
     });
     if (searchNameInput) {
       searchNameInput.value = currentResult.formattedAddress || currentResult.query;
     }
-    if (drawAsSecondary) {
-      setStatus(
-        `Showing ${currentResult.minutes}-minute secondary area for ${currentResult.formattedAddress || location}.`
-      );
-    } else {
-      setStatus(`Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location}.`);
-    }
+    setStatus(`Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location}.`);
     if (driveTimeMeta) {
       driveTimeMeta.textContent = formatQualityText(data.quality);
     }
@@ -1381,26 +1203,6 @@ locationInput?.addEventListener("keydown", (event) => {
 
 driveTimeMinutesInput?.addEventListener("change", () => {
   resolveDriveTimeMinutes();
-});
-
-drawSecondaryInput?.addEventListener("change", () => {
-  recomputeCurrentPolygonFromModes();
-});
-
-useSeaHandleInput?.addEventListener("change", () => {
-  if (!currentResult?.center) {
-    return;
-  }
-  if (useSeaHandleInput.checked) {
-    ensureSeaHandle(currentResult.center, getSeaInlandBearing(currentResult.center));
-  } else {
-    removeSeaHandle();
-  }
-  recomputeCurrentPolygonFromModes();
-});
-
-seaClipStrengthInput?.addEventListener("input", () => {
-  recomputeCurrentPolygonFromModes();
 });
 
 signOutBtn?.addEventListener("click", async () => {
