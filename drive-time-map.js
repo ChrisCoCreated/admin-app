@@ -50,6 +50,7 @@ let previewMarker = null;
 let previewPolygon = null;
 let previewVertexMarkers = [];
 let currentResult = null;
+let editingSearchId = null;
 let savedSearches = [];
 const areaLayers = new Map();
 let peopleOverlayData = [];
@@ -79,6 +80,13 @@ function setBusy(isBusy) {
   if (saveSearchBtn) {
     saveSearchBtn.disabled = isBusy || !currentResult;
   }
+}
+
+function updateSaveButtonLabel() {
+  if (!saveSearchBtn) {
+    return;
+  }
+  saveSearchBtn.textContent = editingSearchId ? "Update area" : "Save search";
 }
 
 function redirectToUnauthorized(pageKey) {
@@ -779,6 +787,37 @@ function addPreviewPoint(latlng) {
   setStatus("Point added.");
 }
 
+function beginEditingSavedSearch(search) {
+  if (!search) {
+    return;
+  }
+  editingSearchId = search.id;
+  currentResult = {
+    query: search.query || search.formattedAddress || "",
+    formattedAddress: search.formattedAddress || search.query || search.name || "Saved area",
+    minutes: clampMinutes(search.minutes),
+    center: { lat: Number(search.center?.lat), lng: Number(search.center?.lng) },
+    polygon: sanitizePolygon(search.polygon),
+    quality: search.quality || null,
+  };
+  if (driveTimeMinutesInput) {
+    driveTimeMinutesInput.value = String(currentResult.minutes);
+  }
+  if (searchNameInput) {
+    searchNameInput.value = search.name || currentResult.formattedAddress;
+  }
+  renderPreview({
+    center: currentResult.center,
+    polygon: currentResult.polygon,
+    formattedAddress: currentResult.formattedAddress,
+  });
+  if (saveSearchBtn) {
+    saveSearchBtn.disabled = false;
+  }
+  updateSaveButtonLabel();
+  setStatus(`Editing '${search.name}'. Adjust points then click Update area.`);
+}
+
 function removeAreaLayers(searchId) {
   const layers = areaLayers.get(searchId);
   if (!layers) {
@@ -885,6 +924,14 @@ function renderSavedSearches() {
     const actions = document.createElement("div");
     actions.className = "drive-time-search-actions";
 
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "secondary";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => {
+      beginEditingSavedSearch(search);
+    });
+
     const focusBtn = document.createElement("button");
     focusBtn.type = "button";
     focusBtn.className = "secondary";
@@ -904,14 +951,35 @@ function renderSavedSearches() {
     removeBtn.className = "secondary";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", () => {
+      const wasEditing = editingSearchId === search.id;
       removeAreaLayers(search.id);
       savedSearches = savedSearches.filter((item) => item.id !== search.id);
       persistSavedSearches();
       renderSavedSearches();
+      if (wasEditing) {
+        editingSearchId = null;
+        currentResult = null;
+        if (previewMarker) {
+          previewMarker.remove();
+          previewMarker = null;
+        }
+        if (previewPolygon) {
+          previewPolygon.remove();
+          previewPolygon = null;
+        }
+        clearPreviewVertexMarkers();
+        if (saveSearchBtn) {
+          saveSearchBtn.disabled = true;
+        }
+        if (searchNameInput) {
+          searchNameInput.value = "";
+        }
+        updateSaveButtonLabel();
+      }
       setStatus(`Removed '${search.name}'.`);
     });
 
-    actions.append(focusBtn, removeBtn);
+    actions.append(editBtn, focusBtn, removeBtn);
     li.append(visibilityLabel, actions);
     savedSearchesList.appendChild(li);
   }
@@ -927,9 +995,10 @@ function saveCurrentSearch() {
 
   const explicitName = normalizeSearchName(searchNameInput?.value || "");
   const fallbackName = normalizeSearchName(currentResult.formattedAddress || currentResult.query || "Saved area");
+  const editingTarget = editingSearchId ? savedSearches.find((item) => item.id === editingSearchId) : null;
   const area = sanitizeSavedSearch(
     {
-      id: createSearchId(),
+      id: editingTarget?.id || createSearchId(),
       name: explicitName || fallbackName,
       query: currentResult.query,
       formattedAddress: currentResult.formattedAddress,
@@ -948,7 +1017,17 @@ function saveCurrentSearch() {
     return;
   }
 
-  savedSearches.unshift(area);
+  if (editingTarget) {
+    const index = savedSearches.findIndex((item) => item.id === editingTarget.id);
+    if (index >= 0) {
+      savedSearches[index] = {
+        ...savedSearches[index],
+        ...area,
+      };
+    }
+  } else {
+    savedSearches.unshift(area);
+  }
   persistSavedSearches();
   syncSearchLayer(area);
   renderSavedSearches();
@@ -965,10 +1044,13 @@ function saveCurrentSearch() {
   if (searchNameInput) {
     searchNameInput.value = "";
   }
+  currentResult = null;
+  editingSearchId = null;
+  updateSaveButtonLabel();
   if (saveSearchBtn) {
-    saveSearchBtn.disabled = false;
+    saveSearchBtn.disabled = true;
   }
-  setStatus(`Saved '${area.name}'.`);
+  setStatus(editingTarget ? `Updated '${area.name}'.` : `Saved '${area.name}'.`);
 }
 
 function setAllSearchVisibility(isVisible) {
@@ -1073,6 +1155,8 @@ async function drawDriveTimeArea() {
       polygon: sanitizePolygon(data.polygon),
       quality: data.quality || null,
     };
+    editingSearchId = null;
+    updateSaveButtonLabel();
 
     renderPreview({
       ...data,
@@ -1091,6 +1175,8 @@ async function drawDriveTimeArea() {
   } catch (error) {
     console.error(error);
     currentResult = null;
+    editingSearchId = null;
+    updateSaveButtonLabel();
     if (saveSearchBtn) {
       saveSearchBtn.disabled = true;
     }
@@ -1122,6 +1208,7 @@ async function init() {
     }
     loadGeocodeCache();
     loadSavedSearches();
+    updateSaveButtonLabel();
     renderSavedSearches();
     syncAllSearchLayers();
     setPeopleOverlayStatus("Overlay not loaded.");
