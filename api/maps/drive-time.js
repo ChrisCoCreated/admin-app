@@ -7,11 +7,12 @@ const TARGET_MINUTES = 20;
 const ANGLE_STEP_DEGREES = 15;
 const BASE_RADIUS_METERS = 30000;
 const MIN_RADIUS_METERS = 2000;
-const MAX_RADIUS_METERS = 50000;
+const BASE_MAX_RADIUS_METERS = 50000;
 const ROUTE_CALL_CONCURRENCY = 2;
 const DEPARTURE_LEAD_SECONDS = 120;
 const DEFAULT_DEPARTURE_WEEKDAY = 3; // Wednesday
 const DEFAULT_DEPARTURE_HOUR = 10;
+const ISOCHRONE_SOLVER_PASSES = 4;
 
 function normalizeLocationQuery(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -108,7 +109,7 @@ function smoothDistances(values) {
   return values.map((value, index) => {
     const prev = values[(index - 1 + values.length) % values.length];
     const next = values[(index + 1) % values.length];
-    return clamp((prev + value + next) / 3, MIN_RADIUS_METERS, MAX_RADIUS_METERS);
+    return (prev + value + next) / 3;
   });
 }
 
@@ -230,6 +231,62 @@ async function computeDurationsForDestinations(origin, destinations, apiKey, dep
   return { durations, failures };
 }
 
+async function solveDirectionalDistances({
+  center,
+  bearings,
+  targetSeconds,
+  minRadiusMeters,
+  maxRadiusMeters,
+  initialRadiusMeters,
+  fallbackDistanceMeters,
+  apiKey,
+  departureTime,
+}) {
+  let distances = bearings.map(() => clamp(initialRadiusMeters, minRadiusMeters, maxRadiusMeters));
+  const failures = [];
+  let latestDurations = new Array(bearings.length).fill(0);
+
+  for (let pass = 0; pass < ISOCHRONE_SOLVER_PASSES; pass += 1) {
+    const destinations = bearings.map((bearing, index) => destinationPoint(center, bearing, distances[index]));
+    const sample = await computeDurationsForDestinations(center, destinations, apiKey, departureTime);
+    latestDurations = sample.durations;
+    failures.push(...sample.failures);
+
+    const nextDistances = bearings.map((_, index) => {
+      const durationSeconds = Number(latestDurations[index] || 0);
+      const currentDistance = distances[index];
+      if (!durationSeconds) {
+        // If no route came back, cautiously expand.
+        return clamp(currentDistance * 1.12, minRadiusMeters, maxRadiusMeters);
+      }
+
+      const ratio = targetSeconds / Math.max(durationSeconds, 1);
+      // Damp updates to avoid wild oscillation between passes.
+      const scaledRatio = pass === ISOCHRONE_SOLVER_PASSES - 1 ? ratio : 1 + (ratio - 1) * 0.72;
+      return clamp(currentDistance * scaledRatio, minRadiusMeters, maxRadiusMeters);
+    });
+
+    distances = smoothDistances(nextDistances).map((distance) =>
+      clamp(distance, minRadiusMeters, maxRadiusMeters)
+    );
+  }
+
+  // Final fallback if any direction still has no resolved duration.
+  distances = distances.map((distance, index) => {
+    const durationSeconds = Number(latestDurations[index] || 0);
+    if (durationSeconds > 0) {
+      return distance;
+    }
+    return clamp(Math.max(distance, fallbackDistanceMeters), minRadiusMeters, maxRadiusMeters);
+  });
+
+  return {
+    distances,
+    durations: latestDurations,
+    failures,
+  };
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method Not Allowed" });
@@ -257,7 +314,11 @@ module.exports = async (req, res) => {
   const minutes = Number.isFinite(requestedMinutes) && requestedMinutes > 0 ? Math.round(requestedMinutes) : TARGET_MINUTES;
   const targetSeconds = minutes * 60;
   const fallbackSpeedMetersPerSecond = 16.7; // ~60 km/h fallback
-  const fallbackDistanceMeters = clamp(targetSeconds * fallbackSpeedMetersPerSecond, MIN_RADIUS_METERS, MAX_RADIUS_METERS);
+  const dynamicMaxRadiusMeters = Math.max(
+    BASE_MAX_RADIUS_METERS,
+    Math.round(targetSeconds * fallbackSpeedMetersPerSecond * 1.35)
+  );
+  const fallbackDistanceMeters = clamp(targetSeconds * fallbackSpeedMetersPerSecond, MIN_RADIUS_METERS, dynamicMaxRadiusMeters);
   let departureTime = "";
   try {
     departureTime = resolveDepartureTime(req.body?.departureTime);
@@ -269,44 +330,18 @@ module.exports = async (req, res) => {
 
   try {
     const center = await geocodeLocation(locationQuery, apiKey, region);
-
-    const firstPassDestinations = bearings.map((bearing) => destinationPoint(center, bearing, BASE_RADIUS_METERS));
-    const firstPass = await computeDurationsForDestinations(
+    const solved = await solveDirectionalDistances({
       center,
-      firstPassDestinations,
+      bearings,
+      targetSeconds,
+      minRadiusMeters: MIN_RADIUS_METERS,
+      maxRadiusMeters: dynamicMaxRadiusMeters,
+      initialRadiusMeters: BASE_RADIUS_METERS,
+      fallbackDistanceMeters,
       apiKey,
-      departureTime
-    );
-    const firstPassDurations = firstPass.durations;
-    const firstPassDistances = bearings.map((_, index) => {
-      const durationSeconds = Number(firstPassDurations[index] || 0);
-      if (!durationSeconds) {
-        return fallbackDistanceMeters;
-      }
-      return clamp(BASE_RADIUS_METERS * (targetSeconds / durationSeconds), MIN_RADIUS_METERS, MAX_RADIUS_METERS);
+      departureTime,
     });
-
-    const smoothedFirstPassDistances = smoothDistances(firstPassDistances);
-    const secondPassDestinations = bearings.map((bearing, index) =>
-      destinationPoint(center, bearing, smoothedFirstPassDistances[index])
-    );
-    const secondPass = await computeDurationsForDestinations(
-      center,
-      secondPassDestinations,
-      apiKey,
-      departureTime
-    );
-    const secondPassDurations = secondPass.durations;
-
-    const finalDistances = bearings.map((_, index) => {
-      const durationSeconds = Number(secondPassDurations[index] || 0);
-      const seedDistance = smoothedFirstPassDistances[index];
-      if (!durationSeconds) {
-        return seedDistance;
-      }
-      return clamp(seedDistance * (targetSeconds / durationSeconds), MIN_RADIUS_METERS, MAX_RADIUS_METERS);
-    });
-    const smoothedFinalDistances = smoothDistances(finalDistances);
+    const smoothedFinalDistances = solved.distances;
     const polygon = bearings.map((bearing, index) => {
       const point = destinationPoint(center, bearing, smoothedFinalDistances[index]);
       return {
@@ -315,8 +350,8 @@ module.exports = async (req, res) => {
       };
     });
 
-    const successfulDurations = secondPassDurations.filter((duration) => Number(duration) > 0);
-    const failedMessages = [...firstPass.failures, ...secondPass.failures];
+    const successfulDurations = solved.durations.filter((duration) => Number(duration) > 0);
+    const failedMessages = solved.failures;
     if (successfulDurations.length === 0) {
       const firstFailure = failedMessages[0] || "No valid routes returned by Google Routes API.";
       res.status(502).json({

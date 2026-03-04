@@ -48,6 +48,7 @@ let reconcilePreview = null;
 let reconcileBusy = false;
 let isDetailOpen = false;
 let isReconcileCollapsed = true;
+let copyStatusResetTimer = null;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -70,6 +71,85 @@ function redirectToUnauthorized(pageKey) {
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
+}
+
+function showCopyStatus(message, isError = false) {
+  setStatus(message, isError);
+  if (copyStatusResetTimer) {
+    clearTimeout(copyStatusResetTimer);
+  }
+  copyStatusResetTimer = setTimeout(() => {
+    copyStatusResetTimer = null;
+    if (statusMessage && statusMessage.textContent === message) {
+      statusMessage.textContent = "";
+      statusMessage.classList.remove("error");
+    }
+  }, 1800);
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(input);
+  if (!copied) {
+    throw new Error("Copy failed.");
+  }
+}
+
+function setupDetailCopy() {
+  if (!detailRoot) {
+    return;
+  }
+
+  const copyDetail = async (target) => {
+    const field = target?.closest?.("dd[data-field]");
+    if (!field || !detailRoot.contains(field)) {
+      return;
+    }
+
+    const row = field.closest("div");
+    const label = String(row?.querySelector("dt")?.textContent || "Detail").trim();
+    const value = String(field.textContent || "").trim();
+    if (!value || value === "-" || /^select\s/i.test(value)) {
+      return;
+    }
+
+    try {
+      await copyTextToClipboard(value);
+      showCopyStatus(`Copied ${label}.`);
+    } catch (error) {
+      showCopyStatus(error?.message || "Could not copy detail.", true);
+    }
+  };
+
+  const fields = detailRoot.querySelectorAll("dd[data-field]");
+  for (const field of fields) {
+    field.tabIndex = 0;
+    field.setAttribute("title", "Click to copy");
+  }
+
+  detailRoot.addEventListener("click", (event) => {
+    void copyDetail(event.target);
+  });
+
+  detailRoot.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    void copyDetail(event.target);
+  });
 }
 
 function setDetail(client) {
@@ -856,6 +936,8 @@ copyAllBtn?.addEventListener("click", async () => {
 updateAllBtn?.addEventListener("click", async () => {
   await applyUpdateAllCandidates();
 });
+
+setupDetailCopy();
 
 signOutBtn?.addEventListener("click", async () => {
   try {

@@ -403,6 +403,42 @@ tbody tr.selected {
   border-radius: 12px;
   padding: 10px 12px;
   background: #fbfcff;
+  position: relative;
+}
+
+.detail-list div::after {
+  content: "Click to copy";
+  position: absolute;
+  right: 10px;
+  top: -8px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transform: translateY(3px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.detail-list div:hover::after,
+.detail-list div:focus-within::after {
+  opacity: 0.92;
+  transform: translateY(0);
+}
+
+.detail-list dd[data-field] {
+  cursor: copy;
+  outline: none;
+}
+
+.detail-list dd[data-field]:focus-visible {
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px #7aa7ff;
 }
 
 .subheading {
