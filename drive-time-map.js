@@ -6,6 +6,7 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const signOutBtn = document.getElementById("signOutBtn");
 const locationInput = document.getElementById("locationInput");
 const driveTimeMinutesInput = document.getElementById("driveTimeMinutesInput");
+const drawSecondaryInput = document.getElementById("drawSecondaryInput");
 const searchNameInput = document.getElementById("searchNameInput");
 const drawDriveTimeBtn = document.getElementById("drawDriveTimeBtn");
 const saveSearchBtn = document.getElementById("saveSearchBtn");
@@ -158,8 +159,158 @@ function sanitizeSavedSearch(raw, fallbackIndex = 0) {
     quality: raw?.quality || null,
     createdAt: String(raw?.createdAt || new Date().toISOString()),
     visible: raw?.visible !== false,
+    secondary: raw?.secondary === true,
     colorIndex: Number.isInteger(colorIndex) && colorIndex >= 0 ? colorIndex : fallbackIndex,
   };
+}
+
+function getVisibleAreaPolygons(excludeId = "") {
+  return savedSearches
+    .filter((search) => search.visible && Array.isArray(search.polygon) && search.polygon.length >= 3)
+    .filter((search) => !excludeId || search.id !== excludeId)
+    .map((search) => search.polygon);
+}
+
+function signedArea(points) {
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    area += a.lng * b.lat - b.lng * a.lat;
+  }
+  return area / 2;
+}
+
+function isPointOnSegment(p, a, b) {
+  const cross = (p.lat - a.lat) * (b.lng - a.lng) - (p.lng - a.lng) * (b.lat - a.lat);
+  if (Math.abs(cross) > 1e-9) {
+    return false;
+  }
+  const dot = (p.lng - a.lng) * (b.lng - a.lng) + (p.lat - a.lat) * (b.lat - a.lat);
+  if (dot < 0) {
+    return false;
+  }
+  const lenSq = (b.lng - a.lng) ** 2 + (b.lat - a.lat) ** 2;
+  return dot <= lenSq;
+}
+
+function segmentsIntersect(a1, a2, b1, b2) {
+  const orient = (p, q, r) => {
+    const value = (q.lng - p.lng) * (r.lat - p.lat) - (q.lat - p.lat) * (r.lng - p.lng);
+    if (Math.abs(value) < 1e-10) {
+      return 0;
+    }
+    return value > 0 ? 1 : -1;
+  };
+
+  const o1 = orient(a1, a2, b1);
+  const o2 = orient(a1, a2, b2);
+  const o3 = orient(b1, b2, a1);
+  const o4 = orient(b1, b2, a2);
+
+  if (o1 !== o2 && o3 !== o4) {
+    return true;
+  }
+
+  if (o1 === 0 && isPointOnSegment(b1, a1, a2)) {
+    return true;
+  }
+  if (o2 === 0 && isPointOnSegment(b2, a1, a2)) {
+    return true;
+  }
+  if (o3 === 0 && isPointOnSegment(a1, b1, b2)) {
+    return true;
+  }
+  if (o4 === 0 && isPointOnSegment(a2, b1, b2)) {
+    return true;
+  }
+  return false;
+}
+
+function pointInPolygon(point, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[i];
+    const b = polygon[j];
+    const intersects =
+      a.lat > point.lat !== b.lat > point.lat &&
+      point.lng < ((b.lng - a.lng) * (point.lat - a.lat)) / (b.lat - a.lat + Number.EPSILON) + a.lng;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function polygonsOverlap(polyA, polyB) {
+  if (!Array.isArray(polyA) || !Array.isArray(polyB) || polyA.length < 3 || polyB.length < 3) {
+    return false;
+  }
+
+  const areaA = Math.abs(signedArea(polyA));
+  const areaB = Math.abs(signedArea(polyB));
+  if (areaA < 1e-10 || areaB < 1e-10) {
+    return false;
+  }
+
+  for (let i = 0; i < polyA.length; i += 1) {
+    const a1 = polyA[i];
+    const a2 = polyA[(i + 1) % polyA.length];
+    for (let j = 0; j < polyB.length; j += 1) {
+      const b1 = polyB[j];
+      const b2 = polyB[(j + 1) % polyB.length];
+      if (segmentsIntersect(a1, a2, b1, b2)) {
+        return true;
+      }
+    }
+  }
+
+  if (pointInPolygon(polyA[0], polyB)) {
+    return true;
+  }
+  if (pointInPolygon(polyB[0], polyA)) {
+    return true;
+  }
+  return false;
+}
+
+function overlapsAnyPolygon(candidatePolygon, existingPolygons) {
+  for (const polygon of existingPolygons) {
+    if (polygonsOverlap(candidatePolygon, polygon)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function scalePolygonAroundCenter(points, center, factor) {
+  return points.map((point) => ({
+    lat: center.lat + (point.lat - center.lat) * factor,
+    lng: center.lng + (point.lng - center.lng) * factor,
+  }));
+}
+
+function buildSecondaryPolygonWithoutOverlap(candidatePolygon, center, existingPolygons) {
+  if (!overlapsAnyPolygon(candidatePolygon, existingPolygons)) {
+    return {
+      polygon: candidatePolygon,
+      wasAdjusted: false,
+      factor: 1,
+    };
+  }
+
+  for (let factor = 0.95; factor >= 0.35; factor -= 0.05) {
+    const scaled = scalePolygonAroundCenter(candidatePolygon, center, factor);
+    if (!overlapsAnyPolygon(scaled, existingPolygons)) {
+      return {
+        polygon: scaled,
+        wasAdjusted: true,
+        factor: Number(factor.toFixed(2)),
+      };
+    }
+  }
+
+  return null;
 }
 
 function loadSavedSearches() {
@@ -593,7 +744,7 @@ function initMap() {
   map = window.L.map(driveTimeMapRoot, {
     zoomControl: true,
     attributionControl: true,
-  }).setView([51.5072, -0.1276], 10);
+  }).setView([51.2802, 1.0789], 11);
 
   window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
@@ -621,6 +772,7 @@ function renderPreview(payload) {
 
   const center = payload?.center;
   const polygonPoints = Array.isArray(payload?.polygon) ? payload.polygon : [];
+  const isSecondary = payload?.secondary === true;
   if (!center || typeof center.lat !== "number" || typeof center.lng !== "number" || !polygonPoints.length) {
     throw new Error("Drive-time response was missing map coordinates.");
   }
@@ -639,12 +791,12 @@ function renderPreview(payload) {
   previewPolygon = window.L.polygon(
     polygonPoints.map((point) => [point.lat, point.lng]),
     {
-      color: "#1d2a42",
+      color: isSecondary ? "#5c4a1d" : "#1d2a42",
       weight: 2,
-      opacity: 0.85,
-      dashArray: "5 5",
-      fillColor: "#9db3df",
-      fillOpacity: 0.2,
+      opacity: isSecondary ? 0.8 : 0.85,
+      dashArray: isSecondary ? "8 6" : "5 5",
+      fillColor: isSecondary ? "#c9b176" : "#9db3df",
+      fillOpacity: isSecondary ? 0.16 : 0.2,
     }
   ).addTo(map);
 
@@ -691,12 +843,13 @@ function syncSearchLayer(search) {
     {
       color: color.stroke,
       weight: 2,
-      opacity: 0.95,
+      opacity: search.secondary ? 0.85 : 0.95,
+      dashArray: search.secondary ? "7 6" : null,
       fillColor: color.fill,
-      fillOpacity: 0.2,
+      fillOpacity: search.secondary ? 0.12 : 0.2,
     }
   ).addTo(map);
-  polygon.bindPopup(`${search.name} (${search.minutes} mins)`);
+  polygon.bindPopup(`${search.name} (${search.minutes} mins${search.secondary ? ", secondary" : ""})`);
   areaLayers.set(search.id, { marker, polygon });
 }
 
@@ -754,7 +907,7 @@ function renderSavedSearches() {
     title.textContent = search.name;
     const subtitle = document.createElement("span");
     subtitle.className = "drive-time-search-subtitle";
-    subtitle.textContent = search.formattedAddress || search.query || "Unknown address";
+    subtitle.textContent = `${search.formattedAddress || search.query || "Unknown address"}${search.secondary ? " • Secondary" : ""}`;
     titleWrap.append(title, subtitle);
 
     visibilityLabel.append(checkbox, colorDot, titleWrap);
@@ -816,6 +969,7 @@ function saveCurrentSearch() {
       quality: currentResult.quality,
       createdAt: new Date().toISOString(),
       visible: true,
+      secondary: currentResult.secondary === true,
       colorIndex: savedSearches.length,
     },
     savedSearches.length
@@ -919,6 +1073,7 @@ async function drawDriveTimeArea() {
     return;
   }
   const minutes = resolveDriveTimeMinutes();
+  const drawAsSecondary = Boolean(drawSecondaryInput?.checked);
 
   setBusy(true);
   setStatus(`Calculating ${minutes}-minute drive-time area...`);
@@ -947,14 +1102,46 @@ async function drawDriveTimeArea() {
       formattedAddress: String(data.formattedAddress || location),
       minutes: clampMinutes(data.minutes || minutes),
       center: data.center,
-      polygon: Array.isArray(data.polygon) ? data.polygon : [],
+      polygon: sanitizePolygon(data.polygon),
       quality: data.quality || null,
+      secondary: drawAsSecondary,
     };
-    renderPreview(data);
+    let secondaryAdjusted = false;
+    if (drawAsSecondary) {
+      const existingVisiblePolygons = getVisibleAreaPolygons();
+      const adjusted = buildSecondaryPolygonWithoutOverlap(
+        currentResult.polygon,
+        currentResult.center,
+        existingVisiblePolygons
+      );
+      if (!adjusted) {
+        throw new Error("Secondary area still overlaps visible areas. Move location or lower minutes.");
+      }
+      currentResult.polygon = adjusted.polygon;
+      if (adjusted.wasAdjusted) {
+        secondaryAdjusted = true;
+        setStatus(
+          `Secondary area adjusted (${Math.round(adjusted.factor * 100)}%) to avoid overlap for ${currentResult.formattedAddress || location}.`
+        );
+      }
+    }
+    renderPreview({
+      ...data,
+      polygon: currentResult.polygon,
+      secondary: drawAsSecondary,
+    });
     if (searchNameInput) {
       searchNameInput.value = currentResult.formattedAddress || currentResult.query;
     }
-    setStatus(`Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location}.`);
+    if (drawAsSecondary) {
+      if (!secondaryAdjusted) {
+        setStatus(
+          `Showing ${currentResult.minutes}-minute secondary area for ${currentResult.formattedAddress || location}.`
+        );
+      }
+    } else {
+      setStatus(`Showing ${currentResult.minutes}-minute drive-time area for ${currentResult.formattedAddress || location}.`);
+    }
     if (driveTimeMeta) {
       driveTimeMeta.textContent = formatQualityText(data.quality);
     }
