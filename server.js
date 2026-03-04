@@ -21,7 +21,7 @@ const tasksWhiteboardSyncHandler = require("./api/tasks/whiteboard-sync");
 const tasksCreateHandler = require("./api/tasks/create");
 const mapsDriveTimeHandler = require("./api/maps/drive-time");
 const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
-const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment-check-click");
+const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 
 function loadEnvFile(envPath) {
   let raw = "";
