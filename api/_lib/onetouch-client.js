@@ -485,6 +485,25 @@ function normalizeCarer(record) {
         .map((tag) => asString(tag?.tag || tag?.name || tag))
         .filter(Boolean)
     : [];
+  const lowerCareComp = tags.find((tag) => {
+    const token = tag.toLowerCase();
+    return token.includes("companion") || token.includes("care");
+  });
+  const careCompanionshipTag = lowerCareComp || "";
+  const otherTags = tags.filter((tag) => tag !== careCompanionshipTag);
+  const area = asString(
+    record?.organisation?.area?.name ||
+      record?.area ||
+      record?.location ||
+      record?.town ||
+      record?.county
+  );
+  const contractedHours = Number(
+    record?.contracted_hrs?.total_weekly ??
+      record?.contracted_hours?.total_weekly ??
+      record?.contracted_hrs_total ??
+      0
+  );
 
   return {
     id,
@@ -494,6 +513,10 @@ function normalizeCarer(record) {
     postcode: asString(record?.postcode || record?.post_code || record?.postCode || record?.zip),
     status: asString(record?.status || record?.carer_status),
     tags,
+    area,
+    contractedHours: Number.isFinite(contractedHours) ? contractedHours : 0,
+    careCompanionshipTag,
+    otherTags,
     raw: record,
   };
 }
@@ -595,6 +618,48 @@ async function listCarers() {
   return allRecords.map(normalizeCarer).filter((carer) => carer.id);
 }
 
+async function getCarerByExternalId(externalId) {
+  const id = asString(externalId);
+  if (!id) {
+    return null;
+  }
+  const payload = await callOneTouch(`carer/get/${encodeURIComponent(id)}`);
+  return normalizeCarer(payload || {});
+}
+
+async function listCarersDetailed() {
+  const carers = await listCarers();
+  const concurrencyRaw = Number(process.env.ONETOUCH_CARER_DETAIL_CONCURRENCY || 4);
+  const concurrency = Number.isFinite(concurrencyRaw)
+    ? Math.max(1, Math.min(Math.floor(concurrencyRaw), 10))
+    : 4;
+  let nextIndex = 0;
+
+  const enriched = new Array(carers.length);
+  const workers = Array.from(
+    { length: Math.min(concurrency, carers.length) },
+    async () => {
+      while (true) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= carers.length) {
+          return;
+        }
+        const carer = carers[index];
+        try {
+          const detail = await getCarerByExternalId(carer.id);
+          enriched[index] = detail || carer;
+        } catch {
+          enriched[index] = carer;
+        }
+      }
+    }
+  );
+
+  await Promise.all(workers);
+  return enriched.filter(Boolean);
+}
+
 async function listVisits() {
   const payload = await callOneTouch("visits");
   const records = resolveRecords(payload, ["visits"]);
@@ -604,6 +669,7 @@ async function listVisits() {
 
 module.exports = {
   listCarers,
+  listCarersDetailed,
   listClients,
   listVisits,
 };

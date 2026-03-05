@@ -194,6 +194,9 @@ button {
 
 input[type="search"],
 input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
 select,
 textarea {
   width: 100%;

@@ -1,6 +1,6 @@
 const fs = require("fs/promises");
 const path = require("path");
-const { listCarers, listClients, listVisits } = require("./onetouch-client");
+const { listCarersDetailed, listClients } = require("./onetouch-client");
 const { readClients: readListClients } = require("./clients-source");
 
 let directoryCache = {
@@ -214,55 +214,6 @@ function attachRelationships(clients, carers, visits) {
   };
 }
 
-function attachCarerRelationshipsFromVisits(carers, visits) {
-  const carerMap = new Map(carers.map((carer) => [carer.id, carer]));
-  const carerLinks = new Map();
-
-  function ensureCarerLink(carerId) {
-    if (!carerLinks.has(carerId)) {
-      carerLinks.set(carerId, {
-        clientIds: new Set(),
-        visitCount: 0,
-        lastVisitAt: "",
-      });
-    }
-    return carerLinks.get(carerId);
-  }
-
-  for (const visit of visits) {
-    if (!carerMap.has(visit.carerId)) {
-      continue;
-    }
-    const link = ensureCarerLink(visit.carerId);
-    if (visit.clientId) {
-      link.clientIds.add(visit.clientId);
-    }
-    link.visitCount += 1;
-    if (visit.startAt && (!link.lastVisitAt || visit.startAt > link.lastVisitAt)) {
-      link.lastVisitAt = visit.startAt;
-    }
-  }
-
-  return carers.map((carer) => {
-    const related = carerLinks.get(carer.id);
-    const clients = related
-      ? Array.from(related.clientIds)
-          .map((clientId) => ({ id: clientId, name: clientId }))
-          .sort(sortByNameThenId)
-      : [];
-
-    return {
-      ...carer,
-      relationships: {
-        clientCount: clients.length,
-        visitCount: related?.visitCount || 0,
-        lastVisitAt: related?.lastVisitAt || "",
-        clients,
-      },
-    };
-  });
-}
-
 async function loadDirectoryData() {
   const loadStartedAt = Date.now();
   if (process.env.USE_LOCAL_CLIENTS_FALLBACK === "1") {
@@ -347,30 +298,22 @@ async function loadCarersDirectoryData() {
   }
 
   const carersTimeoutMs = Number(process.env.ONETOUCH_CARERS_TIMEOUT_MS || "12000");
-  const visitsTimeoutMs = Number(process.env.ONETOUCH_CARERS_VISITS_TIMEOUT_MS || "1200");
-  const carers = await timed("carers/all", () => withTimeout(listCarers(), carersTimeoutMs, "carers/all"));
-  const visitsResult = await timed("visits", () => withTimeout(listVisits(), visitsTimeoutMs, "visits")).then(
-    (visits) => ({ visits, error: "" }),
-    (error) => ({ visits: [], error: error?.message || String(error) })
+  const carers = await timed("carers/detailed", () =>
+    withTimeout(listCarersDetailed(), carersTimeoutMs, "carers/detailed")
   );
 
   const sortedCarers = carers.sort(sortByNameThenId);
-  const carersWithRelationships = attachCarerRelationshipsFromVisits(sortedCarers, visitsResult.visits);
   const warnings = [];
-  if (visitsResult.error) {
-    warnings.push(`Relationships unavailable in fast mode: ${visitsResult.error}`);
-  }
 
   console.info("[OneTouch] Carers load complete", {
     elapsedMs: Date.now() - loadStartedAt,
     carers: sortedCarers.length,
-    visits: visitsResult.visits.length,
     warnings: warnings.length,
   });
 
   return {
     source: "onetouch",
-    carers: carersWithRelationships,
+    carers: sortedCarers,
     warnings,
   };
 }

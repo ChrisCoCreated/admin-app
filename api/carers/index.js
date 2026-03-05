@@ -14,18 +14,37 @@ module.exports = async (req, res) => {
   try {
     const directory = await readCarersDirectoryData();
     const q = String(req.query.q || "").trim().toLowerCase();
+    const area = String(req.query.area || "").trim().toLowerCase();
+    const careComp = String(req.query.care_comp || req.query.careComp || "").trim().toLowerCase();
     const limitRaw = Number(req.query.limit || "250");
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 1000)) : 250;
 
-    const filtered = q
-      ? directory.carers.filter((carer) => {
-          return (
-            String(carer.name || "").toLowerCase().includes(q) ||
-            String(carer.id || "").toLowerCase().includes(q) ||
-            String(carer.postcode || "").toLowerCase().includes(q)
-          );
-        })
-      : directory.carers;
+    const filtered = directory.carers.filter((carer) => {
+      if (q) {
+        const matchesQuery =
+          String(carer.name || "").toLowerCase().includes(q) ||
+          String(carer.id || "").toLowerCase().includes(q) ||
+          String(carer.postcode || "").toLowerCase().includes(q) ||
+          String(carer.area || "").toLowerCase().includes(q);
+        if (!matchesQuery) {
+          return false;
+        }
+      }
+
+      if (area) {
+        if (String(carer.area || "").toLowerCase() !== area) {
+          return false;
+        }
+      }
+
+      if (careComp) {
+        if (String(carer.careCompanionshipTag || "").toLowerCase() !== careComp) {
+          return false;
+        }
+      }
+
+      return true;
+    });
 
     res.setHeader("Cache-Control", "private, max-age=30");
     res.setHeader("X-Client-Source", directory.source);

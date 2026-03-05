@@ -28,6 +28,8 @@ const loadPeopleOverlayBtn = document.getElementById("loadPeopleOverlayBtn");
 const showPeopleOverlayInput = document.getElementById("showPeopleOverlayInput");
 const overlayTypeSelect = document.getElementById("overlayTypeSelect");
 const overlayLocationSelect = document.getElementById("overlayLocationSelect");
+const overlayCompanionAreaSelect = document.getElementById("overlayCompanionAreaSelect");
+const overlayCompanionCareCompSelect = document.getElementById("overlayCompanionCareCompSelect");
 const overlayStatusFilters = document.getElementById("overlayStatusFilters");
 const peopleOverlayStatus = document.getElementById("peopleOverlayStatus");
 const savedSearchesList = document.getElementById("savedSearchesList");
@@ -560,6 +562,26 @@ function deriveOverlayLocationOptions(items) {
   return Array.from(unique).sort((a, b) => a.localeCompare(b));
 }
 
+function deriveCompanionAreaOptions(items) {
+  const values = new Set(
+    items
+      .filter((item) => item.type === "companion")
+      .map((item) => normalizeLocation(item.areaLabel))
+      .filter(Boolean)
+  );
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
+}
+
+function deriveCompanionCareCompOptions(items) {
+  const values = new Set(
+    items
+      .filter((item) => item.type === "companion")
+      .map((item) => normalizeLocation(item.careCompTag))
+      .filter(Boolean)
+  );
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
+}
+
 function formatStatusLabel(status) {
   const value = normalizeStatus(status);
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -632,14 +654,61 @@ function renderOverlayLocationOptions() {
   overlayLocationSelect.value = options.includes(current) ? current : "all";
 }
 
+function renderCompanionOverlayOptions() {
+  if (!overlayCompanionAreaSelect || !overlayCompanionCareCompSelect) {
+    return;
+  }
+
+  const currentArea = String(overlayCompanionAreaSelect.value || "all");
+  const currentCareComp = String(overlayCompanionCareCompSelect.value || "all");
+  const areaOptions = deriveCompanionAreaOptions(peopleOverlayData);
+  const careCompOptions = deriveCompanionCareCompOptions(peopleOverlayData);
+
+  overlayCompanionAreaSelect.innerHTML = '<option value="all">All areas</option>';
+  for (const area of areaOptions) {
+    const option = document.createElement("option");
+    option.value = area;
+    option.textContent = area;
+    overlayCompanionAreaSelect.appendChild(option);
+  }
+
+  overlayCompanionCareCompSelect.innerHTML = '<option value="all">All tags</option>';
+  for (const tag of careCompOptions) {
+    const option = document.createElement("option");
+    option.value = tag;
+    option.textContent = tag;
+    overlayCompanionCareCompSelect.appendChild(option);
+  }
+
+  overlayCompanionAreaSelect.value = areaOptions.includes(currentArea) ? currentArea : "all";
+  overlayCompanionCareCompSelect.value = careCompOptions.includes(currentCareComp) ? currentCareComp : "all";
+}
+
 function getFilteredOverlayPeople() {
   const typeFilter = String(overlayTypeSelect?.value || "all");
   const locationFilter = String(overlayLocationSelect?.value || "all");
+  const companionAreaFilter = String(overlayCompanionAreaSelect?.value || "all");
+  const companionCareCompFilter = String(overlayCompanionCareCompSelect?.value || "all");
   return peopleOverlayData.filter((item) => {
     const matchesType = typeFilter === "all" || item.type === typeFilter;
     const matchesStatus = overlayStatusSet.has(normalizeStatus(item.status));
     const matchesLocation = locationFilter === "all" || normalizeLocation(item.locationLabel) === locationFilter;
-    return matchesType && matchesStatus && matchesLocation;
+    if (!(matchesType && matchesStatus && matchesLocation)) {
+      return false;
+    }
+
+    if (item.type !== "companion") {
+      return true;
+    }
+
+    if (companionAreaFilter !== "all" && normalizeLocation(item.areaLabel) !== companionAreaFilter) {
+      return false;
+    }
+    if (companionCareCompFilter !== "all" && normalizeLocation(item.careCompTag) !== companionCareCompFilter) {
+      return false;
+    }
+
+    return true;
   });
 }
 
@@ -731,6 +800,8 @@ function buildOverlayItems(clientsPayload, carersPayload) {
       name: normalizeLocation(carer.name || "Unnamed companion"),
       status: normalizeStatus(carer.status),
       locationLabel: buildCarerLocationLabel(carer),
+      areaLabel: normalizeLocation(carer.area || ""),
+      careCompTag: normalizeLocation(carer.careCompanionshipTag || ""),
       geocodeQuery: query,
     });
     index += 1;
@@ -821,6 +892,7 @@ async function loadPeopleOverlay() {
       overlayLoaded = true;
       renderOverlayStatusFilters();
       renderOverlayLocationOptions();
+      renderCompanionOverlayOptions();
       applyPeopleOverlayFilters();
       setPeopleOverlayStatus("No mappable people records found.");
       return;
@@ -831,6 +903,7 @@ async function loadPeopleOverlay() {
     overlayLoaded = true;
     renderOverlayStatusFilters();
     renderOverlayLocationOptions();
+    renderCompanionOverlayOptions();
     applyPeopleOverlayFilters();
     setPeopleOverlayStatus(`Loaded ${resolvedItems.length} mapped people.`);
   } catch (error) {
@@ -1847,6 +1920,14 @@ overlayTypeSelect?.addEventListener("change", () => {
 });
 
 overlayLocationSelect?.addEventListener("change", () => {
+  applyPeopleOverlayFilters();
+});
+
+overlayCompanionAreaSelect?.addEventListener("change", () => {
+  applyPeopleOverlayFilters();
+});
+
+overlayCompanionCareCompSelect?.addEventListener("change", () => {
   applyPeopleOverlayFilters();
 });
 

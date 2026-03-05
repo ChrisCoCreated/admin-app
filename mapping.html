@@ -39,7 +39,20 @@
             Search associates
             <input id="carerSearchInput" type="search" placeholder="Search by name, id, or postcode" autocomplete="off" />
           </label>
-          <div id="associateStatusFilters" class="status-filter-row"></div>
+          <div class="mapping-form-grid">
+            <label class="field" for="associateAreaFilterSelect">
+              Area
+              <select id="associateAreaFilterSelect">
+                <option value="all">All areas</option>
+              </select>
+            </label>
+            <label class="field" for="associateCareCompFilterSelect">
+              Care / Companionship
+              <select id="associateCareCompFilterSelect">
+                <option value="all">All tags</option>
+              </select>
+            </label>
+          </div>
           <ul id="carerSearchResults" class="carer-search-results"></ul>
           <p id="carerSearchStatus" class="muted">Loading associates...</p>
 

@@ -29,15 +29,28 @@
     <main class="container clients-main">
       <section class="hero compact">
         <h1>Carers</h1>
-        <p>Browse carers and view the clients they support from OneTouch visits data.</p>
+        <p>Browse carers by area and care/companionship tag.</p>
       </section>
 
       <section class="panel">
         <label class="field" for="searchInput">
           Search
-          <input id="searchInput" type="search" placeholder="Search by name, id or postcode" autocomplete="off" />
+          <input id="searchInput" type="search" placeholder="Search by name, id, area or postcode" autocomplete="off" />
         </label>
-        <div id="carerStatusFilters" class="status-filter-row"></div>
+        <div class="mapping-form-grid">
+          <label class="field" for="areaFilterSelect">
+            Area
+            <select id="areaFilterSelect">
+              <option value="all">All areas</option>
+            </select>
+          </label>
+          <label class="field" for="careCompFilterSelect">
+            Care / Companionship
+            <select id="careCompFilterSelect">
+              <option value="all">All tags</option>
+            </select>
+          </label>
+        </div>
         <p id="statusMessage" class="muted">Loading carers...</p>
         <p id="warningState" class="muted" hidden></p>
       </section>
@@ -51,10 +64,9 @@
                 <tr>
                   <th>ID</th>
                   <th>Name</th>
-                  <th>Status</th>
-                  <th>Postcode</th>
-                  <th>Clients</th>
-                  <th>Visits</th>
+                  <th>Area</th>
+                  <th>Care / Companionship</th>
+                  <th>Contracted Hours</th>
                 </tr>
               </thead>
               <tbody id="carersTableBody"></tbody>
@@ -75,6 +87,22 @@
               <dd data-field="name">Select a carer</dd>
             </div>
             <div>
+              <dt>Area</dt>
+              <dd data-field="area">-</dd>
+            </div>
+            <div>
+              <dt>Care / Companionship</dt>
+              <dd data-field="careComp">-</dd>
+            </div>
+            <div>
+              <dt>Contracted Hours (Weekly)</dt>
+              <dd data-field="contractedHours">-</dd>
+            </div>
+            <div>
+              <dt>Other Tags</dt>
+              <dd data-field="otherTags">-</dd>
+            </div>
+            <div>
               <dt>Postcode</dt>
               <dd data-field="postcode">-</dd>
             </div>
@@ -86,30 +114,7 @@
               <dt>Phone</dt>
               <dd data-field="phone">-</dd>
             </div>
-            <div>
-              <dt>Status</dt>
-              <dd data-field="status">-</dd>
-            </div>
-            <div>
-              <dt>Tags</dt>
-              <dd data-field="tags">-</dd>
-            </div>
-            <div>
-              <dt>Total Visits</dt>
-              <dd data-field="visitCount">-</dd>
-            </div>
-            <div>
-              <dt>Linked Clients</dt>
-              <dd data-field="clientCount">-</dd>
-            </div>
-            <div>
-              <dt>Last Visit</dt>
-              <dd data-field="lastVisitAt">-</dd>
-            </div>
           </dl>
-
-          <h2 class="subheading">Linked Clients</h2>
-          <ul id="linkedClientsList" class="linked-list"></ul>
         </article>
       </section>
     </main>

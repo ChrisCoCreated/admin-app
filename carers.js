@@ -4,331 +4,42 @@ import { createDirectoryApi } from "./directory-api.js";
 import { renderTopNavigation } from "./navigation.js";
 
 const searchInput = document.getElementById("searchInput");
+const areaFilterSelect = document.getElementById("areaFilterSelect");
+const careCompFilterSelect = document.getElementById("careCompFilterSelect");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
-const carerStatusFilters = document.getElementById("carerStatusFilters");
 const carersTableBody = document.getElementById("carersTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
 const detailRoot = document.getElementById("carerDetail");
-const linkedClientsList = document.getElementById("linkedClientsList");
 
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
   name: detailRoot?.querySelector('[data-field="name"]'),
+  area: detailRoot?.querySelector('[data-field="area"]'),
+  careComp: detailRoot?.querySelector('[data-field="careComp"]'),
+  contractedHours: detailRoot?.querySelector('[data-field="contractedHours"]'),
+  otherTags: detailRoot?.querySelector('[data-field="otherTags"]'),
   postcode: detailRoot?.querySelector('[data-field="postcode"]'),
   email: detailRoot?.querySelector('[data-field="email"]'),
   phone: detailRoot?.querySelector('[data-field="phone"]'),
-  status: detailRoot?.querySelector('[data-field="status"]'),
-  tags: detailRoot?.querySelector('[data-field="tags"]'),
-  visitCount: detailRoot?.querySelector('[data-field="visitCount"]'),
-  clientCount: detailRoot?.querySelector('[data-field="clientCount"]'),
-  lastVisitAt: detailRoot?.querySelector('[data-field="lastVisitAt"]'),
 };
-
-const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
-const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
 
 let allCarers = [];
 let selectedCarerId = "";
-let selectedCarerStatuses = new Set(DEFAULT_STATUS_FILTERS);
-let account = null;
-let copyStatusResetTimer = null;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
-  onSignedIn: (signedInAccount) => {
-    account = signedInAccount;
-  },
-  onSignedOut: () => {
-    account = null;
-  },
 });
-
 const directoryApi = createDirectoryApi(authController);
 
-function setStatus(message, isError = false) {
-  statusMessage.textContent = message;
-  statusMessage.classList.toggle("error", isError);
-}
-
-function showCopyStatus(message, isError = false) {
-  setStatus(message, isError);
-  if (copyStatusResetTimer) {
-    clearTimeout(copyStatusResetTimer);
-  }
-  copyStatusResetTimer = setTimeout(() => {
-    copyStatusResetTimer = null;
-    if (statusMessage && statusMessage.textContent === message) {
-      statusMessage.textContent = "";
-      statusMessage.classList.remove("error");
-    }
-  }, 1800);
-}
-
-async function copyTextToClipboard(text) {
-  if (navigator?.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const input = document.createElement("textarea");
-  input.value = text;
-  input.setAttribute("readonly", "");
-  input.style.position = "fixed";
-  input.style.opacity = "0";
-  document.body.appendChild(input);
-  input.select();
-  const copied = document.execCommand("copy");
-  document.body.removeChild(input);
-  if (!copied) {
-    throw new Error("Copy failed.");
-  }
-}
-
-function setupDetailCopy() {
-  if (!detailRoot) {
-    return;
-  }
-
-  const copyDetail = async (target) => {
-    const field = target?.closest?.("dd[data-field]");
-    if (!field || !detailRoot.contains(field)) {
-      return;
-    }
-
-    const row = field.closest("div");
-    const label = String(row?.querySelector("dt")?.textContent || "Detail").trim();
-    const value = String(field.textContent || "").trim();
-    if (!value || value === "-" || /^select\s/i.test(value)) {
-      return;
-    }
-
-    try {
-      await copyTextToClipboard(value);
-      showCopyStatus(`Copied ${label}.`);
-    } catch (error) {
-      showCopyStatus(error?.message || "Could not copy detail.", true);
-    }
-  };
-
-  const fields = detailRoot.querySelectorAll("dd[data-field]");
-  for (const field of fields) {
-    field.tabIndex = 0;
-    field.setAttribute("title", "Click to copy");
-  }
-
-  detailRoot.addEventListener("click", (event) => {
-    void copyDetail(event.target);
-  });
-
-  detailRoot.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") {
-      return;
-    }
-    event.preventDefault();
-    void copyDetail(event.target);
-  });
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
-
-function setDetail(carer) {
-  if (!carer) {
-    detailFields.id.textContent = "-";
-    detailFields.name.textContent = "Select a carer";
-    detailFields.postcode.textContent = "-";
-    detailFields.email.textContent = "-";
-    detailFields.phone.textContent = "-";
-    detailFields.status.textContent = "-";
-    detailFields.tags.textContent = "-";
-    detailFields.visitCount.textContent = "-";
-    detailFields.clientCount.textContent = "-";
-    detailFields.lastVisitAt.textContent = "-";
-    linkedClientsList.innerHTML = "";
-    return;
-  }
-
-  detailFields.id.textContent = carer.id || "-";
-  detailFields.name.textContent = carer.name || "-";
-  detailFields.postcode.textContent = carer.postcode || "-";
-  detailFields.email.textContent = carer.email || "-";
-  detailFields.phone.textContent = carer.phone || "-";
-  detailFields.status.textContent = formatStatusLabel(carer.status);
-  detailFields.tags.textContent = formatTags(carer.tags);
-  detailFields.visitCount.textContent = String(carer.relationships?.visitCount || 0);
-  detailFields.clientCount.textContent = String(carer.relationships?.clientCount || 0);
-  detailFields.lastVisitAt.textContent = formatDateTime(carer.relationships?.lastVisitAt);
-
-  linkedClientsList.innerHTML = "";
-  const clients = Array.isArray(carer.relationships?.clients) ? carer.relationships.clients : [];
-  if (!clients.length) {
-    const li = document.createElement("li");
-    li.textContent = "No linked clients found.";
-    linkedClientsList.appendChild(li);
-    return;
-  }
-
-  for (const client of clients) {
-    const li = document.createElement("li");
-    li.textContent = `${client.name || "Unknown"} (${client.id || "-"})`;
-    linkedClientsList.appendChild(li);
-  }
-}
-
-function normalizeStatus(value) {
+function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function collectStatusOptions(items) {
-  const set = new Set();
-  for (const item of items) {
-    const status = normalizeStatus(item?.status);
-    if (status) {
-      set.add(status);
-    }
-  }
-  if (!set.has("active")) {
-    set.add("active");
-  }
-  if (!set.has("pending")) {
-    set.add("pending");
-  }
-  if (!set.has("archived")) {
-    set.add("archived");
-  }
-
-  const preferred = STATUS_FILTER_ORDER.filter((status) => set.has(status));
-  const remaining = Array.from(set)
-    .filter((status) => !preferred.includes(status))
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  return [...preferred, ...remaining];
-}
-
-function formatStatusLabel(status) {
-  const normalized = normalizeStatus(status);
-  if (!normalized) {
-    return "Unknown";
-  }
-  return normalized
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatTags(tags) {
-  if (!Array.isArray(tags) || !tags.length) {
-    return "-";
-  }
-  const unique = Array.from(
-    new Set(
-      tags
-        .map((tag) => String(tag || "").trim())
-        .filter(Boolean)
-    )
-  );
-  return unique.length ? unique.join(", ") : "-";
-}
-
-function passesStatusFilter(status) {
-  if (!selectedCarerStatuses.size) {
-    return true;
-  }
-  const normalized = normalizeStatus(status);
-  if (!normalized) {
-    return false;
-  }
-  return selectedCarerStatuses.has(normalized);
-}
-
-function renderStatusFilters() {
-  if (!carerStatusFilters) {
-    return;
-  }
-
-  const options = collectStatusOptions(allCarers);
-  if (!options.length) {
-    carerStatusFilters.hidden = true;
-    return;
-  }
-
-  const nextSelected = new Set(Array.from(selectedCarerStatuses).filter((status) => options.includes(status)));
-  if (!nextSelected.size) {
-    selectedCarerStatuses = new Set(options.filter((status) => DEFAULT_STATUS_FILTERS.has(status)));
-    if (!selectedCarerStatuses.size) {
-      selectedCarerStatuses = new Set(options);
-    }
-  } else {
-    selectedCarerStatuses = nextSelected;
-  }
-
-  carerStatusFilters.hidden = false;
-  carerStatusFilters.innerHTML = "";
-
-  for (const status of options) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `status-filter-btn${selectedCarerStatuses.has(status) ? " active" : ""}`;
-    btn.textContent = formatStatusLabel(status);
-    btn.addEventListener("click", () => {
-      const next = new Set(selectedCarerStatuses);
-      if (next.has(status)) {
-        next.delete(status);
-      } else {
-        next.add(status);
-      }
-      if (!next.size) {
-        next.add(status);
-      }
-      selectedCarerStatuses = next;
-      renderStatusFilters();
-      renderCarers();
-    });
-    carerStatusFilters.appendChild(btn);
-  }
-
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = `status-filter-btn${selectedCarerStatuses.size === options.length ? " active" : ""}`;
-  allBtn.textContent = "All";
-  allBtn.addEventListener("click", () => {
-    selectedCarerStatuses = new Set(options);
-    renderStatusFilters();
-    renderCarers();
-  });
-  carerStatusFilters.appendChild(allBtn);
-}
-
-function getFilteredCarers() {
-  const query = String(searchInput.value || "").trim().toLowerCase();
-  return allCarers.filter((carer) => {
-    if (!passesStatusFilter(carer.status)) {
-      return false;
-    }
-    if (!query) {
-      return true;
-    }
-    return (
-      String(carer.id || "").toLowerCase().includes(query) ||
-      String(carer.name || "").toLowerCase().includes(query) ||
-      String(carer.postcode || "").toLowerCase().includes(query) ||
-      formatStatusLabel(carer.status).toLowerCase().includes(query) ||
-      formatTags(carer.tags).toLowerCase().includes(query)
-    );
-  });
+function normalizeValue(value) {
+  return String(value || "").trim();
 }
 
 function escapeHtml(value) {
@@ -338,6 +49,112 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function setStatus(message, isError = false) {
+  statusMessage.textContent = message;
+  statusMessage.classList.toggle("error", isError);
+}
+
+function getAreaLabel(carer) {
+  return normalizeValue(carer.area) || "Unassigned";
+}
+
+function getCareCompLabel(carer) {
+  return normalizeValue(carer.careCompanionshipTag) || "Unassigned";
+}
+
+function getOtherTagsLabel(carer) {
+  const tags = Array.isArray(carer.otherTags) ? carer.otherTags.map(normalizeValue).filter(Boolean) : [];
+  return tags.length ? tags.join(", ") : "-";
+}
+
+function formatHours(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric)) {
+    return "0";
+  }
+  return numeric % 1 === 0 ? String(numeric) : numeric.toFixed(1);
+}
+
+function setDetail(carer) {
+  if (!carer) {
+    detailFields.id.textContent = "-";
+    detailFields.name.textContent = "Select a carer";
+    detailFields.area.textContent = "-";
+    detailFields.careComp.textContent = "-";
+    detailFields.contractedHours.textContent = "-";
+    detailFields.otherTags.textContent = "-";
+    detailFields.postcode.textContent = "-";
+    detailFields.email.textContent = "-";
+    detailFields.phone.textContent = "-";
+    return;
+  }
+
+  detailFields.id.textContent = normalizeValue(carer.id) || "-";
+  detailFields.name.textContent = normalizeValue(carer.name) || "-";
+  detailFields.area.textContent = getAreaLabel(carer);
+  detailFields.careComp.textContent = getCareCompLabel(carer);
+  detailFields.contractedHours.textContent = formatHours(carer.contractedHours);
+  detailFields.otherTags.textContent = getOtherTagsLabel(carer);
+  detailFields.postcode.textContent = normalizeValue(carer.postcode) || "-";
+  detailFields.email.textContent = normalizeValue(carer.email) || "-";
+  detailFields.phone.textContent = normalizeValue(carer.phone) || "-";
+}
+
+function renderFilterOptions() {
+  const areaOptions = Array.from(new Set(allCarers.map(getAreaLabel))).sort((a, b) => a.localeCompare(b));
+  const careCompOptions = Array.from(new Set(allCarers.map(getCareCompLabel))).sort((a, b) => a.localeCompare(b));
+
+  const currentArea = String(areaFilterSelect.value || "all");
+  const currentCare = String(careCompFilterSelect.value || "all");
+
+  areaFilterSelect.innerHTML = '<option value="all">All areas</option>';
+  for (const area of areaOptions) {
+    const option = document.createElement("option");
+    option.value = area;
+    option.textContent = area;
+    areaFilterSelect.appendChild(option);
+  }
+
+  careCompFilterSelect.innerHTML = '<option value="all">All tags</option>';
+  for (const tag of careCompOptions) {
+    const option = document.createElement("option");
+    option.value = tag;
+    option.textContent = tag;
+    careCompFilterSelect.appendChild(option);
+  }
+
+  areaFilterSelect.value = areaOptions.includes(currentArea) ? currentArea : "all";
+  careCompFilterSelect.value = careCompOptions.includes(currentCare) ? currentCare : "all";
+}
+
+function getFilteredCarers() {
+  const query = normalizeText(searchInput.value);
+  const selectedArea = String(areaFilterSelect.value || "all");
+  const selectedCareComp = String(careCompFilterSelect.value || "all");
+
+  return allCarers.filter((carer) => {
+    if (selectedArea !== "all" && getAreaLabel(carer) !== selectedArea) {
+      return false;
+    }
+    if (selectedCareComp !== "all" && getCareCompLabel(carer) !== selectedCareComp) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    return (
+      normalizeText(carer.id).includes(query) ||
+      normalizeText(carer.name).includes(query) ||
+      normalizeText(carer.postcode).includes(query) ||
+      normalizeText(getAreaLabel(carer)).includes(query) ||
+      normalizeText(getCareCompLabel(carer)).includes(query) ||
+      normalizeText(getOtherTagsLabel(carer)).includes(query)
+    );
+  });
 }
 
 function renderCarers() {
@@ -358,14 +175,12 @@ function renderCarers() {
   for (const carer of filtered) {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", carer.id === selectedCarerId);
-
     tr.innerHTML = `
       <td>${escapeHtml(carer.id)}</td>
       <td>${escapeHtml(carer.name)}</td>
-      <td>${escapeHtml(formatStatusLabel(carer.status))}</td>
-      <td>${escapeHtml(carer.postcode || "-")}</td>
-      <td>${escapeHtml(String(carer.relationships?.clientCount || 0))}</td>
-      <td>${escapeHtml(String(carer.relationships?.visitCount || 0))}</td>
+      <td>${escapeHtml(getAreaLabel(carer))}</td>
+      <td>${escapeHtml(getCareCompLabel(carer))}</td>
+      <td>${escapeHtml(formatHours(carer.contractedHours))}</td>
     `;
 
     tr.addEventListener("click", () => {
@@ -382,8 +197,7 @@ function renderCarers() {
 
 async function init() {
   try {
-    const restored = await authController.restoreSession();
-    account = restored;
+    const account = await authController.restoreSession();
     if (!account) {
       window.location.href = "./index.html";
       return;
@@ -405,9 +219,9 @@ async function init() {
     warningState.hidden = warnings.length === 0;
     warningState.textContent = warnings.join(" ");
 
-    renderStatusFilters();
-    setStatus(`Loaded ${allCarers.length} carer(s).`);
+    renderFilterOptions();
     renderCarers();
+    setStatus(`Loaded ${allCarers.length} carer(s).`);
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not load carers.", true);
@@ -417,11 +231,9 @@ async function init() {
   }
 }
 
-searchInput?.addEventListener("input", () => {
-  renderCarers();
-});
-
-setupDetailCopy();
+searchInput?.addEventListener("input", renderCarers);
+areaFilterSelect?.addEventListener("change", renderCarers);
+careCompFilterSelect?.addEventListener("change", renderCarers);
 
 signOutBtn?.addEventListener("click", async () => {
   try {

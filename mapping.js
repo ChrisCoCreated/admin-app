@@ -6,7 +6,8 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const signOutBtn = document.getElementById("signOutBtn");
 const staffPostcodeInput = document.getElementById("staffPostcodeInput");
 const carerSearchInput = document.getElementById("carerSearchInput");
-const associateStatusFilters = document.getElementById("associateStatusFilters");
+const associateAreaFilterSelect = document.getElementById("associateAreaFilterSelect");
+const associateCareCompFilterSelect = document.getElementById("associateCareCompFilterSelect");
 const carerSearchResults = document.getElementById("carerSearchResults");
 const carerSearchStatus = document.getElementById("carerSearchStatus");
 const clientPostcodeInput = document.getElementById("clientPostcodeInput");
@@ -49,7 +50,6 @@ let selectedArea = "ALL";
 const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
 const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
 let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
-let selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
 const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
 const DEFAULT_VISIT_DURATION_MINUTES = 60;
 const SAVED_RUNS_KEY = "thrive.mapping.savedRuns.v1";
@@ -482,25 +482,42 @@ function renderAreaFilters() {
   }
 }
 
-function renderAssociateStatusFilters() {
-  const options = getStatusOptions(allCarers);
-  if (!selectedAssociateStatuses.size) {
-    selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
+function getCarerAreaLabel(carer) {
+  return normalizeLocationQuery(carer?.area || "") || "Unassigned";
+}
+
+function getCarerCareCompLabel(carer) {
+  return normalizeLocationQuery(carer?.careCompanionshipTag || "") || "Unassigned";
+}
+
+function renderAssociateFilters() {
+  if (!associateAreaFilterSelect || !associateCareCompFilterSelect) {
+    return;
   }
-  selectedAssociateStatuses = new Set(
-    Array.from(selectedAssociateStatuses).filter((status) => options.includes(status))
-  );
-  if (!selectedAssociateStatuses.size) {
-    selectedAssociateStatuses = new Set(options.filter((status) => DEFAULT_STATUS_FILTERS.has(status)));
-    if (!selectedAssociateStatuses.size) {
-      selectedAssociateStatuses = new Set(options);
-    }
+
+  const currentArea = String(associateAreaFilterSelect.value || "all");
+  const currentCareComp = String(associateCareCompFilterSelect.value || "all");
+  const areas = Array.from(new Set(allCarers.map(getCarerAreaLabel))).sort((a, b) => a.localeCompare(b));
+  const careCompTags = Array.from(new Set(allCarers.map(getCarerCareCompLabel))).sort((a, b) => a.localeCompare(b));
+
+  associateAreaFilterSelect.innerHTML = '<option value="all">All areas</option>';
+  for (const area of areas) {
+    const option = document.createElement("option");
+    option.value = area;
+    option.textContent = area;
+    associateAreaFilterSelect.appendChild(option);
   }
-  renderStatusFilters(associateStatusFilters, options, selectedAssociateStatuses, (nextSet) => {
-    selectedAssociateStatuses = nextSet;
-    renderAssociateStatusFilters();
-    renderCarerSearchResults();
-  });
+
+  associateCareCompFilterSelect.innerHTML = '<option value="all">All tags</option>';
+  for (const tag of careCompTags) {
+    const option = document.createElement("option");
+    option.value = tag;
+    option.textContent = tag;
+    associateCareCompFilterSelect.appendChild(option);
+  }
+
+  associateAreaFilterSelect.value = areas.includes(currentArea) ? currentArea : "all";
+  associateCareCompFilterSelect.value = careCompTags.includes(currentCareComp) ? currentCareComp : "all";
 }
 
 function renderClientStatusFilters() {
@@ -526,8 +543,13 @@ function renderClientStatusFilters() {
 
 function getFilteredCarers() {
   const query = normalizeText(carerSearchInput?.value);
+  const selectedAreaFilter = String(associateAreaFilterSelect?.value || "all");
+  const selectedCareCompFilter = String(associateCareCompFilterSelect?.value || "all");
   return allCarers.filter((carer) => {
-    if (!passesStatusFilter(carer.status, selectedAssociateStatuses)) {
+    if (selectedAreaFilter !== "all" && getCarerAreaLabel(carer) !== selectedAreaFilter) {
+      return false;
+    }
+    if (selectedCareCompFilter !== "all" && getCarerCareCompLabel(carer) !== selectedCareCompFilter) {
       return false;
     }
     if (!query) {
@@ -537,7 +559,9 @@ function getFilteredCarers() {
     return (
       normalizeText(carer.name).includes(query) ||
       normalizeText(carer.id).includes(query) ||
-      normalizeText(carer.postcode).includes(query)
+      normalizeText(carer.postcode).includes(query) ||
+      normalizeText(getCarerAreaLabel(carer)).includes(query) ||
+      normalizeText(getCarerCareCompLabel(carer)).includes(query)
     );
   });
 }
@@ -569,6 +593,8 @@ function renderCarerSearchResults() {
     info.innerHTML = `
       <strong>${escapeHtml(String(carer.name || "Unnamed associate"))}</strong>
       <span>${escapeHtml(String(carer.id || "-"))}</span>
+      <span>Area: ${escapeHtml(getCarerAreaLabel(carer))}</span>
+      <span>Tag: ${escapeHtml(getCarerCareCompLabel(carer))}</span>
       <span>Postcode: ${escapeHtml(String(carer.postcode || "Not available"))}</span>
     `;
 
@@ -1221,7 +1247,6 @@ async function init() {
     selectedStaffName = "";
     renderSelectedStaffName();
     selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
-    selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
     loadSavedRuns();
     renderClientPostcodes();
     setCarerSearchStatus("Loading associates...");
@@ -1232,7 +1257,7 @@ async function init() {
     ]);
     allClients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
     allCarers = Array.isArray(carersPayload?.carers) ? carersPayload.carers : [];
-    renderAssociateStatusFilters();
+    renderAssociateFilters();
     renderClientStatusFilters();
     renderCarerSearchResults();
     renderAreaFilters();
@@ -1267,6 +1292,14 @@ clientSearchInput?.addEventListener("input", () => {
 });
 
 carerSearchInput?.addEventListener("input", () => {
+  renderCarerSearchResults();
+});
+
+associateAreaFilterSelect?.addEventListener("change", () => {
+  renderCarerSearchResults();
+});
+
+associateCareCompFilterSelect?.addEventListener("change", () => {
   renderCarerSearchResults();
 });
 
@@ -1312,9 +1345,8 @@ clearRunBtn?.addEventListener("click", () => {
   }
   selectedArea = "ALL";
   selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
-  selectedAssociateStatuses = new Set(DEFAULT_STATUS_FILTERS);
   selectedClientStops.length = 0;
-  renderAssociateStatusFilters();
+  renderAssociateFilters();
   renderClientStatusFilters();
   renderCarerSearchResults();
   renderClientPostcodes();
