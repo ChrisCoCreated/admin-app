@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Reports</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <h1>Reports</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel">
+        <h2>Contract Capacity</h2>
+        <p class="muted">Choose a month range, then open the report in OneTouch.</p>
+        <div class="row wrap-row">
+          <label class="field" for="monthPresetSelect">
+            Month
+            <select id="monthPresetSelect">
+              <option value="last">Last month</option>
+              <option value="this" selected>This month</option>
+              <option value="next">Next month</option>
+            </select>
+          </label>
+          <a id="contractCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
+            >Open Contract Capacity</a
+          >
+        </div>
+        <p id="dateRangeMessage" class="muted row-note"></p>
+      </section>
+    </main>
+
+    <script type="module" src="./reports.js"></script>
+  </body>
+</html>

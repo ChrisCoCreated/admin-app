@@ -1,7 +1,7 @@
 const ROLE_PAGES = {
-  admin: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "marketing"],
-  care_manager: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime"],
-  operations: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime"],
+  admin: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports", "marketing"],
+  care_manager: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports"],
+  operations: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports"],
   marketing: ["marketing"],
 };
 
@@ -13,6 +13,7 @@ const PAGE_META = {
   tasks: { href: "./tasks.html", label: "Tasks (Advanced)" },
   mapping: { href: "./mapping.html", label: "Time Mapping" },
   drivetime: { href: "./drive-time-map.html", label: "Drive-Time Map" },
+  reports: { href: "./reports.html", label: "Reports" },
   marketing: { href: "./marketing.html", label: "Marketing" },
 };
 
