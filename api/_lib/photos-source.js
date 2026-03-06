@@ -193,6 +193,33 @@ function resolveConsentSelectFields(columns) {
   return Array.from(result);
 }
 
+function resolveClientLookupFieldNames(columns) {
+  const result = new Set();
+  for (const column of columns) {
+    const name = String(column?.name || "").trim();
+    const displayName = String(column?.displayName || "").trim();
+    if (!name) {
+      continue;
+    }
+    const nameToken = normalizeToken(name);
+    const displayToken = normalizeToken(displayName);
+    const isLikelyClientField =
+      nameToken === "client" ||
+      displayToken === "client" ||
+      (nameToken.includes("client") && !nameToken.includes("consent") && !nameToken.includes("marketing")) ||
+      (displayToken.includes("client") &&
+        !displayToken.includes("consent") &&
+        !displayToken.includes("marketing"));
+    if (isLikelyClientField) {
+      result.add(name);
+    }
+  }
+  if (!result.size) {
+    result.add("Client");
+  }
+  return Array.from(result);
+}
+
 function toAbsoluteUrl(value, hostName) {
   const input = String(value || "").trim();
   if (!input) {
@@ -339,6 +366,30 @@ function extractLookupText(value) {
     ).trim();
   }
   return String(value).trim();
+}
+
+function extractClientValue(fields, clientFieldNames = []) {
+  const names = Array.isArray(clientFieldNames) ? clientFieldNames : [];
+  for (const name of names) {
+    const value = extractLookupText(fields?.[name]);
+    if (value) {
+      return value;
+    }
+  }
+
+  for (const [key, value] of Object.entries(fields || {})) {
+    const token = normalizeToken(key);
+    if (!token || token.endsWith("lookupid")) {
+      continue;
+    }
+    if (token === "client" || (token.includes("client") && !token.includes("consent") && !token.includes("marketing"))) {
+      const text = extractLookupText(value);
+      if (text) {
+        return text;
+      }
+    }
+  }
+  return "";
 }
 
 function lookupValueHasGiven(value) {
@@ -571,7 +622,7 @@ function pickAssetUrls(fields, hostName, mediaType) {
   };
 }
 
-function mapGraphItemToPhoto(item, hostName, listPathname) {
+function mapGraphItemToPhoto(item, hostName, listPathname, clientFieldNames = []) {
   const fields = item?.fields || {};
   const consent = pickClientConsent(fields);
 
@@ -580,7 +631,7 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
     return null;
   }
 
-  const clientFromClientColumn = extractLookupText(fields.Client);
+  const clientFromClientColumn = extractClientValue(fields, clientFieldNames);
   const clientFromClientName = extractLookupText(fields.ClientName);
   const location = extractLookupText(fields.Location);
   const created = String(fields.Created || "").trim();
@@ -798,11 +849,14 @@ async function readMarketingPhotos() {
   })();
   const columns = await resolveListColumns(token, siteId, listId);
   const consentSelectFields = resolveConsentSelectFields(columns);
+  const clientFieldNames = resolveClientLookupFieldNames(columns);
+  const lookupIdFields = clientFieldNames.map((name) => `${name}LookupId`);
   const fieldSelect = [
     "ID",
     "Title",
     "Photo",
-    "Client",
+    ...clientFieldNames,
+    ...lookupIdFields,
     "ClientName",
     "Location",
     "Created",
@@ -823,6 +877,7 @@ async function readMarketingPhotos() {
     listPathname,
     selectedFields: fieldSelect,
     consentSelectFields,
+    clientFieldNames,
   });
 
   const photos = [];
@@ -837,7 +892,7 @@ async function readMarketingPhotos() {
     totalItemsRead += items.length;
 
     for (const item of items) {
-      const photo = mapGraphItemToPhoto(item, hostName, listPathname);
+      const photo = mapGraphItemToPhoto(item, hostName, listPathname, clientFieldNames);
       if (photo) {
         if (photo.needsAttachmentLookup) {
           photosNeedingAttachmentLookup.push(photo);
