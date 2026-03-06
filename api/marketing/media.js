@@ -123,13 +123,23 @@ async function fetchSharePointJson(url, token) {
 }
 
 function parseAttachmentPath(targetUrl, sitePath) {
-  const decodedPath = (() => {
-    try {
-      return decodeURIComponent(String(targetUrl.pathname || ""));
-    } catch {
-      return String(targetUrl.pathname || "");
+  const decodeLoose = (value) => {
+    let output = String(value || "").replace(/\+/g, " ");
+    for (let index = 0; index < 3; index += 1) {
+      try {
+        const next = decodeURIComponent(output);
+        if (next === output) {
+          break;
+        }
+        output = next;
+      } catch {
+        break;
+      }
     }
-  })();
+    return output;
+  };
+
+  const decodedPath = decodeLoose(String(targetUrl.pathname || ""));
 
   if (!decodedPath.startsWith(sitePath)) {
     return null;
@@ -141,9 +151,9 @@ function parseAttachmentPath(targetUrl, sitePath) {
     return null;
   }
   return {
-    listName: String(match[1] || "").trim(),
+    listName: decodeLoose(String(match[1] || "")).trim(),
     itemId: Number(match[2]),
-    fileName: String(match[3] || "").trim(),
+    fileName: decodeLoose(String(match[3] || "")).trim(),
   };
 }
 
@@ -174,7 +184,9 @@ async function fetchAttachmentViaSharePointItemApi(targetUrl, sharePointToken) {
     return null;
   }
 
-  const exact = rows.find((row) => String(row?.FileName || "").trim() === attachment.fileName);
+  const normalizeName = (value) => String(value || "").trim().toLowerCase();
+  const requestedName = normalizeName(attachment.fileName);
+  const exact = rows.find((row) => normalizeName(row?.FileName) === requestedName);
   const fallback = exact || rows[0];
   const rel = String(fallback?.ServerRelativeUrl || "").trim();
   if (!rel) {
