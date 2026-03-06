@@ -582,6 +582,13 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
 
   const clientFromClientColumn = extractLookupText(fields.Client);
   const clientFromClientName = extractLookupText(fields.ClientName);
+  const location = extractLookupText(fields.Location);
+  const created = String(fields.Created || "").trim();
+  const createdBy =
+    extractLookupText(fields.Author) ||
+    extractLookupText(fields.Created_x0020_By) ||
+    extractLookupText(fields.Editor) ||
+    "";
   const title = String(fields.Title || clientFromClientColumn || clientFromClientName || `Photo ${id}`).trim();
   const client = String(clientFromClientColumn || clientFromClientName || "").trim();
   const fileName = String(fields.FileLeafRef || fields.FileName || "").trim();
@@ -664,6 +671,9 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
     id,
     title,
     client,
+    location,
+    created,
+    createdBy,
     imageUrl,
     mediaUrl,
     attachmentUrl,
@@ -672,6 +682,7 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
     needsAttachmentLookup: !hasKnownMediaExtension(fallbackName),
     consentValue: consent.consentValue,
     consented: consent.consented,
+    rawFields: fields,
   };
 }
 
@@ -792,6 +803,12 @@ async function readMarketingPhotos() {
     "Title",
     "Photo",
     "Client",
+    "ClientName",
+    "Location",
+    "Created",
+    "Author",
+    "Created_x0020_By",
+    "Editor",
     "FileLeafRef",
     "FileName",
     ...consentSelectFields,
