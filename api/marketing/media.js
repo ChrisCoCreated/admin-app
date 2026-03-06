@@ -91,6 +91,10 @@ function getAllowedSharePointPrefix() {
   return `https://${siteUrl.hostname}${sitePath}/`;
 }
 
+function quoteODataString(value) {
+  return `'${String(value || "").replace(/'/g, "''")}'`;
+}
+
 function getSharePointSiteParts() {
   const raw = String(process.env.SHAREPOINT_SITE_URL || "").trim();
   if (!raw) {
@@ -102,6 +106,88 @@ function getSharePointSiteParts() {
     hostName: siteUrl.hostname,
     sitePath,
   };
+}
+
+async function fetchSharePointJson(url, token) {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json;odata=nometadata",
+    },
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`SharePoint API failed (${response.status}): ${text.slice(0, 300)}`);
+  }
+  return text ? JSON.parse(text) : null;
+}
+
+function parseAttachmentPath(targetUrl, sitePath) {
+  const decodedPath = (() => {
+    try {
+      return decodeURIComponent(String(targetUrl.pathname || ""));
+    } catch {
+      return String(targetUrl.pathname || "");
+    }
+  })();
+
+  if (!decodedPath.startsWith(sitePath)) {
+    return null;
+  }
+
+  const relative = decodedPath.slice(sitePath.length).replace(/^\/+/, "");
+  const match = /^Lists\/(.+)\/Attachments\/(\d+)\/([^/]+)$/i.exec(relative);
+  if (!match) {
+    return null;
+  }
+  return {
+    listName: String(match[1] || "").trim(),
+    itemId: Number(match[2]),
+    fileName: String(match[3] || "").trim(),
+  };
+}
+
+async function fetchAttachmentViaSharePointItemApi(targetUrl, sharePointToken) {
+  const { hostName, sitePath } = getSharePointSiteParts();
+  const attachment = parseAttachmentPath(targetUrl, sitePath);
+  if (!attachment || !attachment.listName || !Number.isFinite(attachment.itemId)) {
+    return null;
+  }
+
+  const attachmentsUrl = `https://${hostName}${sitePath}/_api/web/lists/GetByTitle(${quoteODataString(
+    attachment.listName
+  )})/items(${attachment.itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
+  logMediaDebug("sharepoint-item-fallback-lookup", {
+    attachmentsUrl,
+    listName: attachment.listName,
+    itemId: attachment.itemId,
+  });
+
+  const payload = await fetchSharePointJson(attachmentsUrl, sharePointToken);
+  const rows = Array.isArray(payload?.value)
+    ? payload.value
+    : Array.isArray(payload?.d?.results)
+      ? payload.d.results
+      : [];
+
+  if (!rows.length) {
+    return null;
+  }
+
+  const exact = rows.find((row) => String(row?.FileName || "").trim() === attachment.fileName);
+  const fallback = exact || rows[0];
+  const rel = String(fallback?.ServerRelativeUrl || "").trim();
+  if (!rel) {
+    return null;
+  }
+  const absolute = `https://${hostName}${rel.startsWith("/") ? rel : `/${rel}`}`;
+  logMediaDebug("sharepoint-item-fallback-content", { absolute });
+  const response = await fetch(absolute, {
+    headers: {
+      Authorization: `Bearer ${sharePointToken}`,
+    },
+  });
+  return response;
 }
 
 async function fetchGraphSiteId(graphToken, hostName, sitePath) {
@@ -203,16 +289,36 @@ module.exports = async (req, res) => {
         status: upstream.status,
         url: targetUrl.href,
       });
+
       try {
-        const graphFallback = await fetchViaGraphSiteDrive(targetUrl);
-        if (graphFallback) {
-          upstream = graphFallback;
+        const viaItemApi = await fetchAttachmentViaSharePointItemApi(targetUrl, sharePointToken);
+        if (viaItemApi && viaItemApi.ok) {
+          upstream = viaItemApi;
+        } else if (viaItemApi) {
+          logMediaDebug("sharepoint-item-fallback-non-ok", {
+            status: viaItemApi.status,
+            url: targetUrl.href,
+          });
         }
-      } catch (fallbackError) {
-        logMediaDebug("graph-fallback-error", {
-          detail: fallbackError?.message || String(fallbackError),
+      } catch (itemFallbackError) {
+        logMediaDebug("sharepoint-item-fallback-error", {
+          detail: itemFallbackError?.message || String(itemFallbackError),
           url: targetUrl.href,
         });
+      }
+
+      if (upstream.status === 401 || upstream.status === 403) {
+        try {
+          const graphFallback = await fetchViaGraphSiteDrive(targetUrl);
+          if (graphFallback) {
+            upstream = graphFallback;
+          }
+        } catch (fallbackError) {
+          logMediaDebug("graph-fallback-error", {
+            detail: fallbackError?.message || String(fallbackError),
+            url: targetUrl.href,
+          });
+        }
       }
     }
 
