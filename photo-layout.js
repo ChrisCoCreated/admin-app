@@ -692,6 +692,7 @@ async function loadPhotos() {
   setImagesStatus("Loading photos...");
   const payload = await directoryApi.listMarketingPhotos();
   allPhotos = Array.isArray(payload?.photos) ? payload.photos : [];
+  console.log("[Photo Layout Debug] First 5 photo records:", allPhotos.slice(0, 5));
   imagePhotos = allPhotos.filter((photo) => isImagePhoto(photo));
   updateClientOptions();
   if (!selectedClient && imagePhotos.length) {
