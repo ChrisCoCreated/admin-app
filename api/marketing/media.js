@@ -265,6 +265,29 @@ async function fetchViaGraphSiteDrive(targetUrl) {
   return response;
 }
 
+function toGraphShareTokenFromUrl(absoluteUrl) {
+  const base64 = Buffer.from(String(absoluteUrl || ""), "utf8").toString("base64");
+  const base64Url = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return `u!${base64Url}`;
+}
+
+async function fetchViaGraphShares(targetUrl) {
+  const graphToken = await getGraphAccessToken();
+  const shareToken = toGraphShareTokenFromUrl(targetUrl.href);
+  const contentUrl = `https://graph.microsoft.com/v1.0/shares/${shareToken}/driveItem/content`;
+  logMediaDebug("graph-shares-fallback", { contentUrl });
+  const response = await fetch(contentUrl, {
+    headers: {
+      Authorization: `Bearer ${graphToken}`,
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Graph shares fallback failed (${response.status}): ${detail.slice(0, 300)}`);
+  }
+  return response;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
     res.status(405).json({ error: "Method Not Allowed" });
@@ -328,6 +351,20 @@ module.exports = async (req, res) => {
         } catch (fallbackError) {
           logMediaDebug("graph-fallback-error", {
             detail: fallbackError?.message || String(fallbackError),
+            url: targetUrl.href,
+          });
+        }
+      }
+
+      if (upstream.status === 401 || upstream.status === 403 || upstream.status === 404) {
+        try {
+          const graphSharesFallback = await fetchViaGraphShares(targetUrl);
+          if (graphSharesFallback) {
+            upstream = graphSharesFallback;
+          }
+        } catch (sharesError) {
+          logMediaDebug("graph-shares-fallback-error", {
+            detail: sharesError?.message || String(sharesError),
             url: targetUrl.href,
           });
         }
