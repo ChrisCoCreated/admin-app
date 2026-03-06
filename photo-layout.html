@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Photo Layout</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container photo-layout-main">
+      <section class="hero compact">
+        <h1>Photo Layout</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel">
+        <div class="photo-layout-controls">
+          <label class="field" for="clientSelect">
+            Client
+            <select id="clientSelect">
+              <option value="">Loading clients...</option>
+            </select>
+          </label>
+        </div>
+        <p id="imagesStatus" class="muted row-note">Select a client to choose images.</p>
+        <div id="imagesGrid" class="layout-image-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Choose Layout</h2>
+        <p class="muted">Select a layout template.</p>
+        <div id="layoutPicker" class="layout-picker" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Compose</h2>
+        <p id="composeStatus" class="muted">Select up to 6 images, then adjust inside each box.</p>
+        <div class="layout-composer-grid">
+          <div class="layout-stage-wrap">
+            <div id="layoutStage" class="layout-stage" aria-label="Layout preview"></div>
+          </div>
+          <aside class="layout-tools">
+            <h3>Selected Images</h3>
+            <div id="selectedImagesList" class="selected-images-list"></div>
+            <h3>Image Adjustments</h3>
+            <p id="adjustStatus" class="muted">Click a slot to adjust zoom and position.</p>
+            <div id="adjustControls" class="layout-adjust-controls" hidden>
+              <label class="field" for="zoomRange">
+                Zoom
+                <input id="zoomRange" type="range" min="1" max="3" step="0.01" value="1" />
+              </label>
+              <label class="field" for="panXRange">
+                Horizontal
+                <input id="panXRange" type="range" min="-100" max="100" step="1" value="0" />
+              </label>
+              <label class="field" for="panYRange">
+                Vertical
+                <input id="panYRange" type="range" min="-100" max="100" step="1" value="0" />
+              </label>
+              <button id="resetAdjustBtn" class="secondary" type="button">Reset position</button>
+            </div>
+            <div class="row wrap-row">
+              <button id="generateOutputBtn" type="button">Generate 2000px Output</button>
+              <button id="copyOutputBtn" class="secondary" type="button">Copy Image</button>
+              <button id="saveOutputBtn" class="secondary" type="button">Save PNG</button>
+            </div>
+            <p id="exportStatus" class="muted row-note">Generate an output image to copy or save.</p>
+          </aside>
+        </div>
+        <div class="layout-output-preview-wrap">
+          <img id="outputPreviewImage" class="layout-output-preview" alt="Generated layout output preview" hidden />
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./photo-layout.js"></script>
+  </body>
+</html>

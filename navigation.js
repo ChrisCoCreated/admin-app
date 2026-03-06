@@ -1,8 +1,19 @@
 const ROLE_PAGES = {
-  admin: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports", "marketing"],
+  admin: [
+    "clients",
+    "carers",
+    "whiteboard",
+    "simpletasks",
+    "tasks",
+    "mapping",
+    "drivetime",
+    "reports",
+    "marketing",
+    "photolayout",
+  ],
   care_manager: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports"],
   operations: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports"],
-  marketing: ["marketing"],
+  marketing: ["marketing", "photolayout"],
 };
 
 const PAGE_META = {
@@ -15,6 +26,7 @@ const PAGE_META = {
   drivetime: { href: "./drive-time-map.html", label: "Drive-Time Map" },
   reports: { href: "./reports.html", label: "Reports" },
   marketing: { href: "./marketing.html", label: "Marketing" },
+  photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
 };
 
 function normalizeRole(role) {
