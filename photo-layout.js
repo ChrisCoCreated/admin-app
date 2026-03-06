@@ -215,7 +215,9 @@ function toggleImageSelection(photo) {
     id: photo.id,
     title: photo.title || photo.client || "Untitled",
     client: normalizeClientName(photo.client),
-    sourceUrl: photo.imageUrl || photo.mediaUrl || "",
+    sourceCandidates: [photo.attachmentUrl, photo.mediaUrl, photo.imageUrl]
+      .map((value) => String(value || "").trim())
+      .filter((value, index, array) => Boolean(value) && array.indexOf(value) === index),
     previewUrl: photo.imageUrl || photo.mediaUrl || "",
     zoom: 1,
     panX: 0,
@@ -349,7 +351,25 @@ function renderSelectedImagesList() {
       renderAll();
     });
 
-    row.append(info, removeBtn);
+    const moveUpBtn = document.createElement("button");
+    moveUpBtn.type = "button";
+    moveUpBtn.className = "secondary selected-image-move";
+    moveUpBtn.textContent = "Up";
+    moveUpBtn.disabled = index === 0;
+    moveUpBtn.addEventListener("click", () => {
+      swapSelectedImages(index, index - 1);
+    });
+
+    const moveDownBtn = document.createElement("button");
+    moveDownBtn.type = "button";
+    moveDownBtn.className = "secondary selected-image-move";
+    moveDownBtn.textContent = "Down";
+    moveDownBtn.disabled = index === selectedImages.length - 1;
+    moveDownBtn.addEventListener("click", () => {
+      swapSelectedImages(index, index + 1);
+    });
+
+    row.append(info, moveUpBtn, moveDownBtn, removeBtn);
     selectedImagesList.append(row);
   });
 }
@@ -375,37 +395,14 @@ function renderStage() {
       renderSelectedImagesList();
     });
 
-    slotEl.draggable = Boolean(assignedImage);
-    slotEl.addEventListener("dragstart", (event) => {
-      if (!assignedImage) {
-        event.preventDefault();
-        return;
-      }
-      event.dataTransfer?.setData("text/plain", String(slotIndex));
-      event.dataTransfer.effectAllowed = "move";
-    });
-    slotEl.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      if (assignedImage) {
-        event.dataTransfer.dropEffect = "move";
-      }
-    });
-    slotEl.addEventListener("drop", (event) => {
-      event.preventDefault();
-      const fromIndex = Number(event.dataTransfer?.getData("text/plain"));
-      if (!Number.isFinite(fromIndex) || fromIndex === slotIndex) {
-        return;
-      }
-      swapSelectedImages(fromIndex, slotIndex);
-    });
-
     if (assignedImage) {
       const media = document.createElement("img");
       media.className = "layout-slot-image";
       media.src = assignedImage.previewUrl;
       media.alt = assignedImage.title;
       media.draggable = false;
-      media.style.transform = `translate(${assignedImage.panX}%, ${assignedImage.panY}%) scale(${assignedImage.zoom})`;
+      media.style.objectPosition = `${50 + assignedImage.panX * 0.5}% ${50 + assignedImage.panY * 0.5}%`;
+      media.style.transform = `scale(${assignedImage.zoom})`;
 
       media.addEventListener("pointerdown", (event) => {
         selectedSlotIndex = slotIndex;
@@ -434,7 +431,8 @@ function renderStage() {
         const deltaY = ((event.clientY - dragState.startY) / dragState.height) * 100;
         image.panX = clamp(dragState.startPanX + deltaX, -PAN_LIMIT, PAN_LIMIT);
         image.panY = clamp(dragState.startPanY + deltaY, -PAN_LIMIT, PAN_LIMIT);
-        media.style.transform = `translate(${image.panX}%, ${image.panY}%) scale(${image.zoom})`;
+        media.style.objectPosition = `${50 + image.panX * 0.5}% ${50 + image.panY * 0.5}%`;
+        media.style.transform = `scale(${image.zoom})`;
         if (slotIndex === selectedSlotIndex) {
           updateAdjustControls();
         }
@@ -460,7 +458,7 @@ function renderStage() {
   setComposeStatus(
     `${layout.name} layout: using ${usedCount} of ${selectedImages.length} selected image${
       selectedImages.length === 1 ? "" : "s"
-    }. Drag one slot onto another to reorder.`
+    }. Drag inside an image to reposition; use Up/Down to reorder.`
   );
 }
 
@@ -532,25 +530,35 @@ function loadImageElement(url) {
   });
 }
 
-async function loadExportImage(sourceUrl) {
-  const cacheKey = String(sourceUrl || "").trim();
-  if (!cacheKey) {
+async function loadExportImage(sourceCandidates = []) {
+  const candidates = Array.isArray(sourceCandidates)
+    ? sourceCandidates.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+  if (!candidates.length) {
     throw new Error("Missing source image URL.");
   }
-  if (exportImageCache.has(cacheKey)) {
-    return exportImageCache.get(cacheKey);
-  }
 
-  const payload = await directoryApi.getMarketingMedia({ url: cacheKey });
-  const blob = decodeBase64ToBlob(payload?.dataBase64, payload?.mimeType);
-  const objectUrl = URL.createObjectURL(blob);
-  try {
-    const image = await loadImageElement(objectUrl);
-    exportImageCache.set(cacheKey, image);
-    return image;
-  } finally {
-    URL.revokeObjectURL(objectUrl);
+  let lastError = null;
+  for (const candidate of candidates) {
+    if (exportImageCache.has(candidate)) {
+      return exportImageCache.get(candidate);
+    }
+    try {
+      const payload = await directoryApi.getMarketingMedia({ url: candidate });
+      const blob = decodeBase64ToBlob(payload?.dataBase64, payload?.mimeType);
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const image = await loadImageElement(objectUrl);
+        exportImageCache.set(candidate, image);
+        return image;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (error) {
+      lastError = error;
+    }
   }
+  throw lastError || new Error("Could not load export image.");
 }
 
 async function buildOutputCanvas() {
@@ -570,11 +578,11 @@ async function buildOutputCanvas() {
   const renderableSlots = Math.min(layout.slots.length, selectedImages.length);
   for (let index = 0; index < renderableSlots; index += 1) {
     const imageState = selectedImages[index];
-    const sourceUrl = imageState?.sourceUrl;
-    if (!sourceUrl) {
+    const sourceCandidates = Array.isArray(imageState?.sourceCandidates) ? imageState.sourceCandidates : [];
+    if (!sourceCandidates.length) {
       continue;
     }
-    const img = await loadExportImage(sourceUrl);
+    const img = await loadExportImage(sourceCandidates);
     const slot = layout.slots[index];
     drawImageIntoSlot(
       ctx,

@@ -580,8 +580,10 @@ function mapGraphItemToPhoto(item, hostName, listPathname) {
     return null;
   }
 
-  const title = String(fields.Title || fields.Client || fields.ClientName || `Photo ${id}`).trim();
-  const client = String(fields.Client || fields.ClientName || title).trim();
+  const clientFromClientColumn = extractLookupText(fields.Client);
+  const clientFromClientName = extractLookupText(fields.ClientName);
+  const title = String(fields.Title || clientFromClientColumn || clientFromClientName || `Photo ${id}`).trim();
+  const client = String(clientFromClientColumn || clientFromClientName || "").trim();
   const fileName = String(fields.FileLeafRef || fields.FileName || "").trim();
   const photoFieldFileName =
     extractPhotoPayloadFileName(fields.Photo) || extractKnownFileNameFromUrls(fields.Photo, hostName);

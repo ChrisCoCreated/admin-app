@@ -825,7 +825,7 @@ body.lightbox-open {
 
 .selected-image-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 6px;
   align-items: center;
 }
@@ -849,6 +849,11 @@ body.lightbox-open {
 }
 
 .selected-image-remove {
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
+.selected-image-move {
   min-height: 36px;
   padding: 7px 10px;
 }
