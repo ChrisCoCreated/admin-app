@@ -217,6 +217,45 @@ async function fetchGraphSiteId(graphToken, hostName, sitePath) {
   return payload.id;
 }
 
+async function fetchGraphListIdByName(graphToken, siteId, listName) {
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$select=id,displayName&$filter=displayName eq ${encodeURIComponent(
+    quoteODataString(listName)
+  )}&$top=1`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${graphToken}`,
+      Accept: "application/json",
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || `Could not resolve list (${response.status}).`);
+  }
+  const row = Array.isArray(payload?.value) ? payload.value[0] : null;
+  if (!row?.id) {
+    throw new Error(`Could not find list '${listName}'.`);
+  }
+  return row.id;
+}
+
+async function fetchGraphListDriveId(graphToken, siteId, listId) {
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/drive?$select=id,webUrl`;
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${graphToken}`,
+      Accept: "application/json",
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload?.id) {
+    throw new Error(payload?.error?.message || `Could not resolve list drive (${response.status}).`);
+  }
+  return {
+    id: payload.id,
+    webUrl: String(payload.webUrl || "").trim(),
+  };
+}
+
 function toDecodedPathname(urlObj) {
   try {
     return decodeURIComponent(String(urlObj.pathname || ""));
@@ -235,6 +274,40 @@ function toGraphDrivePathForAttachments(targetUrl, sitePath) {
     return "";
   }
   return relative;
+}
+
+async function fetchViaGraphListDriveAttachment(targetUrl) {
+  const { hostName, sitePath } = getSharePointSiteParts();
+  const parsed = parseAttachmentPath(targetUrl, sitePath);
+  if (!parsed || !parsed.listName || !parsed.fileName || !Number.isFinite(parsed.itemId)) {
+    return null;
+  }
+
+  const graphToken = await getGraphAccessToken();
+  const siteId = await fetchGraphSiteId(graphToken, hostName, sitePath);
+  const listId = await fetchGraphListIdByName(graphToken, siteId, parsed.listName);
+  const drive = await fetchGraphListDriveId(graphToken, siteId, listId);
+  const encodedSegments = ["Attachments", String(parsed.itemId), parsed.fileName]
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  const contentUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodedSegments}:/content`;
+  logMediaDebug("graph-list-drive-fallback", {
+    listName: parsed.listName,
+    itemId: parsed.itemId,
+    contentUrl,
+    driveWebUrl: drive.webUrl,
+  });
+
+  const response = await fetch(contentUrl, {
+    headers: {
+      Authorization: `Bearer ${graphToken}`,
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Graph list drive fallback failed (${response.status}): ${detail.slice(0, 300)}`);
+  }
+  return response;
 }
 
 async function fetchViaGraphSiteDrive(targetUrl) {
@@ -351,6 +424,20 @@ module.exports = async (req, res) => {
         } catch (fallbackError) {
           logMediaDebug("graph-fallback-error", {
             detail: fallbackError?.message || String(fallbackError),
+            url: targetUrl.href,
+          });
+        }
+      }
+
+      if (upstream.status === 401 || upstream.status === 403 || upstream.status === 404) {
+        try {
+          const graphListDriveFallback = await fetchViaGraphListDriveAttachment(targetUrl);
+          if (graphListDriveFallback) {
+            upstream = graphListDriveFallback;
+          }
+        } catch (listDriveError) {
+          logMediaDebug("graph-list-drive-fallback-error", {
+            detail: listDriveError?.message || String(listDriveError),
             url: targetUrl.href,
           });
         }
