@@ -114,16 +114,43 @@ async function fetchGraphSiteId(graphAccessToken, hostName, sitePath) {
 }
 
 async function fetchGraphListIdByName(graphAccessToken, siteId, listName) {
-  const filter = encodeURIComponent(`displayName eq '${String(listName || "").replace(/'/g, "''")}'`);
-  const payload = await fetchGraphJson(
-    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$select=id,displayName&$filter=${filter}&$top=1`,
-    graphAccessToken
-  );
-  const row = Array.isArray(payload?.value) ? payload.value[0] : null;
-  if (!row?.id) {
+  function normalizeListKey(value) {
+    return decodeLoose(String(value || ""))
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  }
+
+  function getListPathTail(webUrl) {
+    try {
+      const pathname = decodeLoose(new URL(String(webUrl || "")).pathname || "");
+      const parts = pathname.split("/").filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : "";
+    } catch {
+      return "";
+    }
+  }
+
+  const wanted = normalizeListKey(listName);
+  const rows = [];
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$select=id,displayName,webUrl&$top=200`;
+  while (nextUrl) {
+    const payload = await fetchGraphJson(nextUrl, graphAccessToken);
+    const pageRows = Array.isArray(payload?.value) ? payload.value : [];
+    rows.push(...pageRows);
+    nextUrl = String(payload?.["@odata.nextLink"] || "").trim();
+  }
+
+  const match = rows.find((row) => {
+    const display = normalizeListKey(row?.displayName);
+    const tail = normalizeListKey(getListPathTail(row?.webUrl));
+    return display === wanted || tail === wanted;
+  });
+
+  if (!match?.id) {
     throw new Error(`Could not find list '${listName}'.`);
   }
-  return row.id;
+  return match.id;
 }
 
 async function fetchGraphListDriveId(graphAccessToken, siteId, listId) {
