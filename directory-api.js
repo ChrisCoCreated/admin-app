@@ -136,7 +136,9 @@ export function createDirectoryApi(authController) {
     },
 
     async getMarketingMedia(query = {}) {
-      const response = await authFetch(buildUrl("/api/marketing/media", query));
+      const response = await authFetch(buildUrl("/api/marketing/media", query), {
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+      });
       if (!response.ok) {
         await parseError(response, "Marketing media request failed");
       }

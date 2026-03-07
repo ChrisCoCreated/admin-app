@@ -1,4 +1,4 @@
-const { requireApiAuth } = require("../_lib/require-api-auth");
+const { requireGraphAuth } = require("../_lib/require-graph-auth");
 
 const MARKETING_MEDIA_DEBUG = process.env.MARKETING_MEDIA_DEBUG === "1";
 
@@ -11,88 +11,6 @@ function logMediaDebug(message, details) {
     return;
   }
   console.log(`[marketing-media] ${message}`);
-}
-
-async function getSharePointAccessToken(hostName) {
-  const tenantId = process.env.AZURE_TENANT_ID;
-  const clientId = process.env.AZURE_API_CLIENT_ID;
-  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
-
-  if (!tenantId || !clientId || !clientSecret) {
-    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
-  }
-
-  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
-  const body = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope: `https://${hostName}/.default`,
-  });
-
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
-
-  const payload = await response.json();
-  if (!response.ok || !payload?.access_token) {
-    const errorText = payload?.error_description || payload?.error || "Could not get SharePoint token.";
-    throw new Error(errorText);
-  }
-
-  return payload.access_token;
-}
-
-async function getGraphAccessToken() {
-  const tenantId = process.env.AZURE_TENANT_ID;
-  const clientId = process.env.AZURE_API_CLIENT_ID;
-  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
-
-  if (!tenantId || !clientId || !clientSecret) {
-    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
-  }
-
-  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
-  const body = new URLSearchParams({
-    grant_type: "client_credentials",
-    client_id: clientId,
-    client_secret: clientSecret,
-    scope: "https://graph.microsoft.com/.default",
-  });
-
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
-
-  const payload = await response.json();
-  if (!response.ok || !payload?.access_token) {
-    const errorText = payload?.error_description || payload?.error || "Could not get Graph token.";
-    throw new Error(errorText);
-  }
-
-  return payload.access_token;
-}
-
-function getAllowedSharePointPrefix() {
-  const raw = String(process.env.SHAREPOINT_SITE_URL || "").trim();
-  if (!raw) {
-    throw new Error("Missing SHAREPOINT_SITE_URL.");
-  }
-  const siteUrl = new URL(raw);
-  const sitePath = siteUrl.pathname.replace(/\/$/, "");
-  return `https://${siteUrl.hostname}${sitePath}/`;
-}
-
-function quoteODataString(value) {
-  return `'${String(value || "").replace(/'/g, "''")}'`;
 }
 
 function getSharePointSiteParts() {
@@ -108,129 +26,99 @@ function getSharePointSiteParts() {
   };
 }
 
-async function fetchSharePointJson(url, token) {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json;odata=nometadata",
-    },
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`SharePoint API failed (${response.status}): ${text.slice(0, 300)}`);
+function getAllowedSharePointPrefix() {
+  const { hostName, sitePath } = getSharePointSiteParts();
+  return `https://${hostName}${sitePath}/`;
+}
+
+function decodeLoose(value) {
+  let output = String(value || "").replace(/\+/g, " ");
+  for (let index = 0; index < 3; index += 1) {
+    try {
+      const next = decodeURIComponent(output);
+      if (next === output) {
+        break;
+      }
+      output = next;
+    } catch {
+      break;
+    }
   }
-  return text ? JSON.parse(text) : null;
+  return output;
 }
 
 function parseAttachmentPath(targetUrl, sitePath) {
-  const decodeLoose = (value) => {
-    let output = String(value || "").replace(/\+/g, " ");
-    for (let index = 0; index < 3; index += 1) {
-      try {
-        const next = decodeURIComponent(output);
-        if (next === output) {
-          break;
-        }
-        output = next;
-      } catch {
-        break;
-      }
-    }
-    return output;
-  };
-
   const decodedPath = decodeLoose(String(targetUrl.pathname || ""));
-
   if (!decodedPath.startsWith(sitePath)) {
     return null;
   }
-
   const relative = decodedPath.slice(sitePath.length).replace(/^\/+/, "");
   const match = /^Lists\/(.+)\/Attachments\/(\d+)\/([^/]+)$/i.exec(relative);
   if (!match) {
     return null;
   }
   return {
-    listName: decodeLoose(String(match[1] || "")).trim(),
+    listName: decodeLoose(match[1]).trim(),
     itemId: Number(match[2]),
-    fileName: decodeLoose(String(match[3] || "")).trim(),
+    fileName: decodeLoose(match[3]).trim(),
+    normalizedPath: relative,
   };
 }
 
-async function fetchAttachmentViaSharePointItemApi(targetUrl, sharePointToken) {
-  const { hostName, sitePath } = getSharePointSiteParts();
-  const attachment = parseAttachmentPath(targetUrl, sitePath);
-  if (!attachment || !attachment.listName || !Number.isFinite(attachment.itemId)) {
-    return null;
-  }
-
-  const attachmentsUrl = `https://${hostName}${sitePath}/_api/web/lists/GetByTitle(${quoteODataString(
-    attachment.listName
-  )})/items(${attachment.itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
-  logMediaDebug("sharepoint-item-fallback-lookup", {
-    attachmentsUrl,
-    listName: attachment.listName,
-    itemId: attachment.itemId,
-  });
-
-  const payload = await fetchSharePointJson(attachmentsUrl, sharePointToken);
-  const rows = Array.isArray(payload?.value)
-    ? payload.value
-    : Array.isArray(payload?.d?.results)
-      ? payload.d.results
-      : [];
-
-  if (!rows.length) {
-    return null;
-  }
-
-  const normalizeName = (value) => String(value || "").trim().toLowerCase();
-  const requestedName = normalizeName(attachment.fileName);
-  const exact = rows.find((row) => normalizeName(row?.FileName) === requestedName);
-  const fallback = exact || rows[0];
-  const rel = String(fallback?.ServerRelativeUrl || "").trim();
-  if (!rel) {
-    return null;
-  }
-  const absolute = `https://${hostName}${rel.startsWith("/") ? rel : `/${rel}`}`;
-  logMediaDebug("sharepoint-item-fallback-content", { absolute });
-  const response = await fetch(absolute, {
-    headers: {
-      Authorization: `Bearer ${sharePointToken}`,
-    },
-  });
-  return response;
-}
-
-async function fetchGraphSiteId(graphToken, hostName, sitePath) {
-  const url = `https://graph.microsoft.com/v1.0/sites/${hostName}:${sitePath}?$select=id`;
+async function fetchGraphJson(url, graphAccessToken) {
   const response = await fetch(url, {
     headers: {
-      Authorization: `Bearer ${graphToken}`,
+      Authorization: `Bearer ${graphAccessToken}`,
       Accept: "application/json",
     },
   });
-  const payload = await response.json();
-  if (!response.ok || !payload?.id) {
-    throw new Error(payload?.error?.message || `Could not resolve site id (${response.status}).`);
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || text || `Graph API failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function fetchGraphBinary(url, graphAccessToken, label) {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${graphAccessToken}`,
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    const error = new Error(`${label} failed (${response.status}): ${detail.slice(0, 300)}`);
+    error.status = response.status;
+    throw error;
+  }
+  return response;
+}
+
+async function fetchGraphSiteId(graphAccessToken, hostName, sitePath) {
+  const payload = await fetchGraphJson(
+    `https://graph.microsoft.com/v1.0/sites/${hostName}:${sitePath}?$select=id`,
+    graphAccessToken
+  );
+  if (!payload?.id) {
+    throw new Error("Could not resolve site id.");
   }
   return payload.id;
 }
 
-async function fetchGraphListIdByName(graphToken, siteId, listName) {
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$select=id,displayName&$filter=displayName eq ${encodeURIComponent(
-    quoteODataString(listName)
-  )}&$top=1`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${graphToken}`,
-      Accept: "application/json",
-    },
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload?.error?.message || `Could not resolve list (${response.status}).`);
-  }
+async function fetchGraphListIdByName(graphAccessToken, siteId, listName) {
+  const filter = encodeURIComponent(`displayName eq '${String(listName || "").replace(/'/g, "''")}'`);
+  const payload = await fetchGraphJson(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$select=id,displayName&$filter=${filter}&$top=1`,
+    graphAccessToken
+  );
   const row = Array.isArray(payload?.value) ? payload.value[0] : null;
   if (!row?.id) {
     throw new Error(`Could not find list '${listName}'.`);
@@ -238,17 +126,13 @@ async function fetchGraphListIdByName(graphToken, siteId, listName) {
   return row.id;
 }
 
-async function fetchGraphListDriveId(graphToken, siteId, listId) {
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/drive?$select=id,webUrl`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${graphToken}`,
-      Accept: "application/json",
-    },
-  });
-  const payload = await response.json();
-  if (!response.ok || !payload?.id) {
-    throw new Error(payload?.error?.message || `Could not resolve list drive (${response.status}).`);
+async function fetchGraphListDriveId(graphAccessToken, siteId, listId) {
+  const payload = await fetchGraphJson(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/drive?$select=id,webUrl`,
+    graphAccessToken
+  );
+  if (!payload?.id) {
+    throw new Error("Could not resolve list drive id.");
   }
   return {
     id: payload.id,
@@ -256,16 +140,8 @@ async function fetchGraphListDriveId(graphToken, siteId, listId) {
   };
 }
 
-function toDecodedPathname(urlObj) {
-  try {
-    return decodeURIComponent(String(urlObj.pathname || ""));
-  } catch {
-    return String(urlObj.pathname || "");
-  }
-}
-
 function toGraphDrivePathForAttachments(targetUrl, sitePath) {
-  const decodedPath = toDecodedPathname(targetUrl);
+  const decodedPath = decodeLoose(String(targetUrl.pathname || ""));
   if (!decodedPath.startsWith(sitePath)) {
     return "";
   }
@@ -276,65 +152,51 @@ function toGraphDrivePathForAttachments(targetUrl, sitePath) {
   return relative;
 }
 
-async function fetchViaGraphListDriveAttachment(targetUrl) {
+async function fetchViaDelegatedListDrive(targetUrl, graphAccessToken) {
   const { hostName, sitePath } = getSharePointSiteParts();
   const parsed = parseAttachmentPath(targetUrl, sitePath);
   if (!parsed || !parsed.listName || !parsed.fileName || !Number.isFinite(parsed.itemId)) {
     return null;
   }
 
-  const graphToken = await getGraphAccessToken();
-  const siteId = await fetchGraphSiteId(graphToken, hostName, sitePath);
-  const listId = await fetchGraphListIdByName(graphToken, siteId, parsed.listName);
-  const drive = await fetchGraphListDriveId(graphToken, siteId, listId);
+  logMediaDebug("delegated-list-drive-start", {
+    listName: parsed.listName,
+    itemId: parsed.itemId,
+    fileName: parsed.fileName,
+  });
+
+  const siteId = await fetchGraphSiteId(graphAccessToken, hostName, sitePath);
+  const listId = await fetchGraphListIdByName(graphAccessToken, siteId, parsed.listName);
+  const drive = await fetchGraphListDriveId(graphAccessToken, siteId, listId);
   const encodedSegments = ["Attachments", String(parsed.itemId), parsed.fileName]
     .map((part) => encodeURIComponent(part))
     .join("/");
   const contentUrl = `https://graph.microsoft.com/v1.0/drives/${drive.id}/root:/${encodedSegments}:/content`;
-  logMediaDebug("graph-list-drive-fallback", {
-    listName: parsed.listName,
-    itemId: parsed.itemId,
-    contentUrl,
-    driveWebUrl: drive.webUrl,
-  });
+  logMediaDebug("delegated-list-drive-content-url", { contentUrl, driveWebUrl: drive.webUrl });
 
-  const response = await fetch(contentUrl, {
-    headers: {
-      Authorization: `Bearer ${graphToken}`,
-    },
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Graph list drive fallback failed (${response.status}): ${detail.slice(0, 300)}`);
-  }
+  const response = await fetchGraphBinary(contentUrl, graphAccessToken, "Delegated list drive fetch");
+  logMediaDebug("delegated-list-drive-success", { status: response.status });
   return response;
 }
 
-async function fetchViaGraphSiteDrive(targetUrl) {
+async function fetchViaDelegatedSiteDrive(targetUrl, graphAccessToken) {
   const { hostName, sitePath } = getSharePointSiteParts();
   const graphDrivePath = toGraphDrivePathForAttachments(targetUrl, sitePath);
   if (!graphDrivePath) {
     return null;
   }
 
-  const graphToken = await getGraphAccessToken();
-  const siteId = await fetchGraphSiteId(graphToken, hostName, sitePath);
+  logMediaDebug("delegated-site-drive-start", { graphDrivePath });
+  const siteId = await fetchGraphSiteId(graphAccessToken, hostName, sitePath);
   const encodedPath = graphDrivePath
     .split("/")
     .map((part) => encodeURIComponent(part))
     .join("/");
   const contentUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodedPath}:/content`;
-  logMediaDebug("graph-drive-fallback", { contentUrl });
+  logMediaDebug("delegated-site-drive-content-url", { contentUrl });
 
-  const response = await fetch(contentUrl, {
-    headers: {
-      Authorization: `Bearer ${graphToken}`,
-    },
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Graph fallback failed (${response.status}): ${detail.slice(0, 300)}`);
-  }
+  const response = await fetchGraphBinary(contentUrl, graphAccessToken, "Delegated site drive fetch");
+  logMediaDebug("delegated-site-drive-success", { status: response.status });
   return response;
 }
 
@@ -344,20 +206,12 @@ function toGraphShareTokenFromUrl(absoluteUrl) {
   return `u!${base64Url}`;
 }
 
-async function fetchViaGraphShares(targetUrl) {
-  const graphToken = await getGraphAccessToken();
+async function fetchViaDelegatedShares(targetUrl, graphAccessToken) {
   const shareToken = toGraphShareTokenFromUrl(targetUrl.href);
   const contentUrl = `https://graph.microsoft.com/v1.0/shares/${shareToken}/driveItem/content`;
-  logMediaDebug("graph-shares-fallback", { contentUrl });
-  const response = await fetch(contentUrl, {
-    headers: {
-      Authorization: `Bearer ${graphToken}`,
-    },
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Graph shares fallback failed (${response.status}): ${detail.slice(0, 300)}`);
-  }
+  logMediaDebug("delegated-shares-start", { contentUrl });
+  const response = await fetchGraphBinary(contentUrl, graphAccessToken, "Delegated shares fetch");
+  logMediaDebug("delegated-shares-success", { status: response.status });
   return response;
 }
 
@@ -367,7 +221,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  if (!(await requireApiAuth(req, res, { allowedRoles: ["admin", "marketing"] }))) {
+  if (!(await requireGraphAuth(req, res, { allowedRoles: ["admin", "marketing"] }))) {
     return;
   }
 
@@ -385,84 +239,58 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const sharePointToken = await getSharePointAccessToken(targetUrl.hostname);
-    let upstream = await fetch(targetUrl.href, {
-      headers: {
-        Authorization: `Bearer ${sharePointToken}`,
-      },
-    });
-
-    if (upstream.status === 401 || upstream.status === 403) {
-      logMediaDebug("sharepoint-direct-failed", {
-        status: upstream.status,
-        url: targetUrl.href,
+    const { sitePath } = getSharePointSiteParts();
+    const parsedAttachment = parseAttachmentPath(targetUrl, sitePath);
+    if (parsedAttachment) {
+      logMediaDebug("normalized-attachment-tuple", {
+        listName: parsedAttachment.listName,
+        itemId: parsedAttachment.itemId,
+        fileName: parsedAttachment.fileName,
       });
+    }
 
+    const graphAccessToken = req.authUser?.graphAccessToken;
+    if (!graphAccessToken) {
+      res.status(401).json({ error: "Unauthorized." });
+      return;
+    }
+
+    const resolverErrors = [];
+    let upstream = null;
+
+    try {
+      upstream = await fetchViaDelegatedListDrive(targetUrl, graphAccessToken);
+    } catch (error) {
+      resolverErrors.push(`list-drive:${error?.message || String(error)}`);
+      logMediaDebug("delegated-list-drive-error", { detail: error?.message || String(error) });
+    }
+
+    if (!upstream) {
       try {
-        const viaItemApi = await fetchAttachmentViaSharePointItemApi(targetUrl, sharePointToken);
-        if (viaItemApi && viaItemApi.ok) {
-          upstream = viaItemApi;
-        } else if (viaItemApi) {
-          logMediaDebug("sharepoint-item-fallback-non-ok", {
-            status: viaItemApi.status,
-            url: targetUrl.href,
-          });
-        }
-      } catch (itemFallbackError) {
-        logMediaDebug("sharepoint-item-fallback-error", {
-          detail: itemFallbackError?.message || String(itemFallbackError),
-          url: targetUrl.href,
-        });
-      }
-
-      if (upstream.status === 401 || upstream.status === 403) {
-        try {
-          const graphFallback = await fetchViaGraphSiteDrive(targetUrl);
-          if (graphFallback) {
-            upstream = graphFallback;
-          }
-        } catch (fallbackError) {
-          logMediaDebug("graph-fallback-error", {
-            detail: fallbackError?.message || String(fallbackError),
-            url: targetUrl.href,
-          });
-        }
-      }
-
-      if (upstream.status === 401 || upstream.status === 403 || upstream.status === 404) {
-        try {
-          const graphListDriveFallback = await fetchViaGraphListDriveAttachment(targetUrl);
-          if (graphListDriveFallback) {
-            upstream = graphListDriveFallback;
-          }
-        } catch (listDriveError) {
-          logMediaDebug("graph-list-drive-fallback-error", {
-            detail: listDriveError?.message || String(listDriveError),
-            url: targetUrl.href,
-          });
-        }
-      }
-
-      if (upstream.status === 401 || upstream.status === 403 || upstream.status === 404) {
-        try {
-          const graphSharesFallback = await fetchViaGraphShares(targetUrl);
-          if (graphSharesFallback) {
-            upstream = graphSharesFallback;
-          }
-        } catch (sharesError) {
-          logMediaDebug("graph-shares-fallback-error", {
-            detail: sharesError?.message || String(sharesError),
-            url: targetUrl.href,
-          });
-        }
+        upstream = await fetchViaDelegatedSiteDrive(targetUrl, graphAccessToken);
+      } catch (error) {
+        resolverErrors.push(`site-drive:${error?.message || String(error)}`);
+        logMediaDebug("delegated-site-drive-error", { detail: error?.message || String(error) });
       }
     }
 
-    if (!upstream.ok) {
-      const detail = await upstream.text();
-      res.status(upstream.status).json({
+    if (!upstream) {
+      try {
+        upstream = await fetchViaDelegatedShares(targetUrl, graphAccessToken);
+      } catch (error) {
+        resolverErrors.push(`shares:${error?.message || String(error)}`);
+        logMediaDebug("delegated-shares-error", { detail: error?.message || String(error) });
+      }
+    }
+
+    if (!upstream) {
+      const normalizedPath = parsedAttachment?.normalizedPath || decodeLoose(String(targetUrl.pathname || ""));
+      res.status(401).json({
         error: "Upstream request failed.",
-        detail: detail.slice(0, 400),
+        detail: `All delegated resolvers failed for '${normalizedPath}'. ${resolverErrors.join(" | ")}`.slice(
+          0,
+          500
+        ),
       });
       return;
     }
