@@ -31,6 +31,10 @@ function getAllowedSharePointPrefix() {
   return `https://${hostName}${sitePath}/`;
 }
 
+function quoteODataString(value) {
+  return `'${String(value || "").replace(/'/g, "''")}'`;
+}
+
 function decodeLoose(value) {
   let output = String(value || "").replace(/\+/g, " ");
   for (let index = 0; index < 3; index += 1) {
@@ -100,6 +104,42 @@ async function fetchGraphBinary(url, graphAccessToken, label) {
     throw error;
   }
   return response;
+}
+
+async function exchangeForDelegatedSharePointToken(userAccessToken, hostName) {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_API_CLIENT_ID;
+  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
+  }
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    requested_token_use: "on_behalf_of",
+    assertion: String(userAccessToken || ""),
+    scope: `https://${hostName}/.default`,
+  });
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+  if (!response.ok || !payload?.access_token) {
+    throw new Error(payload?.error_description || payload?.error || `OBO token failed (${response.status}).`);
+  }
+  return payload.access_token;
 }
 
 async function fetchGraphSiteId(graphAccessToken, hostName, sitePath) {
@@ -200,6 +240,73 @@ function toGraphDrivePathForAttachments(targetUrl, sitePath) {
     return "";
   }
   return relative;
+}
+
+async function fetchViaDelegatedSharePointAttachment(targetUrl, graphAccessToken) {
+  const { hostName, sitePath } = getSharePointSiteParts();
+  const parsed = parseAttachmentPath(targetUrl, sitePath);
+  if (!parsed || !parsed.listName || !Number.isFinite(parsed.itemId)) {
+    return null;
+  }
+
+  logMediaDebug("delegated-sharepoint-obo-start", {
+    listName: parsed.listName,
+    itemId: parsed.itemId,
+    fileName: parsed.fileName,
+  });
+
+  const spToken = await exchangeForDelegatedSharePointToken(graphAccessToken, hostName);
+  const attachmentsUrl = `https://${hostName}${sitePath}/_api/web/lists/GetByTitle(${quoteODataString(
+    parsed.listName
+  )})/items(${parsed.itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
+  const metaResponse = await fetch(attachmentsUrl, {
+    headers: {
+      Authorization: `Bearer ${spToken}`,
+      Accept: "application/json;odata=nometadata",
+    },
+  });
+  const metaText = await metaResponse.text();
+  let metaPayload = null;
+  try {
+    metaPayload = metaText ? JSON.parse(metaText) : null;
+  } catch {
+    metaPayload = null;
+  }
+  if (!metaResponse.ok) {
+    throw new Error(`SharePoint attachment metadata failed (${metaResponse.status}).`);
+  }
+
+  const rows = Array.isArray(metaPayload?.value)
+    ? metaPayload.value
+    : Array.isArray(metaPayload?.d?.results)
+      ? metaPayload.d.results
+      : [];
+  if (!rows.length) {
+    throw new Error("No attachment rows returned from SharePoint.");
+  }
+
+  const normalizeName = (value) => decodeLoose(String(value || "")).trim().toLowerCase();
+  const requested = normalizeName(parsed.fileName);
+  const exact = rows.find((row) => normalizeName(row?.FileName) === requested);
+  const picked = exact || rows[0];
+  const serverRelative = String(picked?.ServerRelativeUrl || "").trim();
+  if (!serverRelative) {
+    throw new Error("Attachment row missing ServerRelativeUrl.");
+  }
+
+  const absolute = `https://${hostName}${serverRelative.startsWith("/") ? serverRelative : `/${serverRelative}`}`;
+  logMediaDebug("delegated-sharepoint-obo-content-url", { absolute });
+  const fileResponse = await fetch(absolute, {
+    headers: {
+      Authorization: `Bearer ${spToken}`,
+    },
+  });
+  if (!fileResponse.ok) {
+    const detail = await fileResponse.text();
+    throw new Error(`SharePoint attachment content failed (${fileResponse.status}): ${detail.slice(0, 200)}`);
+  }
+  logMediaDebug("delegated-sharepoint-obo-success", { status: fileResponse.status });
+  return fileResponse;
 }
 
 async function fetchViaDelegatedListDrive(targetUrl, graphAccessToken) {
@@ -321,6 +428,15 @@ module.exports = async (req, res) => {
       } catch (error) {
         resolverErrors.push(`list-item-driveitem:${error?.message || String(error)}`);
         logMediaDebug("delegated-list-item-driveitem-error", { detail: error?.message || String(error) });
+      }
+    }
+
+    if (!upstream) {
+      try {
+        upstream = await fetchViaDelegatedSharePointAttachment(targetUrl, graphAccessToken);
+      } catch (error) {
+        resolverErrors.push(`sharepoint-obo:${error?.message || String(error)}`);
+        logMediaDebug("delegated-sharepoint-obo-error", { detail: error?.message || String(error) });
       }
     }
 
