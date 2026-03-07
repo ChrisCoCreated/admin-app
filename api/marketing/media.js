@@ -167,6 +167,29 @@ async function fetchGraphListDriveId(graphAccessToken, siteId, listId) {
   };
 }
 
+async function fetchViaDelegatedListItemDriveItem(targetUrl, graphAccessToken) {
+  const { hostName, sitePath } = getSharePointSiteParts();
+  const parsed = parseAttachmentPath(targetUrl, sitePath);
+  if (!parsed || !parsed.listName || !Number.isFinite(parsed.itemId)) {
+    return null;
+  }
+
+  logMediaDebug("delegated-list-item-driveitem-start", {
+    listName: parsed.listName,
+    itemId: parsed.itemId,
+    fileName: parsed.fileName,
+  });
+
+  const siteId = await fetchGraphSiteId(graphAccessToken, hostName, sitePath);
+  const listId = await fetchGraphListIdByName(graphAccessToken, siteId, parsed.listName);
+  const contentUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${parsed.itemId}/driveItem/content`;
+  logMediaDebug("delegated-list-item-driveitem-content-url", { contentUrl });
+
+  const response = await fetchGraphBinary(contentUrl, graphAccessToken, "Delegated list item driveItem fetch");
+  logMediaDebug("delegated-list-item-driveitem-success", { status: response.status });
+  return response;
+}
+
 function toGraphDrivePathForAttachments(targetUrl, sitePath) {
   const decodedPath = decodeLoose(String(targetUrl.pathname || ""));
   if (!decodedPath.startsWith(sitePath)) {
@@ -290,6 +313,15 @@ module.exports = async (req, res) => {
     } catch (error) {
       resolverErrors.push(`list-drive:${error?.message || String(error)}`);
       logMediaDebug("delegated-list-drive-error", { detail: error?.message || String(error) });
+    }
+
+    if (!upstream) {
+      try {
+        upstream = await fetchViaDelegatedListItemDriveItem(targetUrl, graphAccessToken);
+      } catch (error) {
+        resolverErrors.push(`list-item-driveitem:${error?.message || String(error)}`);
+        logMediaDebug("delegated-list-item-driveitem-error", { detail: error?.message || String(error) });
+      }
     }
 
     if (!upstream) {
