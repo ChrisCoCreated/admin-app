@@ -101,6 +101,7 @@ async function fetchJson(url, headers = {}) {
 }
 
 async function getAppToken(scope) {
+  logMediaDebug("token-request-start", { scope });
   const tenantId = process.env.AZURE_TENANT_ID;
   const clientId = process.env.AZURE_API_CLIENT_ID;
   const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
@@ -136,6 +137,7 @@ async function getAppToken(scope) {
     throw new Error(payload?.error_description || payload?.error || `Token request failed (${response.status}).`);
   }
 
+  logMediaDebug("token-request-success", { scope });
   return payload.access_token;
 }
 
@@ -143,9 +145,15 @@ async function resolveSiteAndListIds(config) {
   const cacheKey = `${config.hostName}|${config.sitePath}|${config.listName}`;
   const now = Date.now();
   if (siteAndListCache.key === cacheKey && siteAndListCache.value && siteAndListCache.expiresAt > now) {
+    logMediaDebug("site-list-cache-hit", { cacheKey });
     return siteAndListCache.value;
   }
 
+  logMediaDebug("site-list-resolve-start", {
+    hostName: config.hostName,
+    sitePath: config.sitePath,
+    listName: config.listName,
+  });
   const graphToken = await getAppToken("https://graph.microsoft.com/.default");
   const graphHeaders = {
     Authorization: `Bearer ${graphToken}`,
@@ -178,10 +186,16 @@ async function resolveSiteAndListIds(config) {
     expiresAt: now + 10 * 60 * 1000,
   };
 
+  logMediaDebug("site-list-resolve-success", {
+    siteId: resolved.siteId,
+    listId: resolved.listId,
+    listName: config.listName,
+  });
   return resolved;
 }
 
 async function fetchSharePointAttachmentRows(config, listId, itemId, sharePointToken) {
+  logMediaDebug("attachment-metadata-start", { listId, itemId });
   const url = `https://${config.hostName}${config.sitePath}/_api/web/lists(guid'${String(listId).toUpperCase()}')/items(${itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
   const response = await fetch(url, {
     headers: {
@@ -208,6 +222,7 @@ async function fetchSharePointAttachmentRows(config, listId, itemId, sharePointT
       ? payload.d.results
       : [];
 
+  logMediaDebug("attachment-metadata-success", { listId, itemId, count: rows.length });
   return rows;
 }
 
@@ -221,6 +236,7 @@ async function fetchSharePointFileBinary(config, serverRelativeUrl, sharePointTo
   const fileApi = `https://${config.hostName}${config.sitePath}/_api/web/GetFileByServerRelativePath(decodedurl=${quoteODataString(
     decodedRel
   )})/$value`;
+  logMediaDebug("attachment-content-start", { fileApi });
 
   let response = await fetch(fileApi, {
     headers: {
@@ -244,6 +260,7 @@ async function fetchSharePointFileBinary(config, serverRelativeUrl, sharePointTo
     throw new Error(`Attachment content request failed (${response.status}): ${detail.slice(0, 300)}`);
   }
 
+  logMediaDebug("attachment-content-success", { status: response.status });
   return response;
 }
 
@@ -311,6 +328,10 @@ module.exports = async (req, res) => {
       dataBase64,
     });
   } catch (error) {
+    logMediaDebug("media-endpoint-error", {
+      detail: error?.message || String(error),
+      stack: String(error?.stack || "").split("\n").slice(0, 4).join(" | "),
+    });
     res.status(500).json({
       error: "Server error",
       detail: error?.message || String(error),
