@@ -8,6 +8,7 @@ const PAN_LIMIT = 100;
 const EXPORT_WIDTH = 2000;
 const DEFAULT_GAP_PX = 24;
 const DEFAULT_RADIUS_PX = 36;
+const CLIENT_LIST_CACHE_KEY = "photoLayoutClientListV1";
 const BACKEND_LOAD_TEST_IMAGE_URL =
   "https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Photos%20and%20Lists/Attachments/109/Agota-20260305-120811-27.jpeg";
 
@@ -109,7 +110,8 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 
 let allPhotos = [];
-let imagePhotos = [];
+let clientPhotoPool = [];
+let cachedClients = [];
 let selectedClient = "";
 let selectedImages = [];
 let selectedSlotIndex = -1;
@@ -125,6 +127,33 @@ const layoutStyle = {
 };
 
 const exportImageCache = new Map();
+const clientPhotoCache = new Map();
+
+function loadCachedClientList() {
+  try {
+    const raw = sessionStorage.getItem(CLIENT_LIST_CACHE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((value) => normalizeClientName(value))
+      .filter((value, index, array) => Boolean(value) && array.indexOf(value) === index);
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedClientList(clients) {
+  try {
+    sessionStorage.setItem(CLIENT_LIST_CACHE_KEY, JSON.stringify(Array.isArray(clients) ? clients : []));
+  } catch {
+    // ignore session cache errors
+  }
+}
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -175,15 +204,12 @@ function getActiveLayout() {
 }
 
 function getClientPhotos() {
-  const target = normalizeClientName(selectedClient);
-  return imagePhotos.filter((photo) => normalizeClientName(photo.client) === target);
+  return clientPhotoPool;
 }
 
 function updateClientOptions() {
   const current = selectedClient;
-  const clients = Array.from(new Set(imagePhotos.map((photo) => normalizeClientName(photo.client)))).sort((a, b) =>
-    a.localeCompare(b)
-  );
+  const clients = cachedClients.slice().sort((a, b) => a.localeCompare(b));
   clientSelect.innerHTML = "";
   if (!clients.length) {
     clientSelect.innerHTML = '<option value="">No clients with images</option>';
@@ -862,15 +888,52 @@ function renderAll() {
 }
 
 async function loadPhotos() {
-  setImagesStatus("Loading photos...");
-  const payload = await directoryApi.listMarketingPhotos();
-  allPhotos = Array.isArray(payload?.photos) ? payload.photos : [];
-  console.log("[Photo Layout Debug] First 5 photo records:", allPhotos.slice(0, 5));
-  imagePhotos = allPhotos.filter((photo) => isImagePhoto(photo));
-  updateClientOptions();
-  if (!selectedClient && imagePhotos.length) {
-    selectedClient = normalizeClientName(imagePhotos[0].client);
+  cachedClients = loadCachedClientList();
+  if (cachedClients.length) {
+    updateClientOptions();
+  } else {
+    setImagesStatus("Loading clients...");
   }
+
+  const clientsPayload = await directoryApi.listMarketingPhotos({ clientsOnly: 1 });
+  const clients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
+  cachedClients = clients
+    .map((item) => normalizeClientName(item?.name))
+    .filter((value, index, array) => Boolean(value) && array.indexOf(value) === index);
+  saveCachedClientList(cachedClients);
+  updateClientOptions();
+  if (!selectedClient && cachedClients.length) {
+    selectedClient = cachedClients[0];
+  }
+  await loadPhotosForClient(selectedClient);
+}
+
+async function loadPhotosForClient(clientName) {
+  const normalizedClient = normalizeClientName(clientName);
+  if (!normalizedClient) {
+    clientPhotoPool = [];
+    renderAll();
+    return;
+  }
+
+  setImagesStatus(`Loading images for ${normalizedClient}...`);
+  selectedImages = [];
+  selectedSlotIndex = -1;
+  invalidateOutput();
+
+  if (clientPhotoCache.has(normalizedClient)) {
+    clientPhotoPool = clientPhotoCache.get(normalizedClient) || [];
+    renderAll();
+    return;
+  }
+
+  const payload = await directoryApi.listMarketingPhotos({ client: normalizedClient });
+  const photos = Array.isArray(payload?.photos) ? payload.photos : [];
+  allPhotos = photos;
+  console.log("[Photo Layout Debug] First 5 photo records:", allPhotos.slice(0, 5));
+  const imagePhotos = photos.filter((photo) => isImagePhoto(photo));
+  clientPhotoCache.set(normalizedClient, imagePhotos);
+  clientPhotoPool = imagePhotos;
   renderAll();
 }
 
@@ -924,8 +987,7 @@ async function init() {
 
 clientSelect?.addEventListener("change", () => {
   selectedClient = normalizeClientName(clientSelect.value);
-  invalidateOutput();
-  renderImagesGrid();
+  void loadPhotosForClient(selectedClient);
 });
 
 zoomRange?.addEventListener("input", applyAdjustmentsFromControls);

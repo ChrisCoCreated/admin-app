@@ -42,6 +42,10 @@ async function getPhotosWithCache() {
   }
 }
 
+function normalizeClientName(value) {
+  return String(value || "").trim() || "Unassigned";
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
     res.status(405).json({ error: "Method Not Allowed" });
@@ -54,6 +58,40 @@ module.exports = async (req, res) => {
 
   try {
     const payload = await getPhotosWithCache();
+    const clientsOnly = String(req.query.clientsOnly || "").trim().toLowerCase();
+    const clientFilter = String(req.query.client || "").trim();
+
+    if (clientsOnly === "1" || clientsOnly === "true") {
+      const counts = new Map();
+      for (const photo of payload.photos) {
+        const clientName = normalizeClientName(photo?.client);
+        counts.set(clientName, (counts.get(clientName) || 0) + 1);
+      }
+      const clients = Array.from(counts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      res.setHeader("Cache-Control", "private, max-age=30");
+      res.status(200).json({
+        clients,
+        totalClients: clients.length,
+        defaultView: "clients",
+      });
+      return;
+    }
+
+    if (clientFilter) {
+      const normalizedClient = normalizeClientName(clientFilter);
+      const photos = payload.photos.filter((photo) => normalizeClientName(photo?.client) === normalizedClient);
+      res.setHeader("Cache-Control", "private, max-age=30");
+      res.status(200).json({
+        photos,
+        total: photos.length,
+        client: normalizedClient,
+        defaultView: "client",
+      });
+      return;
+    }
+
     res.setHeader("Cache-Control", "private, max-age=30");
     res.status(200).json(payload);
   } catch (error) {
