@@ -1,6 +1,20 @@
+const crypto = require("crypto");
+const fs = require("fs");
+const fsp = require("fs/promises");
+const path = require("path");
 const { requireApiAuth } = require("../_lib/require-api-auth");
 
 const MARKETING_MEDIA_DEBUG = process.env.MARKETING_MEDIA_DEBUG === "1";
+const STORE_DIR = process.env.MARKETING_MEDIA_STORE_DIR
+  ? path.resolve(process.env.MARKETING_MEDIA_STORE_DIR)
+  : path.join(process.cwd(), "data", "marketing-media");
+const STORE_FILES_DIR = path.join(STORE_DIR, "files");
+const STORE_INDEX_PATH = path.join(STORE_DIR, "index.json");
+const PRUNE_INTERVAL_MS = 5 * 60 * 1000;
+
+let storeReadyPromise = null;
+let indexWriteLock = Promise.resolve();
+let lastPruneAt = 0;
 
 function logMediaDebug(message, details) {
   if (!MARKETING_MEDIA_DEBUG) {
@@ -72,6 +86,250 @@ function getIncomingBearerToken(req) {
   const authHeader = String(req.headers.authorization || "");
   const match = /^Bearer\s+(.+)$/i.exec(authHeader);
   return match ? String(match[1] || "").trim() : "";
+}
+
+function getPruneDays() {
+  const configured = Number(process.env.MARKETING_MEDIA_PRUNE_DAYS || "0");
+  if (!Number.isFinite(configured) || configured <= 0) {
+    return 0;
+  }
+  return Math.floor(configured);
+}
+
+function getMaxBytes() {
+  const configured = Number(process.env.MARKETING_MEDIA_MAX_BYTES || "0");
+  if (!Number.isFinite(configured) || configured <= 0) {
+    return 0;
+  }
+  return Math.floor(configured);
+}
+
+async function ensureStoreReady() {
+  if (!storeReadyPromise) {
+    storeReadyPromise = (async () => {
+      await fsp.mkdir(STORE_FILES_DIR, { recursive: true });
+      try {
+        await fsp.access(STORE_INDEX_PATH, fs.constants.F_OK);
+      } catch {
+        const initial = { entries: {} };
+        await fsp.writeFile(STORE_INDEX_PATH, JSON.stringify(initial, null, 2), "utf8");
+      }
+    })();
+  }
+  await storeReadyPromise;
+}
+
+async function readIndex() {
+  await ensureStoreReady();
+  try {
+    const raw = await fsp.readFile(STORE_INDEX_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.entries !== "object") {
+      return { entries: {} };
+    }
+    return {
+      entries: parsed.entries,
+    };
+  } catch {
+    return { entries: {} };
+  }
+}
+
+function atomicJsonWrite(filePath, payload) {
+  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const body = JSON.stringify(payload, null, 2);
+  return fsp
+    .writeFile(tmpPath, body, "utf8")
+    .then(() => fsp.rename(tmpPath, filePath))
+    .catch(async (error) => {
+      try {
+        await fsp.unlink(tmpPath);
+      } catch {
+        // ignore temp cleanup failure
+      }
+      throw error;
+    });
+}
+
+function withIndexLock(action) {
+  const next = indexWriteLock.then(() => action());
+  indexWriteLock = next.catch(() => undefined);
+  return next;
+}
+
+function normalizeSourceUrl(targetUrl) {
+  const normalized = new URL(targetUrl.href);
+  normalized.hash = "";
+  normalized.hostname = normalized.hostname.toLowerCase();
+  return normalized.toString();
+}
+
+function buildCacheKey(targetUrl, attachment) {
+  const normalizedUrl = normalizeSourceUrl(targetUrl);
+  const attachmentId = Number.isFinite(attachment?.itemId) ? String(attachment.itemId) : "";
+  const digest = crypto
+    .createHash("sha256")
+    .update(`${normalizedUrl}|${attachmentId}`)
+    .digest("hex");
+  return {
+    key: digest,
+    normalizedUrl,
+  };
+}
+
+async function touchEntry(cacheKey) {
+  await withIndexLock(async () => {
+    const index = await readIndex();
+    const entry = index.entries?.[cacheKey];
+    if (!entry) {
+      return;
+    }
+    entry.lastAccessedAt = new Date().toISOString();
+    await atomicJsonWrite(STORE_INDEX_PATH, index);
+  });
+}
+
+async function getCachedMedia(cacheKey) {
+  const index = await readIndex();
+  const entry = index.entries?.[cacheKey];
+  if (!entry || !entry.fileName) {
+    return null;
+  }
+  const filePath = path.join(STORE_FILES_DIR, entry.fileName);
+  try {
+    const buffer = await fsp.readFile(filePath);
+    void touchEntry(cacheKey);
+    return {
+      buffer,
+      mimeType: String(entry.contentType || "application/octet-stream"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function persistCachedMedia(cacheKey, sourceUrl, buffer, contentType) {
+  await ensureStoreReady();
+  const safeType = String(contentType || "application/octet-stream").split(";")[0].trim();
+  const extByType = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/bmp": "bmp",
+    "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
+  };
+  const ext = extByType[safeType.toLowerCase()] || "bin";
+  const fileName = `${cacheKey}.${ext}`;
+  const filePath = path.join(STORE_FILES_DIR, fileName);
+  const tmpFilePath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+
+  try {
+    await fsp.writeFile(tmpFilePath, buffer);
+    await fsp.rename(tmpFilePath, filePath);
+  } catch (error) {
+    try {
+      await fsp.unlink(tmpFilePath);
+    } catch {
+      // ignore
+    }
+    throw error;
+  }
+
+  const nowIso = new Date().toISOString();
+  await withIndexLock(async () => {
+    const index = await readIndex();
+    index.entries[cacheKey] = {
+      sourceUrl,
+      contentType: safeType,
+      size: buffer.length,
+      fileName,
+      createdAt: index.entries?.[cacheKey]?.createdAt || nowIso,
+      lastAccessedAt: nowIso,
+    };
+    await atomicJsonWrite(STORE_INDEX_PATH, index);
+  });
+}
+
+async function pruneStoreIfNeeded() {
+  const now = Date.now();
+  if (now - lastPruneAt < PRUNE_INTERVAL_MS) {
+    return;
+  }
+  lastPruneAt = now;
+
+  const pruneDays = getPruneDays();
+  const maxBytes = getMaxBytes();
+  if (!pruneDays && !maxBytes) {
+    return;
+  }
+
+  await withIndexLock(async () => {
+    const index = await readIndex();
+    const entries = Object.entries(index.entries || {}).map(([key, value]) => ({
+      key,
+      ...value,
+      lastAccessedMs: Date.parse(value?.lastAccessedAt || value?.createdAt || 0) || 0,
+      createdMs: Date.parse(value?.createdAt || 0) || 0,
+      size: Number(value?.size) || 0,
+    }));
+
+    const keysToRemove = new Set();
+
+    if (pruneDays > 0) {
+      const minAccessMs = now - pruneDays * 24 * 60 * 60 * 1000;
+      for (const entry of entries) {
+        const markMs = entry.lastAccessedMs || entry.createdMs;
+        if (markMs > 0 && markMs < minAccessMs) {
+          keysToRemove.add(entry.key);
+        }
+      }
+    }
+
+    let totalBytes = entries
+      .filter((entry) => !keysToRemove.has(entry.key))
+      .reduce((sum, entry) => sum + entry.size, 0);
+
+    if (maxBytes > 0 && totalBytes > maxBytes) {
+      const byOldest = entries
+        .filter((entry) => !keysToRemove.has(entry.key))
+        .sort((a, b) => (a.lastAccessedMs || a.createdMs) - (b.lastAccessedMs || b.createdMs));
+      for (const entry of byOldest) {
+        if (totalBytes <= maxBytes) {
+          break;
+        }
+        keysToRemove.add(entry.key);
+        totalBytes -= entry.size;
+      }
+    }
+
+    if (!keysToRemove.size) {
+      return;
+    }
+
+    for (const key of keysToRemove) {
+      const fileName = String(index.entries?.[key]?.fileName || "").trim();
+      if (fileName) {
+        const filePath = path.join(STORE_FILES_DIR, fileName);
+        try {
+          await fsp.unlink(filePath);
+        } catch {
+          // ignore missing file
+        }
+      }
+      delete index.entries[key];
+    }
+
+    await atomicJsonWrite(STORE_INDEX_PATH, index);
+    logMediaDebug("cache-prune", {
+      removed: keysToRemove.size,
+      pruneDays,
+      maxBytes,
+    });
+  });
 }
 
 async function exchangeDelegatedToken(assertion, scope, label) {
@@ -418,6 +676,8 @@ module.exports = async (req, res) => {
       return;
     }
 
+    await pruneStoreIfNeeded();
+
     const { sitePath } = getSharePointSiteParts();
     const parsedAttachment = parseAttachmentPath(targetUrl, sitePath);
     if (parsedAttachment) {
@@ -427,6 +687,21 @@ module.exports = async (req, res) => {
         fileName: parsedAttachment.fileName,
       });
     }
+
+    const cacheIdentity = buildCacheKey(targetUrl, parsedAttachment);
+    const cached = await getCachedMedia(cacheIdentity.key);
+    if (cached) {
+      logMediaDebug("cache-hit", { key: cacheIdentity.key, sourceUrl: cacheIdentity.normalizedUrl });
+      const dataBase64 = cached.buffer.toString("base64");
+      res.setHeader("Cache-Control", "no-store");
+      res.status(200).json({
+        mimeType: cached.mimeType,
+        dataBase64,
+      });
+      return;
+    }
+
+    logMediaDebug("cache-miss", { key: cacheIdentity.key, sourceUrl: cacheIdentity.normalizedUrl });
 
     const ctx = buildTokenContext(req);
     const resolverErrors = [];
@@ -480,7 +755,23 @@ module.exports = async (req, res) => {
 
     const mimeType = upstream.headers.get("content-type") || "application/octet-stream";
     const arrayBuffer = await upstream.arrayBuffer();
-    const dataBase64 = Buffer.from(arrayBuffer).toString("base64");
+    const buffer = Buffer.from(arrayBuffer);
+
+    try {
+      await persistCachedMedia(cacheIdentity.key, cacheIdentity.normalizedUrl, buffer, mimeType);
+      logMediaDebug("cache-write-success", {
+        key: cacheIdentity.key,
+        sourceUrl: cacheIdentity.normalizedUrl,
+        bytes: buffer.length,
+      });
+    } catch (cacheWriteError) {
+      logMediaDebug("cache-write-error", {
+        key: cacheIdentity.key,
+        detail: cacheWriteError?.message || String(cacheWriteError),
+      });
+    }
+
+    const dataBase64 = buffer.toString("base64");
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
       mimeType,
