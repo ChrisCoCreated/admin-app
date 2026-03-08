@@ -869,6 +869,18 @@ body.lightbox-open {
   padding: 0;
 }
 
+.layout-style-controls {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.layout-style-controls input[type="range"] {
+  width: 100%;
+  height: auto;
+  padding: 0;
+}
+
 .layout-output-preview-wrap {
   margin-top: 14px;
 }

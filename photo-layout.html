@@ -78,6 +78,25 @@
               </label>
               <button id="resetAdjustBtn" class="secondary" type="button">Reset position</button>
             </div>
+            <h3>Layout Style</h3>
+            <div class="layout-style-controls">
+              <label class="checkbox-row" for="gapEnabled">
+                <input id="gapEnabled" type="checkbox" checked />
+                Gap between images
+              </label>
+              <label class="field" for="gapRange">
+                Gap size <span id="gapValue" class="muted">24px</span>
+                <input id="gapRange" type="range" min="0" max="120" step="1" value="24" />
+              </label>
+              <label class="checkbox-row" for="roundedEnabled">
+                <input id="roundedEnabled" type="checkbox" checked />
+                Rounded corners
+              </label>
+              <label class="field" for="cornerRadiusRange">
+                Corner radius <span id="cornerRadiusValue" class="muted">36px</span>
+                <input id="cornerRadiusRange" type="range" min="0" max="240" step="1" value="36" />
+              </label>
+            </div>
             <div class="row wrap-row">
               <button id="generateOutputBtn" type="button">Generate 2000px Output</button>
               <button id="copyOutputBtn" class="secondary" type="button">Copy Image</button>

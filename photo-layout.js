@@ -6,6 +6,8 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const MAX_SELECTION = 6;
 const PAN_LIMIT = 100;
 const EXPORT_WIDTH = 2000;
+const DEFAULT_GAP_PX = 24;
+const DEFAULT_RADIUS_PX = 36;
 const BACKEND_LOAD_TEST_IMAGE_URL =
   "https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Photos%20and%20Lists/Attachments/109/Agota-20260305-120811-27.jpeg";
 
@@ -88,6 +90,12 @@ const zoomRange = document.getElementById("zoomRange");
 const panXRange = document.getElementById("panXRange");
 const panYRange = document.getElementById("panYRange");
 const resetAdjustBtn = document.getElementById("resetAdjustBtn");
+const gapEnabledInput = document.getElementById("gapEnabled");
+const gapRange = document.getElementById("gapRange");
+const gapValue = document.getElementById("gapValue");
+const roundedEnabledInput = document.getElementById("roundedEnabled");
+const cornerRadiusRange = document.getElementById("cornerRadiusRange");
+const cornerRadiusValue = document.getElementById("cornerRadiusValue");
 const generateOutputBtn = document.getElementById("generateOutputBtn");
 const copyOutputBtn = document.getElementById("copyOutputBtn");
 const saveOutputBtn = document.getElementById("saveOutputBtn");
@@ -109,6 +117,12 @@ let activeLayoutId = LAYOUTS[0].id;
 let dragState = null;
 let latestOutputBlob = null;
 let latestOutputUrl = "";
+const layoutStyle = {
+  gapEnabled: true,
+  gapPx: DEFAULT_GAP_PX,
+  roundedEnabled: true,
+  cornerRadiusPx: DEFAULT_RADIUS_PX,
+};
 
 const exportImageCache = new Map();
 
@@ -200,6 +214,7 @@ function removeImageFromSelection(photoId) {
   if (selectedSlotIndex >= selectedImages.length) {
     selectedSlotIndex = selectedImages.length - 1;
   }
+  invalidateOutput();
 }
 
 function toggleImageSelection(photo) {
@@ -228,6 +243,7 @@ function toggleImageSelection(photo) {
   if (selectedSlotIndex < 0) {
     selectedSlotIndex = 0;
   }
+  invalidateOutput();
   renderAll();
 }
 
@@ -284,6 +300,7 @@ function renderLayoutPicker() {
     btn.addEventListener("click", () => {
       activeLayoutId = layout.id;
       selectedSlotIndex = Math.min(selectedSlotIndex, getActiveLayout().slots.length - 1);
+      invalidateOutput();
       renderAll();
     });
 
@@ -312,6 +329,126 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function rangesOverlap(startA, endA, startB, endB) {
+  return Math.min(endA, endB) - Math.max(startA, startB) > 1e-6;
+}
+
+function nearlyEqual(valueA, valueB) {
+  return Math.abs(valueA - valueB) <= 1e-6;
+}
+
+function getSlotNeighborFlags(slots, index) {
+  const slot = slots[index];
+  const slotLeft = slot.x;
+  const slotRight = slot.x + slot.w;
+  const slotTop = slot.y;
+  const slotBottom = slot.y + slot.h;
+  const flags = {
+    hasLeftNeighbor: false,
+    hasRightNeighbor: false,
+    hasTopNeighbor: false,
+    hasBottomNeighbor: false,
+  };
+
+  for (let otherIndex = 0; otherIndex < slots.length; otherIndex += 1) {
+    if (otherIndex === index) {
+      continue;
+    }
+    const other = slots[otherIndex];
+    const otherLeft = other.x;
+    const otherRight = other.x + other.w;
+    const otherTop = other.y;
+    const otherBottom = other.y + other.h;
+
+    if (nearlyEqual(slotLeft, otherRight) && rangesOverlap(slotTop, slotBottom, otherTop, otherBottom)) {
+      flags.hasLeftNeighbor = true;
+    }
+    if (nearlyEqual(slotRight, otherLeft) && rangesOverlap(slotTop, slotBottom, otherTop, otherBottom)) {
+      flags.hasRightNeighbor = true;
+    }
+    if (nearlyEqual(slotTop, otherBottom) && rangesOverlap(slotLeft, slotRight, otherLeft, otherRight)) {
+      flags.hasTopNeighbor = true;
+    }
+    if (nearlyEqual(slotBottom, otherTop) && rangesOverlap(slotLeft, slotRight, otherLeft, otherRight)) {
+      flags.hasBottomNeighbor = true;
+    }
+  }
+
+  return flags;
+}
+
+function computeAdjustedSlotRect(slot, neighborFlags, width, height, gapPx) {
+  const halfGap = Math.max(0, Number(gapPx) || 0) * 0.5;
+  let x = slot.x * width;
+  let y = slot.y * height;
+  let w = slot.w * width;
+  let h = slot.h * height;
+
+  if (neighborFlags.hasLeftNeighbor) {
+    x += halfGap;
+    w -= halfGap;
+  }
+  if (neighborFlags.hasRightNeighbor) {
+    w -= halfGap;
+  }
+  if (neighborFlags.hasTopNeighbor) {
+    y += halfGap;
+    h -= halfGap;
+  }
+  if (neighborFlags.hasBottomNeighbor) {
+    h -= halfGap;
+  }
+
+  return {
+    x,
+    y,
+    w: Math.max(0, w),
+    h: Math.max(0, h),
+  };
+}
+
+function getExportGapPx() {
+  return layoutStyle.gapEnabled ? clamp(layoutStyle.gapPx, 0, 120) : 0;
+}
+
+function getExportCornerRadiusPx() {
+  return layoutStyle.roundedEnabled ? clamp(layoutStyle.cornerRadiusPx, 0, 240) : 0;
+}
+
+function updateStyleControls() {
+  if (gapEnabledInput) {
+    gapEnabledInput.checked = layoutStyle.gapEnabled;
+  }
+  if (roundedEnabledInput) {
+    roundedEnabledInput.checked = layoutStyle.roundedEnabled;
+  }
+  if (gapRange) {
+    gapRange.value = String(layoutStyle.gapPx);
+    gapRange.disabled = !layoutStyle.gapEnabled;
+  }
+  if (cornerRadiusRange) {
+    cornerRadiusRange.value = String(layoutStyle.cornerRadiusPx);
+    cornerRadiusRange.disabled = !layoutStyle.roundedEnabled;
+  }
+  if (gapValue) {
+    gapValue.textContent = `${Math.round(layoutStyle.gapPx)}px`;
+  }
+  if (cornerRadiusValue) {
+    cornerRadiusValue.textContent = `${Math.round(layoutStyle.cornerRadiusPx)}px`;
+  }
+}
+
+function invalidateOutput() {
+  latestOutputBlob = null;
+  if (latestOutputUrl) {
+    URL.revokeObjectURL(latestOutputUrl);
+    latestOutputUrl = "";
+  }
+  outputPreviewImage.removeAttribute("src");
+  outputPreviewImage.hidden = true;
+  setExportStatus("Generate an output image to copy or save.");
+}
+
 function swapSelectedImages(fromIndex, toIndex) {
   if (fromIndex < 0 || toIndex < 0 || fromIndex >= selectedImages.length || toIndex >= selectedImages.length) {
     return;
@@ -320,6 +457,7 @@ function swapSelectedImages(fromIndex, toIndex) {
   selectedImages[fromIndex] = selectedImages[toIndex];
   selectedImages[toIndex] = temp;
   selectedSlotIndex = toIndex;
+  invalidateOutput();
   renderAll();
 }
 
@@ -380,15 +518,23 @@ function renderStage() {
   const layout = getActiveLayout();
   layoutStage.innerHTML = "";
   layoutStage.style.setProperty("--layout-stage-aspect", String(layout.aspect));
+  const stageWidth = layoutStage.clientWidth || layoutStage.getBoundingClientRect().width || 1;
+  const stageHeight = layoutStage.clientHeight || stageWidth / layout.aspect || 1;
+  const previewScale = stageWidth / EXPORT_WIDTH;
+  const previewGapPx = getExportGapPx() * previewScale;
+  const previewCornerRadiusPx = getExportCornerRadiusPx() * previewScale;
 
   layout.slots.forEach((slot, slotIndex) => {
     const slotEl = document.createElement("div");
     const assignedImage = selectedImages[slotIndex];
+    const neighborFlags = getSlotNeighborFlags(layout.slots, slotIndex);
+    const slotRect = computeAdjustedSlotRect(slot, neighborFlags, stageWidth, stageHeight, previewGapPx);
     slotEl.className = `layout-slot${slotIndex === selectedSlotIndex ? " active" : ""}${assignedImage ? " has-image" : ""}`;
-    slotEl.style.left = `${slot.x * 100}%`;
-    slotEl.style.top = `${slot.y * 100}%`;
-    slotEl.style.width = `${slot.w * 100}%`;
-    slotEl.style.height = `${slot.h * 100}%`;
+    slotEl.style.left = `${slotRect.x}px`;
+    slotEl.style.top = `${slotRect.y}px`;
+    slotEl.style.width = `${slotRect.w}px`;
+    slotEl.style.height = `${slotRect.h}px`;
+    slotEl.style.borderRadius = `${previewCornerRadiusPx}px`;
     slotEl.dataset.slotIndex = String(slotIndex);
     slotEl.addEventListener("click", () => {
       selectedSlotIndex = slotIndex;
@@ -486,10 +632,29 @@ function applyAdjustmentsFromControls() {
   image.zoom = clamp(Number(zoomRange.value) || 1, 1, 3);
   image.panX = clamp(Number(panXRange.value) || 0, -PAN_LIMIT, PAN_LIMIT);
   image.panY = clamp(Number(panYRange.value) || 0, -PAN_LIMIT, PAN_LIMIT);
+  invalidateOutput();
   renderStage();
 }
 
-function drawImageIntoSlot(ctx, img, slot, transform) {
+function drawRoundedRectPath(ctx, x, y, w, h, radius) {
+  const maxRadius = Math.min(w, h) * 0.5;
+  const r = clamp(Number(radius) || 0, 0, maxRadius);
+  if (!r) {
+    ctx.rect(x, y, w, h);
+    return;
+  }
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+}
+
+function drawImageIntoSlot(ctx, img, slot, transform, cornerRadiusPx = 0) {
   const slotX = slot.x;
   const slotY = slot.y;
   const slotW = slot.w;
@@ -508,7 +673,7 @@ function drawImageIntoSlot(ctx, img, slot, transform) {
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(slotX, slotY, slotW, slotH);
+  drawRoundedRectPath(ctx, slotX, slotY, slotW, slotH, cornerRadiusPx);
   ctx.clip();
   ctx.drawImage(img, drawX, drawY, drawW, drawH);
   ctx.restore();
@@ -578,6 +743,8 @@ async function buildOutputCanvas() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const renderableSlots = Math.min(layout.slots.length, selectedImages.length);
+  const gapPx = getExportGapPx();
+  const cornerRadiusPx = getExportCornerRadiusPx();
   for (let index = 0; index < renderableSlots; index += 1) {
     const imageState = selectedImages[index];
     const sourceCandidates = Array.isArray(imageState?.sourceCandidates) ? imageState.sourceCandidates : [];
@@ -586,16 +753,19 @@ async function buildOutputCanvas() {
     }
     const img = await loadExportImage(sourceCandidates);
     const slot = layout.slots[index];
+    const neighborFlags = getSlotNeighborFlags(layout.slots, index);
+    const slotRect = computeAdjustedSlotRect(slot, neighborFlags, canvas.width, canvas.height, gapPx);
     drawImageIntoSlot(
       ctx,
       img,
       {
-        x: slot.x * canvas.width,
-        y: slot.y * canvas.height,
-        w: slot.w * canvas.width,
-        h: slot.h * canvas.height,
+        x: slotRect.x,
+        y: slotRect.y,
+        w: slotRect.w,
+        h: slotRect.h,
       },
-      imageState
+      imageState,
+      cornerRadiusPx
     );
   }
 
@@ -688,6 +858,7 @@ function renderAll() {
   renderSelectedImagesList();
   renderStage();
   updateAdjustControls();
+  updateStyleControls();
 }
 
 async function loadPhotos() {
@@ -753,6 +924,7 @@ async function init() {
 
 clientSelect?.addEventListener("change", () => {
   selectedClient = normalizeClientName(clientSelect.value);
+  invalidateOutput();
   renderImagesGrid();
 });
 
@@ -767,7 +939,36 @@ resetAdjustBtn?.addEventListener("click", () => {
   image.zoom = 1;
   image.panX = 0;
   image.panY = 0;
+  invalidateOutput();
   updateAdjustControls();
+  renderStage();
+});
+
+gapEnabledInput?.addEventListener("change", () => {
+  layoutStyle.gapEnabled = Boolean(gapEnabledInput.checked);
+  invalidateOutput();
+  updateStyleControls();
+  renderStage();
+});
+
+gapRange?.addEventListener("input", () => {
+  layoutStyle.gapPx = clamp(Number(gapRange.value) || 0, 0, 120);
+  invalidateOutput();
+  updateStyleControls();
+  renderStage();
+});
+
+roundedEnabledInput?.addEventListener("change", () => {
+  layoutStyle.roundedEnabled = Boolean(roundedEnabledInput.checked);
+  invalidateOutput();
+  updateStyleControls();
+  renderStage();
+});
+
+cornerRadiusRange?.addEventListener("input", () => {
+  layoutStyle.cornerRadiusPx = clamp(Number(cornerRadiusRange.value) || 0, 0, 240);
+  invalidateOutput();
+  updateStyleControls();
   renderStage();
 });
 
@@ -794,6 +995,10 @@ window.addEventListener("beforeunload", () => {
   if (latestOutputUrl) {
     URL.revokeObjectURL(latestOutputUrl);
   }
+});
+
+window.addEventListener("resize", () => {
+  renderStage();
 });
 
 void init();
