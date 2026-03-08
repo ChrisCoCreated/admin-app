@@ -6,6 +6,8 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 const MAX_SELECTION = 6;
 const PAN_LIMIT = 100;
 const EXPORT_WIDTH = 2000;
+const BACKEND_LOAD_TEST_IMAGE_URL =
+  "https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Photos%20and%20Lists/Attachments/109/Agota-20260305-120811-27.jpeg";
 
 const LAYOUTS = [
   {
@@ -701,6 +703,16 @@ async function loadPhotos() {
   renderAll();
 }
 
+async function testBackendMediaLoad() {
+  console.log("[Photo Layout Debug] Testing backend media load with URL:", BACKEND_LOAD_TEST_IMAGE_URL);
+  const payload = await directoryApi.getMarketingMedia({ url: BACKEND_LOAD_TEST_IMAGE_URL });
+  const bytes = Math.floor((String(payload?.dataBase64 || "").length * 3) / 4);
+  console.log("[Photo Layout Debug] Backend media load success:", {
+    mimeType: payload?.mimeType || "",
+    approxBytes: bytes,
+  });
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
@@ -719,6 +731,11 @@ async function init() {
     renderTopNavigation({ role });
     const email = String(profile?.email || "").trim();
     setStatus(email ? `Signed in as ${email}` : "Signed in");
+    try {
+      await testBackendMediaLoad();
+    } catch (error) {
+      console.error("[Photo Layout Debug] Backend media load test failed.", error);
+    }
     await loadPhotos();
   } catch (error) {
     if (error?.status === 403) {
