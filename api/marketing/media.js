@@ -79,6 +79,12 @@ function parseAttachmentFromUrl(rawUrl, sitePrefix, sitePath) {
   };
 }
 
+function getIncomingBearerToken(req) {
+  const authHeader = String(req.headers.authorization || "");
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader);
+  return match ? String(match[1] || "").trim() : "";
+}
+
 async function getAppToken(scope) {
   logMediaDebug("token-request-start", { scope });
   const tenantId = process.env.AZURE_TENANT_ID;
@@ -120,6 +126,47 @@ async function getAppToken(scope) {
   return payload.access_token;
 }
 
+async function getOboToken(assertion, scope) {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_API_CLIENT_ID;
+  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
+  }
+
+  logMediaDebug("obo-token-request-start", { scope });
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    requested_token_use: "on_behalf_of",
+    assertion: String(assertion || ""),
+    scope,
+  });
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+  if (!response.ok || !payload?.access_token) {
+    const error = new Error(payload?.error_description || payload?.error || `OBO token failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+  logMediaDebug("obo-token-request-success", { scope });
+  return payload.access_token;
+}
+
 async function fetchSharePointAttachmentRows(config, listName, itemId, sharePointToken) {
   logMediaDebug("attachment-metadata-start", { listName, itemId });
   const url = `https://${config.hostName}${config.sitePath}/_api/web/lists/GetByTitle(${quoteODataString(
@@ -141,7 +188,9 @@ async function fetchSharePointAttachmentRows(config, listName, itemId, sharePoin
   }
 
   if (!response.ok) {
-    throw new Error(`Attachment metadata request failed (${response.status}).`);
+    const error = new Error(`Attachment metadata request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
   }
 
   const rows = Array.isArray(payload?.value)
@@ -185,7 +234,9 @@ async function fetchSharePointFileBinary(config, serverRelativeUrl, sharePointTo
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Attachment content request failed (${response.status}): ${detail.slice(0, 300)}`);
+    const error = new Error(`Attachment content request failed (${response.status}): ${detail.slice(0, 300)}`);
+    error.status = response.status;
+    throw error;
   }
 
   logMediaDebug("attachment-content-success", { status: response.status });
@@ -219,14 +270,34 @@ module.exports = async (req, res) => {
       normalizedPath: attachment.normalizedPath,
     });
 
-    const sharePointToken = await getAppToken(`https://${config.hostName}/.default`);
+    const spScope = `https://${config.hostName}/.default`;
+    const sharePointToken = await getAppToken(spScope);
+    const incomingToken = getIncomingBearerToken(req);
+    let oboSharePointToken = "";
 
-    const rows = await fetchSharePointAttachmentRows(
-      config,
-      attachment.listNameFromUrl || config.listName,
-      attachment.itemId,
-      sharePointToken
-    );
+    let rows;
+    try {
+      rows = await fetchSharePointAttachmentRows(
+        config,
+        attachment.listNameFromUrl || config.listName,
+        attachment.itemId,
+        sharePointToken
+      );
+    } catch (error) {
+      const status = Number(error?.status || 0);
+      if ((status === 401 || status === 403) && incomingToken) {
+        logMediaDebug("attachment-metadata-app-token-denied-retrying-obo", { status });
+        oboSharePointToken = await getOboToken(incomingToken, spScope);
+        rows = await fetchSharePointAttachmentRows(
+          config,
+          attachment.listNameFromUrl || config.listName,
+          attachment.itemId,
+          oboSharePointToken
+        );
+      } else {
+        throw error;
+      }
+    }
     if (!rows.length) {
       res.status(404).json({ error: "Attachment not found for item.", detail: `itemId=${attachment.itemId}` });
       return;
@@ -244,11 +315,27 @@ module.exports = async (req, res) => {
       itemId: attachment.itemId,
     });
 
-    const upstream = await fetchSharePointFileBinary(
-      config,
-      String(picked?.ServerRelativeUrl || ""),
-      sharePointToken
-    );
+    let upstream;
+    try {
+      upstream = await fetchSharePointFileBinary(
+        config,
+        String(picked?.ServerRelativeUrl || ""),
+        oboSharePointToken || sharePointToken
+      );
+    } catch (error) {
+      const status = Number(error?.status || 0);
+      if ((status === 401 || status === 403) && incomingToken && !oboSharePointToken) {
+        logMediaDebug("attachment-content-app-token-denied-retrying-obo", { status });
+        oboSharePointToken = await getOboToken(incomingToken, spScope);
+        upstream = await fetchSharePointFileBinary(
+          config,
+          String(picked?.ServerRelativeUrl || ""),
+          oboSharePointToken
+        );
+      } else {
+        throw error;
+      }
+    }
 
     const mimeType = upstream.headers.get("content-type") || "application/octet-stream";
     const arrayBuffer = await upstream.arrayBuffer();
