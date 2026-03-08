@@ -73,6 +73,7 @@ function parseAttachmentFromUrl(rawUrl, sitePrefix, sitePath) {
   return {
     targetUrl,
     listNameFromUrl: decodeLoose(match[1]).trim(),
+    listPathFromUrl: decodeLoose(match[1]).trim(),
     itemId: Number(match[2]),
     fileName: decodeLoose(match[3]).trim(),
     normalizedPath: relative,
@@ -167,11 +168,12 @@ async function getOboToken(assertion, scope) {
   return payload.access_token;
 }
 
-async function fetchSharePointAttachmentRows(config, listName, itemId, sharePointToken) {
-  logMediaDebug("attachment-metadata-start", { listName, itemId });
-  const url = `https://${config.hostName}${config.sitePath}/_api/web/lists/GetByTitle(${quoteODataString(
-    listName
-  )})/items(${itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
+async function fetchSharePointAttachmentRows(config, listName, listPathFromUrl, itemId, sharePointToken) {
+  logMediaDebug("attachment-metadata-start", { listName, listPathFromUrl, itemId });
+  const listServerRelative = `${config.sitePath}/Lists/${String(listPathFromUrl || listName || "").trim()}`;
+  const url = `https://${config.hostName}${config.sitePath}/_api/web/GetList(@listUrl)/items(${itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl&@listUrl=${encodeURIComponent(
+    quoteODataString(listServerRelative)
+  )}`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${sharePointToken}`,
@@ -199,7 +201,7 @@ async function fetchSharePointAttachmentRows(config, listName, itemId, sharePoin
       ? payload.d.results
       : [];
 
-  logMediaDebug("attachment-metadata-success", { listName, itemId, count: rows.length });
+  logMediaDebug("attachment-metadata-success", { listName, listPathFromUrl, itemId, count: rows.length });
   return rows;
 }
 
@@ -243,6 +245,11 @@ async function fetchSharePointFileBinary(config, serverRelativeUrl, sharePointTo
   return response;
 }
 
+async function fetchByKnownAttachmentPath(config, attachment, sharePointToken) {
+  const serverRelative = `${config.sitePath}/${attachment.normalizedPath}`.replace(/\/{2,}/g, "/");
+  return fetchSharePointFileBinary(config, serverRelative, sharePointToken);
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
     res.status(405).json({ error: "Method Not Allowed" });
@@ -275,65 +282,85 @@ module.exports = async (req, res) => {
     const incomingToken = getIncomingBearerToken(req);
     let oboSharePointToken = "";
 
-    let rows;
+    let rows = [];
+    let upstream = null;
+
+    // Prefer direct attachment fetch from the parsed URL path to avoid list-title mismatches.
     try {
-      rows = await fetchSharePointAttachmentRows(
-        config,
-        attachment.listNameFromUrl || config.listName,
-        attachment.itemId,
-        sharePointToken
-      );
+      upstream = await fetchByKnownAttachmentPath(config, attachment, sharePointToken);
     } catch (error) {
       const status = Number(error?.status || 0);
       if ((status === 401 || status === 403) && incomingToken) {
-        logMediaDebug("attachment-metadata-app-token-denied-retrying-obo", { status });
+        logMediaDebug("attachment-direct-app-token-denied-retrying-obo", { status });
         oboSharePointToken = await getOboToken(incomingToken, spScope);
+        upstream = await fetchByKnownAttachmentPath(config, attachment, oboSharePointToken);
+      } else {
+        logMediaDebug("attachment-direct-fetch-error", { status, detail: error?.message || String(error) });
+      }
+    }
+
+    if (!upstream) {
+      try {
         rows = await fetchSharePointAttachmentRows(
           config,
           attachment.listNameFromUrl || config.listName,
+          attachment.listPathFromUrl || attachment.listNameFromUrl || config.listName,
           attachment.itemId,
-          oboSharePointToken
+          oboSharePointToken || sharePointToken
         );
-      } else {
-        throw error;
+      } catch (error) {
+        const status = Number(error?.status || 0);
+        if ((status === 401 || status === 403) && incomingToken && !oboSharePointToken) {
+          logMediaDebug("attachment-metadata-app-token-denied-retrying-obo", { status });
+          oboSharePointToken = await getOboToken(incomingToken, spScope);
+          rows = await fetchSharePointAttachmentRows(
+            config,
+            attachment.listNameFromUrl || config.listName,
+            attachment.listPathFromUrl || attachment.listNameFromUrl || config.listName,
+            attachment.itemId,
+            oboSharePointToken
+          );
+        } else {
+          throw error;
+        }
       }
-    }
-    if (!rows.length) {
-      res.status(404).json({ error: "Attachment not found for item.", detail: `itemId=${attachment.itemId}` });
-      return;
-    }
 
-    const normalizedRequested = attachment.fileName.toLowerCase();
-    const exact = rows.find(
-      (row) => String(row?.FileName || "").trim().toLowerCase() === normalizedRequested
-    );
-    const picked = exact || rows[0];
+      if (!rows.length) {
+        res.status(404).json({ error: "Attachment not found for item.", detail: `itemId=${attachment.itemId}` });
+        return;
+      }
 
-    logMediaDebug("attachment-selected", {
-      requested: attachment.fileName,
-      selected: String(picked?.FileName || ""),
-      itemId: attachment.itemId,
-    });
-
-    let upstream;
-    try {
-      upstream = await fetchSharePointFileBinary(
-        config,
-        String(picked?.ServerRelativeUrl || ""),
-        oboSharePointToken || sharePointToken
+      const normalizedRequested = attachment.fileName.toLowerCase();
+      const exact = rows.find(
+        (row) => String(row?.FileName || "").trim().toLowerCase() === normalizedRequested
       );
-    } catch (error) {
-      const status = Number(error?.status || 0);
-      if ((status === 401 || status === 403) && incomingToken && !oboSharePointToken) {
-        logMediaDebug("attachment-content-app-token-denied-retrying-obo", { status });
-        oboSharePointToken = await getOboToken(incomingToken, spScope);
+      const picked = exact || rows[0];
+
+      logMediaDebug("attachment-selected", {
+        requested: attachment.fileName,
+        selected: String(picked?.FileName || ""),
+        itemId: attachment.itemId,
+      });
+
+      try {
         upstream = await fetchSharePointFileBinary(
           config,
           String(picked?.ServerRelativeUrl || ""),
-          oboSharePointToken
+          oboSharePointToken || sharePointToken
         );
-      } else {
-        throw error;
+      } catch (error) {
+        const status = Number(error?.status || 0);
+        if ((status === 401 || status === 403) && incomingToken && !oboSharePointToken) {
+          logMediaDebug("attachment-content-app-token-denied-retrying-obo", { status });
+          oboSharePointToken = await getOboToken(incomingToken, spScope);
+          upstream = await fetchSharePointFileBinary(
+            config,
+            String(picked?.ServerRelativeUrl || ""),
+            oboSharePointToken
+          );
+        } else {
+          throw error;
+        }
       }
     }
 
@@ -351,7 +378,9 @@ module.exports = async (req, res) => {
       detail: error?.message || String(error),
       stack: String(error?.stack || "").split("\n").slice(0, 4).join(" | "),
     });
-    res.status(500).json({
+    const status = Number(error?.status || 0);
+    const safeStatus = status >= 400 && status < 600 ? status : 500;
+    res.status(safeStatus).json({
       error: "Server error",
       detail: error?.message || String(error),
     });
