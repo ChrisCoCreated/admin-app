@@ -2,12 +2,6 @@ const { requireApiAuth } = require("../_lib/require-api-auth");
 
 const MARKETING_MEDIA_DEBUG = process.env.MARKETING_MEDIA_DEBUG === "1";
 
-let siteAndListCache = {
-  key: "",
-  value: null,
-  expiresAt: 0,
-};
-
 function logMediaDebug(message, details) {
   if (!MARKETING_MEDIA_DEBUG) {
     return;
@@ -85,21 +79,6 @@ function parseAttachmentFromUrl(rawUrl, sitePrefix, sitePath) {
   };
 }
 
-async function fetchJson(url, headers = {}) {
-  const response = await fetch(url, { headers: { Accept: "application/json", ...headers } });
-  const text = await response.text();
-  let payload = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = null;
-  }
-  if (!response.ok) {
-    throw new Error(payload?.error?.message || text || `Request failed (${response.status}).`);
-  }
-  return payload;
-}
-
 async function getAppToken(scope) {
   logMediaDebug("token-request-start", { scope });
   const tenantId = process.env.AZURE_TENANT_ID;
@@ -141,62 +120,11 @@ async function getAppToken(scope) {
   return payload.access_token;
 }
 
-async function resolveSiteAndListIds(config) {
-  const cacheKey = `${config.hostName}|${config.sitePath}|${config.listName}`;
-  const now = Date.now();
-  if (siteAndListCache.key === cacheKey && siteAndListCache.value && siteAndListCache.expiresAt > now) {
-    logMediaDebug("site-list-cache-hit", { cacheKey });
-    return siteAndListCache.value;
-  }
-
-  logMediaDebug("site-list-resolve-start", {
-    hostName: config.hostName,
-    sitePath: config.sitePath,
-    listName: config.listName,
-  });
-  const graphToken = await getAppToken("https://graph.microsoft.com/.default");
-  const graphHeaders = {
-    Authorization: `Bearer ${graphToken}`,
-  };
-
-  const site = await fetchJson(
-    `https://graph.microsoft.com/v1.0/sites/${config.hostName}:${config.sitePath}?$select=id`,
-    graphHeaders
-  );
-
-  const listsPayload = await fetchJson(
-    `https://graph.microsoft.com/v1.0/sites/${site.id}/lists?$select=id,displayName&$top=200`,
-    graphHeaders
-  );
-  const rows = Array.isArray(listsPayload?.value) ? listsPayload.value : [];
-  const wanted = config.listName.toLowerCase();
-  const match = rows.find((row) => String(row?.displayName || "").trim().toLowerCase() === wanted);
-  if (!match?.id) {
-    throw new Error(`Could not find list '${config.listName}'.`);
-  }
-
-  const resolved = {
-    siteId: site.id,
-    listId: match.id,
-  };
-
-  siteAndListCache = {
-    key: cacheKey,
-    value: resolved,
-    expiresAt: now + 10 * 60 * 1000,
-  };
-
-  logMediaDebug("site-list-resolve-success", {
-    siteId: resolved.siteId,
-    listId: resolved.listId,
-    listName: config.listName,
-  });
-  return resolved;
-}
-
-async function fetchSharePointAttachmentRows(config, listId, itemId, sharePointToken) {
-  logMediaDebug("attachment-metadata-start", { listId, itemId });
-  const url = `https://${config.hostName}${config.sitePath}/_api/web/lists(guid'${String(listId).toUpperCase()}')/items(${itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
+async function fetchSharePointAttachmentRows(config, listName, itemId, sharePointToken) {
+  logMediaDebug("attachment-metadata-start", { listName, itemId });
+  const url = `https://${config.hostName}${config.sitePath}/_api/web/lists/GetByTitle(${quoteODataString(
+    listName
+  )})/items(${itemId})/AttachmentFiles?$select=FileName,ServerRelativeUrl`;
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${sharePointToken}`,
@@ -222,7 +150,7 @@ async function fetchSharePointAttachmentRows(config, listId, itemId, sharePointT
       ? payload.d.results
       : [];
 
-  logMediaDebug("attachment-metadata-success", { listId, itemId, count: rows.length });
+  logMediaDebug("attachment-metadata-success", { listName, itemId, count: rows.length });
   return rows;
 }
 
@@ -291,10 +219,14 @@ module.exports = async (req, res) => {
       normalizedPath: attachment.normalizedPath,
     });
 
-    const { listId } = await resolveSiteAndListIds(config);
     const sharePointToken = await getAppToken(`https://${config.hostName}/.default`);
 
-    const rows = await fetchSharePointAttachmentRows(config, listId, attachment.itemId, sharePointToken);
+    const rows = await fetchSharePointAttachmentRows(
+      config,
+      attachment.listNameFromUrl || config.listName,
+      attachment.itemId,
+      sharePointToken
+    );
     if (!rows.length) {
       res.status(404).json({ error: "Attachment not found for item.", detail: `itemId=${attachment.itemId}` });
       return;
