@@ -74,20 +74,12 @@ const LAYOUTS = [
     ],
   },
 ];
-const ASPECT_MODES = [
-  { id: "mixed", label: "Mixed" },
-  { id: "square", label: "Square" },
-  { id: "portrait", label: "Portrait" },
-  { id: "landscape", label: "Landscape" },
-];
-
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientSelect = document.getElementById("clientSelect");
 const imagesStatus = document.getElementById("imagesStatus");
 const imagesGrid = document.getElementById("imagesGrid");
 const layoutPicker = document.getElementById("layoutPicker");
-const layoutAspectPicker = document.getElementById("layoutAspectPicker");
 const composeStatus = document.getElementById("composeStatus");
 const layoutStage = document.getElementById("layoutStage");
 const selectedImagesList = document.getElementById("selectedImagesList");
@@ -122,7 +114,6 @@ let selectedClient = "";
 let selectedImages = [];
 let selectedSlotIndex = -1;
 let activeLayoutId = LAYOUTS[0].id;
-let activeAspectMode = "mixed";
 let dragState = null;
 let latestOutputBlob = null;
 let latestOutputUrl = "";
@@ -227,42 +218,8 @@ function getActiveLayout() {
 }
 
 function getImageAspectRatioMode() {
-  if (activeAspectMode === "square") {
-    return 1;
-  }
-  if (activeAspectMode === "portrait") {
-    return 4 / 5;
-  }
-  if (activeAspectMode === "landscape") {
-    return 3 / 2;
-  }
+  // Ratio selector removed; keep default mixed behavior.
   return null;
-}
-
-function renderLayoutAspectPicker() {
-  if (!layoutAspectPicker) {
-    return;
-  }
-  layoutAspectPicker.innerHTML = "";
-  for (const mode of ASPECT_MODES) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `layout-aspect-btn${mode.id === activeAspectMode ? " active" : ""}`;
-    btn.textContent = mode.label;
-    btn.setAttribute("aria-pressed", mode.id === activeAspectMode ? "true" : "false");
-    btn.addEventListener("click", () => {
-      activeAspectMode = mode.id;
-      const layout = getActiveLayout();
-      const stageWidth = layoutStage.clientWidth || layoutStage.getBoundingClientRect().width || 1;
-      const stageHeight = layoutStage.clientHeight || stageWidth / layout.aspect || 1;
-      const previewScale = stageWidth / EXPORT_WIDTH;
-      const previewGapPx = getExportGapPx() * previewScale;
-      clampImagePanToCurrentMode(stageWidth, stageHeight, layout, previewGapPx);
-      invalidateOutput();
-      renderAll();
-    });
-    layoutAspectPicker.append(btn);
-  }
 }
 
 function getClientPhotos() {
@@ -435,34 +392,6 @@ function getSourceDimensions(previewUrl, fallbackWidth = 1, fallbackHeight = 1) 
     width: Math.max(1, Number(fallbackWidth) || 1),
     height: Math.max(1, Number(fallbackHeight) || 1),
   };
-}
-
-function clampImagePanToCurrentMode(stageWidth, stageHeight, layout, gapPx) {
-  if (!layout || !Array.isArray(layout.slots) || !layout.slots.length) {
-    return;
-  }
-  const renderableSlots = Math.min(layout.slots.length, selectedImages.length);
-  for (let index = 0; index < renderableSlots; index += 1) {
-    const image = selectedImages[index];
-    if (!image) {
-      continue;
-    }
-    const slot = layout.slots[index];
-    const neighborFlags = getSlotNeighborFlags(layout.slots, index);
-    const slotRect = computeAdjustedSlotRect(slot, neighborFlags, stageWidth, stageHeight, gapPx);
-    const source = getSourceDimensions(image.previewUrl, slotRect.w, slotRect.h);
-    const placement = computeImagePlacement(
-      slotRect.w,
-      slotRect.h,
-      source.width,
-      source.height,
-      image.zoom,
-      image.panX,
-      image.panY
-    );
-    image.panX = placement.maxOffsetX <= 0.01 ? 0 : clamp(image.panX, -PAN_LIMIT, PAN_LIMIT);
-    image.panY = placement.maxOffsetY <= 0.01 ? 0 : clamp(image.panY, -PAN_LIMIT, PAN_LIMIT);
-  }
 }
 
 function computeImagePlacement(slotWidth, slotHeight, imageWidth, imageHeight, zoom, panX, panY) {
@@ -1110,7 +1039,6 @@ async function saveOutput() {
 
 function renderAll() {
   renderImagesGrid();
-  renderLayoutAspectPicker();
   renderLayoutPicker();
   renderSelectedImagesList();
   renderStage();
