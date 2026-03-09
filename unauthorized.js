@@ -11,6 +11,7 @@ const authController = createAuthController({
 
 const PAGE_LABELS = {
   clients: "Clients",
+  recruitment: "Recruitment",
   mapping: "Time Mapping",
   drivetime: "Drive-Time Map",
   marketing: "Marketing",

@@ -11,6 +11,7 @@ const signOutBtn = document.getElementById("signOutBtn");
 const topbarActions = document.getElementById("topbarActions");
 const homeMenuSection = document.getElementById("homeMenuSection");
 const homeMenuGrid = document.getElementById("homeMenuGrid");
+const heroSignInMessage = document.getElementById("heroSignInMessage");
 const homeUserEmail = document.getElementById("homeUserEmail");
 const homeUserPermissions = document.getElementById("homeUserPermissions");
 if (authCard) {
@@ -34,9 +35,14 @@ function setSignedOutUi() {
   }
   if (homeUserEmail) {
     homeUserEmail.textContent = "";
+    homeUserEmail.hidden = true;
   }
   if (homeUserPermissions) {
     homeUserPermissions.textContent = "";
+    homeUserPermissions.hidden = true;
+  }
+  if (heroSignInMessage) {
+    heroSignInMessage.hidden = false;
   }
   if (topbarActions) {
     topbarActions.hidden = true;
@@ -55,6 +61,9 @@ function setSignedInUi() {
   }
   if (topbarActions) {
     topbarActions.hidden = false;
+  }
+  if (heroSignInMessage) {
+    heroSignInMessage.hidden = true;
   }
 }
 
@@ -89,10 +98,12 @@ function renderUserSummary(profile) {
 
   if (homeUserEmail) {
     homeUserEmail.textContent = email ? `Signed in as: ${email}` : "Signed in.";
+    homeUserEmail.hidden = false;
   }
   if (homeUserPermissions) {
     const permissions = pageLabels.length ? pageLabels.join(", ") : "None";
     homeUserPermissions.textContent = `Permissions: ${permissions}`;
+    homeUserPermissions.hidden = false;
   }
 }
 

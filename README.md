@@ -7,6 +7,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Entra ID sign-in/sign-out (MSAL popup with redirect fallback)
 - Authenticated Clients page (`clients.html`)
 - Authenticated Carers page (`carers.html`)
+- Authenticated Recruitment page (`recruitment.html`) from SharePoint list (active candidates only)
 - Authenticated Tasks page (`task-whiteboard.html`) with draggable pinned cards and category boxes (default)
 - Authenticated Tasks (Simple) page (`simple-tasks.html`) with pill view and pinning
 - Authenticated Tasks (Advanced) page (`tasks.html`) for full unified To Do + Planner overlay editing
@@ -19,6 +20,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `GET /api/clients/reconcile/preview` (admin + care_manager; OneTouch-to-SharePoint reconciliation preview)
   - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)
   - `GET /api/carers`
+  - `GET /api/recruitment` (delegated Microsoft Graph token; returns active candidates only)
   - `POST /api/routes/run`
   - `POST /api/maps/drive-time`
   - `POST /api/maps/geocode-batch`
@@ -44,6 +46,7 @@ npm start
 - `http://127.0.0.1:8081/index.html`
 - `http://127.0.0.1:8081/clients.html`
 - `http://127.0.0.1:8081/carers.html`
+- `http://127.0.0.1:8081/recruitment.html`
 - `http://127.0.0.1:8081/task-whiteboard.html`
 - `http://127.0.0.1:8081/mapping.html`
 - `http://127.0.0.1:8081/drive-time-map.html`

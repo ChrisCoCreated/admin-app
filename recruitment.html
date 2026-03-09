@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Recruitment</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container clients-main">
+      <section class="hero compact">
+        <h1>Recruitment</h1>
+        <p>Active candidates from SharePoint recruitment list.</p>
+      </section>
+
+      <section class="panel">
+        <label class="field" for="searchInput">
+          Search
+          <input id="searchInput" type="search" placeholder="Search candidate, status, source, notes or phone" autocomplete="off" />
+        </label>
+        <div class="mapping-form-grid">
+          <label class="field" for="locationFilterSelect">
+            Location
+            <select id="locationFilterSelect">
+              <option value="all">All locations</option>
+            </select>
+          </label>
+          <label class="field" for="statusFilterSelect">
+            Status
+            <select id="statusFilterSelect">
+              <option value="all">All statuses</option>
+            </select>
+          </label>
+          <label class="field" for="sourceFilterSelect">
+            Source
+            <select id="sourceFilterSelect">
+              <option value="all">All sources</option>
+            </select>
+          </label>
+        </div>
+        <p id="statusMessage" class="muted">Loading active candidates...</p>
+      </section>
+
+      <section class="clients-grid">
+        <article class="panel list-panel">
+          <h2>Active Candidates</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Candidate</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Source</th>
+                  <th>Phone</th>
+                </tr>
+              </thead>
+              <tbody id="recruitmentTableBody"></tbody>
+            </table>
+          </div>
+          <p id="emptyState" class="muted" hidden>No active candidates found.</p>
+        </article>
+
+        <article class="panel detail-panel">
+          <h2>Candidate Detail</h2>
+          <dl id="candidateDetail" class="detail-list">
+            <div>
+              <dt>Candidate</dt>
+              <dd data-field="candidateName">Select a candidate</dd>
+            </div>
+            <div>
+              <dt>Location</dt>
+              <dd data-field="location">-</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd data-field="status">-</dd>
+            </div>
+            <div>
+              <dt>Source</dt>
+              <dd data-field="source">-</dd>
+            </div>
+            <div>
+              <dt>Phone Number</dt>
+              <dd data-field="phoneNumber">-</dd>
+            </div>
+            <div>
+              <dt>Interview Booked</dt>
+              <dd data-field="interviewBooked">-</dd>
+            </div>
+            <div>
+              <dt>Interview With</dt>
+              <dd data-field="interviewWith">-</dd>
+            </div>
+            <div>
+              <dt>Keep in Mind</dt>
+              <dd data-field="keepInMind">-</dd>
+            </div>
+            <div>
+              <dt>Lives In</dt>
+              <dd data-field="livesIn">-</dd>
+            </div>
+            <div>
+              <dt>1st Interview Date</dt>
+              <dd data-field="firstInterviewDate">-</dd>
+            </div>
+            <div>
+              <dt>Earmarked For</dt>
+              <dd data-field="earmarkedFor">-</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd data-field="created">-</dd>
+            </div>
+            <div>
+              <dt>OneTouch Link</dt>
+              <dd data-field="oneTouchLink">-</dd>
+            </div>
+            <div>
+              <dt>Notes</dt>
+              <dd data-field="notes">-</dd>
+            </div>
+          </dl>
+          <p class="row">
+            <a id="sharePointListLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer">Open SharePoint List</a>
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./recruitment.js"></script>
+  </body>
+</html>

@@ -29,7 +29,9 @@
     <main class="container">
       <section class="hero">
         <h1>Admin Console</h1>
-        <p>Sign in with your work account to access the clients directory.</p>
+        <p id="heroSignInMessage">Sign in with your work account to access the clients directory.</p>
+        <p id="homeUserEmail" class="muted" hidden></p>
+        <p id="homeUserPermissions" class="muted" hidden></p>
       </section>
 
       <section class="panel auth-card">
@@ -44,8 +46,6 @@
       <section id="homeMenuSection" class="panel home-menu-panel" hidden>
         <h2>Menu</h2>
         <p class="muted">Choose a section to continue.</p>
-        <p id="homeUserEmail" class="muted"></p>
-        <p id="homeUserPermissions" class="muted"></p>
         <div id="homeMenuGrid" class="home-menu-grid"></div>
       </section>
     </main>

@@ -10,6 +10,7 @@ const clientsReconcilePreviewHandler = require("./api/clients/reconcile/preview"
 const clientsReconcileApplyHandler = require("./api/clients/reconcile/apply");
 const carersIndexHandler = require("./api/carers/index");
 const oneTouchClientsHandler = require("./api/onetouch/clients");
+const recruitmentHandler = require("./api/recruitment");
 const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
 const marketingPhotosHandler = require("./api/marketing/photos");
@@ -207,6 +208,11 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/onetouch/clients") {
     await oneTouchClientsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/recruitment") {
+    await recruitmentHandler(apiReq, apiRes);
     return true;
   }
 
