@@ -74,6 +74,12 @@ const LAYOUTS = [
     ],
   },
 ];
+const ASPECT_MODES = [
+  { id: "mixed", label: "Mixed" },
+  { id: "square", label: "Square" },
+  { id: "portrait", label: "Portrait" },
+  { id: "landscape", label: "Landscape" },
+];
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
@@ -81,6 +87,7 @@ const clientSelect = document.getElementById("clientSelect");
 const imagesStatus = document.getElementById("imagesStatus");
 const imagesGrid = document.getElementById("imagesGrid");
 const layoutPicker = document.getElementById("layoutPicker");
+const layoutAspectPicker = document.getElementById("layoutAspectPicker");
 const composeStatus = document.getElementById("composeStatus");
 const layoutStage = document.getElementById("layoutStage");
 const selectedImagesList = document.getElementById("selectedImagesList");
@@ -115,6 +122,7 @@ let selectedClient = "";
 let selectedImages = [];
 let selectedSlotIndex = -1;
 let activeLayoutId = LAYOUTS[0].id;
+let activeAspectMode = "mixed";
 let dragState = null;
 let latestOutputBlob = null;
 let latestOutputUrl = "";
@@ -215,7 +223,44 @@ function isImagePhoto(photo) {
 }
 
 function getActiveLayout() {
-  return LAYOUTS.find((layout) => layout.id === activeLayoutId) || LAYOUTS[0];
+  const layout = LAYOUTS.find((item) => item.id === activeLayoutId) || LAYOUTS[0];
+  return {
+    ...layout,
+    aspect: getLayoutAspect(layout),
+  };
+}
+
+function getLayoutAspect(layout) {
+  if (activeAspectMode === "square") {
+    return 1;
+  }
+  if (activeAspectMode === "portrait") {
+    return 0.8;
+  }
+  if (activeAspectMode === "landscape") {
+    return 1.5;
+  }
+  return Number(layout?.aspect) || 1.3;
+}
+
+function renderLayoutAspectPicker() {
+  if (!layoutAspectPicker) {
+    return;
+  }
+  layoutAspectPicker.innerHTML = "";
+  for (const mode of ASPECT_MODES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `layout-aspect-btn${mode.id === activeAspectMode ? " active" : ""}`;
+    btn.textContent = mode.label;
+    btn.setAttribute("aria-pressed", mode.id === activeAspectMode ? "true" : "false");
+    btn.addEventListener("click", () => {
+      activeAspectMode = mode.id;
+      invalidateOutput();
+      renderAll();
+    });
+    layoutAspectPicker.append(btn);
+  }
 }
 
 function getClientPhotos() {
@@ -356,7 +401,7 @@ function renderLayoutPicker() {
 
     const mini = document.createElement("div");
     mini.className = "layout-thumb-canvas";
-    mini.style.setProperty("--layout-thumb-aspect", String(layout.aspect));
+    mini.style.setProperty("--layout-thumb-aspect", String(getLayoutAspect(layout)));
     for (const slot of layout.slots) {
       const cell = document.createElement("span");
       cell.className = "layout-thumb-slot";
@@ -1003,6 +1048,7 @@ async function saveOutput() {
 
 function renderAll() {
   renderImagesGrid();
+  renderLayoutAspectPicker();
   renderLayoutPicker();
   renderSelectedImagesList();
   renderStage();
