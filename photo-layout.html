@@ -84,23 +84,28 @@
                 <input id="gapEnabled" type="checkbox" checked />
                 Gap between images
               </label>
-              <label class="field" for="gapRange" hidden>
-                Gap size <span id="gapValue" class="muted">24px</span>
-                <input id="gapRange" type="range" min="0" max="120" step="1" value="24" />
-              </label>
               <label class="checkbox-row" for="roundedEnabled">
                 <input id="roundedEnabled" type="checkbox" checked />
                 Rounded corners
               </label>
-              <label class="field" for="cornerRadiusRange" hidden>
-                Corner radius <span id="cornerRadiusValue" class="muted">36px</span>
-                <input id="cornerRadiusRange" type="range" min="0" max="240" step="1" value="36" />
-              </label>
+              <details class="layout-style-accordion">
+                <summary>Style sliders</summary>
+                <div class="layout-style-accordion-body">
+                  <label class="field" for="gapRange">
+                    Gap size <span id="gapValue" class="muted">24px</span>
+                    <input id="gapRange" type="range" min="0" max="120" step="1" value="24" />
+                  </label>
+                  <label class="field" for="cornerRadiusRange">
+                    Corner radius <span id="cornerRadiusValue" class="muted">36px</span>
+                    <input id="cornerRadiusRange" type="range" min="0" max="240" step="1" value="36" />
+                  </label>
+                </div>
+              </details>
             </div>
             <div class="row wrap-row">
-              <button id="generateOutputBtn" type="button">Generate 2000px Output</button>
-              <button id="copyOutputBtn" class="secondary" type="button">Copy Image</button>
-              <button id="saveOutputBtn" class="secondary" type="button">Save PNG</button>
+              <button id="generateOutputBtn" type="button" hidden>Generate 2000px Output</button>
+              <button id="copyOutputBtn" type="button">Copy Image</button>
+              <button id="saveOutputBtn" type="button">Save Image</button>
             </div>
             <p id="exportStatus" class="muted row-note">Generate an output image to copy or save.</p>
           </aside>

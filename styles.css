@@ -817,6 +817,12 @@ body.lightbox-open {
   margin: 4px 0 8px;
 }
 
+#adjustStatus {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .selected-images-list {
   display: grid;
   gap: 8px;
@@ -879,6 +885,25 @@ body.lightbox-open {
   width: 100%;
   height: auto;
   padding: 0;
+}
+
+.layout-style-accordion {
+  border: 1px solid #d5deef;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 8px 10px;
+}
+
+.layout-style-accordion summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #243b66;
+}
+
+.layout-style-accordion-body {
+  margin-top: 8px;
+  display: grid;
+  gap: 10px;
 }
 
 .layout-output-preview-wrap {
