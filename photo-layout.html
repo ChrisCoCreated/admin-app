@@ -64,15 +64,15 @@
             <h3>Image Adjustments</h3>
             <p id="adjustStatus" class="muted">Click a slot to adjust zoom and position.</p>
             <div id="adjustControls" class="layout-adjust-controls" hidden>
-              <label class="field" for="zoomRange">
+              <label class="field" for="zoomRange" hidden>
                 Zoom
                 <input id="zoomRange" type="range" min="1" max="3" step="0.01" value="1" />
               </label>
-              <label class="field" for="panXRange">
+              <label class="field" for="panXRange" hidden>
                 Horizontal
                 <input id="panXRange" type="range" min="-100" max="100" step="1" value="0" />
               </label>
-              <label class="field" for="panYRange">
+              <label class="field" for="panYRange" hidden>
                 Vertical
                 <input id="panYRange" type="range" min="-100" max="100" step="1" value="0" />
               </label>
@@ -84,7 +84,7 @@
                 <input id="gapEnabled" type="checkbox" checked />
                 Gap between images
               </label>
-              <label class="field" for="gapRange">
+              <label class="field" for="gapRange" hidden>
                 Gap size <span id="gapValue" class="muted">24px</span>
                 <input id="gapRange" type="range" min="0" max="120" step="1" value="24" />
               </label>
@@ -92,7 +92,7 @@
                 <input id="roundedEnabled" type="checkbox" checked />
                 Rounded corners
               </label>
-              <label class="field" for="cornerRadiusRange">
+              <label class="field" for="cornerRadiusRange" hidden>
                 Corner radius <span id="cornerRadiusValue" class="muted">36px</span>
                 <input id="cornerRadiusRange" type="range" min="0" max="240" step="1" value="36" />
               </label>
