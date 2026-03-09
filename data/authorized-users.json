@@ -5,20 +5,20 @@
       "role": "admin"
     },
     {
-      "email": "peter@planwithcare.co.uk",
-      "role": "operations"
-    },
-    {
-      "email": "Rebecca@planwithcare.co.uk",
-      "role": "care_manager"
-    },
-    {
-      "email": "michalina@thrivehomecare.co.uk",
-      "role": "care_manager"
-    },
-    {
       "email": "claire@planwithcare.co.uk",
       "role": "marketing"
+    },
+    {
+      "email": "agota@planwithcare.co.uk",
+      "role": "photo_layout"
+    },
+    {
+      "email": "rebecca@planwithcare.co.uk",
+      "role": "time_hr_clients"
+    },
+    {
+      "email": "peter@planwithcare.co.uk",
+      "role": "hr_clients"
     }
   ]
 }

@@ -14,6 +14,14 @@ const ROLE_PAGES = {
   care_manager: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports"],
   operations: ["clients", "carers", "whiteboard", "simpletasks", "tasks", "mapping", "drivetime", "reports"],
   marketing: ["marketing", "photolayout"],
+  photo_layout: ["photolayout"],
+  time_only: ["mapping", "drivetime"],
+  hr_only: ["carers"],
+  clients_only: ["clients"],
+  hr_clients: ["clients", "carers"],
+  time_clients: ["clients", "mapping", "drivetime"],
+  time_hr: ["carers", "mapping", "drivetime"],
+  time_hr_clients: ["clients", "carers", "mapping", "drivetime"],
 };
 
 const PAGE_META = {

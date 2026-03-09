@@ -48,11 +48,12 @@
       <section class="panel">
         <h2>Choose Layout</h2>
         <p class="muted">Select a layout template.</p>
-        <label class="checkbox-row" for="showAllLayouts">
+        <p id="layoutPickerHint" class="muted row-note">Select at least one photo to choose a layout.</p>
+        <div id="layoutPicker" class="layout-picker" aria-live="polite"></div>
+        <label id="showAllLayoutsRow" class="checkbox-row" for="showAllLayouts" hidden>
           <input id="showAllLayouts" type="checkbox" />
           Show all layouts
         </label>
-        <div id="layoutPicker" class="layout-picker" aria-live="polite"></div>
       </section>
 
       <section class="panel">

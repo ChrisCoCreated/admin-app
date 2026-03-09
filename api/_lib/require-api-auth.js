@@ -1,24 +1,9 @@
 const crypto = require("crypto");
-const authorizedUsersConfig = require("../../data/authorized-users.json");
+const { getAuthorizedUsersMap } = require("./authorized-users");
 
 const openIdConfigCache = new Map();
 const jwksCache = new Map();
-const authorizedUsers = new Map(
-  (Array.isArray(authorizedUsersConfig?.users) ? authorizedUsersConfig.users : [])
-    .map((entry) => {
-      const email = String(entry?.email || "")
-        .trim()
-        .toLowerCase();
-      const role = String(entry?.role || "")
-        .trim()
-        .toLowerCase();
-      if (!email || !role) {
-        return null;
-      }
-      return [email, role];
-    })
-    .filter(Boolean)
-);
+const authorizedUsers = getAuthorizedUsersMap();
 
 function base64UrlDecode(input) {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/");

@@ -91,10 +91,10 @@ const LAYOUTS = [
     name: "Portrait Four",
     aspect: 0.95,
     slots: [
-      { x: 0, y: 0, w: 0.25, h: 1 },
-      { x: 0.25, y: 0, w: 0.25, h: 1 },
-      { x: 0.5, y: 0, w: 0.25, h: 1 },
-      { x: 0.75, y: 0, w: 0.25, h: 1 },
+      { x: 0, y: 0, w: 0.5, h: 0.5 },
+      { x: 0.5, y: 0, w: 0.5, h: 0.5 },
+      { x: 0, y: 0.5, w: 0.5, h: 0.5 },
+      { x: 0.5, y: 0.5, w: 0.5, h: 0.5 },
     ],
   },
   {
@@ -173,12 +173,12 @@ const LAYOUTS = [
     name: "Portrait Six",
     aspect: 1.2,
     slots: [
-      { x: 0, y: 0, w: 1 / 6, h: 1 },
-      { x: 1 / 6, y: 0, w: 1 / 6, h: 1 },
-      { x: 2 / 6, y: 0, w: 1 / 6, h: 1 },
-      { x: 3 / 6, y: 0, w: 1 / 6, h: 1 },
-      { x: 4 / 6, y: 0, w: 1 / 6, h: 1 },
-      { x: 5 / 6, y: 0, w: 1 / 6, h: 1 },
+      { x: 0, y: 0, w: 1 / 3, h: 0.5 },
+      { x: 1 / 3, y: 0, w: 1 / 3, h: 0.5 },
+      { x: 2 / 3, y: 0, w: 1 / 3, h: 0.5 },
+      { x: 0, y: 0.5, w: 1 / 3, h: 0.5 },
+      { x: 1 / 3, y: 0.5, w: 1 / 3, h: 0.5 },
+      { x: 2 / 3, y: 0.5, w: 1 / 3, h: 0.5 },
     ],
   },
   {
@@ -214,6 +214,8 @@ const clientSelect = document.getElementById("clientSelect");
 const imagesStatus = document.getElementById("imagesStatus");
 const imagesGrid = document.getElementById("imagesGrid");
 const layoutPicker = document.getElementById("layoutPicker");
+const layoutPickerHint = document.getElementById("layoutPickerHint");
+const showAllLayoutsRow = document.getElementById("showAllLayoutsRow");
 const showAllLayoutsInput = document.getElementById("showAllLayouts");
 const composeStatus = document.getElementById("composeStatus");
 const layoutStage = document.getElementById("layoutStage");
@@ -540,6 +542,22 @@ function renderImagesGrid() {
 }
 
 function renderLayoutPicker() {
+  const hasSelectedImages = selectedImages.length > 0;
+  if (layoutPickerHint) {
+    layoutPickerHint.hidden = hasSelectedImages;
+  }
+  if (layoutPicker) {
+    layoutPicker.hidden = !hasSelectedImages;
+  }
+  if (showAllLayoutsRow) {
+    showAllLayoutsRow.hidden = !hasSelectedImages;
+  }
+
+  if (!hasSelectedImages) {
+    layoutPicker.innerHTML = "";
+    return;
+  }
+
   const visibleLayouts = getVisibleLayouts();
   const hasActiveVisible = visibleLayouts.some((layout) => layout.id === activeLayoutId);
   if (!hasActiveVisible && visibleLayouts.length) {

@@ -1,22 +1,7 @@
-const authorizedUsersConfig = require("../../data/authorized-users.json");
+const { getAuthorizedUsersMap } = require("./authorized-users");
 
 const GRAPH_AUTH_DEBUG = process.env.GRAPH_AUTH_DEBUG === "1";
-const authorizedUsers = new Map(
-  (Array.isArray(authorizedUsersConfig?.users) ? authorizedUsersConfig.users : [])
-    .map((entry) => {
-      const email = String(entry?.email || "")
-        .trim()
-        .toLowerCase();
-      const role = String(entry?.role || "")
-        .trim()
-        .toLowerCase();
-      if (!email || !role) {
-        return null;
-      }
-      return [email, role];
-    })
-    .filter(Boolean)
-);
+const authorizedUsers = getAuthorizedUsersMap();
 
 function logGraphAuthDebug(message, details) {
   if (!GRAPH_AUTH_DEBUG) {
