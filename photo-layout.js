@@ -349,6 +349,53 @@ function isImagePhoto(photo) {
   return true;
 }
 
+function toTimestamp(value) {
+  if (value === null || value === undefined || value === "") {
+    return 0;
+  }
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function extractTimestampFromFileName(fileName) {
+  const text = String(fileName || "");
+  const match = /(\d{8})[-_]?(\d{6})/.exec(text);
+  if (!match) {
+    return 0;
+  }
+  const ymd = match[1];
+  const hms = match[2];
+  const iso = `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}T${hms.slice(0, 2)}:${hms.slice(
+    2,
+    4
+  )}:${hms.slice(4, 6)}Z`;
+  return toTimestamp(iso);
+}
+
+function getPhotoSortTimestamp(photo) {
+  return Math.max(
+    toTimestamp(photo?.capturedAt),
+    toTimestamp(photo?.createdAt),
+    toTimestamp(photo?.modifiedAt),
+    toTimestamp(photo?.dateTaken),
+    toTimestamp(photo?.date),
+    extractTimestampFromFileName(photo?.fileName),
+    extractTimestampFromFileName(photo?.title)
+  );
+}
+
+function sortPhotosNewestFirst(photos) {
+  const list = Array.isArray(photos) ? photos.slice() : [];
+  list.sort((a, b) => {
+    const timeDiff = getPhotoSortTimestamp(b) - getPhotoSortTimestamp(a);
+    if (timeDiff !== 0) {
+      return timeDiff;
+    }
+    return String(b?.id || "").localeCompare(String(a?.id || ""), undefined, { numeric: true, sensitivity: "base" });
+  });
+  return list;
+}
+
 function getActiveLayout() {
   return LAYOUTS.find((item) => item.id === activeLayoutId) || LAYOUTS[0];
 }
@@ -1265,9 +1312,9 @@ async function loadPhotosForClient(clientName) {
 
   const payload = await directoryApi.listMarketingPhotos({ client: normalizedClient });
   const photos = Array.isArray(payload?.photos) ? payload.photos : [];
-  allPhotos = photos;
+  allPhotos = sortPhotosNewestFirst(photos);
   console.log("[Photo Layout Debug] First 5 photo records:", allPhotos.slice(0, 5));
-  const imagePhotos = photos.filter((photo) => isImagePhoto(photo));
+  const imagePhotos = allPhotos.filter((photo) => isImagePhoto(photo));
   clientPhotoCache.set(normalizedClient, imagePhotos);
   clientPhotoPool = imagePhotos;
   renderAll();
