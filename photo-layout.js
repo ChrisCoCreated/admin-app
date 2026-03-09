@@ -10,8 +10,6 @@ const DEFAULT_GAP_PX = 24;
 const DEFAULT_RADIUS_PX = 36;
 const CLIENT_LIST_CACHE_KEY = "photoLayoutClientListV1";
 const CLIENT_LIST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const BACKEND_LOAD_TEST_IMAGE_URL =
-  "https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Photos%20and%20Lists/Attachments/109/Agota-20260305-120811-27.jpeg";
 
 const LAYOUTS = [
   {
@@ -913,7 +911,13 @@ function renderAll() {
 }
 
 async function loadPhotos() {
+  const localLoadStartedAt = performance.now();
   cachedClients = loadCachedClientList();
+  const localLoadElapsedMs = performance.now() - localLoadStartedAt;
+  console.log("[Photo Layout Debug] Local client cache load:", {
+    clients: cachedClients.length,
+    elapsedMs: Number(localLoadElapsedMs.toFixed(2)),
+  });
   updateClientOptions();
   renderImagesGrid();
 
@@ -958,7 +962,14 @@ async function loadPhotosForClient(clientName) {
   invalidateOutput();
 
   if (clientPhotoCache.has(normalizedClient)) {
+    const localLoadStartedAt = performance.now();
     clientPhotoPool = clientPhotoCache.get(normalizedClient) || [];
+    const localLoadElapsedMs = performance.now() - localLoadStartedAt;
+    console.log("[Photo Layout Debug] Local client image cache load:", {
+      client: normalizedClient,
+      images: clientPhotoPool.length,
+      elapsedMs: Number(localLoadElapsedMs.toFixed(2)),
+    });
     renderAll();
     return;
   }
@@ -971,16 +982,6 @@ async function loadPhotosForClient(clientName) {
   clientPhotoCache.set(normalizedClient, imagePhotos);
   clientPhotoPool = imagePhotos;
   renderAll();
-}
-
-async function testBackendMediaLoad() {
-  console.log("[Photo Layout Debug] Testing backend media load with URL:", BACKEND_LOAD_TEST_IMAGE_URL);
-  const payload = await directoryApi.getMarketingMedia({ url: BACKEND_LOAD_TEST_IMAGE_URL });
-  const bytes = Math.floor((String(payload?.dataBase64 || "").length * 3) / 4);
-  console.log("[Photo Layout Debug] Backend media load success:", {
-    mimeType: payload?.mimeType || "",
-    approxBytes: bytes,
-  });
 }
 
 async function init() {
@@ -1001,11 +1002,6 @@ async function init() {
     renderTopNavigation({ role });
     const email = String(profile?.email || "").trim();
     setStatus(email ? `Signed in as ${email}` : "Signed in");
-    try {
-      await testBackendMediaLoad();
-    } catch (error) {
-      console.error("[Photo Layout Debug] Backend media load test failed.", error);
-    }
     await loadPhotos();
   } catch (error) {
     if (error?.status === 403) {
