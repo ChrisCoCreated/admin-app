@@ -87,6 +87,17 @@ const LAYOUTS = [
     ],
   },
   {
+    id: "portrait_four",
+    name: "Portrait Four",
+    aspect: 0.95,
+    slots: [
+      { x: 0, y: 0, w: 0.25, h: 1 },
+      { x: 0.25, y: 0, w: 0.25, h: 1 },
+      { x: 0.5, y: 0, w: 0.25, h: 1 },
+      { x: 0.75, y: 0, w: 0.25, h: 1 },
+    ],
+  },
+  {
     id: "feature_four_left",
     name: "Feature Four Left",
     aspect: 1.4,
@@ -158,6 +169,19 @@ const LAYOUTS = [
     ],
   },
   {
+    id: "portrait_six",
+    name: "Portrait Six",
+    aspect: 1.2,
+    slots: [
+      { x: 0, y: 0, w: 1 / 6, h: 1 },
+      { x: 1 / 6, y: 0, w: 1 / 6, h: 1 },
+      { x: 2 / 6, y: 0, w: 1 / 6, h: 1 },
+      { x: 3 / 6, y: 0, w: 1 / 6, h: 1 },
+      { x: 4 / 6, y: 0, w: 1 / 6, h: 1 },
+      { x: 5 / 6, y: 0, w: 1 / 6, h: 1 },
+    ],
+  },
+  {
     id: "columns_six",
     name: "Columns Six",
     aspect: 1.35,
@@ -190,6 +214,7 @@ const clientSelect = document.getElementById("clientSelect");
 const imagesStatus = document.getElementById("imagesStatus");
 const imagesGrid = document.getElementById("imagesGrid");
 const layoutPicker = document.getElementById("layoutPicker");
+const showAllLayoutsInput = document.getElementById("showAllLayouts");
 const composeStatus = document.getElementById("composeStatus");
 const layoutStage = document.getElementById("layoutStage");
 const selectedImagesList = document.getElementById("selectedImagesList");
@@ -224,6 +249,7 @@ let selectedClient = "";
 let selectedImages = [];
 let selectedSlotIndex = -1;
 let activeLayoutId = LAYOUTS[0].id;
+let showAllLayouts = false;
 let dragState = null;
 let latestOutputBlob = null;
 let latestOutputUrl = "";
@@ -325,6 +351,18 @@ function isImagePhoto(photo) {
 
 function getActiveLayout() {
   return LAYOUTS.find((item) => item.id === activeLayoutId) || LAYOUTS[0];
+}
+
+function getVisibleLayouts() {
+  if (showAllLayouts) {
+    return LAYOUTS;
+  }
+  const selectedCount = selectedImages.length;
+  if (selectedCount <= 0) {
+    return LAYOUTS;
+  }
+  const exact = LAYOUTS.filter((layout) => layout.slots.length === selectedCount);
+  return exact.length ? exact : LAYOUTS;
 }
 
 function getImageAspectRatioMode() {
@@ -455,8 +493,16 @@ function renderImagesGrid() {
 }
 
 function renderLayoutPicker() {
+  const visibleLayouts = getVisibleLayouts();
+  const hasActiveVisible = visibleLayouts.some((layout) => layout.id === activeLayoutId);
+  if (!hasActiveVisible && visibleLayouts.length) {
+    activeLayoutId = visibleLayouts[0].id;
+    selectedSlotIndex = Math.min(selectedSlotIndex, visibleLayouts[0].slots.length - 1);
+    invalidateOutput();
+  }
+
   layoutPicker.innerHTML = "";
-  for (const layout of LAYOUTS) {
+  for (const layout of visibleLayouts) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `layout-thumb${layout.id === activeLayoutId ? " active" : ""}`;
@@ -1154,6 +1200,9 @@ function renderAll() {
   renderStage();
   updateAdjustControls();
   updateStyleControls();
+  if (showAllLayoutsInput) {
+    showAllLayoutsInput.checked = showAllLayouts;
+  }
 }
 
 async function loadPhotos() {
@@ -1260,6 +1309,11 @@ async function init() {
 clientSelect?.addEventListener("change", () => {
   selectedClient = String(clientSelect.value || "").trim();
   void loadPhotosForClient(selectedClient);
+});
+
+showAllLayoutsInput?.addEventListener("change", () => {
+  showAllLayouts = Boolean(showAllLayoutsInput.checked);
+  renderLayoutPicker();
 });
 
 zoomRange?.addEventListener("input", applyAdjustmentsFromControls);
