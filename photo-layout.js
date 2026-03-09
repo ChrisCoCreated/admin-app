@@ -252,6 +252,12 @@ function renderLayoutAspectPicker() {
     btn.setAttribute("aria-pressed", mode.id === activeAspectMode ? "true" : "false");
     btn.addEventListener("click", () => {
       activeAspectMode = mode.id;
+      const layout = getActiveLayout();
+      const stageWidth = layoutStage.clientWidth || layoutStage.getBoundingClientRect().width || 1;
+      const stageHeight = layoutStage.clientHeight || stageWidth / layout.aspect || 1;
+      const previewScale = stageWidth / EXPORT_WIDTH;
+      const previewGapPx = getExportGapPx() * previewScale;
+      clampImagePanToCurrentMode(stageWidth, stageHeight, layout, previewGapPx);
       invalidateOutput();
       renderAll();
     });
@@ -431,6 +437,34 @@ function getSourceDimensions(previewUrl, fallbackWidth = 1, fallbackHeight = 1) 
   };
 }
 
+function clampImagePanToCurrentMode(stageWidth, stageHeight, layout, gapPx) {
+  if (!layout || !Array.isArray(layout.slots) || !layout.slots.length) {
+    return;
+  }
+  const renderableSlots = Math.min(layout.slots.length, selectedImages.length);
+  for (let index = 0; index < renderableSlots; index += 1) {
+    const image = selectedImages[index];
+    if (!image) {
+      continue;
+    }
+    const slot = layout.slots[index];
+    const neighborFlags = getSlotNeighborFlags(layout.slots, index);
+    const slotRect = computeAdjustedSlotRect(slot, neighborFlags, stageWidth, stageHeight, gapPx);
+    const source = getSourceDimensions(image.previewUrl, slotRect.w, slotRect.h);
+    const placement = computeImagePlacement(
+      slotRect.w,
+      slotRect.h,
+      source.width,
+      source.height,
+      image.zoom,
+      image.panX,
+      image.panY
+    );
+    image.panX = placement.maxOffsetX <= 0.01 ? 0 : clamp(image.panX, -PAN_LIMIT, PAN_LIMIT);
+    image.panY = placement.maxOffsetY <= 0.01 ? 0 : clamp(image.panY, -PAN_LIMIT, PAN_LIMIT);
+  }
+}
+
 function computeImagePlacement(slotWidth, slotHeight, imageWidth, imageHeight, zoom, panX, panY) {
   const safeSlotWidth = Math.max(1, Number(slotWidth) || 1);
   const safeSlotHeight = Math.max(1, Number(slotHeight) || 1);
@@ -441,38 +475,48 @@ function computeImagePlacement(slotWidth, slotHeight, imageWidth, imageHeight, z
   const safePanY = clamp(Number(panY) || 0, -PAN_LIMIT, PAN_LIMIT);
 
   const targetAspect = getImageAspectRatioMode();
-  let frameX = 0;
-  let frameY = 0;
-  let frameW = safeSlotWidth;
-  let frameH = safeSlotHeight;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceW = safeImageWidth;
+  let sourceH = safeImageHeight;
   if (targetAspect && Number.isFinite(targetAspect) && targetAspect > 0) {
-    const slotAspect = safeSlotWidth / safeSlotHeight;
-    if (slotAspect > targetAspect) {
-      frameH = safeSlotWidth / targetAspect;
-      frameY = (safeSlotHeight - frameH) * 0.5;
-    } else if (slotAspect < targetAspect) {
-      frameW = safeSlotHeight * targetAspect;
-      frameX = (safeSlotWidth - frameW) * 0.5;
+    const sourceAspect = safeImageWidth / safeImageHeight;
+    if (sourceAspect > targetAspect) {
+      sourceW = safeImageHeight * targetAspect;
+      sourceX = (safeImageWidth - sourceW) * 0.5;
+    } else if (sourceAspect < targetAspect) {
+      sourceH = safeImageWidth / targetAspect;
+      sourceY = (safeImageHeight - sourceH) * 0.5;
     }
   }
 
-  const baseScale = Math.max(frameW / safeImageWidth, frameH / safeImageHeight);
-  const drawW = safeImageWidth * baseScale * safeZoom;
-  const drawH = safeImageHeight * baseScale * safeZoom;
-  const overflowX = Math.max(0, drawW - frameW);
-  const overflowY = Math.max(0, drawH - frameH);
+  const baseScale = Math.max(safeSlotWidth / sourceW, safeSlotHeight / sourceH);
+  const scale = baseScale * safeZoom;
+  const drawW = sourceW * scale;
+  const drawH = sourceH * scale;
+  const overflowX = Math.max(0, drawW - safeSlotWidth);
+  const overflowY = Math.max(0, drawH - safeSlotHeight);
   const maxOffsetX = overflowX * 0.5;
   const maxOffsetY = overflowY * 0.5;
   const offsetX = (safePanX / PAN_LIMIT) * maxOffsetX;
   const offsetY = (safePanY / PAN_LIMIT) * maxOffsetY;
-  const drawX = frameX + (frameW - drawW) * 0.5 + offsetX;
-  const drawY = frameY + (frameH - drawH) * 0.5 + offsetY;
+  const drawX = (safeSlotWidth - drawW) * 0.5 + offsetX;
+  const drawY = (safeSlotHeight - drawH) * 0.5 + offsetY;
 
   return {
+    sourceX,
+    sourceY,
+    sourceW,
+    sourceH,
+    scale,
     drawX,
     drawY,
     drawW,
     drawH,
+    renderX: drawX - sourceX * scale,
+    renderY: drawY - sourceY * scale,
+    renderW: safeImageWidth * scale,
+    renderH: safeImageHeight * scale,
     maxOffsetX,
     maxOffsetY,
   };
@@ -710,10 +754,10 @@ function renderStage() {
         assignedImage.panX,
         assignedImage.panY
       );
-      media.style.left = `${placement.drawX}px`;
-      media.style.top = `${placement.drawY}px`;
-      media.style.width = `${placement.drawW}px`;
-      media.style.height = `${placement.drawH}px`;
+      media.style.left = `${placement.renderX}px`;
+      media.style.top = `${placement.renderY}px`;
+      media.style.width = `${placement.renderW}px`;
+      media.style.height = `${placement.renderH}px`;
 
       media.addEventListener("load", () => {
         if (media.naturalWidth > 0 && media.naturalHeight > 0) {
@@ -784,10 +828,10 @@ function renderStage() {
           image.panX,
           image.panY
         );
-        media.style.left = `${livePlacement.drawX}px`;
-        media.style.top = `${livePlacement.drawY}px`;
-        media.style.width = `${livePlacement.drawW}px`;
-        media.style.height = `${livePlacement.drawH}px`;
+        media.style.left = `${livePlacement.renderX}px`;
+        media.style.top = `${livePlacement.renderY}px`;
+        media.style.width = `${livePlacement.renderW}px`;
+        media.style.height = `${livePlacement.renderH}px`;
         if (slotIndex === selectedSlotIndex) {
           updateAdjustControls();
         }
@@ -872,16 +916,22 @@ function drawImageIntoSlot(ctx, img, slot, transform, cornerRadiusPx = 0) {
   const panY = clamp(Number(transform.panY) || 0, -PAN_LIMIT, PAN_LIMIT);
 
   const placement = computeImagePlacement(slotW, slotH, img.width, img.height, zoom, panX, panY);
-  const drawW = placement.drawW;
-  const drawH = placement.drawH;
-  const drawX = slotX + placement.drawX;
-  const drawY = slotY + placement.drawY;
 
   ctx.save();
   ctx.beginPath();
   drawRoundedRectPath(ctx, slotX, slotY, slotW, slotH, cornerRadiusPx);
   ctx.clip();
-  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  ctx.drawImage(
+    img,
+    placement.sourceX,
+    placement.sourceY,
+    placement.sourceW,
+    placement.sourceH,
+    slotX + placement.drawX,
+    slotY + placement.drawY,
+    placement.drawW,
+    placement.drawH
+  );
   ctx.restore();
 }
 
