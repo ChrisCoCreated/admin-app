@@ -198,12 +198,89 @@ async function callOneTouch(endpointPath, query = {}) {
     url.searchParams.set(key, String(value));
   }
 
+  async function requestWithToken(accessToken, options = {}) {
+    const method = String(options.method || "GET").trim().toUpperCase();
+    const headers = {
+      Accept: "application/json",
+      Authorization: `Bearer ${accessToken}`,
+      ...(options.headers && typeof options.headers === "object" ? options.headers : {}),
+    };
+    const requestOptions = {
+      method,
+      headers,
+    };
+    if (options.body !== undefined) {
+      requestOptions.body =
+        typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+      if (!headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+    }
+
+    const response = await fetch(url, {
+      ...requestOptions,
+    });
+
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
+
+    return { response, payload, text };
+  }
+
+  async function callWithRetryOnce(options = {}) {
+    const firstToken = await getAccessToken();
+    const first = await requestWithToken(firstToken, options);
+    if (first.response.ok) {
+      return first.payload;
+    }
+
+    if (first.response.status === 401) {
+      console.warn("[OneTouch] Received 401, clearing cached token and retrying request once.", {
+        endpoint,
+      });
+      clearTokenCache();
+      const retryToken = await getAccessToken();
+      const retry = await requestWithToken(retryToken, options);
+      if (retry.response.ok) {
+        return retry.payload;
+      }
+      const retryDetail = retry.payload?.error || retry.payload?.message || retry.text || `HTTP ${retry.response.status}`;
+      throw new Error(`OneTouch request failed (${retry.response.status}): ${retryDetail}`);
+    }
+
+    const detail = first.payload?.error || first.payload?.message || first.text || `HTTP ${first.response.status}`;
+    throw new Error(`OneTouch request failed (${first.response.status}): ${detail}`);
+  }
+
+  return callWithRetryOnce();
+}
+
+async function postOneTouch(endpointPath, body = {}, query = {}) {
+  const { baseUrl } = getRequiredEnv();
+  const endpoint = String(endpointPath || "").replace(/^\/+/, "");
+  const url = new URL(`${baseUrl}/${endpoint}`);
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    url.searchParams.set(key, String(value));
+  }
+
   async function requestWithToken(accessToken) {
     const response = await fetch(url, {
+      method: "POST",
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify(body && typeof body === "object" ? body : {}),
     });
 
     const text = await response.text();
@@ -667,9 +744,83 @@ async function listVisits() {
   return records.map(normalizeVisit).filter((visit) => visit.clientId && visit.carerId);
 }
 
+function pickFirstNonEmpty(values) {
+  for (const value of values) {
+    const text = asString(value);
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function splitName(name) {
+  const raw = asString(name);
+  if (!raw) {
+    return { first: "", last: "" };
+  }
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return { first: parts[0], last: "Unknown" };
+  }
+  return {
+    first: parts[0],
+    last: parts.slice(1).join(" "),
+  };
+}
+
+function sanitizeCarerCreatePayload(payload = {}) {
+  const candidateName = pickFirstNonEmpty([payload.full_name, payload.name, payload.candidate_name]);
+  const split = splitName(candidateName);
+  const externalId = pickFirstNonEmpty([payload.external_id, payload.externalId, payload.id]);
+
+  const base = {
+    external_id: externalId,
+    firstname: pickFirstNonEmpty([payload.firstname, payload.first_name, split.first]),
+    lastname: pickFirstNonEmpty([payload.lastname, payload.last_name, split.last]),
+    known_as: pickFirstNonEmpty([payload.known_as, payload.knownAs, split.first]),
+    primary_email: pickFirstNonEmpty([payload.primary_email, payload.email]),
+    phone_mobile: pickFirstNonEmpty([payload.phone_mobile, payload.phone, payload.phone_number]),
+    town: pickFirstNonEmpty([payload.town, payload.location]),
+    area: pickFirstNonEmpty([payload.area, payload.location]),
+    recruitment_source: pickFirstNonEmpty([payload.recruitment_source, payload.source]),
+    comment: pickFirstNonEmpty([payload.comment, payload.notes]),
+    position: pickFirstNonEmpty([payload.position, "Carer"]),
+  };
+
+  const out = {};
+  for (const [key, value] of Object.entries(base)) {
+    const text = asString(value);
+    if (!text) {
+      continue;
+    }
+    out[key] = text;
+  }
+  return out;
+}
+
+async function createCarer(payload = {}) {
+  const createPayload = sanitizeCarerCreatePayload(payload);
+  if (!createPayload.firstname || !createPayload.lastname) {
+    throw new Error("OneTouch create requires candidate name.");
+  }
+
+  const response = await postOneTouch("carer/create", createPayload);
+  const success = response?.success === true || response?.status === true;
+  const id = asString(response?.id || response?.carer_id || response?.data?.id || response?.result?.id);
+  if (!success || !id) {
+    throw new Error("OneTouch create did not return a successful carer id.");
+  }
+  return {
+    id,
+    raw: response,
+  };
+}
+
 module.exports = {
   listCarers,
   listCarersDetailed,
   listClients,
   listVisits,
+  createCarer,
 };

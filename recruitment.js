@@ -13,6 +13,7 @@ const statusMessage = document.getElementById("statusMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const detailRoot = document.getElementById("candidateDetail");
 const sharePointListLink = document.getElementById("sharePointListLink");
+const addMissingToOneTouchBtn = document.getElementById("addMissingToOneTouchBtn");
 
 const detailFields = {
   candidateName: detailRoot?.querySelector('[data-field="candidateName"]'),
@@ -39,6 +40,7 @@ const directoryApi = createDirectoryApi(authController);
 
 let allCandidates = [];
 let selectedCandidateId = "";
+let addToOneTouchBusy = false;
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -63,6 +65,26 @@ function setStatus(message, isError = false) {
   }
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
+}
+
+function hasOneTouchLink(candidate) {
+  return Boolean(cleanText(candidate?.oneTouchLink));
+}
+
+function setAddButtonsBusy(disabled) {
+  addToOneTouchBusy = disabled;
+  if (addMissingToOneTouchBtn) {
+    addMissingToOneTouchBtn.disabled = disabled;
+  }
+}
+
+function updateAddMissingButtonLabel() {
+  if (!addMissingToOneTouchBtn) {
+    return;
+  }
+  const missingCount = allCandidates.filter((candidate) => !hasOneTouchLink(candidate)).length;
+  addMissingToOneTouchBtn.textContent =
+    missingCount > 0 ? `Add Missing to OneTouch (${missingCount})` : "Add Missing to OneTouch";
 }
 
 function formatBoolean(value) {
@@ -210,6 +232,7 @@ function renderCandidates() {
   if (!filtered.length) {
     emptyState.hidden = false;
     setDetail(null);
+    updateAddMissingButtonLabel();
     return;
   }
 
@@ -226,6 +249,13 @@ function renderCandidates() {
       <td>${escapeHtml(cleanText(candidate.status) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.source) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.phoneNumber) || "-")}</td>
+      <td>
+        ${
+          hasOneTouchLink(candidate)
+            ? '<span class="muted">Added</span>'
+            : `<button type="button" class="secondary recruitment-add-btn"${addToOneTouchBusy ? " disabled" : ""}>Add to OneTouch</button>`
+        }
+      </td>
     `;
 
     tr.addEventListener("click", () => {
@@ -234,10 +264,89 @@ function renderCandidates() {
       renderCandidates();
     });
 
+    const addBtn = tr.querySelector(".recruitment-add-btn");
+    addBtn?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (addToOneTouchBusy) {
+        return;
+      }
+      await addCandidateToOneTouch(candidate.id);
+    });
+
     recruitmentTableBody.appendChild(tr);
   }
 
   setDetail(selected);
+  updateAddMissingButtonLabel();
+}
+
+function upsertCandidateInCache(item) {
+  if (!item || !item.id) {
+    return;
+  }
+  const index = allCandidates.findIndex((candidate) => candidate.id === item.id);
+  if (index < 0) {
+    allCandidates.push(item);
+    return;
+  }
+  allCandidates[index] = item;
+}
+
+async function addCandidateToOneTouch(itemId) {
+  const cleanItemId = cleanText(itemId);
+  if (!cleanItemId) {
+    return;
+  }
+  setAddButtonsBusy(true);
+  try {
+    setStatus("Adding candidate to OneTouch...");
+    const result = await directoryApi.addRecruitmentCandidateToOneTouch({
+      itemId: cleanItemId,
+    });
+    if (result?.item) {
+      upsertCandidateInCache(result.item);
+    }
+    renderCandidates();
+    setStatus(`Candidate added to OneTouch (ID: ${cleanText(result?.oneTouchId) || "-"})`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not add candidate to OneTouch.", true);
+  } finally {
+    setAddButtonsBusy(false);
+  }
+}
+
+async function addAllMissingCandidatesToOneTouch() {
+  const missing = allCandidates.filter((candidate) => !hasOneTouchLink(candidate));
+  if (!missing.length) {
+    setStatus("All active candidates already have a OneTouch link.");
+    return;
+  }
+
+  setAddButtonsBusy(true);
+  let successCount = 0;
+  try {
+    for (const candidate of missing) {
+      setStatus(`Adding ${cleanText(candidate.candidateName) || "candidate"} to OneTouch...`);
+      const result = await directoryApi.addRecruitmentCandidateToOneTouch({
+        itemId: candidate.id,
+      });
+      if (result?.item) {
+        upsertCandidateInCache(result.item);
+      }
+      successCount += 1;
+      renderCandidates();
+    }
+    setStatus(`Added ${successCount} candidate(s) to OneTouch.`);
+  } catch (error) {
+    console.error(error);
+    setStatus(
+      `Added ${successCount} candidate(s), then failed: ${error?.message || "OneTouch request failed."}`,
+      true
+    );
+  } finally {
+    setAddButtonsBusy(false);
+  }
 }
 
 function redirectToUnauthorized(pageKey) {
@@ -290,6 +399,12 @@ searchInput?.addEventListener("input", renderCandidates);
 locationFilterSelect?.addEventListener("change", renderCandidates);
 statusFilterSelect?.addEventListener("change", renderCandidates);
 sourceFilterSelect?.addEventListener("change", renderCandidates);
+addMissingToOneTouchBtn?.addEventListener("click", async () => {
+  if (addToOneTouchBusy) {
+    return;
+  }
+  await addAllMissingCandidatesToOneTouch();
+});
 
 signOutBtn?.addEventListener("click", async () => {
   try {

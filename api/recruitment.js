@@ -1,10 +1,12 @@
 const { requireGraphAuth } = require("./_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("./_lib/tasks/graph-delegated-client");
+const { createCarer } = require("./_lib/onetouch-client");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
 const DEFAULT_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency/Lists/Associate%20Recruitment/Active.aspx?env=WebViewList";
+const ONETOUCH_CARER_PROFILE_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerSummaryProfile.php";
 
 const ALLOWED_ROLES = [
   "admin",
@@ -98,6 +100,12 @@ function parsePersonField(value, lookupIdValue) {
 }
 
 function parseHyperlink(value) {
+  if (value && typeof value === "object") {
+    const fromObject = normalizeText(value.Url || value.url || value.Description || value.description);
+    if (fromObject) {
+      return fromObject;
+    }
+  }
   const text = normalizeText(value);
   if (!text) {
     return "";
@@ -107,6 +115,12 @@ function parseHyperlink(value) {
     return text;
   }
   return text.slice(0, commaIndex).trim();
+}
+
+function buildOneTouchProfileUrl(oneTouchId) {
+  const url = new URL(ONETOUCH_CARER_PROFILE_BASE_URL);
+  url.searchParams.set("p", normalizeText(oneTouchId));
+  return url.toString();
 }
 
 function normalizeRecruitmentItem(item) {
@@ -164,6 +178,58 @@ async function fetchRecruitmentItems(graphClient, siteId, listId) {
   return items.map(normalizeRecruitmentItem).filter((item) => item.active);
 }
 
+async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {
+  const selectFields = [
+    "Title",
+    "Location",
+    "PhoneNumber",
+    "InterviewBooked",
+    "InterviewWith",
+    "InterviewWithLookupId",
+    "Status",
+    "Active",
+    "KeepinMind",
+    "LivesIn",
+    "_x0031_stInterviewDate",
+    "Notes",
+    "Source",
+    "EarmarkedFor",
+    "OnetouchLink",
+    "Created",
+  ];
+  const params = new URLSearchParams({
+    $expand: `fields($select=${selectFields.join(",")})`,
+  });
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}?${params.toString()}`;
+  const payload = await graphClient.fetchJson(url);
+  return normalizeRecruitmentItem(payload);
+}
+
+async function patchRecruitmentOneTouchLink(graphClient, siteId, listId, itemId, oneTouchProfileUrl) {
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
+  await graphClient.fetchJson(url, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      OnetouchLink: normalizeText(oneTouchProfileUrl),
+    }),
+  });
+}
+
+function buildOneTouchCreatePayload(candidate) {
+  return {
+    external_id: normalizeText(candidate.id),
+    full_name: normalizeText(candidate.candidateName),
+    phone: normalizeText(candidate.phoneNumber),
+    location: normalizeText(candidate.location),
+    area: normalizeText(candidate.location),
+    source: normalizeText(candidate.source),
+    notes: normalizeText(candidate.notes),
+  };
+}
+
 function mapGraphError(error) {
   const status = Number(error?.status) || 502;
   const code = String(error?.code || "GRAPH_REQUEST_FAILED");
@@ -182,7 +248,7 @@ function mapGraphError(error) {
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "POST") {
     res.status(405).json({
       error: {
         code: "METHOD_NOT_ALLOWED",
@@ -201,6 +267,63 @@ module.exports = async (req, res) => {
     const graphClient = createGraphDelegatedClient(req.authUser?.graphAccessToken);
     const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
     const list = await resolveList(graphClient, siteId, config.listName);
+    if (req.method === "POST") {
+      const itemId = normalizeText(req.body?.itemId);
+      if (!itemId) {
+        res.status(400).json({
+          error: {
+            code: "BAD_REQUEST",
+            message: "Missing itemId.",
+          },
+        });
+        return;
+      }
+
+      const candidate = await fetchRecruitmentItem(graphClient, siteId, list.id, itemId);
+      if (!candidate.id) {
+        res.status(404).json({
+          error: {
+            code: "NOT_FOUND",
+            message: "Recruitment candidate not found.",
+          },
+        });
+        return;
+      }
+      if (!candidate.active) {
+        res.status(409).json({
+          error: {
+            code: "INACTIVE_CANDIDATE",
+            message: "Only active candidates can be added to OneTouch.",
+          },
+        });
+        return;
+      }
+      if (normalizeText(candidate.oneTouchLink)) {
+        res.status(409).json({
+          error: {
+            code: "ALREADY_LINKED",
+            message: "Candidate already has a OneTouch link.",
+          },
+        });
+        return;
+      }
+
+      const createResult = await createCarer(buildOneTouchCreatePayload(candidate));
+      const oneTouchProfileUrl = buildOneTouchProfileUrl(createResult.id);
+      await patchRecruitmentOneTouchLink(graphClient, siteId, list.id, itemId, oneTouchProfileUrl);
+      const updatedCandidate = await fetchRecruitmentItem(graphClient, siteId, list.id, itemId);
+
+      res.setHeader("Cache-Control", "no-store");
+      res.status(200).json({
+        success: true,
+        itemId,
+        oneTouchId: createResult.id,
+        oneTouchLink: oneTouchProfileUrl,
+        item: updatedCandidate,
+      });
+      return;
+    }
+
     const items = await fetchRecruitmentItems(graphClient, siteId, list.id);
 
     res.setHeader("Cache-Control", "private, max-age=30");

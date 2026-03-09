@@ -137,6 +137,21 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async addRecruitmentCandidateToOneTouch(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment create request failed");
+      }
+      return response.json();
+    },
+
     async listMarketingPhotos(query = {}) {
       const response = await authFetch(buildUrl("/api/marketing/photos", query));
       if (!response.ok) {

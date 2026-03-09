@@ -212,6 +212,9 @@ async function handleApi(req, res, reqUrl) {
   }
 
   if (reqUrl.pathname === "/api/recruitment") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
     await recruitmentHandler(apiReq, apiRes);
     return true;
   }

@@ -21,6 +21,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)
   - `GET /api/carers`
   - `GET /api/recruitment` (delegated Microsoft Graph token; returns active candidates only)
+  - `POST /api/recruitment` (delegated Microsoft Graph token; creates OneTouch carer and writes SharePoint `OnetouchLink`)
   - `POST /api/routes/run`
   - `POST /api/maps/drive-time`
   - `POST /api/maps/geocode-batch`
