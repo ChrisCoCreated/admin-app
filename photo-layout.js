@@ -10,6 +10,7 @@ const DEFAULT_GAP_PX = 24;
 const DEFAULT_RADIUS_PX = 36;
 const CLIENT_LIST_CACHE_KEY = "photoLayoutClientListV1";
 const CLIENT_LIST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const ALL_CLIENTS_VALUE = "__all_clients__";
 
 const LAYOUTS = [
   {
@@ -89,7 +90,7 @@ const LAYOUTS = [
   {
     id: "portrait_four",
     name: "Portrait Four",
-    aspect: 0.95,
+    aspect: 0.75,
     slots: [
       { x: 0, y: 0, w: 0.5, h: 0.5 },
       { x: 0.5, y: 0, w: 0.5, h: 0.5 },
@@ -336,6 +337,13 @@ function normalizeClientName(value) {
   return String(value || "").trim() || "Unassigned";
 }
 
+function getSelectedClientLabel() {
+  if (selectedClient === ALL_CLIENTS_VALUE) {
+    return "All clients";
+  }
+  return String(selectedClient || "").trim();
+}
+
 function isImagePhoto(photo) {
   const type = String(photo?.mediaType || "").toLowerCase();
   if (type === "video") {
@@ -437,13 +445,22 @@ function updateClientOptions() {
     selectedClient = "";
     return;
   }
+
+  const allOption = document.createElement("option");
+  allOption.value = ALL_CLIENTS_VALUE;
+  allOption.textContent = "All clients";
+  clientSelect.append(allOption);
+
   for (const client of clients) {
     const option = document.createElement("option");
     option.value = client;
     option.textContent = client;
     clientSelect.append(option);
   }
-  if (current && clients.includes(current)) {
+  if (current === ALL_CLIENTS_VALUE) {
+    clientSelect.value = ALL_CLIENTS_VALUE;
+    selectedClient = ALL_CLIENTS_VALUE;
+  } else if (current && clients.includes(current)) {
     clientSelect.value = current;
     selectedClient = current;
   } else {
@@ -535,7 +552,7 @@ function renderImagesGrid() {
     imagesGrid.append(card);
   }
   setImagesStatus(
-    `${photos.length} image${photos.length === 1 ? "" : "s"} for ${selectedClient}. Selected ${
+    `${photos.length} image${photos.length === 1 ? "" : "s"} for ${getSelectedClientLabel()}. Selected ${
       selectedImages.length
     }/${MAX_SELECTION}.`
   );
@@ -1311,13 +1328,15 @@ async function loadPhotosForClient(clientName) {
     setImagesStatus("Select a client to load images.");
     return;
   }
-  const normalizedClient = normalizeClientName(requestedClient);
+  const isAllClients = requestedClient === ALL_CLIENTS_VALUE;
+  const normalizedClient = isAllClients ? "All clients" : normalizeClientName(requestedClient);
+  const cacheKey = isAllClients ? ALL_CLIENTS_VALUE : normalizedClient;
 
   setImagesStatus(`Loading images for ${normalizedClient}...`);
 
-  if (clientPhotoCache.has(normalizedClient)) {
+  if (clientPhotoCache.has(cacheKey)) {
     const localLoadStartedAt = performance.now();
-    clientPhotoPool = clientPhotoCache.get(normalizedClient) || [];
+    clientPhotoPool = clientPhotoCache.get(cacheKey) || [];
     const localLoadElapsedMs = performance.now() - localLoadStartedAt;
     console.log("[Photo Layout Debug] Local client image cache load:", {
       client: normalizedClient,
@@ -1328,12 +1347,14 @@ async function loadPhotosForClient(clientName) {
     return;
   }
 
-  const payload = await directoryApi.listMarketingPhotos({ client: normalizedClient });
+  const payload = isAllClients
+    ? await directoryApi.listMarketingPhotos()
+    : await directoryApi.listMarketingPhotos({ client: normalizedClient });
   const photos = Array.isArray(payload?.photos) ? payload.photos : [];
   allPhotos = sortPhotosNewestFirst(photos);
   console.log("[Photo Layout Debug] First 5 photo records:", allPhotos.slice(0, 5));
   const imagePhotos = allPhotos.filter((photo) => isImagePhoto(photo));
-  clientPhotoCache.set(normalizedClient, imagePhotos);
+  clientPhotoCache.set(cacheKey, imagePhotos);
   clientPhotoPool = imagePhotos;
   renderAll();
 }

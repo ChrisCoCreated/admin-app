@@ -793,6 +793,41 @@ function getAttachmentLookupConcurrency() {
   return Math.min(Math.floor(configured), 24);
 }
 
+function parseTimestamp(value) {
+  if (!value) {
+    return Number.NaN;
+  }
+  const timestamp = Date.parse(String(value));
+  return Number.isFinite(timestamp) ? timestamp : Number.NaN;
+}
+
+function comparePhotosNewestFirst(photoA, photoB) {
+  const createdATime = parseTimestamp(photoA?.created);
+  const createdBTime = parseTimestamp(photoB?.created);
+  const hasCreatedA = Number.isFinite(createdATime);
+  const hasCreatedB = Number.isFinite(createdBTime);
+
+  if (hasCreatedA && hasCreatedB && createdATime !== createdBTime) {
+    return createdBTime - createdATime;
+  }
+  if (hasCreatedA && !hasCreatedB) {
+    return -1;
+  }
+  if (!hasCreatedA && hasCreatedB) {
+    return 1;
+  }
+
+  const idA = Number(photoA?.id);
+  const idB = Number(photoB?.id);
+  if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) {
+    return idB - idA;
+  }
+
+  return String(photoB?.title || "").localeCompare(String(photoA?.title || ""), undefined, {
+    sensitivity: "base",
+  });
+}
+
 async function resolveAttachmentUrlsForPhotos(photos, params) {
   if (!Array.isArray(photos) || !photos.length) {
     return;
@@ -913,7 +948,7 @@ async function readMarketingPhotos() {
     listId,
   });
 
-  photos.sort((a, b) => a.client.localeCompare(b.client, undefined, { sensitivity: "base" }));
+  photos.sort(comparePhotosNewestFirst);
   logMarketingDebug("photos-fetch-summary", {
     totalItemsRead,
     returnedPhotos: photos.length,
