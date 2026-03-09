@@ -598,7 +598,7 @@ function renderStage() {
       media.src = assignedImage.previewUrl;
       media.alt = assignedImage.title;
       media.draggable = false;
-      media.style.objectPosition = `${50 + assignedImage.panX * 0.5}% ${50 + assignedImage.panY * 0.5}%`;
+      media.style.objectPosition = `${50 - assignedImage.panX * 0.5}% ${50 - assignedImage.panY * 0.5}%`;
       media.style.transform = `scale(${assignedImage.zoom})`;
 
       media.addEventListener("pointerdown", (event) => {
@@ -626,9 +626,9 @@ function renderStage() {
         }
         const deltaX = ((event.clientX - dragState.startX) / dragState.width) * 100;
         const deltaY = ((event.clientY - dragState.startY) / dragState.height) * 100;
-        image.panX = clamp(dragState.startPanX + deltaX, -PAN_LIMIT, PAN_LIMIT);
-        image.panY = clamp(dragState.startPanY + deltaY, -PAN_LIMIT, PAN_LIMIT);
-        media.style.objectPosition = `${50 + image.panX * 0.5}% ${50 + image.panY * 0.5}%`;
+        image.panX = clamp(dragState.startPanX - deltaX, -PAN_LIMIT, PAN_LIMIT);
+        image.panY = clamp(dragState.startPanY - deltaY, -PAN_LIMIT, PAN_LIMIT);
+        media.style.objectPosition = `${50 - image.panX * 0.5}% ${50 - image.panY * 0.5}%`;
         media.style.transform = `scale(${image.zoom})`;
         if (slotIndex === selectedSlotIndex) {
           updateAdjustControls();
@@ -717,8 +717,8 @@ function drawImageIntoSlot(ctx, img, slot, transform, cornerRadiusPx = 0) {
   const drawH = img.height * baseScale * zoom;
   const overflowX = Math.max(0, drawW - slotW);
   const overflowY = Math.max(0, drawH - slotH);
-  const drawX = slotX + (slotW - drawW) / 2 + (overflowX / 2) * (panX / PAN_LIMIT);
-  const drawY = slotY + (slotH - drawH) / 2 + (overflowY / 2) * (panY / PAN_LIMIT);
+  const drawX = slotX + (slotW - drawW) / 2 - (overflowX / 2) * (panX / PAN_LIMIT);
+  const drawY = slotY + (slotH - drawH) / 2 - (overflowY / 2) * (panY / PAN_LIMIT);
 
   ctx.save();
   ctx.beginPath();
@@ -947,9 +947,6 @@ async function loadPhotosForClient(clientName) {
   const requestedClient = String(clientName || "").trim();
   if (!requestedClient) {
     clientPhotoPool = [];
-    selectedImages = [];
-    selectedSlotIndex = -1;
-    invalidateOutput();
     renderAll();
     setImagesStatus("Select a client to load images.");
     return;
@@ -957,9 +954,6 @@ async function loadPhotosForClient(clientName) {
   const normalizedClient = normalizeClientName(requestedClient);
 
   setImagesStatus(`Loading images for ${normalizedClient}...`);
-  selectedImages = [];
-  selectedSlotIndex = -1;
-  invalidateOutput();
 
   if (clientPhotoCache.has(normalizedClient)) {
     const localLoadStartedAt = performance.now();
