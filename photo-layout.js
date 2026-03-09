@@ -124,6 +124,7 @@ const layoutStyle = {
   roundedEnabled: true,
   cornerRadiusPx: DEFAULT_RADIUS_PX,
 };
+const previewImageMetaCache = new Map();
 
 const exportImageCache = new Map();
 const clientPhotoCache = new Map();
@@ -378,6 +379,48 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function getSourceDimensions(previewUrl, fallbackWidth = 1, fallbackHeight = 1) {
+  const cached = previewImageMetaCache.get(String(previewUrl || ""));
+  if (cached && cached.width > 0 && cached.height > 0) {
+    return { width: cached.width, height: cached.height };
+  }
+  return {
+    width: Math.max(1, Number(fallbackWidth) || 1),
+    height: Math.max(1, Number(fallbackHeight) || 1),
+  };
+}
+
+function computeImagePlacement(slotWidth, slotHeight, imageWidth, imageHeight, zoom, panX, panY) {
+  const safeSlotWidth = Math.max(1, Number(slotWidth) || 1);
+  const safeSlotHeight = Math.max(1, Number(slotHeight) || 1);
+  const safeImageWidth = Math.max(1, Number(imageWidth) || 1);
+  const safeImageHeight = Math.max(1, Number(imageHeight) || 1);
+  const safeZoom = clamp(Number(zoom) || 1, 1, 3);
+  const safePanX = clamp(Number(panX) || 0, -PAN_LIMIT, PAN_LIMIT);
+  const safePanY = clamp(Number(panY) || 0, -PAN_LIMIT, PAN_LIMIT);
+
+  const baseScale = Math.max(safeSlotWidth / safeImageWidth, safeSlotHeight / safeImageHeight);
+  const drawW = safeImageWidth * baseScale * safeZoom;
+  const drawH = safeImageHeight * baseScale * safeZoom;
+  const overflowX = Math.max(0, drawW - safeSlotWidth);
+  const overflowY = Math.max(0, drawH - safeSlotHeight);
+  const maxOffsetX = overflowX * 0.5;
+  const maxOffsetY = overflowY * 0.5;
+  const offsetX = (safePanX / PAN_LIMIT) * maxOffsetX;
+  const offsetY = (safePanY / PAN_LIMIT) * maxOffsetY;
+  const drawX = (safeSlotWidth - drawW) * 0.5 + offsetX;
+  const drawY = (safeSlotHeight - drawH) * 0.5 + offsetY;
+
+  return {
+    drawX,
+    drawY,
+    drawW,
+    drawH,
+    maxOffsetX,
+    maxOffsetY,
+  };
+}
+
 function rangesOverlap(startA, endA, startB, endB) {
   return Math.min(endA, endB) - Math.max(startA, startB) > 1e-6;
 }
@@ -598,12 +641,52 @@ function renderStage() {
       media.src = assignedImage.previewUrl;
       media.alt = assignedImage.title;
       media.draggable = false;
-      media.style.objectPosition = `${50 - assignedImage.panX * 0.5}% ${50 - assignedImage.panY * 0.5}%`;
-      media.style.transform = `scale(${assignedImage.zoom})`;
+      media.style.position = "absolute";
+
+      const source = getSourceDimensions(assignedImage.previewUrl, slotRect.w, slotRect.h);
+      const placement = computeImagePlacement(
+        slotRect.w,
+        slotRect.h,
+        source.width,
+        source.height,
+        assignedImage.zoom,
+        assignedImage.panX,
+        assignedImage.panY
+      );
+      media.style.left = `${placement.drawX}px`;
+      media.style.top = `${placement.drawY}px`;
+      media.style.width = `${placement.drawW}px`;
+      media.style.height = `${placement.drawH}px`;
+
+      media.addEventListener("load", () => {
+        if (media.naturalWidth > 0 && media.naturalHeight > 0) {
+          const cacheKey = String(assignedImage.previewUrl || "");
+          const previous = previewImageMetaCache.get(cacheKey);
+          const next = {
+            width: media.naturalWidth,
+            height: media.naturalHeight,
+          };
+          const changed = !previous || previous.width !== next.width || previous.height !== next.height;
+          if (changed) {
+            previewImageMetaCache.set(cacheKey, next);
+            renderStage();
+          }
+        }
+      });
 
       media.addEventListener("pointerdown", (event) => {
         selectedSlotIndex = slotIndex;
         const rect = slotEl.getBoundingClientRect();
+        const activeSource = getSourceDimensions(assignedImage.previewUrl, rect.width, rect.height);
+        const activePlacement = computeImagePlacement(
+          rect.width,
+          rect.height,
+          activeSource.width,
+          activeSource.height,
+          assignedImage.zoom,
+          assignedImage.panX,
+          assignedImage.panY
+        );
         dragState = {
           slotIndex,
           pointerId: event.pointerId,
@@ -611,8 +694,8 @@ function renderStage() {
           startY: event.clientY,
           startPanX: assignedImage.panX,
           startPanY: assignedImage.panY,
-          width: rect.width || 1,
-          height: rect.height || 1,
+          maxOffsetX: activePlacement.maxOffsetX,
+          maxOffsetY: activePlacement.maxOffsetY,
         };
         media.setPointerCapture(event.pointerId);
       });
@@ -624,15 +707,34 @@ function renderStage() {
         if (!image) {
           return;
         }
-        const deltaX = ((event.clientX - dragState.startX) / dragState.width) * 100;
-        const deltaY = ((event.clientY - dragState.startY) / dragState.height) * 100;
-        image.panX = clamp(dragState.startPanX + deltaX, -PAN_LIMIT, PAN_LIMIT);
-        image.panY = clamp(dragState.startPanY + deltaY, -PAN_LIMIT, PAN_LIMIT);
-        media.style.objectPosition = `${50 - image.panX * 0.5}% ${50 - image.panY * 0.5}%`;
-        media.style.transform = `scale(${image.zoom})`;
+        const deltaPxX = event.clientX - dragState.startX;
+        const deltaPxY = event.clientY - dragState.startY;
+        const deltaPanX =
+          dragState.maxOffsetX > 0 ? (deltaPxX / dragState.maxOffsetX) * PAN_LIMIT : 0;
+        const deltaPanY =
+          dragState.maxOffsetY > 0 ? (deltaPxY / dragState.maxOffsetY) * PAN_LIMIT : 0;
+        image.panX = clamp(dragState.startPanX + deltaPanX, -PAN_LIMIT, PAN_LIMIT);
+        image.panY = clamp(dragState.startPanY + deltaPanY, -PAN_LIMIT, PAN_LIMIT);
+
+        const liveRect = slotEl.getBoundingClientRect();
+        const liveSource = getSourceDimensions(image.previewUrl, liveRect.width, liveRect.height);
+        const livePlacement = computeImagePlacement(
+          liveRect.width,
+          liveRect.height,
+          liveSource.width,
+          liveSource.height,
+          image.zoom,
+          image.panX,
+          image.panY
+        );
+        media.style.left = `${livePlacement.drawX}px`;
+        media.style.top = `${livePlacement.drawY}px`;
+        media.style.width = `${livePlacement.drawW}px`;
+        media.style.height = `${livePlacement.drawH}px`;
         if (slotIndex === selectedSlotIndex) {
           updateAdjustControls();
         }
+        invalidateOutput();
       });
       const clearDrag = () => {
         dragState = null;
@@ -712,13 +814,11 @@ function drawImageIntoSlot(ctx, img, slot, transform, cornerRadiusPx = 0) {
   const panX = clamp(Number(transform.panX) || 0, -PAN_LIMIT, PAN_LIMIT);
   const panY = clamp(Number(transform.panY) || 0, -PAN_LIMIT, PAN_LIMIT);
 
-  const baseScale = Math.max(slotW / img.width, slotH / img.height);
-  const drawW = img.width * baseScale * zoom;
-  const drawH = img.height * baseScale * zoom;
-  const overflowX = Math.max(0, drawW - slotW);
-  const overflowY = Math.max(0, drawH - slotH);
-  const drawX = slotX + (slotW - drawW) / 2 + (overflowX / 2) * (panX / PAN_LIMIT);
-  const drawY = slotY + (slotH - drawH) / 2 + (overflowY / 2) * (panY / PAN_LIMIT);
+  const placement = computeImagePlacement(slotW, slotH, img.width, img.height, zoom, panX, panY);
+  const drawW = placement.drawW;
+  const drawH = placement.drawH;
+  const drawX = slotX + placement.drawX;
+  const drawY = slotY + placement.drawY;
 
   ctx.save();
   ctx.beginPath();
