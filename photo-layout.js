@@ -948,8 +948,8 @@ async function generateOutput() {
       URL.revokeObjectURL(latestOutputUrl);
     }
     latestOutputUrl = URL.createObjectURL(blob);
-    outputPreviewImage.src = latestOutputUrl;
-    outputPreviewImage.hidden = false;
+    outputPreviewImage.removeAttribute("src");
+    outputPreviewImage.hidden = true;
     setExportStatus(`Output ready (${EXPORT_WIDTH}px wide PNG).`);
     return blob;
   } catch (error) {
