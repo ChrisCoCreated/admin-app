@@ -28,6 +28,24 @@ const LAYOUTS = [
     ],
   },
   {
+    id: "stacked_two",
+    name: "Stacked Two",
+    aspect: 1.25,
+    slots: [
+      { x: 0, y: 0, w: 1, h: 0.5 },
+      { x: 0, y: 0.5, w: 1, h: 0.5 },
+    ],
+  },
+  {
+    id: "feature_two",
+    name: "Feature Two",
+    aspect: 1.5,
+    slots: [
+      { x: 0, y: 0, w: 0.62, h: 1 },
+      { x: 0.62, y: 0, w: 0.38, h: 1 },
+    ],
+  },
+  {
     id: "feature_three",
     name: "Feature Three",
     aspect: 1.3333,
@@ -35,6 +53,26 @@ const LAYOUTS = [
       { x: 0, y: 0, w: 1, h: 0.55 },
       { x: 0, y: 0.55, w: 0.5, h: 0.45 },
       { x: 0.5, y: 0.55, w: 0.5, h: 0.45 },
+    ],
+  },
+  {
+    id: "columns_three",
+    name: "Columns Three",
+    aspect: 1.5,
+    slots: [
+      { x: 0, y: 0, w: 1 / 3, h: 1 },
+      { x: 1 / 3, y: 0, w: 1 / 3, h: 1 },
+      { x: 2 / 3, y: 0, w: 1 / 3, h: 1 },
+    ],
+  },
+  {
+    id: "side_stack_three",
+    name: "Side Stack Three",
+    aspect: 1.4,
+    slots: [
+      { x: 0, y: 0, w: 0.58, h: 1 },
+      { x: 0.58, y: 0, w: 0.42, h: 0.5 },
+      { x: 0.58, y: 0.5, w: 0.42, h: 0.5 },
     ],
   },
   {
@@ -46,6 +84,28 @@ const LAYOUTS = [
       { x: 0.5, y: 0, w: 0.5, h: 0.5 },
       { x: 0, y: 0.5, w: 0.5, h: 0.5 },
       { x: 0.5, y: 0.5, w: 0.5, h: 0.5 },
+    ],
+  },
+  {
+    id: "feature_four_left",
+    name: "Feature Four Left",
+    aspect: 1.4,
+    slots: [
+      { x: 0, y: 0, w: 0.58, h: 1 },
+      { x: 0.58, y: 0, w: 0.42, h: 0.4 },
+      { x: 0.58, y: 0.4, w: 0.21, h: 0.6 },
+      { x: 0.79, y: 0.4, w: 0.21, h: 0.6 },
+    ],
+  },
+  {
+    id: "banner_four",
+    name: "Banner Four",
+    aspect: 1.45,
+    slots: [
+      { x: 0, y: 0, w: 1, h: 0.58 },
+      { x: 0, y: 0.58, w: 1 / 3, h: 0.42 },
+      { x: 1 / 3, y: 0.58, w: 1 / 3, h: 0.42 },
+      { x: 2 / 3, y: 0.58, w: 1 / 3, h: 0.42 },
     ],
   },
   {
@@ -61,6 +121,30 @@ const LAYOUTS = [
     ],
   },
   {
+    id: "strip_five",
+    name: "Strip Five",
+    aspect: 1.6,
+    slots: [
+      { x: 0, y: 0, w: 1 / 3, h: 0.55 },
+      { x: 1 / 3, y: 0, w: 1 / 3, h: 0.55 },
+      { x: 2 / 3, y: 0, w: 1 / 3, h: 0.55 },
+      { x: 0, y: 0.55, w: 0.5, h: 0.45 },
+      { x: 0.5, y: 0.55, w: 0.5, h: 0.45 },
+    ],
+  },
+  {
+    id: "feature_five_right",
+    name: "Feature Five Right",
+    aspect: 1.45,
+    slots: [
+      { x: 0, y: 0, w: 0.35, h: 0.5 },
+      { x: 0, y: 0.5, w: 0.35, h: 0.5 },
+      { x: 0.35, y: 0, w: 0.65, h: 0.64 },
+      { x: 0.35, y: 0.64, w: 0.325, h: 0.36 },
+      { x: 0.675, y: 0.64, w: 0.325, h: 0.36 },
+    ],
+  },
+  {
     id: "grid_six",
     name: "Grid Six",
     aspect: 1.5,
@@ -71,6 +155,32 @@ const LAYOUTS = [
       { x: 0, y: 0.5, w: 1 / 3, h: 0.5 },
       { x: 1 / 3, y: 0.5, w: 1 / 3, h: 0.5 },
       { x: 2 / 3, y: 0.5, w: 1 / 3, h: 0.5 },
+    ],
+  },
+  {
+    id: "columns_six",
+    name: "Columns Six",
+    aspect: 1.35,
+    slots: [
+      { x: 0, y: 0, w: 0.5, h: 1 / 3 },
+      { x: 0, y: 1 / 3, w: 0.5, h: 1 / 3 },
+      { x: 0, y: 2 / 3, w: 0.5, h: 1 / 3 },
+      { x: 0.5, y: 0, w: 0.5, h: 1 / 3 },
+      { x: 0.5, y: 1 / 3, w: 0.5, h: 1 / 3 },
+      { x: 0.5, y: 2 / 3, w: 0.5, h: 1 / 3 },
+    ],
+  },
+  {
+    id: "feature_six",
+    name: "Feature Six",
+    aspect: 1.5,
+    slots: [
+      { x: 0, y: 0, w: 0.5, h: 0.66 },
+      { x: 0.5, y: 0, w: 0.25, h: 0.33 },
+      { x: 0.75, y: 0, w: 0.25, h: 0.33 },
+      { x: 0.5, y: 0.33, w: 0.5, h: 0.33 },
+      { x: 0, y: 0.66, w: 1 / 3, h: 0.34 },
+      { x: 1 / 3, y: 0.66, w: 2 / 3, h: 0.34 },
     ],
   },
 ];
