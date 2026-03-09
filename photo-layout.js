@@ -223,24 +223,20 @@ function isImagePhoto(photo) {
 }
 
 function getActiveLayout() {
-  const layout = LAYOUTS.find((item) => item.id === activeLayoutId) || LAYOUTS[0];
-  return {
-    ...layout,
-    aspect: getLayoutAspect(layout),
-  };
+  return LAYOUTS.find((item) => item.id === activeLayoutId) || LAYOUTS[0];
 }
 
-function getLayoutAspect(layout) {
+function getImageAspectRatioMode() {
   if (activeAspectMode === "square") {
     return 1;
   }
   if (activeAspectMode === "portrait") {
-    return 0.8;
+    return 4 / 5;
   }
   if (activeAspectMode === "landscape") {
-    return 1.5;
+    return 3 / 2;
   }
-  return Number(layout?.aspect) || 1.3;
+  return null;
 }
 
 function renderLayoutAspectPicker() {
@@ -401,7 +397,7 @@ function renderLayoutPicker() {
 
     const mini = document.createElement("div");
     mini.className = "layout-thumb-canvas";
-    mini.style.setProperty("--layout-thumb-aspect", String(getLayoutAspect(layout)));
+    mini.style.setProperty("--layout-thumb-aspect", String(layout.aspect));
     for (const slot of layout.slots) {
       const cell = document.createElement("span");
       cell.className = "layout-thumb-slot";
@@ -444,17 +440,33 @@ function computeImagePlacement(slotWidth, slotHeight, imageWidth, imageHeight, z
   const safePanX = clamp(Number(panX) || 0, -PAN_LIMIT, PAN_LIMIT);
   const safePanY = clamp(Number(panY) || 0, -PAN_LIMIT, PAN_LIMIT);
 
-  const baseScale = Math.max(safeSlotWidth / safeImageWidth, safeSlotHeight / safeImageHeight);
+  const targetAspect = getImageAspectRatioMode();
+  let frameX = 0;
+  let frameY = 0;
+  let frameW = safeSlotWidth;
+  let frameH = safeSlotHeight;
+  if (targetAspect && Number.isFinite(targetAspect) && targetAspect > 0) {
+    const slotAspect = safeSlotWidth / safeSlotHeight;
+    if (slotAspect > targetAspect) {
+      frameH = safeSlotWidth / targetAspect;
+      frameY = (safeSlotHeight - frameH) * 0.5;
+    } else if (slotAspect < targetAspect) {
+      frameW = safeSlotHeight * targetAspect;
+      frameX = (safeSlotWidth - frameW) * 0.5;
+    }
+  }
+
+  const baseScale = Math.max(frameW / safeImageWidth, frameH / safeImageHeight);
   const drawW = safeImageWidth * baseScale * safeZoom;
   const drawH = safeImageHeight * baseScale * safeZoom;
-  const overflowX = Math.max(0, drawW - safeSlotWidth);
-  const overflowY = Math.max(0, drawH - safeSlotHeight);
+  const overflowX = Math.max(0, drawW - frameW);
+  const overflowY = Math.max(0, drawH - frameH);
   const maxOffsetX = overflowX * 0.5;
   const maxOffsetY = overflowY * 0.5;
   const offsetX = (safePanX / PAN_LIMIT) * maxOffsetX;
   const offsetY = (safePanY / PAN_LIMIT) * maxOffsetY;
-  const drawX = (safeSlotWidth - drawW) * 0.5 + offsetX;
-  const drawY = (safeSlotHeight - drawH) * 0.5 + offsetY;
+  const drawX = frameX + (frameW - drawW) * 0.5 + offsetX;
+  const drawY = frameY + (frameH - drawH) * 0.5 + offsetY;
 
   return {
     drawX,
