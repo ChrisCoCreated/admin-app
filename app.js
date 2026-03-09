@@ -11,6 +11,8 @@ const signOutBtn = document.getElementById("signOutBtn");
 const topbarActions = document.getElementById("topbarActions");
 const homeMenuSection = document.getElementById("homeMenuSection");
 const homeMenuGrid = document.getElementById("homeMenuGrid");
+const homeUserEmail = document.getElementById("homeUserEmail");
+const homeUserPermissions = document.getElementById("homeUserPermissions");
 if (authCard) {
   authCard.hidden = true;
 }
@@ -29,6 +31,12 @@ function setSignedOutUi() {
   }
   if (homeMenuGrid) {
     homeMenuGrid.innerHTML = "";
+  }
+  if (homeUserEmail) {
+    homeUserEmail.textContent = "";
+  }
+  if (homeUserPermissions) {
+    homeUserPermissions.textContent = "";
   }
   if (topbarActions) {
     topbarActions.hidden = true;
@@ -72,6 +80,22 @@ function renderHomeMenu(role) {
   }
 }
 
+function renderUserSummary(profile) {
+  const role = String(profile?.role || "").trim().toLowerCase();
+  const email = String(profile?.email || "").trim();
+  const pageLabels = getAccessiblePages(role)
+    .map((pageKey) => getPageMeta(pageKey)?.label)
+    .filter(Boolean);
+
+  if (homeUserEmail) {
+    homeUserEmail.textContent = email ? `Signed in as: ${email}` : "Signed in.";
+  }
+  if (homeUserPermissions) {
+    const permissions = pageLabels.length ? pageLabels.join(", ") : "None";
+    homeUserPermissions.textContent = `Permissions: ${permissions}`;
+  }
+}
+
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
@@ -101,6 +125,7 @@ async function renderRoleMenu() {
     return;
   }
   setSignedInUi();
+  renderUserSummary(profile);
   renderHomeMenu(role);
 }
 
