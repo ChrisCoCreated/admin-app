@@ -11,7 +11,15 @@ const DEFAULT_RADIUS_PX = 36;
 const CLIENT_LIST_CACHE_KEY = "photoLayoutClientListV1";
 const CLIENT_LIST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const ALL_CLIENTS_VALUE = "__all_clients__";
-const LAYOUT_BACKGROUND_COLORS = new Set(["#ffffff", "#31b7c8", "#c9439b", "#6c3ed1", "#49cfbf", "#030303"]);
+const LAYOUT_BACKGROUND_COLORS = new Set([
+  "#ffffff",
+  "#000000",
+  "#1db9d2",
+  "#6d3ac6",
+  "#ce3f8f",
+  "#3aceac",
+  "#ffd23f",
+]);
 
 const LAYOUTS = [
   {
