@@ -11,6 +11,7 @@ const DEFAULT_RADIUS_PX = 36;
 const CLIENT_LIST_CACHE_KEY = "photoLayoutClientListV1";
 const CLIENT_LIST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const ALL_CLIENTS_VALUE = "__all_clients__";
+const LAYOUT_BACKGROUND_COLORS = new Set(["#ffffff", "#31b7c8", "#c9439b", "#6c3ed1", "#49cfbf", "#030303"]);
 
 const LAYOUTS = [
   {
@@ -233,6 +234,7 @@ const gapValue = document.getElementById("gapValue");
 const roundedEnabledInput = document.getElementById("roundedEnabled");
 const cornerRadiusRange = document.getElementById("cornerRadiusRange");
 const cornerRadiusValue = document.getElementById("cornerRadiusValue");
+const backgroundColorSelect = document.getElementById("backgroundColorSelect");
 const generateOutputBtn = document.getElementById("generateOutputBtn");
 const copyOutputBtn = document.getElementById("copyOutputBtn");
 const saveOutputBtn = document.getElementById("saveOutputBtn");
@@ -257,6 +259,7 @@ let dragState = null;
 let latestOutputBlob = null;
 let latestOutputUrl = "";
 const layoutStyle = {
+  backgroundColor: "#ffffff",
   gapEnabled: true,
   gapPx: DEFAULT_GAP_PX,
   roundedEnabled: true,
@@ -775,7 +778,15 @@ function getExportCornerRadiusPx() {
   return layoutStyle.roundedEnabled ? clamp(layoutStyle.cornerRadiusPx, 0, 240) : 0;
 }
 
+function getExportBackgroundColor() {
+  const candidate = String(layoutStyle.backgroundColor || "").trim().toLowerCase();
+  return LAYOUT_BACKGROUND_COLORS.has(candidate) ? candidate : "#ffffff";
+}
+
 function updateStyleControls() {
+  if (backgroundColorSelect) {
+    backgroundColorSelect.value = getExportBackgroundColor();
+  }
   if (gapEnabledInput) {
     gapEnabledInput.checked = layoutStyle.gapEnabled;
   }
@@ -878,6 +889,7 @@ function renderStage() {
   const layout = getActiveLayout();
   layoutStage.innerHTML = "";
   layoutStage.style.setProperty("--layout-stage-aspect", String(layout.aspect));
+  layoutStage.style.background = getExportBackgroundColor();
   const stageWidth = layoutStage.clientWidth || layoutStage.getBoundingClientRect().width || 1;
   const stageHeight = layoutStage.clientHeight || stageWidth / layout.aspect || 1;
   const previewScale = stageWidth / EXPORT_WIDTH;
@@ -1162,7 +1174,7 @@ async function buildOutputCanvas() {
     throw new Error("Could not initialize output canvas.");
   }
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = getExportBackgroundColor();
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const renderableSlots = Math.min(layout.slots.length, selectedImages.length);
@@ -1441,6 +1453,14 @@ roundedEnabledInput?.addEventListener("change", () => {
 
 cornerRadiusRange?.addEventListener("input", () => {
   layoutStyle.cornerRadiusPx = clamp(Number(cornerRadiusRange.value) || 0, 0, 240);
+  invalidateOutput();
+  updateStyleControls();
+  renderStage();
+});
+
+backgroundColorSelect?.addEventListener("change", () => {
+  const candidate = String(backgroundColorSelect.value || "").trim().toLowerCase();
+  layoutStyle.backgroundColor = LAYOUT_BACKGROUND_COLORS.has(candidate) ? candidate : "#ffffff";
   invalidateOutput();
   updateStyleControls();
   renderStage();
