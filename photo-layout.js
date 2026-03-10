@@ -1265,6 +1265,18 @@ function canvasToBlob(canvas) {
   });
 }
 
+function setGenerateLoadingState(activeAction) {
+  const isLoading = Boolean(activeAction);
+  const actions = [copyOutputBtn, saveOutputBtn];
+  actions.forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.disabled = isLoading;
+    button.classList.toggle("is-generating", isLoading && button.id === activeAction);
+  });
+}
+
 async function generateOutput() {
   if (!selectedImages.length) {
     setExportStatus("Select at least one image first.", true);
@@ -1296,7 +1308,12 @@ async function generateOutput() {
 async function copyOutput() {
   let blob = latestOutputBlob;
   if (!blob) {
-    blob = await generateOutput();
+    setGenerateLoadingState("copyOutputBtn");
+    try {
+      blob = await generateOutput();
+    } finally {
+      setGenerateLoadingState("");
+    }
   }
   if (!blob) {
     return;
@@ -1317,7 +1334,12 @@ async function copyOutput() {
 async function saveOutput() {
   let blob = latestOutputBlob;
   if (!blob) {
-    blob = await generateOutput();
+    setGenerateLoadingState("saveOutputBtn");
+    try {
+      blob = await generateOutput();
+    } finally {
+      setGenerateLoadingState("");
+    }
   }
   if (!blob) {
     return;
