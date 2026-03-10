@@ -33,19 +33,25 @@
       </section>
 
       <section class="panel">
-        <h2>Contract Capacity</h2>
-        <p class="muted">Choose a month range, then open the report in OneTouch.</p>
+        <h2>Capacity Reports</h2>
+        <p class="muted">Choose a period, then open either report in OneTouch.</p>
         <div class="row wrap-row">
-          <label class="field" for="monthPresetSelect">
-            Month
-            <select id="monthPresetSelect">
-              <option value="last">Last month</option>
-              <option value="this" selected>This month</option>
-              <option value="next">Next month</option>
+          <label class="field" for="periodPresetSelect">
+            Period
+            <select id="periodPresetSelect">
+              <option value="this_month" selected>This month</option>
+              <option value="last_month">Last month</option>
+              <option value="next_month">Next month</option>
+              <option value="this_week">This week (Mon-Sun)</option>
+              <option value="last_week">Last week (Mon-Sun)</option>
+              <option value="next_week">Next week (Mon-Sun)</option>
             </select>
           </label>
           <a id="contractCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
             >Open Contract Capacity</a
+          >
+          <a id="availabilityCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
+            >Open Availability Capacity</a
           >
         </div>
         <p id="dateRangeMessage" class="muted row-note"></p>

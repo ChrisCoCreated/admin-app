@@ -5,11 +5,13 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
-const monthPresetSelect = document.getElementById("monthPresetSelect");
+const periodPresetSelect = document.getElementById("periodPresetSelect");
 const contractCapacityLink = document.getElementById("contractCapacityLink");
+const availabilityCapacityLink = document.getElementById("availabilityCapacityLink");
 const dateRangeMessage = document.getElementById("dateRangeMessage");
 
 const CONTRACT_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/contractCapacity.php";
+const AVAILABILITY_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/availabilityCapacity.php";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -34,41 +36,78 @@ function formatDateParam(date) {
   return `${day}-${month}-${year}`;
 }
 
-function getMonthOffsetForPreset(preset) {
-  if (preset === "last") {
-    return -1;
-  }
-  if (preset === "next") {
-    return 1;
-  }
-  return 0;
+function toStartOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-function getMonthRangeForPreset(preset) {
+function getMondayOfWeek(baseDate) {
+  const date = toStartOfDay(baseDate);
+  const day = date.getDay();
+  const daysSinceMonday = (day + 6) % 7;
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - daysSinceMonday);
+}
+
+function addDays(baseDate, days) {
+  return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + days);
+}
+
+function getDateRangeForPreset(preset) {
   const today = new Date();
-  const monthOffset = getMonthOffsetForPreset(preset);
-  const year = today.getFullYear();
-  const month = today.getMonth() + monthOffset;
 
-  const start = new Date(year, month, 1);
-  const end = new Date(year, month + 1, 0);
+  if (preset === "last_month" || preset === "this_month" || preset === "next_month") {
+    let monthOffset = 0;
+    if (preset === "last_month") {
+      monthOffset = -1;
+    }
+    if (preset === "next_month") {
+      monthOffset = 1;
+    }
 
+    const year = today.getFullYear();
+    const month = today.getMonth() + monthOffset;
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+    return { start, end };
+  }
+
+  const thisWeekMonday = getMondayOfWeek(today);
+  if (preset === "last_week") {
+    const start = addDays(thisWeekMonday, -7);
+    const end = addDays(start, 6);
+    return { start, end };
+  }
+  if (preset === "next_week") {
+    const start = addDays(thisWeekMonday, 7);
+    const end = addDays(start, 6);
+    return { start, end };
+  }
+  const start = thisWeekMonday;
+  const end = addDays(start, 6);
   return { start, end };
 }
 
-function updateContractCapacityLink() {
-  const preset = String(monthPresetSelect?.value || "this").trim().toLowerCase();
-  const { start, end } = getMonthRangeForPreset(preset);
+function buildCapacityUrl(baseUrl, start, end) {
   const datePickSt = formatDateParam(start);
   const datePickFn = formatDateParam(end);
 
-  const url = new URL(CONTRACT_CAPACITY_BASE_URL);
+  const url = new URL(baseUrl);
   url.searchParams.set("datePickSt", datePickSt);
   url.searchParams.set("datePickFn", datePickFn);
   url.searchParams.set("hoursCapacity", "hours");
+  return url.toString();
+}
+
+function updateCapacityLinks() {
+  const preset = String(periodPresetSelect?.value || "this_month").trim().toLowerCase();
+  const { start, end } = getDateRangeForPreset(preset);
+  const datePickSt = formatDateParam(start);
+  const datePickFn = formatDateParam(end);
 
   if (contractCapacityLink) {
-    contractCapacityLink.href = url.toString();
+    contractCapacityLink.href = buildCapacityUrl(CONTRACT_CAPACITY_BASE_URL, start, end);
+  }
+  if (availabilityCapacityLink) {
+    availabilityCapacityLink.href = buildCapacityUrl(AVAILABILITY_CAPACITY_BASE_URL, start, end);
   }
   if (dateRangeMessage) {
     dateRangeMessage.textContent = `Date range: ${datePickSt} to ${datePickFn}`;
@@ -100,10 +139,10 @@ async function init() {
     const email = String(profile?.email || "").trim();
     setStatus(email ? `Signed in as ${email}` : "Signed in");
 
-    if (monthPresetSelect) {
-      monthPresetSelect.value = "this";
+    if (periodPresetSelect) {
+      periodPresetSelect.value = "this_month";
     }
-    updateContractCapacityLink();
+    updateCapacityLinks();
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("reports");
@@ -116,8 +155,8 @@ async function init() {
   }
 }
 
-monthPresetSelect?.addEventListener("change", () => {
-  updateContractCapacityLink();
+periodPresetSelect?.addEventListener("change", () => {
+  updateCapacityLinks();
 });
 
 signOutBtn?.addEventListener("click", async () => {
