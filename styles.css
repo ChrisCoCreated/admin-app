@@ -517,6 +517,25 @@ dd {
   margin-top: 12px;
 }
 
+.reports-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.report-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fbfcff;
+}
+
+.report-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
 .consent-filter-btn.active {
   background: #1f3c88;
   color: #fff;

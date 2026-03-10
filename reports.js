@@ -8,10 +8,12 @@ const statusMessage = document.getElementById("statusMessage");
 const periodPresetSelect = document.getElementById("periodPresetSelect");
 const contractCapacityLink = document.getElementById("contractCapacityLink");
 const availabilityCapacityLink = document.getElementById("availabilityCapacityLink");
+const areaCapacityLink = document.getElementById("areaCapacityLink");
 const dateRangeMessage = document.getElementById("dateRangeMessage");
 
 const CONTRACT_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/contractCapacity.php";
 const AVAILABILITY_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/availabilityCapacity.php";
+const AREA_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/areaCapacity.php";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -97,6 +99,16 @@ function buildCapacityUrl(baseUrl, start, end) {
   return url.toString();
 }
 
+function buildAreaCapacityUrl(start, end) {
+  const datePickSt = formatDateParam(start);
+  const datePickFn = formatDateParam(end);
+
+  const url = new URL(AREA_CAPACITY_BASE_URL);
+  url.searchParams.set("datePickSt", datePickSt);
+  url.searchParams.set("datePickFn", datePickFn);
+  return url.toString();
+}
+
 function updateCapacityLinks() {
   const preset = String(periodPresetSelect?.value || "this_month").trim().toLowerCase();
   const { start, end } = getDateRangeForPreset(preset);
@@ -108,6 +120,9 @@ function updateCapacityLinks() {
   }
   if (availabilityCapacityLink) {
     availabilityCapacityLink.href = buildCapacityUrl(AVAILABILITY_CAPACITY_BASE_URL, start, end);
+  }
+  if (areaCapacityLink) {
+    areaCapacityLink.href = buildAreaCapacityUrl(start, end);
   }
   if (dateRangeMessage) {
     dateRangeMessage.textContent = `Date range: ${datePickSt} to ${datePickFn}`;

@@ -34,7 +34,7 @@
 
       <section class="panel">
         <h2>Capacity Reports</h2>
-        <p class="muted">Choose a period, then open either report in OneTouch.</p>
+        <p class="muted">Choose a period, then open a report in OneTouch.</p>
         <div class="row wrap-row">
           <label class="field" for="periodPresetSelect">
             Period
@@ -47,14 +47,69 @@
               <option value="next_week">Next week (Mon-Sun)</option>
             </select>
           </label>
-          <a id="contractCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
-            >Open Contract Capacity</a
-          >
-          <a id="availabilityCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
-            >Open Availability Capacity</a
-          >
         </div>
         <p id="dateRangeMessage" class="muted row-note"></p>
+
+        <div class="reports-grid">
+          <article class="report-card">
+            <h3>Availability Capacity Analysis</h3>
+            <p class="muted">Shows how much of each carer&apos;s available working time is currently scheduled.</p>
+            <p class="muted row-note">Use this report to:</p>
+            <ul class="linked-list">
+              <li>Find carers with spare availability</li>
+              <li>Avoid over-scheduling staff</li>
+              <li>Assign extra visits or runs</li>
+              <li>Monitor carer workload balance</li>
+            </ul>
+            <p class="row">
+              <a id="availabilityCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
+                >Open Availability Capacity</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Area Capacity Analysis</h3>
+            <p class="muted">
+              Shows total care capacity across geographical areas by comparing staff availability with scheduled care
+              hours.
+            </p>
+            <p class="muted row-note">Use this report to:</p>
+            <ul class="linked-list">
+              <li>Check if an area has enough carers</li>
+              <li>Identify staff shortages</li>
+              <li>Decide whether you can accept new clients</li>
+              <li>Plan recruitment by location</li>
+            </ul>
+            <p class="row">
+              <a id="areaCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
+                >Open Area Capacity Analysis</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Contract Capacity</h3>
+            <p class="muted">Compares carers&apos; contracted weekly hours with the hours they are currently scheduled.</p>
+            <p class="muted row-note">Use this report to:</p>
+            <ul class="linked-list">
+              <li>Ensure staff receive their contracted hours</li>
+              <li>Identify under-utilised carers</li>
+              <li>Balance workloads across the team</li>
+              <li>Allocate additional shifts where needed</li>
+            </ul>
+            <p class="row">
+              <a id="contractCapacityLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer"
+                >Open Contract Capacity</a
+              >
+            </p>
+          </article>
+        </div>
+
+        <p class="muted row-note">
+          These reports help managers monitor staff availability, workload, and service capacity to support better
+          scheduling and workforce planning.
+        </p>
       </section>
     </main>
 
