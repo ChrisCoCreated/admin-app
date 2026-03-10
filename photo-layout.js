@@ -234,7 +234,7 @@ const gapValue = document.getElementById("gapValue");
 const roundedEnabledInput = document.getElementById("roundedEnabled");
 const cornerRadiusRange = document.getElementById("cornerRadiusRange");
 const cornerRadiusValue = document.getElementById("cornerRadiusValue");
-const backgroundColorSelect = document.getElementById("backgroundColorSelect");
+const backgroundColorPicker = document.getElementById("backgroundColorPicker");
 const generateOutputBtn = document.getElementById("generateOutputBtn");
 const copyOutputBtn = document.getElementById("copyOutputBtn");
 const saveOutputBtn = document.getElementById("saveOutputBtn");
@@ -783,9 +783,20 @@ function getExportBackgroundColor() {
   return LAYOUT_BACKGROUND_COLORS.has(candidate) ? candidate : "#ffffff";
 }
 
+function isNonWhiteBackground() {
+  return getExportBackgroundColor() !== "#ffffff";
+}
+
 function updateStyleControls() {
-  if (backgroundColorSelect) {
-    backgroundColorSelect.value = getExportBackgroundColor();
+  if (backgroundColorPicker) {
+    const active = getExportBackgroundColor();
+    const swatches = backgroundColorPicker.querySelectorAll(".layout-color-swatch[data-color]");
+    swatches.forEach((swatch) => {
+      const swatchColor = String(swatch.getAttribute("data-color") || "").trim().toLowerCase();
+      const selected = swatchColor === active;
+      swatch.classList.toggle("active", selected);
+      swatch.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
   }
   if (gapEnabledInput) {
     gapEnabledInput.checked = layoutStyle.gapEnabled;
@@ -889,18 +900,31 @@ function renderStage() {
   const layout = getActiveLayout();
   layoutStage.innerHTML = "";
   layoutStage.style.setProperty("--layout-stage-aspect", String(layout.aspect));
-  layoutStage.style.background = getExportBackgroundColor();
+  const backgroundColor = getExportBackgroundColor();
   const stageWidth = layoutStage.clientWidth || layoutStage.getBoundingClientRect().width || 1;
   const stageHeight = layoutStage.clientHeight || stageWidth / layout.aspect || 1;
   const previewScale = stageWidth / EXPORT_WIDTH;
   const previewGapPx = getExportGapPx() * previewScale;
   const previewCornerRadiusPx = getExportCornerRadiusPx() * previewScale;
+  const nonWhiteBackground = isNonWhiteBackground();
+  const outerPaddingPx = nonWhiteBackground ? previewGapPx : 0;
+  const innerWidth = Math.max(1, stageWidth - outerPaddingPx * 2);
+  const innerHeight = Math.max(1, stageHeight - outerPaddingPx * 2);
+
+  layoutStage.style.background = nonWhiteBackground ? backgroundColor : "#e9eff8";
+  layoutStage.style.borderRadius = `${nonWhiteBackground ? previewCornerRadiusPx : 8}px`;
 
   layout.slots.forEach((slot, slotIndex) => {
     const slotEl = document.createElement("div");
     const assignedImage = selectedImages[slotIndex];
     const neighborFlags = getSlotNeighborFlags(layout.slots, slotIndex);
-    const slotRect = computeAdjustedSlotRect(slot, neighborFlags, stageWidth, stageHeight, previewGapPx);
+    const slotRectBase = computeAdjustedSlotRect(slot, neighborFlags, innerWidth, innerHeight, previewGapPx);
+    const slotRect = {
+      x: slotRectBase.x + outerPaddingPx,
+      y: slotRectBase.y + outerPaddingPx,
+      w: slotRectBase.w,
+      h: slotRectBase.h,
+    };
     slotEl.className = `layout-slot${slotIndex === selectedSlotIndex ? " active" : ""}${assignedImage ? " has-image" : ""}`;
     slotEl.style.left = `${slotRect.x}px`;
     slotEl.style.top = `${slotRect.y}px`;
@@ -1174,12 +1198,28 @@ async function buildOutputCanvas() {
     throw new Error("Could not initialize output canvas.");
   }
 
-  ctx.fillStyle = getExportBackgroundColor();
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const renderableSlots = Math.min(layout.slots.length, selectedImages.length);
+  const backgroundColor = getExportBackgroundColor();
+  const nonWhiteBackground = isNonWhiteBackground();
   const gapPx = getExportGapPx();
   const cornerRadiusPx = getExportCornerRadiusPx();
+  const outerPaddingPx = nonWhiteBackground ? gapPx : 0;
+  const innerWidth = Math.max(1, canvas.width - outerPaddingPx * 2);
+  const innerHeight = Math.max(1, canvas.height - outerPaddingPx * 2);
+
+  if (nonWhiteBackground) {
+    ctx.save();
+    ctx.beginPath();
+    drawRoundedRectPath(ctx, 0, 0, canvas.width, canvas.height, cornerRadiusPx);
+    ctx.clip();
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  const renderableSlots = Math.min(layout.slots.length, selectedImages.length);
   for (let index = 0; index < renderableSlots; index += 1) {
     const imageState = selectedImages[index];
     const sourceCandidates = Array.isArray(imageState?.sourceCandidates) ? imageState.sourceCandidates : [];
@@ -1189,7 +1229,13 @@ async function buildOutputCanvas() {
     const img = await loadExportImage(sourceCandidates);
     const slot = layout.slots[index];
     const neighborFlags = getSlotNeighborFlags(layout.slots, index);
-    const slotRect = computeAdjustedSlotRect(slot, neighborFlags, canvas.width, canvas.height, gapPx);
+    const slotRectBase = computeAdjustedSlotRect(slot, neighborFlags, innerWidth, innerHeight, gapPx);
+    const slotRect = {
+      x: slotRectBase.x + outerPaddingPx,
+      y: slotRectBase.y + outerPaddingPx,
+      w: slotRectBase.w,
+      h: slotRectBase.h,
+    };
     drawImageIntoSlot(
       ctx,
       img,
@@ -1458,8 +1504,12 @@ cornerRadiusRange?.addEventListener("input", () => {
   renderStage();
 });
 
-backgroundColorSelect?.addEventListener("change", () => {
-  const candidate = String(backgroundColorSelect.value || "").trim().toLowerCase();
+backgroundColorPicker?.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target.closest(".layout-color-swatch[data-color]") : null;
+  if (!target) {
+    return;
+  }
+  const candidate = String(target.getAttribute("data-color") || "").trim().toLowerCase();
   layoutStyle.backgroundColor = LAYOUT_BACKGROUND_COLORS.has(candidate) ? candidate : "#ffffff";
   invalidateOutput();
   updateStyleControls();

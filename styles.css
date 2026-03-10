@@ -891,6 +891,32 @@ body.lightbox-open {
   padding: 0;
 }
 
+.layout-color-picker {
+  margin-top: 6px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.layout-color-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #c8d4e9;
+  background: var(--swatch, #ffffff);
+  padding: 0;
+}
+
+.layout-color-swatch.active {
+  border-color: #214c9d;
+  box-shadow: 0 0 0 2px rgba(33, 76, 157, 0.2);
+}
+
+.layout-color-swatch:focus-visible {
+  outline: 2px solid #214c9d;
+  outline-offset: 2px;
+}
+
 .layout-style-accordion {
   border: 1px solid #d5deef;
   border-radius: 10px;

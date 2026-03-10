@@ -85,17 +85,17 @@
             </div>
             <h3>Layout Style</h3>
             <div class="layout-style-controls">
-              <label class="field" for="backgroundColorSelect">
-                Background colour
-                <select id="backgroundColorSelect">
-                  <option value="#ffffff">White</option>
-                  <option value="#31b7c8">Thrive Cyan</option>
-                  <option value="#c9439b">Thrive Pink</option>
-                  <option value="#6c3ed1">Thrive Purple</option>
-                  <option value="#49cfbf">Thrive Mint</option>
-                  <option value="#030303">Thrive Dark</option>
-                </select>
-              </label>
+              <div class="field">
+                <span>Background colour</span>
+                <div id="backgroundColorPicker" class="layout-color-picker" role="group" aria-label="Background colour">
+                  <button type="button" class="layout-color-swatch active" data-color="#ffffff" aria-label="White" style="--swatch:#ffffff"></button>
+                  <button type="button" class="layout-color-swatch" data-color="#31b7c8" aria-label="Thrive Cyan" style="--swatch:#31b7c8"></button>
+                  <button type="button" class="layout-color-swatch" data-color="#c9439b" aria-label="Thrive Pink" style="--swatch:#c9439b"></button>
+                  <button type="button" class="layout-color-swatch" data-color="#6c3ed1" aria-label="Thrive Purple" style="--swatch:#6c3ed1"></button>
+                  <button type="button" class="layout-color-swatch" data-color="#49cfbf" aria-label="Thrive Mint" style="--swatch:#49cfbf"></button>
+                  <button type="button" class="layout-color-swatch" data-color="#030303" aria-label="Thrive Dark" style="--swatch:#030303"></button>
+                </div>
+              </div>
               <label class="checkbox-row" for="gapEnabled">
                 <input id="gapEnabled" type="checkbox" checked />
                 Gap between images
