@@ -9,11 +9,15 @@ const periodPresetSelect = document.getElementById("periodPresetSelect");
 const contractCapacityLink = document.getElementById("contractCapacityLink");
 const availabilityCapacityLink = document.getElementById("availabilityCapacityLink");
 const areaCapacityLink = document.getElementById("areaCapacityLink");
+const clientHoursLink = document.getElementById("clientHoursLink");
+const carerHoursLink = document.getElementById("carerHoursLink");
 const dateRangeMessage = document.getElementById("dateRangeMessage");
 
 const CONTRACT_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/contractCapacity.php";
 const AVAILABILITY_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/availabilityCapacity.php";
 const AREA_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/areaCapacity.php";
+const CLIENT_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/clientsHoursRpt.php";
+const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -109,6 +113,28 @@ function buildAreaCapacityUrl(start, end) {
   return url.toString();
 }
 
+function buildClientHoursUrl(start, end) {
+  const startDate = formatDateParam(start);
+  const endDate = formatDateParam(end);
+
+  const url = new URL(CLIENT_HOURS_BASE_URL);
+  url.searchParams.set("selectJob", "all");
+  url.searchParams.set("startDate", startDate);
+  url.searchParams.set("endDate", endDate);
+  return url.toString();
+}
+
+function buildCarerHoursUrl(start, end) {
+  const startDate = formatDateParam(start);
+  const endDate = formatDateParam(end);
+
+  const url = new URL(CARER_HOURS_BASE_URL);
+  url.searchParams.set("jobtype", "All");
+  url.searchParams.set("start", startDate);
+  url.searchParams.set("finish", endDate);
+  return url.toString();
+}
+
 function updateCapacityLinks() {
   const preset = String(periodPresetSelect?.value || "this_month").trim().toLowerCase();
   const { start, end } = getDateRangeForPreset(preset);
@@ -123,6 +149,12 @@ function updateCapacityLinks() {
   }
   if (areaCapacityLink) {
     areaCapacityLink.href = buildAreaCapacityUrl(start, end);
+  }
+  if (clientHoursLink) {
+    clientHoursLink.href = buildClientHoursUrl(start, end);
+  }
+  if (carerHoursLink) {
+    carerHoursLink.href = buildCarerHoursUrl(start, end);
   }
   if (dateRangeMessage) {
     dateRangeMessage.textContent = `Date range: ${datePickSt} to ${datePickFn}`;
