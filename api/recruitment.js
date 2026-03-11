@@ -347,6 +347,14 @@ module.exports = async (req, res) => {
       items,
     });
   } catch (error) {
+    console.error("[recruitment] Add to OneTouch failed", {
+      itemId: normalizeText(req?.body?.itemId),
+      area: normalizeText(req?.body?.area),
+      recruitmentSource: normalizeText(req?.body?.recruitmentSource),
+      position: normalizeText(req?.body?.position),
+      statusInput: normalizeText(req?.body?.status),
+      message: error?.message || String(error),
+    });
     const mapped = mapGraphError(error);
     res.status(mapped.status).json(mapped.payload);
   }

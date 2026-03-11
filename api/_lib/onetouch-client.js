@@ -30,6 +30,16 @@ function maskValue(value) {
   return `${raw.slice(0, 2)}***${raw.slice(-1)}`;
 }
 
+function createOneTouchError({ endpoint = "", status = 0, payload = null, text = "" } = {}) {
+  const detail = payload?.error || payload?.message || text || `HTTP ${status || 0}`;
+  const error = new Error(`OneTouch request failed (${status || 0}): ${detail}`);
+  error.endpoint = endpoint;
+  error.status = status || 0;
+  error.payload = payload;
+  error.raw = text;
+  return error;
+}
+
 function getRequiredEnv() {
   const baseUrl = String(process.env.ONETOUCH_BASE_URL || DEFAULT_BASE_URL).trim().replace(/\/+$/, "");
   const username = String(process.env.ONETOUCH_USERNAME || "").trim();
@@ -315,12 +325,20 @@ async function postOneTouch(endpointPath, body = {}, query = {}) {
     if (retry.response.ok) {
       return retry.payload;
     }
-    const retryDetail = retry.payload?.error || retry.payload?.message || retry.text || `HTTP ${retry.response.status}`;
-    throw new Error(`OneTouch request failed (${retry.response.status}): ${retryDetail}`);
+    throw createOneTouchError({
+      endpoint,
+      status: retry.response.status,
+      payload: retry.payload,
+      text: retry.text,
+    });
   }
 
-  const detail = first.payload?.error || first.payload?.message || first.text || `HTTP ${first.response.status}`;
-  throw new Error(`OneTouch request failed (${first.response.status}): ${detail}`);
+  throw createOneTouchError({
+    endpoint,
+    status: first.response.status,
+    payload: first.payload,
+    text: first.text,
+  });
 }
 
 function resolveRecords(payload, explicitKeys = []) {
@@ -1033,6 +1051,7 @@ function sanitizeCarerCreatePayload(payload = {}) {
 }
 
 async function createCarer(payload = {}) {
+  const requestId = `otc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   const createPayload = sanitizeCarerCreatePayload(payload);
   const explicitLocation = asString(payload?.location);
   const explicitArea = asString(payload?.area);
@@ -1066,12 +1085,59 @@ async function createCarer(payload = {}) {
     throw new Error("OneTouch create requires candidate name.");
   }
 
-  const response = await postOneTouch("carer/create", createPayload);
+  console.info("[OneTouch] carer/create request", {
+    requestId,
+    external_id: createPayload.external_id || "",
+    firstname: createPayload.firstname || "",
+    lastname: createPayload.lastname || "",
+    area: createPayload.area || "",
+    recruitment_source: createPayload.recruitment_source || "",
+    position: createPayload.position || "",
+    status: createPayload.status || "",
+    location: createPayload.location || "",
+    town: createPayload.town || "",
+  });
+
+  let response;
+  try {
+    response = await postOneTouch("carer/create", createPayload);
+  } catch (error) {
+    console.error("[OneTouch] carer/create failed", {
+      requestId,
+      endpoint: error?.endpoint || "carer/create",
+      status: error?.status || 0,
+      payload: error?.payload ?? null,
+      message: error?.message || String(error),
+      request: {
+        external_id: createPayload.external_id || "",
+        firstname: createPayload.firstname || "",
+        lastname: createPayload.lastname || "",
+        area: createPayload.area || "",
+        recruitment_source: createPayload.recruitment_source || "",
+        position: createPayload.position || "",
+        status: createPayload.status || "",
+        location: createPayload.location || "",
+        town: createPayload.town || "",
+      },
+    });
+    const message = error?.message || "OneTouch create failed.";
+    throw new Error(`[${requestId}] ${message}`);
+  }
+
   const success = response?.success === true || response?.status === true;
   const id = asString(response?.id || response?.carer_id || response?.data?.id || response?.result?.id);
   if (!success || !id) {
+    console.error("[OneTouch] carer/create unexpected success payload", {
+      requestId,
+      payload: response,
+    });
     throw new Error("OneTouch create did not return a successful carer id.");
   }
+  console.info("[OneTouch] carer/create success", {
+    requestId,
+    id,
+    external_id: createPayload.external_id || "",
+  });
   return {
     id,
     raw: response,
