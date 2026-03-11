@@ -1050,6 +1050,21 @@ function sanitizeCarerCreatePayload(payload = {}) {
   return out;
 }
 
+function pickObjectKeys(input, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (input[key] === undefined || input[key] === null) {
+      continue;
+    }
+    const value = asString(input[key]);
+    if (!value) {
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 async function createCarer(payload = {}) {
   const requestId = `otc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   const createPayload = sanitizeCarerCreatePayload(payload);
@@ -1098,10 +1113,70 @@ async function createCarer(payload = {}) {
     town: createPayload.town || "",
   });
 
-  let response;
-  try {
-    response = await postOneTouch("carer/create", createPayload);
-  } catch (error) {
+  const attempts = [
+    { label: "full", payload: { ...createPayload } },
+    { label: "without_status", payload: (() => {
+      const copy = { ...createPayload };
+      delete copy.status;
+      return copy;
+    })() },
+    { label: "without_status_location", payload: (() => {
+      const copy = { ...createPayload };
+      delete copy.status;
+      delete copy.location;
+      return copy;
+    })() },
+    {
+      label: "minimal",
+      payload: pickObjectKeys(createPayload, [
+        "external_id",
+        "firstname",
+        "lastname",
+        "known_as",
+        "primary_email",
+        "phone_mobile",
+        "town",
+        "area",
+        "recruitment_source",
+        "position",
+        "comment",
+      ]),
+    },
+  ];
+
+  let response = null;
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      console.info("[OneTouch] carer/create attempt", {
+        requestId,
+        attempt: attempt.label,
+        keys: Object.keys(attempt.payload).sort(),
+      });
+      response = await postOneTouch("carer/create", attempt.payload);
+      console.info("[OneTouch] carer/create attempt success", {
+        requestId,
+        attempt: attempt.label,
+      });
+      break;
+    } catch (error) {
+      lastError = error;
+      const isQueryError = /query error/i.test(error?.message || "");
+      console.warn("[OneTouch] carer/create attempt failed", {
+        requestId,
+        attempt: attempt.label,
+        status: error?.status || 0,
+        isQueryError,
+        message: error?.message || String(error),
+      });
+      if (!isQueryError) {
+        break;
+      }
+    }
+  }
+
+  if (!response) {
+    const error = lastError || new Error("OneTouch create failed.");
     console.error("[OneTouch] carer/create failed", {
       requestId,
       endpoint: error?.endpoint || "carer/create",
