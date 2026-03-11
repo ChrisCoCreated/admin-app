@@ -777,6 +777,10 @@ function renderCandidates() {
   for (const candidate of filtered) {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", candidate.id === selectedCandidateId);
+    const statusOptionsHtml = RECRUITMENT_STATUS_OPTIONS.map((status) => {
+      const selected = cleanText(candidate.status) === status ? " selected" : "";
+      return `<option value="${escapeHtml(status)}"${selected}>${escapeHtml(status)}</option>`;
+    }).join("");
     tr.innerHTML = `
       <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
@@ -784,6 +788,15 @@ function renderCandidates() {
       <td>${escapeHtml(cleanText(candidate.source) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.phoneNumber) || "-")}</td>
       <td>
+        <div class="recruitment-row-actions">
+          <select class="recruitment-status-inline">
+            <option value="">Select status</option>
+            ${statusOptionsHtml}
+          </select>
+          <button type="button" class="secondary recruitment-status-save-btn"${
+            statusUpdateBusy ? " disabled" : ""
+          }>Save</button>
+        </div>
         ${
           hasOneTouchLink(candidate)
             ? `<a
@@ -811,6 +824,30 @@ function renderCandidates() {
         return;
       }
       await openOneTouchPicker(candidate);
+    });
+    const rowStatusSelect = tr.querySelector(".recruitment-status-inline");
+    const rowStatusSaveBtn = tr.querySelector(".recruitment-status-save-btn");
+    rowStatusSaveBtn?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (statusUpdateBusy) {
+        return;
+      }
+      const nextStatus = cleanText(rowStatusSelect?.value);
+      if (!nextStatus) {
+        setStatus("Select a status first.", true);
+        return;
+      }
+      statusUpdateBusy = true;
+      renderCandidates();
+      try {
+        await updateCandidateStatusById(candidate.id, nextStatus);
+      } catch (error) {
+        console.error(error);
+        setStatus(error?.message || "Could not update status.", true);
+      } finally {
+        statusUpdateBusy = false;
+        renderCandidates();
+      }
     });
 
     recruitmentTableBody.appendChild(tr);
@@ -1035,6 +1072,34 @@ async function addCandidateToOneTouch(itemId) {
   }
 }
 
+async function updateCandidateStatusById(candidateId, selectedStatus) {
+  const targetId = cleanText(candidateId);
+  const nextStatus = cleanText(selectedStatus);
+  if (!targetId || !nextStatus) {
+    setStatus("Select a status first.", true);
+    return false;
+  }
+
+  await directoryApi.updateRecruitmentStatus({
+    itemId: targetId,
+    status: nextStatus,
+  });
+
+  const candidate = allCandidates.find((item) => item.id === targetId);
+  if (candidate) {
+    candidate.status = nextStatus;
+  }
+
+  if (targetId === selectedCandidateId && statusUpdateSelect) {
+    statusUpdateSelect.value = nextStatus;
+  }
+
+  renderFilterOptions();
+  renderCandidates();
+  setStatus(`Status updated to ${nextStatus}.`);
+  return true;
+}
+
 async function saveCandidateStatus() {
   if (statusUpdateBusy || !statusUpdateSelect) {
     return;
@@ -1053,18 +1118,7 @@ async function saveCandidateStatus() {
     statusUpdateSelect.disabled = true;
   }
   try {
-    await directoryApi.updateRecruitmentStatus({
-      itemId: selectedCandidateId,
-      status: selectedStatus,
-    });
-    const candidate = allCandidates.find((item) => item.id === selectedCandidateId);
-    if (candidate) {
-      candidate.status = selectedStatus;
-      setDetail(candidate);
-      renderFilterOptions();
-      renderCandidates();
-    }
-    setStatus(`Status updated to ${selectedStatus}.`);
+    await updateCandidateStatusById(selectedCandidateId, selectedStatus);
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not update status.", true);

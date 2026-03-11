@@ -582,6 +582,23 @@ dd {
   font-size: 0.82rem;
 }
 
+.recruitment-row-actions {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) auto;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.recruitment-status-inline {
+  min-height: 32px;
+  border: 1px solid #cfd9e8;
+  border-radius: 8px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  background: #fff;
+}
+
 .wrap-row {
   flex-wrap: wrap;
 }
