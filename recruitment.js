@@ -20,6 +20,9 @@ const importFileName = document.getElementById("importFileName");
 const importSummary = document.getElementById("importSummary");
 const importErrors = document.getElementById("importErrors");
 const runImportBtn = document.getElementById("runImportBtn");
+const importPreviewWrap = document.getElementById("importPreviewWrap");
+const importPreviewTitle = document.getElementById("importPreviewTitle");
+const importPreviewBody = document.getElementById("importPreviewBody");
 
 const detailFields = {
   candidateName: detailRoot?.querySelector('[data-field="candidateName"]'),
@@ -49,6 +52,7 @@ let selectedCandidateId = "";
 let addToOneTouchBusy = false;
 let importBusy = false;
 let pendingImportRows = [];
+const IMPORT_PREVIEW_LIMIT = 10;
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -116,6 +120,108 @@ function setImportErrors(errors = []) {
   }
   importErrors.hidden = false;
   importErrors.textContent = validErrors.join(" | ");
+}
+
+function stripTrailingUkPostcode(value) {
+  const raw = cleanText(value);
+  if (!raw) {
+    return "";
+  }
+  const withSpaces = raw.replace(/([A-Za-z])(\d)/g, "$1 $2").replace(/(\d)([A-Za-z])/g, "$1 $2");
+  const normalized = withSpaces.replace(/\s+/g, " ").trim();
+
+  const fullPostcode = /^(.*?)(?:[\s,;-]+)?([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})$/i.exec(normalized);
+  if (fullPostcode) {
+    return cleanText(fullPostcode[1]) || normalized;
+  }
+  const outwardOnly = /^(.*?)(?:[\s,;-]+)?([A-Z]{1,2}\d[A-Z\d]?)$/i.exec(normalized);
+  if (outwardOnly) {
+    return cleanText(outwardOnly[1]) || normalized;
+  }
+
+  return raw;
+}
+
+function normalizeImportStatus(statusValue, interestLevelValue) {
+  const status = cleanText(statusValue);
+  const interest = cleanText(interestLevelValue);
+  const merged = `${status} ${interest}`.trim().toLowerCase();
+  if (!merged) {
+    return "Initial Call";
+  }
+  if (/\b(contacting|applied|application|new)\b/.test(merged)) {
+    return "Initial Call";
+  }
+  if (/\b(interview|screening|screen)\b/.test(merged)) {
+    return "1st Interview";
+  }
+  if (/\boffer\b/.test(merged)) {
+    return "Offered";
+  }
+  if (/\b(hired|accepted)\b/.test(merged)) {
+    return "Accepted";
+  }
+  if (/\brejected\b/.test(merged)) {
+    return "Rejected";
+  }
+  if (/\blost\b/.test(merged)) {
+    return "Lost";
+  }
+  return status || "Initial Call";
+}
+
+function getCsvValue(row, key) {
+  const target = normalizeText(key);
+  for (const [field, value] of Object.entries(row || {})) {
+    if (normalizeText(field) === target) {
+      return cleanText(value);
+    }
+  }
+  return "";
+}
+
+function toImportPreviewRow(row) {
+  return {
+    candidateName: getCsvValue(row, "name"),
+    email: getCsvValue(row, "email"),
+    phone: getCsvValue(row, "phone"),
+    livesIn: getCsvValue(row, "candidate location"),
+    location: stripTrailingUkPostcode(getCsvValue(row, "job location")),
+    status: normalizeImportStatus(getCsvValue(row, "status"), getCsvValue(row, "interest level")),
+    source: getCsvValue(row, "source") || "Indeed",
+  };
+}
+
+function renderImportPreview(rows) {
+  if (!importPreviewWrap || !importPreviewBody || !importPreviewTitle) {
+    return;
+  }
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    importPreviewWrap.hidden = true;
+    importPreviewBody.innerHTML = "";
+    importPreviewTitle.textContent = `Preview (top ${IMPORT_PREVIEW_LIMIT})`;
+    return;
+  }
+
+  const previewRows = list.slice(0, IMPORT_PREVIEW_LIMIT).map(toImportPreviewRow);
+  importPreviewWrap.hidden = false;
+  importPreviewTitle.textContent = `Preview (top ${Math.min(IMPORT_PREVIEW_LIMIT, list.length)} of ${list.length})`;
+  importPreviewBody.innerHTML = "";
+
+  for (const row of previewRows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(row.candidateName || "-")}</td>
+      <td>${escapeHtml(row.email || "-")}</td>
+      <td>${escapeHtml(row.phone || "-")}</td>
+      <td>${escapeHtml(row.livesIn || "-")}</td>
+      <td>${escapeHtml(row.location || "-")}</td>
+      <td>${escapeHtml(row.status || "-")}</td>
+      <td>${escapeHtml(row.source || "-")}</td>
+    `;
+    importPreviewBody.appendChild(tr);
+  }
 }
 
 function updateAddMissingButtonLabel() {
@@ -420,6 +526,7 @@ async function handleCsvFile(file) {
   const parsed = parseCsvText(text);
   if (!parsed.rows.length) {
     pendingImportRows = [];
+    renderImportPreview([]);
     setImportSummary("No importable rows found.", true);
     setImportErrors(parsed.errors);
     if (runImportBtn) {
@@ -434,6 +541,7 @@ async function handleCsvFile(file) {
     setImportErrors([]);
   }
 
+  renderImportPreview(parsed.rows);
   await previewImportRows(parsed.rows);
 }
 
@@ -453,6 +561,13 @@ async function runCsvImport() {
     setImportSummary(summary);
     setImportErrors((result.errors || []).map((error) => `Row ${error.row}: ${error.message}`));
     pendingImportRows = [];
+    renderImportPreview([]);
+    if (importFileName) {
+      importFileName.textContent = "No file selected.";
+    }
+    if (importFileInput) {
+      importFileInput.value = "";
+    }
     await loadRecruitmentCandidates();
     setStatus(`CSV import complete. ${summary}`);
   } catch (error) {

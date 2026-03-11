@@ -69,6 +69,25 @@
           </div>
           <p id="importFileName" class="muted">No file selected.</p>
           <p id="importSummary" class="muted">Upload a CSV to preview import results.</p>
+          <div id="importPreviewWrap" class="import-preview-wrap" hidden>
+            <h4 id="importPreviewTitle">Preview (top 10)</h4>
+            <div class="table-wrap">
+              <table class="import-preview-table">
+                <thead>
+                  <tr>
+                    <th>Candidate</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Lives In</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody id="importPreviewBody"></tbody>
+              </table>
+            </div>
+          </div>
           <p id="importErrors" class="muted error" hidden></p>
           <div class="row">
             <button id="runImportBtn" type="button" disabled>Import CSV</button>

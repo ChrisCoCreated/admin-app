@@ -599,6 +599,21 @@ dd {
   cursor: not-allowed;
 }
 
+.import-preview-wrap {
+  margin-top: 0.75rem;
+}
+
+.import-preview-wrap h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.import-preview-table th,
+.import-preview-table td {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 .reports-grid {
   margin-top: 14px;
   display: grid;
