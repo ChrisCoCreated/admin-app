@@ -9,8 +9,6 @@ const authCard = document.querySelector(".auth-card");
 const mainContainer = document.querySelector("main.container");
 const signOutBtn = document.getElementById("signOutBtn");
 const topbarActions = document.getElementById("topbarActions");
-const homeMenuSection = document.getElementById("homeMenuSection");
-const homeMenuGrid = document.getElementById("homeMenuGrid");
 const heroSignInMessage = document.getElementById("heroSignInMessage");
 const homeUserEmail = document.getElementById("homeUserEmail");
 const homeUserPermissions = document.getElementById("homeUserPermissions");
@@ -26,12 +24,6 @@ function setStatus(message, isError = false) {
 function setSignedOutUi() {
   if (authCard) {
     authCard.hidden = false;
-  }
-  if (homeMenuSection) {
-    homeMenuSection.hidden = true;
-  }
-  if (homeMenuGrid) {
-    homeMenuGrid.innerHTML = "";
   }
   if (homeUserEmail) {
     homeUserEmail.textContent = "";
@@ -56,36 +48,11 @@ function setSignedInUi() {
   if (authCard) {
     authCard.hidden = true;
   }
-  if (homeMenuSection) {
-    homeMenuSection.hidden = false;
-  }
   if (topbarActions) {
     topbarActions.hidden = false;
   }
   if (heroSignInMessage) {
     heroSignInMessage.hidden = true;
-  }
-}
-
-function renderHomeMenu(role) {
-  if (!homeMenuGrid) {
-    return;
-  }
-
-  const pages = getAccessiblePages(role);
-  homeMenuGrid.innerHTML = "";
-  renderTopNavigation({ role, currentPathname: "./index.html" });
-
-  for (const pageKey of pages) {
-    const page = getPageMeta(pageKey);
-    if (!page) {
-      continue;
-    }
-    const link = document.createElement("a");
-    link.className = "home-menu-link";
-    link.href = page.href;
-    link.textContent = page.label;
-    homeMenuGrid.appendChild(link);
   }
 }
 
@@ -137,7 +104,7 @@ async function renderRoleMenu() {
   }
   setSignedInUi();
   renderUserSummary(profile);
-  renderHomeMenu(role);
+  renderTopNavigation({ role, currentPathname: "./index.html" });
 }
 
 async function init() {
