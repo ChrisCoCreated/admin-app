@@ -557,6 +557,25 @@ dd {
   color: #fff;
 }
 
+.button-link-one-touch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 11px;
+  text-decoration: none;
+  font-weight: 700;
+  background: #1f3c88;
+  color: #fff;
+}
+
+.button-link-one-touch.is-disabled {
+  background: #8d99b3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .wrap-row {
   flex-wrap: wrap;
 }

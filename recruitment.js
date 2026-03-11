@@ -13,6 +13,7 @@ const statusMessage = document.getElementById("statusMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const detailRoot = document.getElementById("candidateDetail");
 const sharePointListLink = document.getElementById("sharePointListLink");
+const openOneTouchBtn = document.getElementById("openOneTouchBtn");
 const importDropZone = document.getElementById("importDropZone");
 const importFileInput = document.getElementById("importFileInput");
 const importFileName = document.getElementById("importFileName");
@@ -65,6 +66,9 @@ let importEditingRowIndex = -1;
 let importEditingDraft = null;
 let oneTouchOptionsCache = null;
 let oneTouchPickerCandidateId = "";
+const ONE_TOUCH_DEFAULT_AREA = "East Kent";
+const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
+const ONE_TOUCH_DEFAULT_STATUS = "Pending";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -201,7 +205,10 @@ async function openOneTouchPicker(candidate) {
         option.textContent = area;
         oneTouchAreaSelect.appendChild(option);
       }
-      oneTouchAreaSelect.value = pickBestOption(options.areas, candidate?.earmarkedFor) || "";
+      oneTouchAreaSelect.value =
+        pickBestOption(options.areas, ONE_TOUCH_DEFAULT_AREA) ||
+        pickBestOption(options.areas, candidate?.earmarkedFor) ||
+        "";
       oneTouchAreaSelect.disabled = false;
     }
     if (oneTouchRecruitmentSourceSelect) {
@@ -223,7 +230,10 @@ async function openOneTouchPicker(candidate) {
         option.textContent = position;
         oneTouchPositionSelect.appendChild(option);
       }
-      oneTouchPositionSelect.value = pickBestOption(options.positions, "Carer") || "";
+      oneTouchPositionSelect.value =
+        pickBestOption(options.positions, ONE_TOUCH_DEFAULT_POSITION) ||
+        pickBestOption(options.positions, "Carer") ||
+        "";
       oneTouchPositionSelect.disabled = false;
     }
     if (oneTouchStatusSelect) {
@@ -234,7 +244,10 @@ async function openOneTouchPicker(candidate) {
         option.textContent = status;
         oneTouchStatusSelect.appendChild(option);
       }
-      oneTouchStatusSelect.value = pickBestOption(options.statuses, candidate?.status) || "";
+      oneTouchStatusSelect.value =
+        pickBestOption(options.statuses, ONE_TOUCH_DEFAULT_STATUS) ||
+        pickBestOption(options.statuses, candidate?.status) ||
+        "";
       oneTouchStatusSelect.disabled = false;
     }
   } catch (error) {
@@ -577,6 +590,17 @@ function setLinkField(node, url) {
   node.innerHTML = `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">Open link</a>`;
 }
 
+function setOneTouchButton(url) {
+  if (!openOneTouchBtn) {
+    return;
+  }
+  const cleanUrl = cleanText(url);
+  const enabled = Boolean(cleanUrl);
+  openOneTouchBtn.href = enabled ? cleanUrl : "#";
+  openOneTouchBtn.setAttribute("aria-disabled", enabled ? "false" : "true");
+  openOneTouchBtn.classList.toggle("is-disabled", !enabled);
+}
+
 function setDetail(candidate) {
   if (!candidate) {
     detailFields.candidateName.textContent = "Select a candidate";
@@ -593,6 +617,7 @@ function setDetail(candidate) {
     detailFields.created.textContent = "-";
     detailFields.oneTouchLink.textContent = "-";
     detailFields.notes.textContent = "-";
+    setOneTouchButton("");
     return;
   }
 
@@ -609,6 +634,7 @@ function setDetail(candidate) {
   detailFields.earmarkedFor.textContent = cleanText(candidate.earmarkedFor) || "-";
   detailFields.created.textContent = formatDate(candidate.created);
   setLinkField(detailFields.oneTouchLink, candidate.oneTouchLink);
+  setOneTouchButton(candidate.oneTouchLink);
   detailFields.notes.textContent = cleanText(candidate.notes) || "-";
 }
 
