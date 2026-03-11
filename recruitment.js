@@ -14,6 +14,8 @@ const signOutBtn = document.getElementById("signOutBtn");
 const detailRoot = document.getElementById("candidateDetail");
 const sharePointListLink = document.getElementById("sharePointListLink");
 const openOneTouchBtn = document.getElementById("openOneTouchBtn");
+const statusUpdateSelect = document.getElementById("statusUpdateSelect");
+const saveStatusBtn = document.getElementById("saveStatusBtn");
 const importDropZone = document.getElementById("importDropZone");
 const importFileInput = document.getElementById("importFileInput");
 const importFileName = document.getElementById("importFileName");
@@ -66,9 +68,25 @@ let importEditingRowIndex = -1;
 let importEditingDraft = null;
 let oneTouchOptionsCache = null;
 let oneTouchPickerCandidateId = "";
+let statusUpdateBusy = false;
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
+const RECRUITMENT_STATUS_OPTIONS = [
+  "Rejected",
+  "RED FLAG (Rejected)",
+  "Keep in Mind",
+  "Initial Call",
+  "1st Interview",
+  "2nd Interview",
+  "Exploring an offer",
+  "Make Offer",
+  "Offered",
+  "Accepted",
+  "Start Date Agreed",
+  "Started",
+  "Lost",
+];
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -601,6 +619,21 @@ function setOneTouchButton(url) {
   openOneTouchBtn.classList.toggle("is-disabled", !enabled);
 }
 
+function renderStatusUpdateOptions() {
+  if (!statusUpdateSelect) {
+    return;
+  }
+  const current = cleanText(statusUpdateSelect.value);
+  statusUpdateSelect.innerHTML = '<option value="">Select status</option>';
+  for (const status of RECRUITMENT_STATUS_OPTIONS) {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = status;
+    statusUpdateSelect.appendChild(option);
+  }
+  statusUpdateSelect.value = RECRUITMENT_STATUS_OPTIONS.includes(current) ? current : "";
+}
+
 function setDetail(candidate) {
   if (!candidate) {
     detailFields.candidateName.textContent = "Select a candidate";
@@ -618,6 +651,13 @@ function setDetail(candidate) {
     detailFields.oneTouchLink.textContent = "-";
     detailFields.notes.textContent = "-";
     setOneTouchButton("");
+    if (statusUpdateSelect) {
+      statusUpdateSelect.value = "";
+      statusUpdateSelect.disabled = true;
+    }
+    if (saveStatusBtn) {
+      saveStatusBtn.disabled = true;
+    }
     return;
   }
 
@@ -636,6 +676,14 @@ function setDetail(candidate) {
   setLinkField(detailFields.oneTouchLink, candidate.oneTouchLink);
   setOneTouchButton(candidate.oneTouchLink);
   detailFields.notes.textContent = cleanText(candidate.notes) || "-";
+  renderStatusUpdateOptions();
+  if (statusUpdateSelect) {
+    statusUpdateSelect.value = cleanText(candidate.status);
+    statusUpdateSelect.disabled = false;
+  }
+  if (saveStatusBtn) {
+    saveStatusBtn.disabled = statusUpdateBusy;
+  }
 }
 
 function renderFilterOptions() {
@@ -987,6 +1035,50 @@ async function addCandidateToOneTouch(itemId) {
   }
 }
 
+async function saveCandidateStatus() {
+  if (statusUpdateBusy || !statusUpdateSelect) {
+    return;
+  }
+  const selectedStatus = cleanText(statusUpdateSelect.value);
+  if (!selectedCandidateId || !selectedStatus) {
+    setStatus("Select a candidate and status first.", true);
+    return;
+  }
+
+  statusUpdateBusy = true;
+  if (saveStatusBtn) {
+    saveStatusBtn.disabled = true;
+  }
+  if (statusUpdateSelect) {
+    statusUpdateSelect.disabled = true;
+  }
+  try {
+    await directoryApi.updateRecruitmentStatus({
+      itemId: selectedCandidateId,
+      status: selectedStatus,
+    });
+    const candidate = allCandidates.find((item) => item.id === selectedCandidateId);
+    if (candidate) {
+      candidate.status = selectedStatus;
+      setDetail(candidate);
+      renderFilterOptions();
+      renderCandidates();
+    }
+    setStatus(`Status updated to ${selectedStatus}.`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not update status.", true);
+  } finally {
+    statusUpdateBusy = false;
+    if (saveStatusBtn) {
+      saveStatusBtn.disabled = false;
+    }
+    if (statusUpdateSelect) {
+      statusUpdateSelect.disabled = false;
+    }
+  }
+}
+
 function redirectToUnauthorized(pageKey) {
   const page = encodeURIComponent(String(pageKey || "recruitment").trim().toLowerCase());
   window.location.href = `./unauthorized.html?page=${page}`;
@@ -1091,6 +1183,9 @@ importFileInput?.addEventListener("change", async () => {
 
 runImportBtn?.addEventListener("click", async () => {
   await runCsvImport();
+});
+saveStatusBtn?.addEventListener("click", async () => {
+  await saveCandidateStatus();
 });
 
 oneTouchPickerCancelBtn?.addEventListener("click", () => {
