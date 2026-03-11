@@ -112,15 +112,49 @@ function openOutlookDraft() {
     return;
   }
 
-  const url = new URL("https://outlook.office.com/mail/deeplink/compose");
-  url.searchParams.set("subject", subject);
-  url.searchParams.set("body", body);
+  const params = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
   if (to) {
-    url.searchParams.set("to", to);
+    params.push(`to=${encodeURIComponent(to)}`);
   }
+  const webUrl = `https://outlook.office.com/mail/deeplink/compose?${params.join("&")}`;
+  const mailtoParts = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
+  const mailtoUrl = `mailto:${encodeURIComponent(to)}?${mailtoParts.join("&")}`;
 
-  window.open(url.toString(), "_blank", "noopener,noreferrer");
-  setActionStatus("Opened Outlook draft.");
+  let fallbackTriggered = false;
+  let fallbackTimer = null;
+
+  const clearFallback = () => {
+    if (fallbackTimer) {
+      window.clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    }
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+  };
+
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      clearFallback();
+      setActionStatus("Opened in your mail app.");
+    }
+  };
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  fallbackTimer = window.setTimeout(() => {
+    fallbackTriggered = true;
+    clearFallback();
+    window.open(webUrl, "_blank", "noopener,noreferrer");
+    setActionStatus("Opened Outlook on the web (app fallback).");
+  }, 1400);
+
+  window.location.href = mailtoUrl;
+
+  // If a popup blocker prevents web fallback, keep a clear status for users.
+  window.setTimeout(() => {
+    if (!fallbackTriggered && !document.hidden) {
+      setActionStatus("Tried opening your mail app.");
+    }
+  }, 1600);
 }
 
 async function fetchCurrentUser() {
