@@ -64,6 +64,10 @@ function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+function normalizeToken(value) {
+  return normalizeText(value).replace(/[^a-z0-9]/g, "");
+}
+
 async function resolveSiteId(graphClient, hostName, sitePath) {
   const url = `https://graph.microsoft.com/v1.0/sites/${hostName}:${sitePath}?$select=id`;
   const payload = await graphClient.fetchJson(url);
@@ -89,6 +93,34 @@ async function resolveList(graphClient, siteId, listName) {
     id: String(list.id),
     webUrl: normalizeText(list.webUrl),
   };
+}
+
+async function resolveOneTouchLinkFieldName(graphClient, siteId, listId) {
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName&$top=200`;
+  const columns = [];
+  while (nextUrl) {
+    const payload = await graphClient.fetchJson(nextUrl);
+    const values = Array.isArray(payload?.value) ? payload.value : [];
+    columns.push(...values);
+    nextUrl = String(payload?.["@odata.nextLink"] || "");
+  }
+
+  const candidates = [];
+  for (const column of columns) {
+    const name = normalizeText(column?.name);
+    const displayName = normalizeText(column?.displayName);
+    const nameToken = normalizeToken(name);
+    const displayToken = normalizeToken(displayName);
+    const isOneTouchLink =
+      nameToken.includes("onetouchlink") ||
+      displayToken.includes("onetouchlink") ||
+      (displayToken.includes("onetouch") && displayToken.includes("link"));
+    if (isOneTouchLink && name) {
+      candidates.push(name);
+    }
+  }
+
+  return candidates[0] || "OnetouchLink";
 }
 
 function parsePersonField(value, lookupIdValue) {
@@ -229,15 +261,37 @@ async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {
 
 async function patchRecruitmentOneTouchLink(graphClient, siteId, listId, itemId, oneTouchProfileUrl) {
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
-  await graphClient.fetchJson(url, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      OnetouchLink: normalizeText(oneTouchProfileUrl),
-    }),
-  });
+  const fieldName = await resolveOneTouchLinkFieldName(graphClient, siteId, listId);
+  const link = normalizeText(oneTouchProfileUrl);
+  const attempts = [
+    { label: "plain_url", body: { [fieldName]: link } },
+    { label: "url_plus_description", body: { [fieldName]: `${link}, OneTouch` } },
+    { label: "url_object", body: { [fieldName]: { Url: link, Description: "OneTouch" } } },
+  ];
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      await graphClient.fetchJson(url, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(attempt.body),
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn("[recruitment] SharePoint OnetouchLink patch attempt failed", {
+        itemId,
+        fieldName,
+        attempt: attempt.label,
+        message: error?.message || String(error),
+      });
+    }
+  }
+
+  throw lastError || new Error("Could not patch SharePoint OnetouchLink field.");
 }
 
 function buildOneTouchCreatePayload(candidate, overrides = {}) {

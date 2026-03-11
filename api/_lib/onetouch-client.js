@@ -1,4 +1,5 @@
 const DEFAULT_BASE_URL = "https://api-uk.onetouchhealth.net/connect/c2/v1";
+const ONETOUCH_CREATE_DEBUG = process.env.ONETOUCH_CREATE_DEBUG === "1";
 
 let tokenCache = {
   accessToken: "",
@@ -1213,6 +1214,12 @@ async function createCarer(payload = {}) {
     id,
     external_id: createPayload.external_id || "",
   });
+  if (ONETOUCH_CREATE_DEBUG) {
+    console.info("[OneTouch] carer/create success payload", {
+      requestId,
+      payload: response,
+    });
+  }
   return {
     id,
     raw: response,
