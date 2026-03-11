@@ -231,6 +231,8 @@ function buildOneTouchCreatePayload(candidate, overrides = {}) {
     area: normalizeText(overrides.area || candidate.earmarkedFor),
     recruitment_source: normalizeText(overrides.recruitmentSource || candidate.source),
     source: normalizeText(overrides.recruitmentSource || candidate.source),
+    position: normalizeText(overrides.position || "Carer"),
+    status: normalizeText(overrides.status),
     notes: normalizeText(candidate.notes),
   };
 }
@@ -317,6 +319,8 @@ module.exports = async (req, res) => {
         buildOneTouchCreatePayload(candidate, {
           area: req.body?.area,
           recruitmentSource: req.body?.recruitmentSource,
+          position: req.body?.position,
+          status: req.body?.status,
         })
       );
       const oneTouchProfileUrl = buildOneTouchProfileUrl(createResult.id);

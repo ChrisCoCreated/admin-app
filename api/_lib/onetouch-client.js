@@ -514,6 +514,42 @@ async function getOneTouchRecruitmentSourceOptions() {
   return Array.from(new Set(sources)).sort((a, b) => a.localeCompare(b));
 }
 
+function normalizePositionOption(record) {
+  const name = asString(
+    record?.name ||
+      record?.position ||
+      record?.position_name ||
+      record?.title ||
+      record?.label
+  );
+  return { name };
+}
+
+async function getOneTouchPositionOptions() {
+  const payload = await callOneTouch("carer/get-positions");
+  const records = resolveRecords(payload, ["positions", "data.positions", "result.positions"]);
+  const values = records.map(normalizePositionOption).map((row) => asString(row?.name)).filter(Boolean);
+  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeStatusOption(record) {
+  const name = asString(
+    record?.name ||
+      record?.status ||
+      record?.status_name ||
+      record?.title ||
+      record?.label
+  );
+  return { name };
+}
+
+async function getOneTouchStatusOptions() {
+  const payload = await callOneTouch("carer/statuses");
+  const records = resolveRecords(payload, ["statuses", "data.statuses", "result.statuses"]);
+  const values = records.map(normalizeStatusOption).map((row) => asString(row?.name)).filter(Boolean);
+  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+}
+
 async function resolveOneTouchLocationArea({ location = "", livesIn = "", explicitArea = "" } = {}) {
   const locationHint = stripTrailingUkPostcode(location) || asString(location);
   const livesInHint = stripTrailingUkPostcode(livesIn) || asString(livesIn);
@@ -980,6 +1016,7 @@ function sanitizeCarerCreatePayload(payload = {}) {
     town: pickFirstNonEmpty([payload.town, payload.location]),
     area: pickFirstNonEmpty([payload.area, payload.location]),
     recruitment_source: pickFirstNonEmpty([payload.recruitment_source, payload.source]),
+    status: pickFirstNonEmpty([payload.status, payload.carer_status]),
     comment: pickFirstNonEmpty([payload.comment, payload.notes]),
     position: pickFirstNonEmpty([payload.position, "Carer"]),
   };
@@ -1051,4 +1088,6 @@ module.exports = {
   getOneTouchLocationAreaOptions,
   getOneTouchAreaOptions,
   getOneTouchRecruitmentSourceOptions,
+  getOneTouchPositionOptions,
+  getOneTouchStatusOptions,
 };

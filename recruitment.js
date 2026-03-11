@@ -26,6 +26,8 @@ const oneTouchPickerModal = document.getElementById("oneTouchPickerModal");
 const oneTouchPickerCandidate = document.getElementById("oneTouchPickerCandidate");
 const oneTouchAreaSelect = document.getElementById("oneTouchAreaSelect");
 const oneTouchRecruitmentSourceSelect = document.getElementById("oneTouchRecruitmentSourceSelect");
+const oneTouchPositionSelect = document.getElementById("oneTouchPositionSelect");
+const oneTouchStatusSelect = document.getElementById("oneTouchStatusSelect");
 const oneTouchPickerError = document.getElementById("oneTouchPickerError");
 const oneTouchPickerConfirmBtn = document.getElementById("oneTouchPickerConfirmBtn");
 const oneTouchPickerCancelBtn = document.getElementById("oneTouchPickerCancelBtn");
@@ -151,6 +153,8 @@ async function ensureOneTouchOptionsLoaded() {
   oneTouchOptionsCache = {
     areas: Array.isArray(options?.areas) ? options.areas : [],
     recruitmentSources: Array.isArray(options?.recruitmentSources) ? options.recruitmentSources : [],
+    positions: Array.isArray(options?.positions) ? options.positions : [],
+    statuses: Array.isArray(options?.statuses) ? options.statuses : [],
   };
   return oneTouchOptionsCache;
 }
@@ -191,6 +195,26 @@ async function openOneTouchPicker(candidate) {
         oneTouchRecruitmentSourceSelect.appendChild(option);
       }
       oneTouchRecruitmentSourceSelect.value = pickBestOption(options.recruitmentSources, candidate?.source) || "";
+    }
+    if (oneTouchPositionSelect) {
+      oneTouchPositionSelect.innerHTML = '<option value="">Select position</option>';
+      for (const position of options.positions) {
+        const option = document.createElement("option");
+        option.value = position;
+        option.textContent = position;
+        oneTouchPositionSelect.appendChild(option);
+      }
+      oneTouchPositionSelect.value = pickBestOption(options.positions, "Carer") || "";
+    }
+    if (oneTouchStatusSelect) {
+      oneTouchStatusSelect.innerHTML = '<option value="">Select status</option>';
+      for (const status of options.statuses) {
+        const option = document.createElement("option");
+        option.value = status;
+        option.textContent = status;
+        oneTouchStatusSelect.appendChild(option);
+      }
+      oneTouchStatusSelect.value = pickBestOption(options.statuses, candidate?.status) || "";
     }
   } catch (error) {
     setOneTouchPickerError(error?.message || "Could not load OneTouch options.");
@@ -870,8 +894,10 @@ async function addCandidateToOneTouch(itemId) {
   }
   const selectedArea = cleanText(oneTouchAreaSelect?.value);
   const selectedRecruitmentSource = cleanText(oneTouchRecruitmentSourceSelect?.value);
-  if (!selectedArea || !selectedRecruitmentSource) {
-    setOneTouchPickerError("Select both area and recruitment source.");
+  const selectedPosition = cleanText(oneTouchPositionSelect?.value);
+  const selectedStatus = cleanText(oneTouchStatusSelect?.value);
+  if (!selectedArea || !selectedRecruitmentSource || !selectedPosition || !selectedStatus) {
+    setOneTouchPickerError("Select area, recruitment source, position, and status.");
     return;
   }
 
@@ -882,6 +908,8 @@ async function addCandidateToOneTouch(itemId) {
       itemId: cleanItemId,
       area: selectedArea,
       recruitmentSource: selectedRecruitmentSource,
+      position: selectedPosition,
+      status: selectedStatus,
     });
     if (result?.item) {
       upsertCandidateInCache(result.item);
