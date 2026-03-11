@@ -583,68 +583,121 @@ dd {
 }
 
 .status-pill-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   min-height: 32px;
-  padding: 5px 11px;
-  border: 1px solid #b9c9de;
+  padding: 5px 12px;
+  border: 1px solid #adc0da;
   border-radius: 999px;
-  background: #f4f8ff;
-  color: #1f2a3e;
+  background: linear-gradient(180deg, #f8fbff 0%, #edf3fb 100%);
+  color: #1c2940;
   font: inherit;
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.status-pill-trigger::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid #425a7f;
+  border-bottom: 2px solid #425a7f;
+  transform: rotate(45deg) translateY(-1px);
+  opacity: 0.85;
 }
 
 .status-pill-trigger:hover {
-  background: #e9f1ff;
-  border-color: #90a9cc;
+  background: linear-gradient(180deg, #f0f6ff 0%, #e4edf9 100%);
+  border-color: #89a5c9;
+  transform: translateY(-1px);
 }
 
 .status-pill-trigger:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(31, 60, 136, 0.22);
+  box-shadow: 0 0 0 3px rgba(31, 60, 136, 0.2);
 }
 
 .status-quick-menu {
   position: absolute;
   z-index: 55;
-  min-width: 240px;
-  max-height: 320px;
-  overflow: auto;
+  min-width: 260px;
+  max-width: min(360px, calc(100vw - 24px));
+  max-height: 340px;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: #ffffff;
-  border: 1px solid #d8e1ef;
-  border-radius: 12px;
-  box-shadow: 0 14px 34px rgba(31, 42, 62, 0.18);
-  padding: 6px;
+  border: 1px solid #d2ddec;
+  border-radius: 14px;
+  box-shadow:
+    0 20px 44px rgba(18, 35, 64, 0.2),
+    0 2px 8px rgba(18, 35, 64, 0.08);
+  padding: 8px;
+  transform-origin: top left;
+  animation: statusQuickMenuIn 140ms ease-out;
+}
+
+.status-quick-menu::-webkit-scrollbar {
+  width: 9px;
+}
+
+.status-quick-menu::-webkit-scrollbar-thumb {
+  background: #c2cfdf;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+}
+
+.status-quick-menu::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .status-quick-menu-list {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 .status-quick-option {
   width: 100%;
   text-align: left;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #1f2a3e;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #1f2c44;
   font: inherit;
-  font-size: 0.86rem;
-  padding: 8px 10px;
+  font-size: 0.84rem;
+  padding: 9px 11px;
   cursor: pointer;
+  transition: background-color 100ms ease, border-color 100ms ease, transform 100ms ease;
 }
 
 .status-quick-option:hover {
-  background: #edf3ff;
+  background: #edf4ff;
+  border-color: #d0ddf1;
+  transform: translateX(1px);
 }
 
 .status-quick-option.is-active {
-  background: #dde9ff;
-  color: #173678;
+  background: #e3edff;
+  border-color: #9db8e4;
+  color: #183b7c;
   font-weight: 700;
+}
+
+@keyframes statusQuickMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .wrap-row {

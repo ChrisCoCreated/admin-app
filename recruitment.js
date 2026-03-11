@@ -690,11 +690,34 @@ function openStatusQuickMenu(candidate, anchorEl) {
   }
 
   const rect = anchorEl.getBoundingClientRect();
-  const top = rect.bottom + window.scrollY + 8;
-  const left = Math.max(12, rect.left + window.scrollX);
+  statusQuickMenu.hidden = false;
+  statusQuickMenu.style.visibility = "hidden";
+
+  const viewportPad = 12;
+  const offset = 8;
+  const menuWidth = statusQuickMenu.offsetWidth || 240;
+  const menuHeight = statusQuickMenu.offsetHeight || 280;
+  const viewportLeft = window.scrollX;
+  const viewportTop = window.scrollY;
+  const viewportRight = viewportLeft + window.innerWidth;
+  const viewportBottom = viewportTop + window.innerHeight;
+
+  let left = rect.left + window.scrollX;
+  if (left + menuWidth + viewportPad > viewportRight) {
+    left = viewportRight - menuWidth - viewportPad;
+  }
+  left = Math.max(viewportLeft + viewportPad, left);
+
+  const topBelow = rect.bottom + window.scrollY + offset;
+  const topAbove = rect.top + window.scrollY - menuHeight - offset;
+  const top =
+    topBelow + menuHeight + viewportPad <= viewportBottom || topAbove < viewportTop + viewportPad
+      ? topBelow
+      : topAbove;
+
   statusQuickMenu.style.top = `${top}px`;
   statusQuickMenu.style.left = `${left}px`;
-  statusQuickMenu.hidden = false;
+  statusQuickMenu.style.visibility = "";
 }
 
 function setDetail(candidate) {
