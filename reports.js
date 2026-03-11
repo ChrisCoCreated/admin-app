@@ -11,6 +11,7 @@ const availabilityCapacityLink = document.getElementById("availabilityCapacityLi
 const areaCapacityLink = document.getElementById("areaCapacityLink");
 const clientHoursLink = document.getElementById("clientHoursLink");
 const carerHoursLink = document.getElementById("carerHoursLink");
+const financialAnalysisLink = document.getElementById("financialAnalysisLink");
 const dateRangeMessage = document.getElementById("dateRangeMessage");
 
 const CONTRACT_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/contractCapacity.php";
@@ -18,6 +19,7 @@ const AVAILABILITY_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/c
 const AREA_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/areaCapacity.php";
 const CLIENT_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/clientsHoursRpt.php";
 const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
+const FINANCIAL_ANALYSIS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/timesheet_analysis_newscale_getPay.php";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -135,8 +137,18 @@ function buildCarerHoursUrl(start, end) {
   return url.toString();
 }
 
+function buildFinancialAnalysisUrl(start, end) {
+  const startDate = formatDateParam(start);
+  const endDate = formatDateParam(end);
+
+  const url = new URL(FINANCIAL_ANALYSIS_BASE_URL);
+  url.searchParams.set("start", startDate);
+  url.searchParams.set("finish", endDate);
+  return url.toString();
+}
+
 function updateCapacityLinks() {
-  const preset = String(periodPresetSelect?.value || "this_month").trim().toLowerCase();
+  const preset = String(periodPresetSelect?.value || "last_month").trim().toLowerCase();
   const { start, end } = getDateRangeForPreset(preset);
   const datePickSt = formatDateParam(start);
   const datePickFn = formatDateParam(end);
@@ -155,6 +167,9 @@ function updateCapacityLinks() {
   }
   if (carerHoursLink) {
     carerHoursLink.href = buildCarerHoursUrl(start, end);
+  }
+  if (financialAnalysisLink) {
+    financialAnalysisLink.href = buildFinancialAnalysisUrl(start, end);
   }
   if (dateRangeMessage) {
     dateRangeMessage.textContent = `Date range: ${datePickSt} to ${datePickFn}`;
@@ -187,7 +202,7 @@ async function init() {
     setStatus(email ? `Signed in as ${email}` : "Signed in");
 
     if (periodPresetSelect) {
-      periodPresetSelect.value = "this_month";
+      periodPresetSelect.value = "last_month";
     }
     updateCapacityLinks();
   } catch (error) {

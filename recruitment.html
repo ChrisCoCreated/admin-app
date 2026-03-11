@@ -61,6 +61,19 @@
         <div class="row">
           <button id="addMissingToOneTouchBtn" type="button">Add Missing to OneTouch</button>
         </div>
+        <div class="recruitment-import-wrap">
+          <h3>Import CSV</h3>
+          <div id="importDropZone" class="recruitment-dropzone" tabindex="0" role="button" aria-label="Upload recruitment CSV">
+            <p>Drag and drop CSV here, or click to choose file.</p>
+            <input id="importFileInput" type="file" accept=".csv,text/csv" hidden />
+          </div>
+          <p id="importFileName" class="muted">No file selected.</p>
+          <p id="importSummary" class="muted">Upload a CSV to preview import results.</p>
+          <p id="importErrors" class="muted error" hidden></p>
+          <div class="row">
+            <button id="runImportBtn" type="button" disabled>Import CSV</button>
+          </div>
+        </div>
       </section>
 
       <section class="clients-grid">

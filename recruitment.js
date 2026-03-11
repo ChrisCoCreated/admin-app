@@ -14,6 +14,12 @@ const signOutBtn = document.getElementById("signOutBtn");
 const detailRoot = document.getElementById("candidateDetail");
 const sharePointListLink = document.getElementById("sharePointListLink");
 const addMissingToOneTouchBtn = document.getElementById("addMissingToOneTouchBtn");
+const importDropZone = document.getElementById("importDropZone");
+const importFileInput = document.getElementById("importFileInput");
+const importFileName = document.getElementById("importFileName");
+const importSummary = document.getElementById("importSummary");
+const importErrors = document.getElementById("importErrors");
+const runImportBtn = document.getElementById("runImportBtn");
 
 const detailFields = {
   candidateName: detailRoot?.querySelector('[data-field="candidateName"]'),
@@ -41,6 +47,8 @@ const directoryApi = createDirectoryApi(authController);
 let allCandidates = [];
 let selectedCandidateId = "";
 let addToOneTouchBusy = false;
+let importBusy = false;
+let pendingImportRows = [];
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -76,6 +84,38 @@ function setAddButtonsBusy(disabled) {
   if (addMissingToOneTouchBtn) {
     addMissingToOneTouchBtn.disabled = disabled;
   }
+}
+
+function setImportBusy(disabled) {
+  importBusy = disabled;
+  if (runImportBtn) {
+    runImportBtn.disabled = disabled || pendingImportRows.length === 0;
+  }
+  if (importDropZone) {
+    importDropZone.classList.toggle("is-disabled", disabled);
+  }
+}
+
+function setImportSummary(message, isError = false) {
+  if (!importSummary) {
+    return;
+  }
+  importSummary.textContent = message;
+  importSummary.classList.toggle("error", isError);
+}
+
+function setImportErrors(errors = []) {
+  if (!importErrors) {
+    return;
+  }
+  const validErrors = Array.isArray(errors) ? errors.filter(Boolean).slice(0, 8) : [];
+  if (!validErrors.length) {
+    importErrors.hidden = true;
+    importErrors.textContent = "";
+    return;
+  }
+  importErrors.hidden = false;
+  importErrors.textContent = validErrors.join(" | ");
 }
 
 function updateAddMissingButtonLabel() {
@@ -280,6 +320,149 @@ function renderCandidates() {
   updateAddMissingButtonLabel();
 }
 
+function parseCsvLine(line) {
+  const fields = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      value += '"';
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (char === "," && !inQuotes) {
+      fields.push(value);
+      value = "";
+      continue;
+    }
+    value += char;
+  }
+  fields.push(value);
+  return fields;
+}
+
+function parseCsvText(text) {
+  const raw = String(text || "");
+  const lines = raw.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim() !== "");
+  if (!lines.length) {
+    return { rows: [], errors: ["CSV file is empty."] };
+  }
+
+  const headers = parseCsvLine(lines[0]).map((header) => cleanText(header));
+  if (!headers.length) {
+    return { rows: [], errors: ["CSV headers could not be read."] };
+  }
+
+  const rows = [];
+  const errors = [];
+  for (let lineIndex = 1; lineIndex < lines.length; lineIndex += 1) {
+    const values = parseCsvLine(lines[lineIndex]);
+    const row = {};
+    for (let i = 0; i < headers.length; i += 1) {
+      row[headers[i]] = cleanText(values[i] || "");
+    }
+
+    const isEmptyRow = Object.values(row).every((value) => !cleanText(value));
+    if (isEmptyRow) {
+      continue;
+    }
+
+    if (values.length !== headers.length) {
+      errors.push(`Row ${lineIndex + 1} has ${values.length} value(s); expected ${headers.length}.`);
+    }
+
+    rows.push(row);
+  }
+
+  return { rows, errors };
+}
+
+async function previewImportRows(rows) {
+  setImportBusy(true);
+  setImportErrors([]);
+  try {
+    const preview = await directoryApi.previewRecruitmentImport({ rows });
+    const summary = [
+      `Rows: ${preview.totalRows}`,
+      `Would insert: ${preview.wouldInsert}`,
+      `Duplicates: ${preview.skippedDuplicates}`,
+      `Rejected: ${preview.rejected}`,
+    ].join(" | ");
+    setImportSummary(summary);
+    setImportErrors((preview.errors || []).map((error) => `Row ${error.row}: ${error.message}`));
+    pendingImportRows = preview.wouldInsert > 0 ? rows : [];
+  } catch (error) {
+    pendingImportRows = [];
+    setImportSummary(error?.message || "Could not preview CSV import.", true);
+    setImportErrors([]);
+  } finally {
+    setImportBusy(false);
+  }
+}
+
+async function handleCsvFile(file) {
+  if (!file) {
+    return;
+  }
+  if (importFileName) {
+    importFileName.textContent = `Selected: ${file.name}`;
+  }
+
+  const text = await file.text();
+  const parsed = parseCsvText(text);
+  if (!parsed.rows.length) {
+    pendingImportRows = [];
+    setImportSummary("No importable rows found.", true);
+    setImportErrors(parsed.errors);
+    if (runImportBtn) {
+      runImportBtn.disabled = true;
+    }
+    return;
+  }
+
+  if (parsed.errors.length) {
+    setImportErrors(parsed.errors);
+  } else {
+    setImportErrors([]);
+  }
+
+  await previewImportRows(parsed.rows);
+}
+
+async function runCsvImport() {
+  if (importBusy || !pendingImportRows.length) {
+    return;
+  }
+  setImportBusy(true);
+  setImportErrors([]);
+  try {
+    const result = await directoryApi.runRecruitmentImport({ rows: pendingImportRows });
+    const summary = [
+      `Imported: ${result.inserted}`,
+      `Duplicates skipped: ${result.skippedDuplicates}`,
+      `Rejected: ${result.rejected}`,
+    ].join(" | ");
+    setImportSummary(summary);
+    setImportErrors((result.errors || []).map((error) => `Row ${error.row}: ${error.message}`));
+    pendingImportRows = [];
+    await loadRecruitmentCandidates();
+    setStatus(`CSV import complete. ${summary}`);
+  } catch (error) {
+    console.error(error);
+    setImportSummary(error?.message || "CSV import failed.", true);
+  } finally {
+    setImportBusy(false);
+  }
+}
+
 function upsertCandidateInCache(item) {
   if (!item || !item.id) {
     return;
@@ -354,6 +537,16 @@ function redirectToUnauthorized(pageKey) {
   window.location.href = `./unauthorized.html?page=${page}`;
 }
 
+async function loadRecruitmentCandidates() {
+  const payload = await directoryApi.listRecruitment();
+  allCandidates = Array.isArray(payload?.items) ? payload.items : [];
+  if (sharePointListLink) {
+    sharePointListLink.href = cleanText(payload?.listUrl) || "#";
+  }
+  renderFilterOptions();
+  renderCandidates();
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
@@ -371,15 +564,7 @@ async function init() {
 
     renderTopNavigation({ role });
     setStatus("Loading active candidates...");
-
-    const payload = await directoryApi.listRecruitment();
-    allCandidates = Array.isArray(payload?.items) ? payload.items : [];
-    if (sharePointListLink) {
-      sharePointListLink.href = cleanText(payload?.listUrl) || "#";
-    }
-
-    renderFilterOptions();
-    renderCandidates();
+    await loadRecruitmentCandidates();
     setStatus(`Loaded ${allCandidates.length} active candidate(s).`);
   } catch (error) {
     if (error?.status === 403) {
@@ -404,6 +589,59 @@ addMissingToOneTouchBtn?.addEventListener("click", async () => {
     return;
   }
   await addAllMissingCandidatesToOneTouch();
+});
+
+importDropZone?.addEventListener("click", () => {
+  if (importBusy) {
+    return;
+  }
+  importFileInput?.click();
+});
+
+importDropZone?.addEventListener("keydown", (event) => {
+  if (importBusy) {
+    return;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    importFileInput?.click();
+  }
+});
+
+importDropZone?.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  if (!importBusy) {
+    importDropZone.classList.add("is-dragover");
+  }
+});
+
+importDropZone?.addEventListener("dragleave", () => {
+  importDropZone.classList.remove("is-dragover");
+});
+
+importDropZone?.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  importDropZone.classList.remove("is-dragover");
+  if (importBusy) {
+    return;
+  }
+  const file = event.dataTransfer?.files?.[0] || null;
+  if (!file) {
+    return;
+  }
+  await handleCsvFile(file);
+});
+
+importFileInput?.addEventListener("change", async () => {
+  const file = importFileInput.files?.[0] || null;
+  if (!file || importBusy) {
+    return;
+  }
+  await handleCsvFile(file);
+});
+
+runImportBtn?.addEventListener("click", async () => {
+  await runCsvImport();
 });
 
 signOutBtn?.addEventListener("click", async () => {

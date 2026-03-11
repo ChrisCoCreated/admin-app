@@ -132,6 +132,7 @@ function normalizeRecruitmentItem(item) {
     id: normalizeText(item?.id),
     candidateName: normalizeText(fields.Title),
     location: normalizeText(fields.Location),
+    email: normalizeText(fields.Email),
     phoneNumber: normalizeText(fields.PhoneNumber),
     interviewBooked: toBoolean(fields.InterviewBooked),
     interviewWith,
@@ -152,6 +153,7 @@ async function fetchRecruitmentItems(graphClient, siteId, listId) {
   const selectFields = [
     "Title",
     "Location",
+    "Email",
     "PhoneNumber",
     "InterviewBooked",
     "InterviewWith",
@@ -182,6 +184,7 @@ async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {
   const selectFields = [
     "Title",
     "Location",
+    "Email",
     "PhoneNumber",
     "InterviewBooked",
     "InterviewWith",

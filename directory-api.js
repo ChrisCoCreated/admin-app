@@ -152,6 +152,42 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async previewRecruitmentImport(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment/import"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify({
+          ...(payload && typeof payload === "object" ? payload : {}),
+          dryRun: true,
+        }),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment import preview request failed");
+      }
+      return response.json();
+    },
+
+    async runRecruitmentImport(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment/import"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify({
+          ...(payload && typeof payload === "object" ? payload : {}),
+          dryRun: false,
+        }),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment import request failed");
+      }
+      return response.json();
+    },
+
     async listMarketingPhotos(query = {}) {
       const response = await authFetch(buildUrl("/api/marketing/photos", query));
       if (!response.ok) {
