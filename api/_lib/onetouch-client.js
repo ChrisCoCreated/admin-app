@@ -481,6 +481,13 @@ async function getOneTouchLocationAreaOptions() {
   };
 }
 
+async function getOneTouchAreaOptions() {
+  const payload = await callOneTouch("general/get-areas");
+  const areaRecords = resolveRecords(payload, ["areas", "data.areas", "result.areas"]);
+  const areas = areaRecords.map(normalizeGeneralArea).map((row) => asString(row?.name)).filter(Boolean);
+  return Array.from(new Set(areas)).sort((a, b) => a.localeCompare(b));
+}
+
 async function resolveOneTouchLocationArea({ location = "", livesIn = "", explicitArea = "" } = {}) {
   const locationHint = stripTrailingUkPostcode(location) || asString(location);
   const livesInHint = stripTrailingUkPostcode(livesIn) || asString(livesIn);
@@ -966,12 +973,14 @@ async function createCarer(payload = {}) {
   const createPayload = sanitizeCarerCreatePayload(payload);
   const explicitLocation = asString(payload?.location);
   const explicitArea = asString(payload?.area);
-  const hasExplicitLocationArea = Boolean(explicitLocation && explicitArea);
+  const hasExplicitArea = Boolean(explicitArea);
 
-  if (hasExplicitLocationArea) {
-    createPayload.location = explicitLocation;
+  if (hasExplicitArea) {
+    if (explicitLocation) {
+      createPayload.location = explicitLocation;
+    }
     createPayload.area = explicitArea;
-    if (!createPayload.town) {
+    if (!createPayload.town && createPayload.location) {
       createPayload.town = explicitLocation;
     }
   } else {
@@ -1014,4 +1023,5 @@ module.exports = {
   createCarer,
   resolveOneTouchLocationArea,
   getOneTouchLocationAreaOptions,
+  getOneTouchAreaOptions,
 };

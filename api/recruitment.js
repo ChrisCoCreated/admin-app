@@ -227,7 +227,7 @@ function buildOneTouchCreatePayload(candidate, overrides = {}) {
     full_name: normalizeText(candidate.candidateName),
     phone: normalizeText(candidate.phoneNumber),
     livesIn: normalizeText(candidate.livesIn),
-    location: normalizeText(overrides.location || candidate.location),
+    location: normalizeText(candidate.location),
     area: normalizeText(overrides.area || candidate.earmarkedFor),
     source: normalizeText(candidate.source),
     notes: normalizeText(candidate.notes),
@@ -314,7 +314,6 @@ module.exports = async (req, res) => {
 
       const createResult = await createCarer(
         buildOneTouchCreatePayload(candidate, {
-          location: req.body?.location,
           area: req.body?.area,
         })
       );

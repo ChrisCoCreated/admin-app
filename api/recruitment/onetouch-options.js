@@ -1,5 +1,5 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
-const { getOneTouchLocationAreaOptions } = require("../_lib/onetouch-client");
+const { getOneTouchAreaOptions } = require("../_lib/onetouch-client");
 
 const ALLOWED_ROLES = [
   "admin",
@@ -27,9 +27,9 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const options = await getOneTouchLocationAreaOptions();
+    const areas = await getOneTouchAreaOptions();
     res.setHeader("Cache-Control", "private, max-age=300");
-    res.status(200).json(options);
+    res.status(200).json({ areas });
   } catch (error) {
     res.status(502).json({
       error: {

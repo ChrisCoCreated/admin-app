@@ -24,7 +24,6 @@ const importPreviewTitle = document.getElementById("importPreviewTitle");
 const importPreviewBody = document.getElementById("importPreviewBody");
 const oneTouchPickerModal = document.getElementById("oneTouchPickerModal");
 const oneTouchPickerCandidate = document.getElementById("oneTouchPickerCandidate");
-const oneTouchLocationSelect = document.getElementById("oneTouchLocationSelect");
 const oneTouchAreaSelect = document.getElementById("oneTouchAreaSelect");
 const oneTouchPickerError = document.getElementById("oneTouchPickerError");
 const oneTouchPickerConfirmBtn = document.getElementById("oneTouchPickerConfirmBtn");
@@ -149,7 +148,6 @@ async function ensureOneTouchOptionsLoaded() {
   }
   const options = await directoryApi.getRecruitmentOneTouchOptions();
   oneTouchOptionsCache = {
-    locations: Array.isArray(options?.locations) ? options.locations : [],
     areas: Array.isArray(options?.areas) ? options.areas : [],
   };
   return oneTouchOptionsCache;
@@ -171,20 +169,6 @@ async function openOneTouchPicker(candidate) {
     oneTouchPickerConfirmBtn.disabled = true;
     oneTouchPickerCancelBtn.disabled = true;
     const options = await ensureOneTouchOptionsLoaded();
-
-    if (oneTouchLocationSelect) {
-      oneTouchLocationSelect.innerHTML = '<option value="">Select location</option>';
-      for (const location of options.locations) {
-        const option = document.createElement("option");
-        option.value = location;
-        option.textContent = location;
-        oneTouchLocationSelect.appendChild(option);
-      }
-      oneTouchLocationSelect.value =
-        pickBestOption(options.locations, candidate?.location) ||
-        pickBestOption(options.locations, candidate?.livesIn) ||
-        "";
-    }
 
     if (oneTouchAreaSelect) {
       oneTouchAreaSelect.innerHTML = '<option value="">Select area</option>';
@@ -872,10 +856,9 @@ async function addCandidateToOneTouch(itemId) {
   if (!cleanItemId) {
     return;
   }
-  const selectedLocation = cleanText(oneTouchLocationSelect?.value);
   const selectedArea = cleanText(oneTouchAreaSelect?.value);
-  if (!selectedLocation || !selectedArea) {
-    setOneTouchPickerError("Select both location and area.");
+  if (!selectedArea) {
+    setOneTouchPickerError("Select an area.");
     return;
   }
 
@@ -884,7 +867,6 @@ async function addCandidateToOneTouch(itemId) {
     setStatus("Adding candidate to OneTouch...");
     const result = await directoryApi.addRecruitmentCandidateToOneTouch({
       itemId: cleanItemId,
-      location: selectedLocation,
       area: selectedArea,
     });
     if (result?.item) {
