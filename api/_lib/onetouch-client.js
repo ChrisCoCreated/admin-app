@@ -488,6 +488,32 @@ async function getOneTouchAreaOptions() {
   return Array.from(new Set(areas)).sort((a, b) => a.localeCompare(b));
 }
 
+function normalizeRecruitmentSource(record) {
+  const name = asString(
+    record?.name ||
+      record?.source ||
+      record?.recruitment_source ||
+      record?.recruitmentSource ||
+      record?.title ||
+      record?.label
+  );
+  return { name };
+}
+
+async function getOneTouchRecruitmentSourceOptions() {
+  const payload = await callOneTouch("carer/recruitment-sources");
+  const sourceRecords = resolveRecords(payload, [
+    "sources",
+    "recruitment_sources",
+    "data.sources",
+    "data.recruitment_sources",
+    "result.sources",
+    "result.recruitment_sources",
+  ]);
+  const sources = sourceRecords.map(normalizeRecruitmentSource).map((row) => asString(row?.name)).filter(Boolean);
+  return Array.from(new Set(sources)).sort((a, b) => a.localeCompare(b));
+}
+
 async function resolveOneTouchLocationArea({ location = "", livesIn = "", explicitArea = "" } = {}) {
   const locationHint = stripTrailingUkPostcode(location) || asString(location);
   const livesInHint = stripTrailingUkPostcode(livesIn) || asString(livesIn);
@@ -1024,4 +1050,5 @@ module.exports = {
   resolveOneTouchLocationArea,
   getOneTouchLocationAreaOptions,
   getOneTouchAreaOptions,
+  getOneTouchRecruitmentSourceOptions,
 };

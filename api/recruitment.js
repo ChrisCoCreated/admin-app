@@ -229,7 +229,8 @@ function buildOneTouchCreatePayload(candidate, overrides = {}) {
     livesIn: normalizeText(candidate.livesIn),
     location: normalizeText(candidate.location),
     area: normalizeText(overrides.area || candidate.earmarkedFor),
-    source: normalizeText(candidate.source),
+    recruitment_source: normalizeText(overrides.recruitmentSource || candidate.source),
+    source: normalizeText(overrides.recruitmentSource || candidate.source),
     notes: normalizeText(candidate.notes),
   };
 }
@@ -315,6 +316,7 @@ module.exports = async (req, res) => {
       const createResult = await createCarer(
         buildOneTouchCreatePayload(candidate, {
           area: req.body?.area,
+          recruitmentSource: req.body?.recruitmentSource,
         })
       );
       const oneTouchProfileUrl = buildOneTouchProfileUrl(createResult.id);
