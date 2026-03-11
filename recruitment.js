@@ -738,7 +738,13 @@ function renderCandidates() {
       <td>
         ${
           hasOneTouchLink(candidate)
-            ? '<span class="muted">Added</span>'
+            ? `<a
+                class="button-link-one-touch recruitment-open-link"
+                href="${escapeHtml(cleanText(candidate.oneTouchLink))}"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open in OneTouch</a
+              >`
             : `<button type="button" class="secondary recruitment-add-btn"${addToOneTouchBusy ? " disabled" : ""}>Add to OneTouch</button>`
         }
       </td>

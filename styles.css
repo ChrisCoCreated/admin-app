@@ -576,6 +576,12 @@ dd {
   pointer-events: none;
 }
 
+.recruitment-open-link {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
 .wrap-row {
   flex-wrap: wrap;
 }
