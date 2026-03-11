@@ -1,5 +1,43 @@
 const DEFAULT_BASE_URL = "https://api-uk.onetouchhealth.net/connect/c2/v1";
 const ONETOUCH_CREATE_DEBUG = process.env.ONETOUCH_CREATE_DEBUG === "1";
+const ALLOWED_CARER_CREATE_FIELDS = new Set([
+  "external_id",
+  "increment",
+  "strict",
+  "title",
+  "firstname",
+  "lastname",
+  "known_as",
+  "sex",
+  "dob",
+  "pps",
+  "ni_number",
+  "primary_email",
+  "secondary_email",
+  "phone_mobile",
+  "phone_home",
+  "phone_work",
+  "address",
+  "town",
+  "county",
+  "postcode",
+  "country",
+  "nationality",
+  "date_start",
+  "transport_type",
+  "recruitment_source",
+  "position",
+  "location",
+  "branch",
+  "area",
+  "status",
+  "comment",
+  "bank_account_name",
+  "bank_sort_code",
+  "bank_account_number",
+  "bank_iban",
+  "profile_photo",
+]);
 
 let tokenCache = {
   accessToken: "",
@@ -1066,9 +1104,31 @@ function pickObjectKeys(input, keys) {
   return out;
 }
 
+function enforceAllowedCarerCreateFields(payload = {}) {
+  const out = {};
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (!ALLOWED_CARER_CREATE_FIELDS.has(key)) {
+      continue;
+    }
+    if (value === undefined || value === null) {
+      continue;
+    }
+    if (typeof value === "string") {
+      const text = asString(value);
+      if (!text) {
+        continue;
+      }
+      out[key] = text;
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 async function createCarer(payload = {}) {
   const requestId = `otc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const createPayload = sanitizeCarerCreatePayload(payload);
+  let createPayload = sanitizeCarerCreatePayload(payload);
   const explicitLocation = asString(payload?.location);
   const explicitArea = asString(payload?.area);
   const hasExplicitArea = Boolean(explicitArea);
@@ -1100,6 +1160,8 @@ async function createCarer(payload = {}) {
   if (!createPayload.firstname || !createPayload.lastname) {
     throw new Error("OneTouch create requires candidate name.");
   }
+
+  createPayload = enforceAllowedCarerCreateFields(createPayload);
 
   console.info("[OneTouch] carer/create request", {
     requestId,

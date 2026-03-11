@@ -1378,6 +1378,15 @@ body.lightbox-open {
   padding: 18px;
 }
 
+.modal-panel {
+  width: min(620px, 100%);
+  border: 1px solid #d4dceb;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 20px 44px rgba(24, 35, 58, 0.28);
+  padding: 18px;
+}
+
 .modal-form {
   margin-top: 10px;
   display: grid;

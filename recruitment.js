@@ -122,6 +122,18 @@ function closeOneTouchPicker() {
   setOneTouchPickerError("");
 }
 
+function setSelectLoading(selectEl, placeholder) {
+  if (!selectEl) {
+    return;
+  }
+  selectEl.disabled = true;
+  selectEl.innerHTML = "";
+  const option = document.createElement("option");
+  option.value = "";
+  option.textContent = placeholder;
+  selectEl.appendChild(option);
+}
+
 function normalizeToken(value) {
   return cleanText(value)
     .toLowerCase()
@@ -171,6 +183,11 @@ async function openOneTouchPicker(candidate) {
     oneTouchPickerCandidate.textContent = `Candidate: ${cleanText(candidate?.candidateName) || "-"}`;
   }
 
+  setSelectLoading(oneTouchAreaSelect, "Loading areas...");
+  setSelectLoading(oneTouchRecruitmentSourceSelect, "Loading recruitment sources...");
+  setSelectLoading(oneTouchPositionSelect, "Loading positions...");
+  setSelectLoading(oneTouchStatusSelect, "Loading statuses...");
+
   try {
     oneTouchPickerConfirmBtn.disabled = true;
     oneTouchPickerCancelBtn.disabled = true;
@@ -185,6 +202,7 @@ async function openOneTouchPicker(candidate) {
         oneTouchAreaSelect.appendChild(option);
       }
       oneTouchAreaSelect.value = pickBestOption(options.areas, candidate?.earmarkedFor) || "";
+      oneTouchAreaSelect.disabled = false;
     }
     if (oneTouchRecruitmentSourceSelect) {
       oneTouchRecruitmentSourceSelect.innerHTML = '<option value="">Select recruitment source</option>';
@@ -195,6 +213,7 @@ async function openOneTouchPicker(candidate) {
         oneTouchRecruitmentSourceSelect.appendChild(option);
       }
       oneTouchRecruitmentSourceSelect.value = pickBestOption(options.recruitmentSources, candidate?.source) || "";
+      oneTouchRecruitmentSourceSelect.disabled = false;
     }
     if (oneTouchPositionSelect) {
       oneTouchPositionSelect.innerHTML = '<option value="">Select position</option>';
@@ -205,6 +224,7 @@ async function openOneTouchPicker(candidate) {
         oneTouchPositionSelect.appendChild(option);
       }
       oneTouchPositionSelect.value = pickBestOption(options.positions, "Carer") || "";
+      oneTouchPositionSelect.disabled = false;
     }
     if (oneTouchStatusSelect) {
       oneTouchStatusSelect.innerHTML = '<option value="">Select status</option>';
@@ -215,6 +235,7 @@ async function openOneTouchPicker(candidate) {
         oneTouchStatusSelect.appendChild(option);
       }
       oneTouchStatusSelect.value = pickBestOption(options.statuses, candidate?.status) || "";
+      oneTouchStatusSelect.disabled = false;
     }
   } catch (error) {
     setOneTouchPickerError(error?.message || "Could not load OneTouch options.");
@@ -913,6 +934,14 @@ async function addCandidateToOneTouch(itemId) {
     });
     if (result?.item) {
       upsertCandidateInCache(result.item);
+    } else if (result?.itemId && result?.oneTouchLink) {
+      const existing = allCandidates.find((candidate) => candidate.id === cleanText(result.itemId));
+      if (existing) {
+        upsertCandidateInCache({
+          ...existing,
+          oneTouchLink: cleanText(result.oneTouchLink),
+        });
+      }
     }
     renderCandidates();
     closeOneTouchPicker();

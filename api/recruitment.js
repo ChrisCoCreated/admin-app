@@ -298,12 +298,12 @@ function buildOneTouchCreatePayload(candidate, overrides = {}) {
   return {
     external_id: buildRecruitmentExternalId(candidate.id),
     full_name: normalizeText(candidate.candidateName),
+    primary_email: normalizeText(candidate.email),
     phone: normalizeText(candidate.phoneNumber),
     livesIn: normalizeText(candidate.livesIn),
     location: normalizeText(candidate.location),
     area: normalizeText(overrides.area || candidate.earmarkedFor),
     recruitment_source: normalizeText(overrides.recruitmentSource || candidate.source),
-    source: normalizeText(overrides.recruitmentSource || candidate.source),
     position: normalizeText(overrides.position || "Carer"),
     status: normalizeText(overrides.status),
     notes: normalizeText(candidate.notes),
@@ -398,7 +398,6 @@ module.exports = async (req, res) => {
       );
       const oneTouchProfileUrl = buildOneTouchProfileUrl(createResult.id);
       await patchRecruitmentOneTouchLink(graphClient, siteId, list.id, itemId, oneTouchProfileUrl);
-      const updatedCandidate = await fetchRecruitmentItem(graphClient, siteId, list.id, itemId);
 
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json({
@@ -406,7 +405,6 @@ module.exports = async (req, res) => {
         itemId,
         oneTouchId: createResult.id,
         oneTouchLink: oneTouchProfileUrl,
-        item: updatedCandidate,
       });
       return;
     }
