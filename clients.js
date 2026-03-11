@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260311";
 
 const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");

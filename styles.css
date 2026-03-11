@@ -61,20 +61,68 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .topnav {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  position: relative;
+}
+
+.topnav-menu {
+  position: relative;
+}
+
+.topnav-summary {
+  list-style: none;
+  cursor: pointer;
+  color: #1d2a42;
+  font-weight: 700;
+  border: 1px solid #ccd5e6;
+  border-radius: 10px;
+  background: #f9fbff;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.topnav-summary::-webkit-details-marker {
+  display: none;
+}
+
+.topnav-summary::after {
+  content: " \25BE";
+  font-size: 0.8em;
+}
+
+.topnav-menu[open] .topnav-summary::after {
+  content: " \25B4";
+}
+
+.topnav-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  min-width: 240px;
+  max-width: min(88vw, 360px);
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid #cdd6e6;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 16px 34px rgba(17, 20, 26, 0.16);
 }
 
 .topnav-link {
-  text-decoration: none;
+  display: block;
   color: #1d2a42;
   font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .topnav-link.active {
@@ -230,9 +278,9 @@ button.secondary {
 }
 
 #signOutBtn {
-  min-width: 170px;
-  padding: 14px 28px;
-  margin-top: 10px;
+  min-width: 0;
+  padding: 10px 16px;
+  margin-top: 0;
 }
 
 button:disabled {

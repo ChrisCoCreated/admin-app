@@ -96,6 +96,20 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
   const currentPath = normalizePath(currentPathname);
   nav.innerHTML = "";
 
+  if (!pages.length) {
+    return;
+  }
+
+  const menu = document.createElement("details");
+  menu.className = "topnav-menu";
+  const summary = document.createElement("summary");
+  summary.className = "topnav-summary";
+  summary.textContent = "Menu";
+  menu.appendChild(summary);
+
+  const panel = document.createElement("div");
+  panel.className = "topnav-panel";
+
   for (const pageKey of pages) {
     const page = PAGE_META[pageKey];
     if (!page) {
@@ -107,7 +121,15 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
     link.textContent = page.label;
     if (normalizePath(page.href) === currentPath) {
       link.classList.add("active");
+      link.setAttribute("aria-current", "page");
+      summary.textContent = `Menu: ${page.label}`;
     }
-    nav.appendChild(link);
+    link.addEventListener("click", () => {
+      menu.open = false;
+    });
+    panel.appendChild(link);
   }
+
+  menu.appendChild(panel);
+  nav.appendChild(menu);
 }
