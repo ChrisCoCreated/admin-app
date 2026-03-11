@@ -13,7 +13,6 @@ const statusMessage = document.getElementById("statusMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const detailRoot = document.getElementById("candidateDetail");
 const sharePointListLink = document.getElementById("sharePointListLink");
-const addMissingToOneTouchBtn = document.getElementById("addMissingToOneTouchBtn");
 const importDropZone = document.getElementById("importDropZone");
 const importFileInput = document.getElementById("importFileInput");
 const importFileName = document.getElementById("importFileName");
@@ -85,9 +84,6 @@ function hasOneTouchLink(candidate) {
 
 function setAddButtonsBusy(disabled) {
   addToOneTouchBusy = disabled;
-  if (addMissingToOneTouchBtn) {
-    addMissingToOneTouchBtn.disabled = disabled;
-  }
 }
 
 function setImportBusy(disabled) {
@@ -127,19 +123,21 @@ function stripTrailingUkPostcode(value) {
   if (!raw) {
     return "";
   }
-  const withSpaces = raw.replace(/([A-Za-z])(\d)/g, "$1 $2").replace(/(\d)([A-Za-z])/g, "$1 $2");
-  const normalized = withSpaces.replace(/\s+/g, " ").trim();
+  const normalized = raw.replace(/\s+/g, " ").trim();
+  const trimmed = normalized.replace(/[\s,;-]+([A-Z]{1,2}\d[A-Z\d]{0,2})$/i, "").trim();
+  return trimmed || normalized;
+}
 
-  const fullPostcode = /^(.*?)(?:[\s,;-]+)?([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})$/i.exec(normalized);
-  if (fullPostcode) {
-    return cleanText(fullPostcode[1]) || normalized;
+function ensureIndeedPrefix(value) {
+  const raw = cleanText(value);
+  if (!raw) {
+    return "Indeed";
   }
-  const outwardOnly = /^(.*?)(?:[\s,;-]+)?([A-Z]{1,2}\d[A-Z\d]?)$/i.exec(normalized);
-  if (outwardOnly) {
-    return cleanText(outwardOnly[1]) || normalized;
+  const withoutIndeed = raw.replace(/^indeed(?:\s*[-:|]\s*|\s+)/i, "").trim();
+  if (!withoutIndeed) {
+    return "Indeed";
   }
-
-  return raw;
+  return `Indeed - ${withoutIndeed}`;
 }
 
 function normalizeImportStatus(statusValue, interestLevelValue) {
@@ -188,7 +186,7 @@ function toImportPreviewRow(row) {
     livesIn: getCsvValue(row, "candidate location"),
     location: stripTrailingUkPostcode(getCsvValue(row, "job location")),
     status: normalizeImportStatus(getCsvValue(row, "status"), getCsvValue(row, "interest level")),
-    source: getCsvValue(row, "source") || "Indeed",
+    source: ensureIndeedPrefix(getCsvValue(row, "source")),
   };
 }
 
@@ -222,15 +220,6 @@ function renderImportPreview(rows) {
     `;
     importPreviewBody.appendChild(tr);
   }
-}
-
-function updateAddMissingButtonLabel() {
-  if (!addMissingToOneTouchBtn) {
-    return;
-  }
-  const missingCount = allCandidates.filter((candidate) => !hasOneTouchLink(candidate)).length;
-  addMissingToOneTouchBtn.textContent =
-    missingCount > 0 ? `Add Missing to OneTouch (${missingCount})` : "Add Missing to OneTouch";
 }
 
 function formatBoolean(value) {
@@ -378,7 +367,6 @@ function renderCandidates() {
   if (!filtered.length) {
     emptyState.hidden = false;
     setDetail(null);
-    updateAddMissingButtonLabel();
     return;
   }
 
@@ -423,7 +411,6 @@ function renderCandidates() {
   }
 
   setDetail(selected);
-  updateAddMissingButtonLabel();
 }
 
 function parseCsvLine(line) {
@@ -614,39 +601,6 @@ async function addCandidateToOneTouch(itemId) {
   }
 }
 
-async function addAllMissingCandidatesToOneTouch() {
-  const missing = allCandidates.filter((candidate) => !hasOneTouchLink(candidate));
-  if (!missing.length) {
-    setStatus("All active candidates already have a OneTouch link.");
-    return;
-  }
-
-  setAddButtonsBusy(true);
-  let successCount = 0;
-  try {
-    for (const candidate of missing) {
-      setStatus(`Adding ${cleanText(candidate.candidateName) || "candidate"} to OneTouch...`);
-      const result = await directoryApi.addRecruitmentCandidateToOneTouch({
-        itemId: candidate.id,
-      });
-      if (result?.item) {
-        upsertCandidateInCache(result.item);
-      }
-      successCount += 1;
-      renderCandidates();
-    }
-    setStatus(`Added ${successCount} candidate(s) to OneTouch.`);
-  } catch (error) {
-    console.error(error);
-    setStatus(
-      `Added ${successCount} candidate(s), then failed: ${error?.message || "OneTouch request failed."}`,
-      true
-    );
-  } finally {
-    setAddButtonsBusy(false);
-  }
-}
-
 function redirectToUnauthorized(pageKey) {
   const page = encodeURIComponent(String(pageKey || "recruitment").trim().toLowerCase());
   window.location.href = `./unauthorized.html?page=${page}`;
@@ -699,12 +653,6 @@ searchInput?.addEventListener("input", renderCandidates);
 locationFilterSelect?.addEventListener("change", renderCandidates);
 statusFilterSelect?.addEventListener("change", renderCandidates);
 sourceFilterSelect?.addEventListener("change", renderCandidates);
-addMissingToOneTouchBtn?.addEventListener("click", async () => {
-  if (addToOneTouchBusy) {
-    return;
-  }
-  await addAllMissingCandidatesToOneTouch();
-});
 
 importDropZone?.addEventListener("click", () => {
   if (importBusy) {

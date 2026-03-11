@@ -117,21 +117,22 @@ function stripTrailingUkPostcode(input) {
     return "";
   }
 
-  const withSpaces = value.replace(/([A-Za-z])(\d)/g, "$1 $2").replace(/(\d)([A-Za-z])/g, "$1 $2");
-  const normalized = withSpaces.replace(/\s+/g, " ").trim();
-  const fullPostcode = /^(.*?)(?:[\s,;-]+)?([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})$/i.exec(normalized);
-  if (fullPostcode) {
-    const base = normalizeText(fullPostcode[1]);
-    return base || normalized;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const trimmed = normalized.replace(/[\s,;-]+([A-Z]{1,2}\d[A-Z\d]{0,2})$/i, "").trim();
+  return trimmed || normalized;
+}
+
+function ensureIndeedPrefix(value) {
+  const raw = normalizeText(value);
+  if (!raw) {
+    return "Indeed";
   }
 
-  const outwardOnly = /^(.*?)(?:[\s,;-]+)?([A-Z]{1,2}\d[A-Z\d]?)$/i.exec(normalized);
-  if (outwardOnly) {
-    const base = normalizeText(outwardOnly[1]);
-    return base || normalized;
+  const withoutIndeed = raw.replace(/^indeed(?:\s*[-:|]\s*|\s+)/i, "").trim();
+  if (!withoutIndeed) {
+    return "Indeed";
   }
-
-  return value;
+  return `Indeed - ${withoutIndeed}`;
 }
 
 function normalizePipelineStatus(statusValue, interestLevelValue) {
@@ -171,7 +172,7 @@ function mapRowToSharePointFields(row) {
 
   const phoneNumber = getRowValue(row, "phone");
   const email = getRowValue(row, "email");
-  const source = getRowValue(row, "source") || "Indeed";
+  const source = ensureIndeedPrefix(getRowValue(row, "source"));
   const livesIn = getRowValue(row, "candidate location");
   const locationRaw = getRowValue(row, "job location");
   const location = stripTrailingUkPostcode(locationRaw);
