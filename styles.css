@@ -536,6 +536,17 @@ dd {
   font-size: 1.05rem;
 }
 
+.email-template-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.email-body-field textarea {
+  min-height: 320px;
+}
+
 .consent-filter-btn.active {
   background: #1f3c88;
   color: #fff;
