@@ -7,6 +7,7 @@ const DEFAULT_LIST_NAME = "Associate Recruitment";
 const DEFAULT_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency/Lists/Associate%20Recruitment/Active.aspx?env=WebViewList";
 const ONETOUCH_CARER_PROFILE_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerSummaryProfile.php";
+const DEFAULT_EXTERNAL_ID_PREFIX = "thrive-recruitment";
 
 const ALLOWED_ROLES = [
   "admin",
@@ -123,6 +124,24 @@ function buildOneTouchProfileUrl(oneTouchId) {
   return url.toString();
 }
 
+function buildRecruitmentExternalId(candidateId) {
+  const id = normalizeText(candidateId);
+  if (!id) {
+    return "";
+  }
+  const configuredPrefix = normalizeText(
+    process.env.ONETOUCH_RECRUITMENT_EXTERNAL_ID_PREFIX || DEFAULT_EXTERNAL_ID_PREFIX
+  );
+  if (!configuredPrefix) {
+    return id;
+  }
+  const prefixWithDash = `${configuredPrefix}-`;
+  if (id.toLowerCase().startsWith(prefixWithDash.toLowerCase())) {
+    return id;
+  }
+  return `${configuredPrefix}-${id}`;
+}
+
 function normalizeRecruitmentItem(item) {
   const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
   const active = toBoolean(fields.Active);
@@ -223,7 +242,7 @@ async function patchRecruitmentOneTouchLink(graphClient, siteId, listId, itemId,
 
 function buildOneTouchCreatePayload(candidate, overrides = {}) {
   return {
-    external_id: normalizeText(candidate.id),
+    external_id: buildRecruitmentExternalId(candidate.id),
     full_name: normalizeText(candidate.candidateName),
     phone: normalizeText(candidate.phoneNumber),
     livesIn: normalizeText(candidate.livesIn),
