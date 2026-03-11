@@ -34,6 +34,8 @@ const oneTouchStatusSelect = document.getElementById("oneTouchStatusSelect");
 const oneTouchPickerError = document.getElementById("oneTouchPickerError");
 const oneTouchPickerConfirmBtn = document.getElementById("oneTouchPickerConfirmBtn");
 const oneTouchPickerCancelBtn = document.getElementById("oneTouchPickerCancelBtn");
+const statusQuickMenu = document.getElementById("statusQuickMenu");
+const statusQuickMenuList = document.getElementById("statusQuickMenuList");
 
 const detailFields = {
   candidateName: detailRoot?.querySelector('[data-field="candidateName"]'),
@@ -69,6 +71,7 @@ let importEditingDraft = null;
 let oneTouchOptionsCache = null;
 let oneTouchPickerCandidateId = "";
 let statusUpdateBusy = false;
+let statusQuickMenuCandidateId = "";
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
@@ -634,6 +637,66 @@ function renderStatusUpdateOptions() {
   statusUpdateSelect.value = RECRUITMENT_STATUS_OPTIONS.includes(current) ? current : "";
 }
 
+function closeStatusQuickMenu() {
+  statusQuickMenuCandidateId = "";
+  if (statusQuickMenu) {
+    statusQuickMenu.hidden = true;
+    statusQuickMenu.style.left = "";
+    statusQuickMenu.style.top = "";
+  }
+  if (statusQuickMenuList) {
+    statusQuickMenuList.innerHTML = "";
+  }
+}
+
+function openStatusQuickMenu(candidate, anchorEl) {
+  if (!statusQuickMenu || !statusQuickMenuList || !anchorEl || !candidate?.id) {
+    return;
+  }
+  const candidateId = cleanText(candidate.id);
+  if (!candidateId) {
+    return;
+  }
+
+  statusQuickMenuCandidateId = candidateId;
+  const currentStatus = cleanText(candidate.status);
+  const optionsHtml = RECRUITMENT_STATUS_OPTIONS.map((status) => {
+    const activeClass = currentStatus === status ? " is-active" : "";
+    return `<button type="button" class="status-quick-option${activeClass}" data-status="${escapeHtml(status)}">${escapeHtml(status)}</button>`;
+  }).join("");
+  statusQuickMenuList.innerHTML = optionsHtml;
+
+  for (const btn of statusQuickMenuList.querySelectorAll(".status-quick-option")) {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (statusUpdateBusy) {
+        return;
+      }
+      const nextStatus = cleanText(btn.getAttribute("data-status"));
+      if (!nextStatus) {
+        return;
+      }
+      statusUpdateBusy = true;
+      try {
+        await updateCandidateStatusById(candidateId, nextStatus);
+        closeStatusQuickMenu();
+      } catch (error) {
+        console.error(error);
+        setStatus(error?.message || "Could not update status.", true);
+      } finally {
+        statusUpdateBusy = false;
+      }
+    });
+  }
+
+  const rect = anchorEl.getBoundingClientRect();
+  const top = rect.bottom + window.scrollY + 8;
+  const left = Math.max(12, rect.left + window.scrollX);
+  statusQuickMenu.style.top = `${top}px`;
+  statusQuickMenu.style.left = `${left}px`;
+  statusQuickMenu.hidden = false;
+}
+
 function setDetail(candidate) {
   if (!candidate) {
     detailFields.candidateName.textContent = "Select a candidate";
@@ -763,6 +826,7 @@ function getFilteredCandidates() {
 function renderCandidates() {
   const filtered = getFilteredCandidates();
   recruitmentTableBody.innerHTML = "";
+  closeStatusQuickMenu();
 
   if (!filtered.length) {
     emptyState.hidden = false;
@@ -777,26 +841,15 @@ function renderCandidates() {
   for (const candidate of filtered) {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", candidate.id === selectedCandidateId);
-    const statusOptionsHtml = RECRUITMENT_STATUS_OPTIONS.map((status) => {
-      const selected = cleanText(candidate.status) === status ? " selected" : "";
-      return `<option value="${escapeHtml(status)}"${selected}>${escapeHtml(status)}</option>`;
-    }).join("");
     tr.innerHTML = `
       <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
-      <td>${escapeHtml(cleanText(candidate.status) || "-")}</td>
+      <td>
+        <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
+      </td>
       <td>${escapeHtml(cleanText(candidate.source) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.phoneNumber) || "-")}</td>
       <td>
-        <div class="recruitment-row-actions">
-          <select class="recruitment-status-inline">
-            <option value="">Select status</option>
-            ${statusOptionsHtml}
-          </select>
-          <button type="button" class="secondary recruitment-status-save-btn"${
-            statusUpdateBusy ? " disabled" : ""
-          }>Save</button>
-        </div>
         ${
           hasOneTouchLink(candidate)
             ? `<a
@@ -825,29 +878,15 @@ function renderCandidates() {
       }
       await openOneTouchPicker(candidate);
     });
-    const rowStatusSelect = tr.querySelector(".recruitment-status-inline");
-    const rowStatusSaveBtn = tr.querySelector(".recruitment-status-save-btn");
-    rowStatusSaveBtn?.addEventListener("click", async (event) => {
+    const statusTrigger = tr.querySelector(".status-pill-trigger");
+    statusTrigger?.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (statusUpdateBusy) {
+      selectedCandidateId = candidate.id;
+      setDetail(candidate);
+      if (statusUpdateBusy || addToOneTouchBusy) {
         return;
       }
-      const nextStatus = cleanText(rowStatusSelect?.value);
-      if (!nextStatus) {
-        setStatus("Select a status first.", true);
-        return;
-      }
-      statusUpdateBusy = true;
-      renderCandidates();
-      try {
-        await updateCandidateStatusById(candidate.id, nextStatus);
-      } catch (error) {
-        console.error(error);
-        setStatus(error?.message || "Could not update status.", true);
-      } finally {
-        statusUpdateBusy = false;
-        renderCandidates();
-      }
+      openStatusQuickMenu(candidate, statusTrigger);
     });
 
     recruitmentTableBody.appendChild(tr);
@@ -1267,10 +1306,35 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || addToOneTouchBusy) {
     return;
   }
+  closeStatusQuickMenu();
   if (!oneTouchPickerModal?.hidden) {
     closeOneTouchPicker();
   }
 });
+
+document.addEventListener("click", (event) => {
+  if (statusQuickMenu?.hidden) {
+    return;
+  }
+  const target = event.target;
+  if (!(target instanceof Node)) {
+    return;
+  }
+  if (statusQuickMenu.contains(target)) {
+    return;
+  }
+  closeStatusQuickMenu();
+});
+
+window.addEventListener(
+  "scroll",
+  () => {
+    if (!statusQuickMenu?.hidden) {
+      closeStatusQuickMenu();
+    }
+  },
+  true
+);
 
 signOutBtn?.addEventListener("click", async () => {
   try {
