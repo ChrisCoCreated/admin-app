@@ -221,14 +221,14 @@ async function patchRecruitmentOneTouchLink(graphClient, siteId, listId, itemId,
   });
 }
 
-function buildOneTouchCreatePayload(candidate) {
+function buildOneTouchCreatePayload(candidate, overrides = {}) {
   return {
     external_id: normalizeText(candidate.id),
     full_name: normalizeText(candidate.candidateName),
     phone: normalizeText(candidate.phoneNumber),
     livesIn: normalizeText(candidate.livesIn),
-    location: normalizeText(candidate.location),
-    area: normalizeText(candidate.earmarkedFor),
+    location: normalizeText(overrides.location || candidate.location),
+    area: normalizeText(overrides.area || candidate.earmarkedFor),
     source: normalizeText(candidate.source),
     notes: normalizeText(candidate.notes),
   };
@@ -312,7 +312,12 @@ module.exports = async (req, res) => {
         return;
       }
 
-      const createResult = await createCarer(buildOneTouchCreatePayload(candidate));
+      const createResult = await createCarer(
+        buildOneTouchCreatePayload(candidate, {
+          location: req.body?.location,
+          area: req.body?.area,
+        })
+      );
       const oneTouchProfileUrl = buildOneTouchProfileUrl(createResult.id);
       await patchRecruitmentOneTouchLink(graphClient, siteId, list.id, itemId, oneTouchProfileUrl);
       const updatedCandidate = await fetchRecruitmentItem(graphClient, siteId, list.id, itemId);

@@ -183,6 +183,32 @@
       </section>
     </main>
 
+    <div id="oneTouchPickerModal" class="modal-backdrop" hidden>
+      <div class="modal-panel">
+        <h3>Select OneTouch Location and Area</h3>
+        <p id="oneTouchPickerCandidate" class="muted"></p>
+        <div class="mapping-form-grid">
+          <label class="field" for="oneTouchLocationSelect">
+            Location
+            <select id="oneTouchLocationSelect">
+              <option value="">Select location</option>
+            </select>
+          </label>
+          <label class="field" for="oneTouchAreaSelect">
+            Area
+            <select id="oneTouchAreaSelect">
+              <option value="">Select area</option>
+            </select>
+          </label>
+        </div>
+        <p id="oneTouchPickerError" class="muted error" hidden></p>
+        <div class="row">
+          <button id="oneTouchPickerConfirmBtn" type="button">Add to OneTouch</button>
+          <button id="oneTouchPickerCancelBtn" type="button" class="secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="./recruitment.js"></script>
   </body>
 </html>

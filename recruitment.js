@@ -22,6 +22,13 @@ const runImportBtn = document.getElementById("runImportBtn");
 const importPreviewWrap = document.getElementById("importPreviewWrap");
 const importPreviewTitle = document.getElementById("importPreviewTitle");
 const importPreviewBody = document.getElementById("importPreviewBody");
+const oneTouchPickerModal = document.getElementById("oneTouchPickerModal");
+const oneTouchPickerCandidate = document.getElementById("oneTouchPickerCandidate");
+const oneTouchLocationSelect = document.getElementById("oneTouchLocationSelect");
+const oneTouchAreaSelect = document.getElementById("oneTouchAreaSelect");
+const oneTouchPickerError = document.getElementById("oneTouchPickerError");
+const oneTouchPickerConfirmBtn = document.getElementById("oneTouchPickerConfirmBtn");
+const oneTouchPickerCancelBtn = document.getElementById("oneTouchPickerCancelBtn");
 
 const detailFields = {
   candidateName: detailRoot?.querySelector('[data-field="candidateName"]'),
@@ -54,6 +61,8 @@ let pendingImportRows = [];
 let latestImportWouldInsert = 0;
 let importEditingRowIndex = -1;
 let importEditingDraft = null;
+let oneTouchOptionsCache = null;
+let oneTouchPickerCandidateId = "";
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -86,6 +95,113 @@ function hasOneTouchLink(candidate) {
 
 function setAddButtonsBusy(disabled) {
   addToOneTouchBusy = disabled;
+  if (oneTouchPickerConfirmBtn) {
+    oneTouchPickerConfirmBtn.disabled = disabled;
+  }
+  if (oneTouchPickerCancelBtn) {
+    oneTouchPickerCancelBtn.disabled = disabled;
+  }
+}
+
+function setOneTouchPickerError(message = "") {
+  if (!oneTouchPickerError) {
+    return;
+  }
+  const text = cleanText(message);
+  oneTouchPickerError.hidden = !text;
+  oneTouchPickerError.textContent = text;
+}
+
+function closeOneTouchPicker() {
+  oneTouchPickerCandidateId = "";
+  if (oneTouchPickerModal) {
+    oneTouchPickerModal.hidden = true;
+  }
+  setOneTouchPickerError("");
+}
+
+function normalizeToken(value) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function pickBestOption(options, hint) {
+  const tokenHint = normalizeToken(hint);
+  if (!tokenHint || !Array.isArray(options)) {
+    return "";
+  }
+  const exact = options.find((option) => normalizeToken(option) === tokenHint);
+  if (exact) {
+    return exact;
+  }
+  const contains = options.find((option) => normalizeToken(option).includes(tokenHint));
+  if (contains) {
+    return contains;
+  }
+  const reverseContains = options.find((option) => tokenHint.includes(normalizeToken(option)));
+  return reverseContains || "";
+}
+
+async function ensureOneTouchOptionsLoaded() {
+  if (oneTouchOptionsCache) {
+    return oneTouchOptionsCache;
+  }
+  const options = await directoryApi.getRecruitmentOneTouchOptions();
+  oneTouchOptionsCache = {
+    locations: Array.isArray(options?.locations) ? options.locations : [],
+    areas: Array.isArray(options?.areas) ? options.areas : [],
+  };
+  return oneTouchOptionsCache;
+}
+
+async function openOneTouchPicker(candidate) {
+  const candidateId = cleanText(candidate?.id);
+  if (!candidateId || !oneTouchPickerModal) {
+    return;
+  }
+  oneTouchPickerCandidateId = candidateId;
+  oneTouchPickerModal.hidden = false;
+  setOneTouchPickerError("");
+  if (oneTouchPickerCandidate) {
+    oneTouchPickerCandidate.textContent = `Candidate: ${cleanText(candidate?.candidateName) || "-"}`;
+  }
+
+  try {
+    oneTouchPickerConfirmBtn.disabled = true;
+    oneTouchPickerCancelBtn.disabled = true;
+    const options = await ensureOneTouchOptionsLoaded();
+
+    if (oneTouchLocationSelect) {
+      oneTouchLocationSelect.innerHTML = '<option value="">Select location</option>';
+      for (const location of options.locations) {
+        const option = document.createElement("option");
+        option.value = location;
+        option.textContent = location;
+        oneTouchLocationSelect.appendChild(option);
+      }
+      oneTouchLocationSelect.value =
+        pickBestOption(options.locations, candidate?.location) ||
+        pickBestOption(options.locations, candidate?.livesIn) ||
+        "";
+    }
+
+    if (oneTouchAreaSelect) {
+      oneTouchAreaSelect.innerHTML = '<option value="">Select area</option>';
+      for (const area of options.areas) {
+        const option = document.createElement("option");
+        option.value = area;
+        option.textContent = area;
+        oneTouchAreaSelect.appendChild(option);
+      }
+      oneTouchAreaSelect.value = pickBestOption(options.areas, candidate?.earmarkedFor) || "";
+    }
+  } catch (error) {
+    setOneTouchPickerError(error?.message || "Could not load OneTouch location/area options.");
+  } finally {
+    oneTouchPickerConfirmBtn.disabled = false;
+    oneTouchPickerCancelBtn.disabled = false;
+  }
 }
 
 function updateRunImportButtonState() {
@@ -573,7 +689,7 @@ function renderCandidates() {
       if (addToOneTouchBusy) {
         return;
       }
-      await addCandidateToOneTouch(candidate.id);
+      await openOneTouchPicker(candidate);
     });
 
     recruitmentTableBody.appendChild(tr);
@@ -756,19 +872,30 @@ async function addCandidateToOneTouch(itemId) {
   if (!cleanItemId) {
     return;
   }
+  const selectedLocation = cleanText(oneTouchLocationSelect?.value);
+  const selectedArea = cleanText(oneTouchAreaSelect?.value);
+  if (!selectedLocation || !selectedArea) {
+    setOneTouchPickerError("Select both location and area.");
+    return;
+  }
+
   setAddButtonsBusy(true);
   try {
     setStatus("Adding candidate to OneTouch...");
     const result = await directoryApi.addRecruitmentCandidateToOneTouch({
       itemId: cleanItemId,
+      location: selectedLocation,
+      area: selectedArea,
     });
     if (result?.item) {
       upsertCandidateInCache(result.item);
     }
     renderCandidates();
+    closeOneTouchPicker();
     setStatus(`Candidate added to OneTouch (ID: ${cleanText(result?.oneTouchId) || "-"})`);
   } catch (error) {
     console.error(error);
+    setOneTouchPickerError(error?.message || "Could not add candidate to OneTouch.");
     setStatus(error?.message || "Could not add candidate to OneTouch.", true);
   } finally {
     setAddButtonsBusy(false);
@@ -879,6 +1006,36 @@ importFileInput?.addEventListener("change", async () => {
 
 runImportBtn?.addEventListener("click", async () => {
   await runCsvImport();
+});
+
+oneTouchPickerCancelBtn?.addEventListener("click", () => {
+  if (addToOneTouchBusy) {
+    return;
+  }
+  closeOneTouchPicker();
+});
+
+oneTouchPickerConfirmBtn?.addEventListener("click", async () => {
+  if (addToOneTouchBusy) {
+    return;
+  }
+  await addCandidateToOneTouch(oneTouchPickerCandidateId);
+});
+
+oneTouchPickerModal?.addEventListener("click", (event) => {
+  if (event.target !== oneTouchPickerModal || addToOneTouchBusy) {
+    return;
+  }
+  closeOneTouchPicker();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || addToOneTouchBusy) {
+    return;
+  }
+  if (!oneTouchPickerModal?.hidden) {
+    closeOneTouchPicker();
+  }
 });
 
 signOutBtn?.addEventListener("click", async () => {

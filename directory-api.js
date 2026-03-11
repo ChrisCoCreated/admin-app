@@ -152,6 +152,16 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getRecruitmentOneTouchOptions() {
+      const response = await authFetch(endpoint("/api/recruitment/onetouch-options"), {
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment OneTouch options request failed");
+      }
+      return response.json();
+    },
+
     async previewRecruitmentImport(payload = {}) {
       const response = await authFetch(endpoint("/api/recruitment/import"), {
         method: "POST",

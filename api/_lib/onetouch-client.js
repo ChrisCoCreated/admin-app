@@ -467,6 +467,20 @@ async function fetchGeneralLocationsAndAreas() {
   return { locations, areas };
 }
 
+async function getOneTouchLocationAreaOptions() {
+  const { locations, areas } = await fetchGeneralLocationsAndAreas();
+  const uniqueLocations = Array.from(new Set(locations.map((row) => asString(row?.name)).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  const uniqueAreas = Array.from(new Set(areas.map((row) => asString(row?.name)).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  return {
+    locations: uniqueLocations,
+    areas: uniqueAreas,
+  };
+}
+
 async function resolveOneTouchLocationArea({ location = "", livesIn = "", explicitArea = "" } = {}) {
   const locationHint = stripTrailingUkPostcode(location) || asString(location);
   const livesInHint = stripTrailingUkPostcode(livesIn) || asString(livesIn);
@@ -950,19 +964,31 @@ function sanitizeCarerCreatePayload(payload = {}) {
 
 async function createCarer(payload = {}) {
   const createPayload = sanitizeCarerCreatePayload(payload);
-  const resolved = await resolveOneTouchLocationArea({
-    location: createPayload.location,
-    livesIn: payload?.livesIn || payload?.lives_in || "",
-    explicitArea: createPayload.area,
-  });
-  if (resolved.location) {
-    createPayload.location = resolved.location;
+  const explicitLocation = asString(payload?.location);
+  const explicitArea = asString(payload?.area);
+  const hasExplicitLocationArea = Boolean(explicitLocation && explicitArea);
+
+  if (hasExplicitLocationArea) {
+    createPayload.location = explicitLocation;
+    createPayload.area = explicitArea;
     if (!createPayload.town) {
-      createPayload.town = resolved.location;
+      createPayload.town = explicitLocation;
     }
-  }
-  if (resolved.area) {
-    createPayload.area = resolved.area;
+  } else {
+    const resolved = await resolveOneTouchLocationArea({
+      location: createPayload.location,
+      livesIn: payload?.livesIn || payload?.lives_in || "",
+      explicitArea: createPayload.area,
+    });
+    if (resolved.location) {
+      createPayload.location = resolved.location;
+      if (!createPayload.town) {
+        createPayload.town = resolved.location;
+      }
+    }
+    if (resolved.area) {
+      createPayload.area = resolved.area;
+    }
   }
   if (!createPayload.firstname || !createPayload.lastname) {
     throw new Error("OneTouch create requires candidate name.");
@@ -987,4 +1013,5 @@ module.exports = {
   listVisits,
   createCarer,
   resolveOneTouchLocationArea,
+  getOneTouchLocationAreaOptions,
 };
