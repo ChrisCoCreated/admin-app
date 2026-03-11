@@ -1,5 +1,6 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
+const { resolveOneTouchLocationArea } = require("../_lib/onetouch-client");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -196,7 +197,7 @@ function buildNotes(row) {
   return sections.map((entry) => `${entry[0]}: ${entry[1]}`).join("\n");
 }
 
-function mapRowToSharePointFields(row) {
+async function mapRowToSharePointFields(row) {
   const candidateName = toTitleCaseName(getRowValue(row, "name"));
   if (!candidateName) {
     return { error: "Missing candidate name." };
@@ -207,7 +208,13 @@ function mapRowToSharePointFields(row) {
   const source = ensureIndeedPrefix(getRowValue(row, "source"));
   const livesIn = getRowValue(row, "candidate location");
   const locationRaw = getRowValue(row, "job location");
-  const location = stripTrailingUkPostcode(locationRaw);
+  const trimmedLocation = stripTrailingUkPostcode(locationRaw);
+  const resolved = await resolveOneTouchLocationArea({
+    location: trimmedLocation,
+    livesIn,
+  });
+  const location = normalizeText(resolved?.location) || trimmedLocation;
+  const area = normalizeText(resolved?.area);
   const status = normalizePipelineStatus(getRowValue(row, "status"), getRowValue(row, "interest level"));
   const notes = buildNotes(row);
 
@@ -218,6 +225,7 @@ function mapRowToSharePointFields(row) {
       Email: email,
       LivesIn: livesIn,
       Location: location,
+      EarmarkedFor: area,
       Source: source,
       Status: status,
       Notes: notes,
@@ -333,7 +341,7 @@ module.exports = async (req, res) => {
 
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index];
-      const mapped = mapRowToSharePointFields(row);
+      const mapped = await mapRowToSharePointFields(row);
       if (mapped.error) {
         rejected += 1;
         errors.push({ row: index + 2, message: mapped.error });

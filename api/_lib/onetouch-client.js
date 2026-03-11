@@ -5,6 +5,11 @@ let tokenCache = {
   expiresAtMs: 0,
 };
 let tokenInFlight = null;
+const generalLocationAreaCache = {
+  expiresAtMs: 0,
+  locations: [],
+  areas: [],
+};
 
 function clearTokenCache() {
   tokenCache = {
@@ -352,6 +357,150 @@ function resolveRecords(payload, explicitKeys = []) {
 
 function asString(value) {
   return String(value || "").trim();
+}
+
+function normalizeToken(value) {
+  return asString(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function stripTrailingUkPostcode(value) {
+  const raw = asString(value);
+  if (!raw) {
+    return "";
+  }
+  const normalized = raw.replace(/\s+/g, " ").trim();
+  const trimmed = normalized.replace(/[\s,;-]+([A-Z]{1,2}\d[A-Z\d]{0,2})$/i, "").trim();
+  return trimmed || normalized;
+}
+
+function scoreMatch(candidate, lookup) {
+  if (!candidate || !lookup) {
+    return 0;
+  }
+  if (candidate === lookup) {
+    return 100;
+  }
+  if (candidate.startsWith(lookup) || lookup.startsWith(candidate)) {
+    return 75;
+  }
+  if (candidate.includes(lookup) || lookup.includes(candidate)) {
+    return 50;
+  }
+  return 0;
+}
+
+function pickBestByName(items, value) {
+  const lookupText = stripTrailingUkPostcode(value);
+  const lookup = normalizeToken(lookupText);
+  if (!lookup) {
+    return null;
+  }
+
+  let best = null;
+  let bestScore = 0;
+  for (const item of items || []) {
+    const candidate = normalizeToken(item?.name || "");
+    const score = scoreMatch(candidate, lookup);
+    if (score > bestScore) {
+      best = item;
+      bestScore = score;
+    }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+function normalizeGeneralLocation(record) {
+  const name = asString(
+    record?.name ||
+      record?.location ||
+      record?.location_name ||
+      record?.title ||
+      record?.label
+  );
+  const area = asString(
+    record?.area ||
+      record?.area_name ||
+      record?.areaName ||
+      record?.area_title ||
+      record?.areaLabel ||
+      record?.area?.name
+  );
+  return { name, area };
+}
+
+function normalizeGeneralArea(record) {
+  const name = asString(
+    record?.name ||
+      record?.area ||
+      record?.area_name ||
+      record?.title ||
+      record?.label
+  );
+  return { name };
+}
+
+async function fetchGeneralLocationsAndAreas() {
+  const now = Date.now();
+  if (generalLocationAreaCache.expiresAtMs > now && generalLocationAreaCache.locations.length) {
+    return {
+      locations: generalLocationAreaCache.locations,
+      areas: generalLocationAreaCache.areas,
+    };
+  }
+
+  const [locationsPayload, areasPayload] = await Promise.all([
+    callOneTouch("general/locations"),
+    callOneTouch("general/get-areas"),
+  ]);
+
+  const locationRecords = resolveRecords(locationsPayload, ["locations", "data.locations", "result.locations"]);
+  const areaRecords = resolveRecords(areasPayload, ["areas", "data.areas", "result.areas"]);
+  const locations = locationRecords.map(normalizeGeneralLocation).filter((row) => row.name);
+  const areas = areaRecords.map(normalizeGeneralArea).filter((row) => row.name);
+
+  generalLocationAreaCache.expiresAtMs = now + 5 * 60 * 1000;
+  generalLocationAreaCache.locations = locations;
+  generalLocationAreaCache.areas = areas;
+
+  return { locations, areas };
+}
+
+async function resolveOneTouchLocationArea({ location = "", livesIn = "", explicitArea = "" } = {}) {
+  const locationHint = stripTrailingUkPostcode(location) || asString(location);
+  const livesInHint = stripTrailingUkPostcode(livesIn) || asString(livesIn);
+  const explicitAreaHint = asString(explicitArea);
+
+  try {
+    const { locations, areas } = await fetchGeneralLocationsAndAreas();
+
+    const matchedLocation =
+      pickBestByName(locations, locationHint) ||
+      pickBestByName(locations, livesInHint) ||
+      null;
+
+    const areaFromLocation = asString(matchedLocation?.area);
+    const matchedArea =
+      pickBestByName(areas, explicitAreaHint) ||
+      pickBestByName(areas, areaFromLocation) ||
+      pickBestByName(areas, locationHint) ||
+      pickBestByName(areas, livesInHint) ||
+      null;
+
+    const resolvedLocation = asString(matchedLocation?.name) || locationHint || livesInHint;
+    const resolvedArea = asString(matchedArea?.name) || areaFromLocation || explicitAreaHint || "";
+
+    return {
+      location: resolvedLocation,
+      area: resolvedArea,
+    };
+  } catch {
+    return {
+      location: locationHint || livesInHint,
+      area: explicitAreaHint || "",
+    };
+  }
 }
 
 function collectNonEmptyValues(values) {
@@ -801,6 +950,20 @@ function sanitizeCarerCreatePayload(payload = {}) {
 
 async function createCarer(payload = {}) {
   const createPayload = sanitizeCarerCreatePayload(payload);
+  const resolved = await resolveOneTouchLocationArea({
+    location: createPayload.location,
+    livesIn: payload?.livesIn || payload?.lives_in || "",
+    explicitArea: createPayload.area,
+  });
+  if (resolved.location) {
+    createPayload.location = resolved.location;
+    if (!createPayload.town) {
+      createPayload.town = resolved.location;
+    }
+  }
+  if (resolved.area) {
+    createPayload.area = resolved.area;
+  }
   if (!createPayload.firstname || !createPayload.lastname) {
     throw new Error("OneTouch create requires candidate name.");
   }
@@ -823,4 +986,5 @@ module.exports = {
   listClients,
   listVisits,
   createCarer,
+  resolveOneTouchLocationArea,
 };

@@ -625,6 +625,22 @@ dd {
   background: #fff;
 }
 
+.import-preview-row {
+  cursor: pointer;
+}
+
+.import-preview-row:hover {
+  background: #f4f8ff;
+}
+
+.import-preview-row-editing {
+  background: #eef6ff;
+}
+
+.import-preview-actions {
+  white-space: nowrap;
+}
+
 .reports-grid {
   margin-top: 14px;
   display: grid;

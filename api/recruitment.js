@@ -226,8 +226,9 @@ function buildOneTouchCreatePayload(candidate) {
     external_id: normalizeText(candidate.id),
     full_name: normalizeText(candidate.candidateName),
     phone: normalizeText(candidate.phoneNumber),
+    livesIn: normalizeText(candidate.livesIn),
     location: normalizeText(candidate.location),
-    area: normalizeText(candidate.location),
+    area: normalizeText(candidate.earmarkedFor),
     source: normalizeText(candidate.source),
     notes: normalizeText(candidate.notes),
   };

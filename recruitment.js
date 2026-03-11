@@ -51,9 +51,9 @@ let selectedCandidateId = "";
 let addToOneTouchBusy = false;
 let importBusy = false;
 let pendingImportRows = [];
-let importPreviewDebounce = null;
 let latestImportWouldInsert = 0;
-const IMPORT_PREVIEW_LIMIT = 10;
+let importEditingRowIndex = -1;
+let importEditingDraft = null;
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -92,7 +92,8 @@ function updateRunImportButtonState() {
   if (!runImportBtn) {
     return;
   }
-  runImportBtn.disabled = importBusy || pendingImportRows.length === 0 || latestImportWouldInsert <= 0;
+  runImportBtn.disabled =
+    importBusy || pendingImportRows.length === 0 || latestImportWouldInsert <= 0 || importEditingRowIndex >= 0;
 }
 
 function setImportBusy(disabled) {
@@ -229,6 +230,19 @@ function setCsvValue(row, key, value) {
   row[key] = cleanValue;
 }
 
+function createImportEditDraft(row) {
+  return {
+    name: toTitleCaseName(getCsvValue(row, "name")),
+    email: getCsvValue(row, "email"),
+    phone: sanitizePhone(getCsvValue(row, "phone")),
+    candidateLocation: getCsvValue(row, "candidate location"),
+    jobLocation: getCsvValue(row, "job location"),
+    status: getCsvValue(row, "status"),
+    interestLevel: getCsvValue(row, "interest level"),
+    source: getCsvValue(row, "source"),
+  };
+}
+
 function toImportPreviewRow(row) {
   return {
     candidateName: toTitleCaseName(getCsvValue(row, "name")),
@@ -242,13 +256,39 @@ function toImportPreviewRow(row) {
   };
 }
 
-function scheduleImportPreviewRefresh() {
-  if (importPreviewDebounce) {
-    clearTimeout(importPreviewDebounce);
+function beginImportRowEdit(rowIndex, row) {
+  importEditingRowIndex = rowIndex;
+  importEditingDraft = createImportEditDraft(row);
+  updateRunImportButtonState();
+  renderImportPreview(pendingImportRows);
+}
+
+function cancelImportRowEdit() {
+  importEditingRowIndex = -1;
+  importEditingDraft = null;
+  updateRunImportButtonState();
+  renderImportPreview(pendingImportRows);
+}
+
+async function saveImportRowEdit(row) {
+  if (!row || !importEditingDraft) {
+    return;
   }
-  importPreviewDebounce = setTimeout(() => {
-    void previewImportRows(pendingImportRows);
-  }, 400);
+
+  setCsvValue(row, "name", toTitleCaseName(importEditingDraft.name));
+  setCsvValue(row, "email", importEditingDraft.email);
+  setCsvValue(row, "phone", sanitizePhone(importEditingDraft.phone));
+  setCsvValue(row, "candidate location", importEditingDraft.candidateLocation);
+  setCsvValue(row, "job location", importEditingDraft.jobLocation);
+  setCsvValue(row, "status", importEditingDraft.status);
+  setCsvValue(row, "interest level", importEditingDraft.interestLevel);
+  setCsvValue(row, "source", importEditingDraft.source);
+
+  importEditingRowIndex = -1;
+  importEditingDraft = null;
+  updateRunImportButtonState();
+  renderImportPreview(pendingImportRows);
+  await previewImportRows(pendingImportRows);
 }
 
 function renderImportPreview(rows) {
@@ -259,50 +299,92 @@ function renderImportPreview(rows) {
   if (!list.length) {
     importPreviewWrap.hidden = true;
     importPreviewBody.innerHTML = "";
-    importPreviewTitle.textContent = `Preview (top ${IMPORT_PREVIEW_LIMIT})`;
+    importPreviewTitle.textContent = "Preview (all rows)";
     return;
   }
 
-  const previewRows = list.slice(0, IMPORT_PREVIEW_LIMIT).map(toImportPreviewRow);
+  const previewRows = list.map(toImportPreviewRow);
   importPreviewWrap.hidden = false;
-  importPreviewTitle.textContent = `Preview (top ${Math.min(IMPORT_PREVIEW_LIMIT, list.length)} of ${list.length})`;
+  importPreviewTitle.textContent = `Preview (all ${list.length} rows)`;
   importPreviewBody.innerHTML = "";
 
   for (let rowIndex = 0; rowIndex < previewRows.length; rowIndex += 1) {
     const row = previewRows[rowIndex];
     const sourceRow = list[rowIndex];
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><input class="import-edit-input" data-field="name" type="text" value="${escapeHtml(row.candidateName || "")}" /></td>
-      <td><input class="import-edit-input" data-field="email" type="email" value="${escapeHtml(row.email || "")}" /></td>
-      <td><input class="import-edit-input" data-field="phone" type="text" value="${escapeHtml(row.phone || "")}" /></td>
-      <td><input class="import-edit-input" data-field="candidate location" type="text" value="${escapeHtml(row.candidateLocation || "")}" /></td>
-      <td><input class="import-edit-input" data-field="job location" type="text" value="${escapeHtml(row.jobLocation || "")}" /></td>
-      <td><input class="import-edit-input" data-field="status" type="text" value="${escapeHtml(row.status || "")}" /></td>
-      <td><input class="import-edit-input" data-field="interest level" type="text" value="${escapeHtml(row.interestLevel || "")}" /></td>
-      <td><input class="import-edit-input" data-field="source" type="text" value="${escapeHtml(row.source || "")}" /></td>
-    `;
-    const inputs = tr.querySelectorAll(".import-edit-input");
-    for (const input of inputs) {
-      input.addEventListener("input", () => {
-        const field = cleanText(input.getAttribute("data-field"));
-        if (!field || !sourceRow) {
-          return;
-        }
-        const nextValue = field === "name" ? toTitleCaseName(input.value) : input.value;
-        if (field === "name" && input.value !== nextValue) {
-          input.value = nextValue;
-        }
-        if (field === "phone") {
-          const cleaned = sanitizePhone(nextValue);
-          if (input.value !== cleaned) {
-            input.value = cleaned;
+    const isEditing = importEditingRowIndex === rowIndex && importEditingDraft;
+    tr.classList.toggle("import-preview-row", !isEditing);
+    tr.classList.toggle("import-preview-row-editing", Boolean(isEditing));
+
+    if (isEditing) {
+      tr.innerHTML = `
+        <td><input class="import-edit-input" data-field="name" type="text" value="${escapeHtml(importEditingDraft.name || "")}" /></td>
+        <td><input class="import-edit-input" data-field="email" type="email" value="${escapeHtml(importEditingDraft.email || "")}" /></td>
+        <td><input class="import-edit-input" data-field="phone" type="text" value="${escapeHtml(importEditingDraft.phone || "")}" /></td>
+        <td><input class="import-edit-input" data-field="candidateLocation" type="text" value="${escapeHtml(importEditingDraft.candidateLocation || "")}" /></td>
+        <td><input class="import-edit-input" data-field="jobLocation" type="text" value="${escapeHtml(importEditingDraft.jobLocation || "")}" /></td>
+        <td><input class="import-edit-input" data-field="status" type="text" value="${escapeHtml(importEditingDraft.status || "")}" /></td>
+        <td><input class="import-edit-input" data-field="interestLevel" type="text" value="${escapeHtml(importEditingDraft.interestLevel || "")}" /></td>
+        <td><input class="import-edit-input" data-field="source" type="text" value="${escapeHtml(importEditingDraft.source || "")}" /></td>
+      `;
+      const inputs = tr.querySelectorAll(".import-edit-input");
+      for (const input of inputs) {
+        input.addEventListener("input", () => {
+          const key = cleanText(input.getAttribute("data-field"));
+          if (!key || !importEditingDraft) {
+            return;
           }
-          setCsvValue(sourceRow, field, cleaned);
-        } else {
-          setCsvValue(sourceRow, field, nextValue);
-        }
-        scheduleImportPreviewRefresh();
+          let nextValue = input.value;
+          if (key === "name") {
+            nextValue = toTitleCaseName(nextValue);
+            if (input.value !== nextValue) {
+              input.value = nextValue;
+            }
+          } else if (key === "phone") {
+            nextValue = sanitizePhone(nextValue);
+            if (input.value !== nextValue) {
+              input.value = nextValue;
+            }
+          }
+          importEditingDraft[key] = nextValue;
+        });
+      }
+      const actionCell = document.createElement("td");
+      actionCell.className = "import-preview-actions";
+      actionCell.innerHTML = `
+        <button type="button" class="secondary import-save-btn">Save</button>
+        <button type="button" class="secondary import-cancel-btn">Cancel</button>
+      `;
+      actionCell.querySelector(".import-save-btn")?.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await saveImportRowEdit(sourceRow);
+      });
+      actionCell.querySelector(".import-cancel-btn")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        cancelImportRowEdit();
+      });
+      tr.appendChild(actionCell);
+    } else {
+      tr.innerHTML = `
+        <td>${escapeHtml(row.candidateName || "-")}</td>
+        <td>${escapeHtml(row.email || "-")}</td>
+        <td>${escapeHtml(row.phone || "-")}</td>
+        <td>${escapeHtml(row.candidateLocation || "-")}</td>
+        <td>${escapeHtml(row.jobLocation || "-")}</td>
+        <td>${escapeHtml(row.status || "-")}</td>
+        <td>${escapeHtml(row.interestLevel || "-")}</td>
+        <td>${escapeHtml(row.source || "-")}</td>
+      `;
+      const actionCell = document.createElement("td");
+      actionCell.className = "import-preview-actions";
+      actionCell.innerHTML = `<button type="button" class="secondary import-edit-btn">Edit</button>`;
+      actionCell.querySelector(".import-edit-btn")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        beginImportRowEdit(rowIndex, sourceRow);
+      });
+      tr.appendChild(actionCell);
+      tr.addEventListener("click", () => {
+        beginImportRowEdit(rowIndex, sourceRow);
       });
     }
     importPreviewBody.appendChild(tr);
@@ -625,10 +707,6 @@ async function handleCsvFile(file) {
 async function runCsvImport() {
   if (importBusy || !pendingImportRows.length) {
     return;
-  }
-  if (importPreviewDebounce) {
-    clearTimeout(importPreviewDebounce);
-    importPreviewDebounce = null;
   }
   setImportBusy(true);
   setImportErrors([]);
