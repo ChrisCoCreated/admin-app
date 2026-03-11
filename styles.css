@@ -614,6 +614,17 @@ dd {
   white-space: nowrap;
 }
 
+.import-edit-input {
+  width: 100%;
+  min-width: 130px;
+  padding: 6px 7px;
+  border: 1px solid #cfd9e8;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.82rem;
+  background: #fff;
+}
+
 .reports-grid {
   margin-top: 14px;
   display: grid;

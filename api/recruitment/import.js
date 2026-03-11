@@ -54,10 +54,22 @@ function toTitleCaseName(value) {
   if (!raw) {
     return "";
   }
+
+  function capitalizeToken(token) {
+    const clean = normalizeText(token);
+    if (!clean) {
+      return "";
+    }
+    return clean
+      .split("-")
+      .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ""))
+      .join("-");
+  }
+
   return raw
     .split(/\s+/)
     .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => capitalizeToken(word))
     .join(" ");
 }
 

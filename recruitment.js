@@ -51,6 +51,8 @@ let selectedCandidateId = "";
 let addToOneTouchBusy = false;
 let importBusy = false;
 let pendingImportRows = [];
+let importPreviewDebounce = null;
+let latestImportWouldInsert = 0;
 const IMPORT_PREVIEW_LIMIT = 10;
 
 function normalizeText(value) {
@@ -86,11 +88,16 @@ function setAddButtonsBusy(disabled) {
   addToOneTouchBusy = disabled;
 }
 
+function updateRunImportButtonState() {
+  if (!runImportBtn) {
+    return;
+  }
+  runImportBtn.disabled = importBusy || pendingImportRows.length === 0 || latestImportWouldInsert <= 0;
+}
+
 function setImportBusy(disabled) {
   importBusy = disabled;
-  if (runImportBtn) {
-    runImportBtn.disabled = disabled || pendingImportRows.length === 0;
-  }
+  updateRunImportButtonState();
   if (importDropZone) {
     importDropZone.classList.toggle("is-disabled", disabled);
   }
@@ -145,10 +152,22 @@ function toTitleCaseName(value) {
   if (!raw) {
     return "";
   }
+
+  function capitalizeToken(token) {
+    const clean = cleanText(token);
+    if (!clean) {
+      return "";
+    }
+    return clean
+      .split("-")
+      .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ""))
+      .join("-");
+  }
+
   return raw
     .split(/\s+/)
     .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => capitalizeToken(word))
     .join(" ");
 }
 
@@ -198,16 +217,38 @@ function getCsvValue(row, key) {
   return "";
 }
 
+function setCsvValue(row, key, value) {
+  const target = normalizeText(key);
+  const cleanValue = cleanText(value);
+  for (const existingKey of Object.keys(row || {})) {
+    if (normalizeText(existingKey) === target) {
+      row[existingKey] = cleanValue;
+      return;
+    }
+  }
+  row[key] = cleanValue;
+}
+
 function toImportPreviewRow(row) {
   return {
     candidateName: toTitleCaseName(getCsvValue(row, "name")),
     email: getCsvValue(row, "email"),
     phone: sanitizePhone(getCsvValue(row, "phone")),
-    livesIn: getCsvValue(row, "candidate location"),
-    location: stripTrailingUkPostcode(getCsvValue(row, "job location")),
-    status: normalizeImportStatus(getCsvValue(row, "status"), getCsvValue(row, "interest level")),
+    candidateLocation: getCsvValue(row, "candidate location"),
+    jobLocation: getCsvValue(row, "job location"),
+    status: getCsvValue(row, "status"),
+    interestLevel: getCsvValue(row, "interest level"),
     source: ensureIndeedPrefix(getCsvValue(row, "source")),
   };
+}
+
+function scheduleImportPreviewRefresh() {
+  if (importPreviewDebounce) {
+    clearTimeout(importPreviewDebounce);
+  }
+  importPreviewDebounce = setTimeout(() => {
+    void previewImportRows(pendingImportRows);
+  }, 400);
 }
 
 function renderImportPreview(rows) {
@@ -227,17 +268,43 @@ function renderImportPreview(rows) {
   importPreviewTitle.textContent = `Preview (top ${Math.min(IMPORT_PREVIEW_LIMIT, list.length)} of ${list.length})`;
   importPreviewBody.innerHTML = "";
 
-  for (const row of previewRows) {
+  for (let rowIndex = 0; rowIndex < previewRows.length; rowIndex += 1) {
+    const row = previewRows[rowIndex];
+    const sourceRow = list[rowIndex];
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${escapeHtml(row.candidateName || "-")}</td>
-      <td>${escapeHtml(row.email || "-")}</td>
-      <td>${escapeHtml(row.phone || "-")}</td>
-      <td>${escapeHtml(row.livesIn || "-")}</td>
-      <td>${escapeHtml(row.location || "-")}</td>
-      <td>${escapeHtml(row.status || "-")}</td>
-      <td>${escapeHtml(row.source || "-")}</td>
+      <td><input class="import-edit-input" data-field="name" type="text" value="${escapeHtml(row.candidateName || "")}" /></td>
+      <td><input class="import-edit-input" data-field="email" type="email" value="${escapeHtml(row.email || "")}" /></td>
+      <td><input class="import-edit-input" data-field="phone" type="text" value="${escapeHtml(row.phone || "")}" /></td>
+      <td><input class="import-edit-input" data-field="candidate location" type="text" value="${escapeHtml(row.candidateLocation || "")}" /></td>
+      <td><input class="import-edit-input" data-field="job location" type="text" value="${escapeHtml(row.jobLocation || "")}" /></td>
+      <td><input class="import-edit-input" data-field="status" type="text" value="${escapeHtml(row.status || "")}" /></td>
+      <td><input class="import-edit-input" data-field="interest level" type="text" value="${escapeHtml(row.interestLevel || "")}" /></td>
+      <td><input class="import-edit-input" data-field="source" type="text" value="${escapeHtml(row.source || "")}" /></td>
     `;
+    const inputs = tr.querySelectorAll(".import-edit-input");
+    for (const input of inputs) {
+      input.addEventListener("input", () => {
+        const field = cleanText(input.getAttribute("data-field"));
+        if (!field || !sourceRow) {
+          return;
+        }
+        const nextValue = field === "name" ? toTitleCaseName(input.value) : input.value;
+        if (field === "name" && input.value !== nextValue) {
+          input.value = nextValue;
+        }
+        if (field === "phone") {
+          const cleaned = sanitizePhone(nextValue);
+          if (input.value !== cleaned) {
+            input.value = cleaned;
+          }
+          setCsvValue(sourceRow, field, cleaned);
+        } else {
+          setCsvValue(sourceRow, field, nextValue);
+        }
+        scheduleImportPreviewRefresh();
+      });
+    }
     importPreviewBody.appendChild(tr);
   }
 }
@@ -511,9 +578,13 @@ async function previewImportRows(rows) {
     ].join(" | ");
     setImportSummary(summary);
     setImportErrors((preview.errors || []).map((error) => `Row ${error.row}: ${error.message}`));
-    pendingImportRows = preview.wouldInsert > 0 ? rows : [];
+    pendingImportRows = rows;
+    latestImportWouldInsert = Number(preview.wouldInsert || 0);
+    updateRunImportButtonState();
   } catch (error) {
-    pendingImportRows = [];
+    pendingImportRows = rows;
+    latestImportWouldInsert = 0;
+    updateRunImportButtonState();
     setImportSummary(error?.message || "Could not preview CSV import.", true);
     setImportErrors([]);
   } finally {
@@ -533,12 +604,11 @@ async function handleCsvFile(file) {
   const parsed = parseCsvText(text);
   if (!parsed.rows.length) {
     pendingImportRows = [];
+    latestImportWouldInsert = 0;
     renderImportPreview([]);
     setImportSummary("No importable rows found.", true);
     setImportErrors(parsed.errors);
-    if (runImportBtn) {
-      runImportBtn.disabled = true;
-    }
+    updateRunImportButtonState();
     return;
   }
 
@@ -556,6 +626,10 @@ async function runCsvImport() {
   if (importBusy || !pendingImportRows.length) {
     return;
   }
+  if (importPreviewDebounce) {
+    clearTimeout(importPreviewDebounce);
+    importPreviewDebounce = null;
+  }
   setImportBusy(true);
   setImportErrors([]);
   try {
@@ -568,6 +642,7 @@ async function runCsvImport() {
     setImportSummary(summary);
     setImportErrors((result.errors || []).map((error) => `Row ${error.row}: ${error.message}`));
     pendingImportRows = [];
+    latestImportWouldInsert = 0;
     renderImportPreview([]);
     if (importFileName) {
       importFileName.textContent = "No file selected.";
@@ -575,6 +650,7 @@ async function runCsvImport() {
     if (importFileInput) {
       importFileInput.value = "";
     }
+    updateRunImportButtonState();
     await loadRecruitmentCandidates();
     setStatus(`CSV import complete. ${summary}`);
   } catch (error) {
