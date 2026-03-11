@@ -140,6 +140,26 @@ function ensureIndeedPrefix(value) {
   return `Indeed - ${withoutIndeed}`;
 }
 
+function toTitleCaseName(value) {
+  const raw = cleanText(value).toLowerCase();
+  if (!raw) {
+    return "";
+  }
+  return raw
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function sanitizePhone(value) {
+  const raw = cleanText(value);
+  if (!raw) {
+    return "";
+  }
+  return raw.replace(/^[\s'"`´‘’“”]+/, "").trim();
+}
+
 function normalizeImportStatus(statusValue, interestLevelValue) {
   const status = cleanText(statusValue);
   const interest = cleanText(interestLevelValue);
@@ -180,9 +200,9 @@ function getCsvValue(row, key) {
 
 function toImportPreviewRow(row) {
   return {
-    candidateName: getCsvValue(row, "name"),
+    candidateName: toTitleCaseName(getCsvValue(row, "name")),
     email: getCsvValue(row, "email"),
-    phone: getCsvValue(row, "phone"),
+    phone: sanitizePhone(getCsvValue(row, "phone")),
     livesIn: getCsvValue(row, "candidate location"),
     location: stripTrailingUkPostcode(getCsvValue(row, "job location")),
     status: normalizeImportStatus(getCsvValue(row, "status"), getCsvValue(row, "interest level")),

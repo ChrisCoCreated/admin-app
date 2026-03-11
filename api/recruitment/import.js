@@ -41,6 +41,26 @@ function normalizePhone(value) {
   return normalizeText(value).replace(/[^\d+]/g, "");
 }
 
+function sanitizePhone(value) {
+  const raw = normalizeText(value);
+  if (!raw) {
+    return "";
+  }
+  return raw.replace(/^[\s'"`´‘’“”]+/, "").trim();
+}
+
+function toTitleCaseName(value) {
+  const raw = normalizeText(value).toLowerCase();
+  if (!raw) {
+    return "";
+  }
+  return raw
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function parseSiteConfig() {
   const siteUrlValue = normalizeText(process.env.SHAREPOINT_RECRUITMENT_SITE_URL || DEFAULT_SITE_URL);
   const listName = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_NAME || DEFAULT_LIST_NAME);
@@ -165,12 +185,12 @@ function buildNotes(row) {
 }
 
 function mapRowToSharePointFields(row) {
-  const candidateName = getRowValue(row, "name");
+  const candidateName = toTitleCaseName(getRowValue(row, "name"));
   if (!candidateName) {
     return { error: "Missing candidate name." };
   }
 
-  const phoneNumber = getRowValue(row, "phone");
+  const phoneNumber = sanitizePhone(getRowValue(row, "phone"));
   const email = getRowValue(row, "email");
   const source = ensureIndeedPrefix(getRowValue(row, "source"));
   const livesIn = getRowValue(row, "candidate location");
