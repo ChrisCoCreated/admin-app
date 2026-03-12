@@ -97,6 +97,20 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async exportConsultantReportDocx(payload = {}) {
+      const response = await authFetch(endpoint("/api/consultant/report-docx"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Consultant report export failed");
+      }
+      return response.blob();
+    },
+
     async getClientsReconcilePreview() {
       const response = await authFetch(endpoint("/api/clients/reconcile/preview"));
       if (!response.ok) {

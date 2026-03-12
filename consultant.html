@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Consultant</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260312" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container consultant-main">
+      <section class="hero compact">
+        <h1>Consultant</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel">
+        <h2>Report Builder</h2>
+
+        <div class="consultant-grid">
+          <label class="field" for="clientSelect">
+            Client
+            <select id="clientSelect">
+              <option value="">Loading clients...</option>
+            </select>
+          </label>
+
+          <label class="field" for="consultantNameInput">
+            Consultant Name
+            <input id="consultantNameInput" type="text" placeholder="Enter report author" />
+          </label>
+        </div>
+
+        <p class="row-note"><strong>Client address:</strong> <span id="clientAddressDisplay">-</span></p>
+
+        <label class="field row" for="notesInput">
+          Notes
+          <textarea id="notesInput" placeholder="Write notes here..."></textarea>
+        </label>
+
+        <div class="row wrap-row">
+          <button id="anonymiseBtn" type="button">Anonymise Notes</button>
+        </div>
+
+        <label class="field row" for="anonOutput">
+          Anonymised Notes
+          <textarea id="anonOutput" readonly placeholder="Anonymised output appears here."></textarea>
+        </label>
+
+        <div class="row wrap-row">
+          <button id="copyAnonBtn" class="secondary" type="button">Copy Anonymised Notes</button>
+        </div>
+
+        <label class="field row" for="reportEditor">
+          Report Text
+          <div class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+            <button class="secondary editor-btn" type="button" data-cmd="formatBlock" data-value="P">Paragraph</button>
+            <button class="secondary editor-btn" type="button" data-cmd="formatBlock" data-value="H1">H1</button>
+            <button class="secondary editor-btn" type="button" data-cmd="formatBlock" data-value="H2">H2</button>
+            <button class="secondary editor-btn" type="button" data-cmd="formatBlock" data-value="H3">H3</button>
+            <button class="secondary editor-btn" type="button" data-cmd="bold">Bold</button>
+            <button class="secondary editor-btn" type="button" data-cmd="italic">Italic</button>
+            <button class="secondary editor-btn" type="button" data-cmd="insertUnorderedList">Bullets</button>
+            <button class="secondary editor-btn" type="button" data-cmd="insertOrderedList">Numbering</button>
+          </div>
+          <div id="reportEditor" class="report-editor" contenteditable="true" aria-multiline="true"></div>
+        </label>
+
+        <div class="row wrap-row">
+          <button id="downloadDocxBtn" type="button">Download Word Document</button>
+          <span id="actionStatus" class="muted"></span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./consultant.js"></script>
+  </body>
+</html>

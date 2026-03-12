@@ -14,6 +14,7 @@ const PAGE_LABELS = {
   recruitment: "Recruitment",
   mapping: "Time Mapping",
   drivetime: "Drive-Time Map",
+  consultant: "Consultant",
   marketing: "Marketing",
 };
 

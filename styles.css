@@ -855,6 +855,56 @@ dd {
   min-height: 320px;
 }
 
+.consultant-main {
+  padding-bottom: 36px;
+}
+
+.consultant-grid {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editor-btn {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 0.84rem;
+}
+
+.report-editor {
+  width: 100%;
+  min-height: 260px;
+  border-radius: 11px;
+  border: 1px solid #c9d1e1;
+  padding: 10px 12px;
+  background: #fdfefe;
+  overflow: auto;
+}
+
+.report-editor:focus {
+  outline: 2px solid #8db6ff;
+  outline-offset: 1px;
+}
+
+.report-editor h1,
+.report-editor h2,
+.report-editor h3 {
+  margin: 0.6em 0 0.3em;
+}
+
+.report-editor p,
+.report-editor ul,
+.report-editor ol {
+  margin: 0.5em 0;
+}
+
 .consent-filter-btn.active {
   background: #1f3c88;
   color: #fff;

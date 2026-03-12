@@ -26,6 +26,7 @@ const tasksCreateHandler = require("./api/tasks/create");
 const mapsDriveTimeHandler = require("./api/maps/drive-time");
 const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
+const consultantReportDocxHandler = require("./api/consultant/report-docx");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -147,6 +148,12 @@ function createApiResponseAdapter(nodeRes) {
         });
       }
       nodeRes.end(JSON.stringify(payload));
+    },
+    send(payload) {
+      if (!nodeRes.headersSent) {
+        nodeRes.statusCode = statusCode;
+      }
+      nodeRes.end(payload);
     },
   };
 }
@@ -321,6 +328,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await mapsOfficeCatchmentCheckClickHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/consultant/report-docx") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await consultantReportDocxHandler(apiReq, apiRes);
     return true;
   }
 

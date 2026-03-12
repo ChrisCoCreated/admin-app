@@ -10,6 +10,7 @@ const ROLE_PAGES = {
     "drivetime",
     "reports",
     "emailtemplates",
+    "consultant",
     "marketing",
     "photolayout",
   ],
@@ -37,6 +38,7 @@ const ROLE_PAGES = {
     "reports",
     "emailtemplates",
   ],
+  consultant: ["consultant"],
   marketing: ["marketing", "photolayout", "emailtemplates"],
   photo_layout: ["photolayout"],
   time_only: ["mapping", "drivetime"],
@@ -59,6 +61,7 @@ const PAGE_META = {
   drivetime: { href: "./drive-time-map.html", label: "Drive-Time Map" },
   reports: { href: "./reports.html", label: "Reports" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates" },
+  consultant: { href: "./consultant.html", label: "Consultant" },
   marketing: { href: "./marketing.html", label: "Marketing" },
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
 };

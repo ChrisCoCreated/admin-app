@@ -13,6 +13,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Authenticated Tasks (Advanced) page (`tasks.html`) for full unified To Do + Planner overlay editing
 - Authenticated Time Mapping page (`mapping.html`) for run planning
 - Authenticated Drive-Time Map page (`drive-time-map.html`) for 20-minute drive-time polygons
+- Authenticated Consultant page (`consultant.html`) for anonymisation and DOCX report export
 - Secure backend APIs:
   - `GET /api/clients` (original SharePoint/local clients list)
   - `GET /api/clients/:id`
@@ -27,6 +28,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `POST /api/maps/geocode-batch`
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)
   - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
+  - `POST /api/consultant/report-docx` (admin + consultant; DOCX export from template)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
 - Clients reconciliation workflow on `clients.html` treats OneTouch as source of truth and writes changes into SharePoint

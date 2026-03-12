@@ -7,6 +7,7 @@ const ACCESS_ENV_KEYS = [
   "ACCESS_TIME_EMAILS",
   "ACCESS_HR_EMAILS",
   "ACCESS_CLIENTS_EMAILS",
+  "ACCESS_CONSULTANT_EMAILS",
 ];
 
 const ROLE_BY_PAGE_KEY = new Map(
@@ -21,6 +22,7 @@ const ROLE_BY_PAGE_KEY = new Map(
     ["clients,mapping,drivetime", "time_clients"],
     ["carers,mapping,drivetime", "time_hr"],
     ["clients,carers,mapping,drivetime", "time_hr_clients"],
+    ["consultant", "consultant"],
   ].map(([pageKey, role]) => [canonicalizePagesKey(pageKey.split(",")), role])
 );
 
@@ -72,6 +74,9 @@ function resolveRoleFromFlags(flags) {
   if (flags.clients) {
     pages.push("clients");
   }
+  if (flags.consultant) {
+    pages.push("consultant");
+  }
 
   const pageKey = canonicalizePagesKey(pages);
   return ROLE_BY_PAGE_KEY.get(pageKey) || null;
@@ -89,6 +94,7 @@ function buildAuthorizedUsersFromEnv() {
         time: false,
         hr: false,
         clients: false,
+        consultant: false,
       };
       existing[flagKey] = true;
       flagsByEmail.set(email, existing);
@@ -101,6 +107,7 @@ function buildAuthorizedUsersFromEnv() {
   mark(parseEmailList(process.env.ACCESS_TIME_EMAILS), "time");
   mark(parseEmailList(process.env.ACCESS_HR_EMAILS), "hr");
   mark(parseEmailList(process.env.ACCESS_CLIENTS_EMAILS), "clients");
+  mark(parseEmailList(process.env.ACCESS_CONSULTANT_EMAILS), "consultant");
 
   const map = new Map();
   for (const [email, flags] of flagsByEmail.entries()) {
