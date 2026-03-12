@@ -82,6 +82,8 @@ function createBreakRun() {
 
 function paragraphToXml(paragraph) {
   const pPrParts = [];
+  // Keep generated report paragraphs compact: no extra space before/after lines.
+  pPrParts.push('<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>');
   if (paragraph.style) {
     pPrParts.push(`<w:pStyle w:val="${escapeXml(paragraph.style)}"/>`);
   }
@@ -226,11 +228,8 @@ function htmlToWordParagraphs(html) {
       continue;
     }
 
-    const text = decodeEntities(token).replace(/\s+/g, " ");
+    const text = decodeEntities(token);
     if (!text.trim()) {
-      if (current && current.runs.length) {
-        current.runs.push(createRun(" ", boldDepth > 0, italicDepth > 0));
-      }
       continue;
     }
 
@@ -286,6 +285,10 @@ function buildMetadataParagraphsXml({ consultantName, clientName, clientAddress,
     .join("");
 }
 
+function buildSingleMetadataLineXml(label, value) {
+  return `<w:p><w:r><w:t xml:space="preserve">${escapeXml(`${label}: ${value}`)}</w:t></w:r></w:p>`;
+}
+
 function insertBeforeSectPr(documentXml, injectedXml) {
   const marker = "<w:sectPr";
   const index = documentXml.indexOf(marker);
@@ -293,6 +296,21 @@ function insertBeforeSectPr(documentXml, injectedXml) {
     return `${documentXml}${injectedXml}`;
   }
   return `${documentXml.slice(0, index)}${injectedXml}${documentXml.slice(index)}`;
+}
+
+function ensureConsultantLine(documentXml, consultantName) {
+  const escapedName = escapeXml(consultantName);
+  if (!escapedName) {
+    return documentXml;
+  }
+
+  const hasRawName = documentXml.includes(escapedName);
+  const hasLabeledLine = documentXml.includes(escapeXml(`Consultant: ${consultantName}`));
+  if (hasRawName || hasLabeledLine) {
+    return documentXml;
+  }
+
+  return insertBeforeSectPr(documentXml, buildSingleMetadataLineXml("Consultant", consultantName));
 }
 
 async function buildConsultantDocx({ templateBuffer, consultantName, clientName, clientAddress, reportHtml, createdDate }) {
@@ -326,6 +344,8 @@ async function buildConsultantDocx({ templateBuffer, consultantName, clientName,
     }
     documentXml = insertBeforeSectPr(documentXml, injectedParts.join(""));
   }
+
+  documentXml = ensureConsultantLine(documentXml, consultantName);
 
   zip.file("word/document.xml", documentXml);
 

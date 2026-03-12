@@ -256,7 +256,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  if (!(await requireApiAuth(req, res, { allowedRoles: ["admin", "marketing"] }))) {
+  if (!(await requireApiAuth(req, res, { allowedRoles: ["admin", "marketing", "photo_layout"] }))) {
     return;
   }
 

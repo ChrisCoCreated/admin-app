@@ -14,6 +14,22 @@ function cleanHtml(value, max = 120000) {
   return String(value || "").trim().slice(0, max);
 }
 
+function deriveNameFromEmail(email) {
+  const local = String(email || "")
+    .trim()
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .trim();
+  if (!local) {
+    return "";
+  }
+  return local
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method Not Allowed" });
@@ -25,7 +41,12 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const consultantName = cleanText(req.body?.consultantName, 200);
+    const consultantNameInput = cleanText(req.body?.consultantName, 200);
+    const fallbackConsultantName =
+      cleanText(req.authUser?.claims?.name || "", 200) ||
+      deriveNameFromEmail(req.authUser?.email || "") ||
+      "Consultant";
+    const consultantName = consultantNameInput || fallbackConsultantName;
     const clientName = cleanText(req.body?.clientName, 200);
     const clientAddress = cleanText(req.body?.clientAddress, 600);
     const reportHtml = cleanHtml(req.body?.reportHtml, 120000);
