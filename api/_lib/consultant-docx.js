@@ -1,6 +1,7 @@
 const JSZip = require("jszip");
 
 const PLACEHOLDER_BODY = "{{REPORT_BODY}}";
+const METADATA_FIELDS = ["CONSULTANT_NAME", "CLIENT_NAME", "CLIENT_ADDRESS", "CREATED_DATE"];
 
 function escapeXml(value) {
   return String(value || "")
@@ -249,17 +250,49 @@ function htmlToWordParagraphs(html) {
 function replaceBodyPlaceholder(documentXml, bodyXml) {
   const bodyParagraphPattern = /<w:p\b[\s\S]*?\{\{REPORT_BODY\}\}[\s\S]*?<\/w:p>/;
   if (bodyParagraphPattern.test(documentXml)) {
-    return documentXml.replace(bodyParagraphPattern, bodyXml);
+    return {
+      xml: documentXml.replace(bodyParagraphPattern, bodyXml),
+      replaced: true,
+    };
   }
-  return documentXml.replace(PLACEHOLDER_BODY, bodyXml);
+  const replacedXml = documentXml.replace(PLACEHOLDER_BODY, bodyXml);
+  return {
+    xml: replacedXml,
+    replaced: replacedXml !== documentXml,
+  };
 }
 
 function replaceTextPlaceholders(documentXml, replacements) {
   let output = documentXml;
+  const replacedFlags = {};
   for (const [placeholder, value] of Object.entries(replacements)) {
-    output = output.split(`{{${placeholder}}}`).join(escapeXml(value));
+    const token = `{{${placeholder}}}`;
+    replacedFlags[placeholder] = output.includes(token);
+    output = output.split(token).join(escapeXml(value));
   }
-  return output;
+  return { output, replacedFlags };
+}
+
+function buildMetadataParagraphsXml({ consultantName, clientName, clientAddress, createdDate }) {
+  const lines = [
+    `Consultant: ${consultantName}`,
+    `Client: ${clientName}`,
+    `Address: ${clientAddress}`,
+    `Date: ${createdDate}`,
+  ];
+
+  return lines
+    .map((line) => `<w:p><w:r><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`)
+    .join("");
+}
+
+function insertBeforeSectPr(documentXml, injectedXml) {
+  const marker = "<w:sectPr";
+  const index = documentXml.indexOf(marker);
+  if (index === -1) {
+    return `${documentXml}${injectedXml}`;
+  }
+  return `${documentXml.slice(0, index)}${injectedXml}${documentXml.slice(index)}`;
 }
 
 async function buildConsultantDocx({ templateBuffer, consultantName, clientName, clientAddress, reportHtml, createdDate }) {
@@ -270,15 +303,30 @@ async function buildConsultantDocx({ templateBuffer, consultantName, clientName,
   }
 
   let documentXml = await documentFile.async("string");
-  documentXml = replaceTextPlaceholders(documentXml, {
+  const textReplacement = replaceTextPlaceholders(documentXml, {
     CONSULTANT_NAME: consultantName,
     CLIENT_NAME: clientName,
     CLIENT_ADDRESS: clientAddress,
     CREATED_DATE: createdDate,
   });
+  documentXml = textReplacement.output;
 
   const bodyXml = htmlToWordParagraphs(reportHtml);
-  documentXml = replaceBodyPlaceholder(documentXml, bodyXml);
+  const bodyReplacement = replaceBodyPlaceholder(documentXml, bodyXml);
+  documentXml = bodyReplacement.xml;
+
+  const missingMetadata = METADATA_FIELDS.some((field) => !textReplacement.replacedFlags[field]);
+  if (!bodyReplacement.replaced || missingMetadata) {
+    const injectedParts = [];
+    if (missingMetadata) {
+      injectedParts.push(buildMetadataParagraphsXml({ consultantName, clientName, clientAddress, createdDate }));
+    }
+    if (!bodyReplacement.replaced) {
+      injectedParts.push(bodyXml);
+    }
+    documentXml = insertBeforeSectPr(documentXml, injectedParts.join(""));
+  }
+
   zip.file("word/document.xml", documentXml);
 
   return zip.generateAsync({

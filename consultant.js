@@ -15,6 +15,7 @@ const anonOutput = document.getElementById("anonOutput");
 const copyAnonBtn = document.getElementById("copyAnonBtn");
 const reportEditor = document.getElementById("reportEditor");
 const downloadDocxBtn = document.getElementById("downloadDocxBtn");
+const deanonymiseReportBtn = document.getElementById("deanonymiseReportBtn");
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -98,6 +99,22 @@ function anonymiseText(rawText, clientName) {
   }
 
   return output;
+}
+
+function deriveDisplayNameFromEmail(email) {
+  const local = String(email || "")
+    .trim()
+    .split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .trim();
+  if (!local) {
+    return "";
+  }
+  return local
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function sanitizeReportHtml() {
@@ -246,6 +263,38 @@ function runEditorCommand(cmd, value = null) {
   document.execCommand(cmd, false, value);
 }
 
+function deanonymiseReport() {
+  if (!selectedClient || !String(selectedClient.name || "").trim()) {
+    setActionStatus("Select a client first.", true);
+    return;
+  }
+
+  const clientName = String(selectedClient.name || "").trim();
+  const walker = document.createTreeWalker(reportEditor, NodeFilter.SHOW_TEXT);
+  const targets = [];
+  let node = walker.nextNode();
+  while (node) {
+    targets.push(node);
+    node = walker.nextNode();
+  }
+
+  let changed = 0;
+  for (const textNode of targets) {
+    const original = String(textNode.nodeValue || "");
+    const next = original.replace(/\bP\b/g, clientName);
+    if (next !== original) {
+      textNode.nodeValue = next;
+      changed += 1;
+    }
+  }
+
+  if (changed > 0) {
+    setActionStatus("Report deanonymised.");
+  } else {
+    setActionStatus("No anonymised P tokens found in report text.");
+  }
+}
+
 async function handleDownloadDocx() {
   if (!selectedClient) {
     setActionStatus("Select a client first.", true);
@@ -330,6 +379,11 @@ async function init() {
     const email = String(profile?.email || "").trim();
     setStatus(email ? `Signed in as ${email}` : "Signed in");
 
+    if (!String(consultantNameInput?.value || "").trim()) {
+      const fallbackName = String(account?.name || "").trim() || deriveDisplayNameFromEmail(email);
+      consultantNameInput.value = fallbackName;
+    }
+
     await loadClients();
   } catch (error) {
     if (error?.status === 403) {
@@ -369,6 +423,10 @@ document.querySelectorAll(".editor-btn").forEach((button) => {
 
 downloadDocxBtn?.addEventListener("click", () => {
   void handleDownloadDocx();
+});
+
+deanonymiseReportBtn?.addEventListener("click", () => {
+  deanonymiseReport();
 });
 
 signOutBtn?.addEventListener("click", async () => {
