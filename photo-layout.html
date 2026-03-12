@@ -65,6 +65,10 @@
           </div>
           <aside class="layout-tools">
             <h3>Selected Images</h3>
+            <div id="localImageDropZone" class="layout-drop-zone" tabindex="0" role="button" aria-label="Add local images">
+              Drag and drop images here, or click to browse
+            </div>
+            <input id="localImageInput" type="file" accept="image/*" multiple hidden />
             <div id="selectedImagesList" class="selected-images-list"></div>
             <h3>Image Adjustments</h3>
             <p id="adjustStatus" class="muted">Click a slot to adjust zoom and position.</p>

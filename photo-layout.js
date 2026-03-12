@@ -229,6 +229,8 @@ const showAllLayoutsRow = document.getElementById("showAllLayoutsRow");
 const showAllLayoutsInput = document.getElementById("showAllLayouts");
 const composeStatus = document.getElementById("composeStatus");
 const layoutStage = document.getElementById("layoutStage");
+const localImageDropZone = document.getElementById("localImageDropZone");
+const localImageInput = document.getElementById("localImageInput");
 const selectedImagesList = document.getElementById("selectedImagesList");
 const adjustStatus = document.getElementById("adjustStatus");
 const adjustControls = document.getElementById("adjustControls");
@@ -485,6 +487,11 @@ function removeImageFromSelection(photoId) {
   if (index < 0) {
     return;
   }
+  const removed = selectedImages[index];
+  if (removed?.localObjectUrl) {
+    exportImageCache.delete(removed.localObjectUrl);
+    URL.revokeObjectURL(removed.localObjectUrl);
+  }
   selectedImages.splice(index, 1);
   if (selectedSlotIndex >= selectedImages.length) {
     selectedSlotIndex = selectedImages.length - 1;
@@ -517,6 +524,54 @@ function toggleImageSelection(photo) {
   });
   if (selectedSlotIndex < 0) {
     selectedSlotIndex = 0;
+  }
+  invalidateOutput();
+  renderAll();
+}
+
+function addLocalImages(files = []) {
+  const candidates = Array.from(files || []).filter((file) => {
+    const type = String(file?.type || "").toLowerCase();
+    return type.startsWith("image/");
+  });
+  if (!candidates.length) {
+    setImagesStatus("No valid image files found in drop selection.", true);
+    return;
+  }
+
+  const remaining = MAX_SELECTION - selectedImages.length;
+  if (remaining <= 0) {
+    setImagesStatus(`You can select up to ${MAX_SELECTION} images.`, true);
+    return;
+  }
+
+  const accepted = candidates.slice(0, remaining);
+  for (const file of accepted) {
+    const objectUrl = URL.createObjectURL(file);
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    selectedImages.push({
+      id: localId,
+      title: String(file.name || "Local image").trim() || "Local image",
+      client: "Local Upload",
+      sourceCandidates: [objectUrl],
+      previewUrl: objectUrl,
+      localObjectUrl: objectUrl,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+    });
+  }
+
+  if (selectedSlotIndex < 0 && selectedImages.length) {
+    selectedSlotIndex = 0;
+  }
+
+  if (accepted.length < candidates.length) {
+    setImagesStatus(
+      `Added ${accepted.length} image${accepted.length === 1 ? "" : "s"}. Reached selection limit (${MAX_SELECTION}).`
+    );
+  } else {
+    setImagesStatus(`Added ${accepted.length} local image${accepted.length === 1 ? "" : "s"}.`);
   }
   invalidateOutput();
   renderAll();
@@ -1178,6 +1233,11 @@ async function loadExportImage(sourceCandidates = []) {
       return exportImageCache.get(candidate);
     }
     try {
+      if (/^(blob:|data:)/i.test(candidate)) {
+        const localImage = await loadImageElement(candidate);
+        exportImageCache.set(candidate, localImage);
+        return localImage;
+      }
       const payload = await directoryApi.getMarketingMedia({ url: candidate });
       const blob = decodeBase64ToBlob(payload?.dataBase64, payload?.mimeType);
       const objectUrl = URL.createObjectURL(blob);
@@ -1490,6 +1550,47 @@ showAllLayoutsInput?.addEventListener("change", () => {
   renderLayoutPicker();
 });
 
+localImageDropZone?.addEventListener("click", () => {
+  localImageInput?.click();
+});
+
+localImageDropZone?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    localImageInput?.click();
+  }
+});
+
+localImageInput?.addEventListener("change", () => {
+  const files = Array.from(localImageInput.files || []);
+  addLocalImages(files);
+  localImageInput.value = "";
+});
+
+localImageDropZone?.addEventListener("dragenter", (event) => {
+  event.preventDefault();
+  localImageDropZone.classList.add("is-dragover");
+});
+
+localImageDropZone?.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  localImageDropZone.classList.add("is-dragover");
+});
+
+localImageDropZone?.addEventListener("dragleave", (event) => {
+  if (event.relatedTarget && localImageDropZone.contains(event.relatedTarget)) {
+    return;
+  }
+  localImageDropZone.classList.remove("is-dragover");
+});
+
+localImageDropZone?.addEventListener("drop", (event) => {
+  event.preventDefault();
+  localImageDropZone.classList.remove("is-dragover");
+  const files = Array.from(event.dataTransfer?.files || []);
+  addLocalImages(files);
+});
+
 zoomRange?.addEventListener("input", applyAdjustmentsFromControls);
 panXRange?.addEventListener("input", applyAdjustmentsFromControls);
 panYRange?.addEventListener("input", applyAdjustmentsFromControls);
@@ -1566,6 +1667,11 @@ signOutBtn?.addEventListener("click", async () => {
 });
 
 window.addEventListener("beforeunload", () => {
+  for (const image of selectedImages) {
+    if (image?.localObjectUrl) {
+      URL.revokeObjectURL(image.localObjectUrl);
+    }
+  }
   if (latestOutputUrl) {
     URL.revokeObjectURL(latestOutputUrl);
   }

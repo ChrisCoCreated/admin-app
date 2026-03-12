@@ -1241,6 +1241,25 @@ body.lightbox-open {
   margin-bottom: 12px;
 }
 
+.layout-drop-zone {
+  border: 1px dashed #9bb0d7;
+  border-radius: 12px;
+  background: #f6f9ff;
+  color: #334a72;
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 12px 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+}
+
+.layout-drop-zone.is-dragover {
+  border-color: #2e67c5;
+  background: #eaf2ff;
+  color: #1f448a;
+}
+
 .selected-image-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
