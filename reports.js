@@ -13,6 +13,9 @@ const clientHoursLink = document.getElementById("clientHoursLink");
 const carerHoursLink = document.getElementById("carerHoursLink");
 const financialAnalysisLink = document.getElementById("financialAnalysisLink");
 const dateRangeMessage = document.getElementById("dateRangeMessage");
+const wallchartQuickPicker = document.getElementById("wallchartQuickPicker");
+const wallchartDateMessage = document.getElementById("wallchartDateMessage");
+const carerWallchartLink = document.getElementById("carerWallchartLink");
 
 const CONTRACT_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/contractCapacity.php";
 const AVAILABILITY_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/availabilityCapacity.php";
@@ -20,12 +23,14 @@ const AREA_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/are
 const CLIENT_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/clientsHoursRpt.php";
 const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
 const FINANCIAL_ANALYSIS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/timesheet_analysis_newscale_getPay.php";
+const CARER_WALLCHART_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerWallchart_V2.php";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
 });
 const directoryApi = createDirectoryApi(authController);
+let selectedWallchartDate = null;
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -57,6 +62,70 @@ function getMondayOfWeek(baseDate) {
 
 function addDays(baseDate, days) {
   return new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + days);
+}
+
+function formatReadableDate(date) {
+  return date.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function buildCarerWallchartUrl(date) {
+  const calendarPick = formatDateParam(date);
+  const url = new URL(CARER_WALLCHART_BASE_URL);
+  url.searchParams.set("slotDuration", "00:10:00");
+  url.searchParams.set("calendarPick", calendarPick);
+  url.searchParams.set("eventSize", "m");
+  return url.toString();
+}
+
+function updateCarerWallchartLink() {
+  if (!selectedWallchartDate) {
+    return;
+  }
+  if (carerWallchartLink) {
+    carerWallchartLink.href = buildCarerWallchartUrl(selectedWallchartDate);
+  }
+  if (wallchartDateMessage) {
+    wallchartDateMessage.textContent = `Selected date: ${formatReadableDate(selectedWallchartDate)}`;
+  }
+}
+
+function renderWallchartQuickPicker() {
+  if (!wallchartQuickPicker) {
+    return;
+  }
+
+  const today = toStartOfDay(new Date());
+  if (!selectedWallchartDate) {
+    selectedWallchartDate = today;
+  }
+
+  wallchartQuickPicker.innerHTML = "";
+  for (let offset = 0; offset < 14; offset += 1) {
+    const date = addDays(today, offset);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "quick-date-button";
+    if (selectedWallchartDate.getTime() === date.getTime()) {
+      button.classList.add("active");
+    }
+    button.innerHTML = `<span>${date.toLocaleDateString("en-GB", { weekday: "short" })}</span><strong>${date
+      .getDate()
+      .toString()
+      .padStart(2, "0")}/${(date.getMonth() + 1).toString().padStart(2, "0")}</strong>`;
+    button.addEventListener("click", () => {
+      selectedWallchartDate = date;
+      renderWallchartQuickPicker();
+      updateCarerWallchartLink();
+    });
+    wallchartQuickPicker.appendChild(button);
+  }
+
+  updateCarerWallchartLink();
 }
 
 function getDateRangeForPreset(preset) {
@@ -205,6 +274,7 @@ async function init() {
       periodPresetSelect.value = "last_month";
     }
     updateCapacityLinks();
+    renderWallchartQuickPicker();
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("reports");
