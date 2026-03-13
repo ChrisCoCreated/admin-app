@@ -1,11 +1,11 @@
-const { requireApiAuth } = require("./_lib/require-api-auth");
+const { requireApiAuth } = require("../_lib/require-api-auth");
 const {
   createDefinition,
   getDefinitionById,
   listDefinitions,
   normalizeEntityType,
   updateDefinition,
-} = require("./_lib/scorecard-repository");
+} = require("../_lib/scorecard-repository");
 
 const ALLOWED_ROLES = ["admin", "care_manager", "operations"];
 

@@ -28,7 +28,7 @@ const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 const consultantReportDocxHandler = require("./api/consultant/report-docx");
 const scorecardHandler = require("./api/scorecard");
-const scorecardDefinitionsHandler = require("./api/scorecard-definitions");
+const scorecardDefinitionsHandler = require("./api/scorecard/definitions");
 
 function loadEnvFile(envPath) {
   let raw = "";
