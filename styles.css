@@ -1390,6 +1390,203 @@ body.lightbox-open {
   padding-bottom: 40px;
 }
 
+.scorecard-main {
+  padding-bottom: 48px;
+}
+
+.scorecard-hero {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  align-items: start;
+}
+
+.scorecard-kicker {
+  display: inline-flex;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: rgba(49, 183, 200, 0.14);
+  color: #125b64;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+}
+
+.scorecard-hero-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.scorecard-hero-meta {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #d6dfef;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.scorecard-overview-panel {
+  background:
+    radial-gradient(640px 240px at 100% 0, rgba(49, 183, 200, 0.08), transparent 58%),
+    linear-gradient(180deg, #fbfcff 0%, #ffffff 100%);
+}
+
+.scorecard-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scorecard-rhythm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scorecard-rhythm-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid #d5deee;
+  border-radius: 999px;
+  background: #f8fbff;
+  color: #29405f;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.scorecard-snapshot-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.scorecard-snapshot-card {
+  border: 1px solid #d7dfed;
+  border-radius: 16px;
+  padding: 16px;
+  background: #fbfcff;
+}
+
+.scorecard-snapshot-card.is-strong {
+  border-color: #8bd2bd;
+  background: linear-gradient(180deg, #f4fcf8 0%, #ffffff 100%);
+}
+
+.scorecard-snapshot-card.is-watch {
+  border-color: #eed89a;
+  background: linear-gradient(180deg, #fffaf0 0%, #ffffff 100%);
+}
+
+.scorecard-snapshot-card.is-risk {
+  border-color: #edb7b7;
+  background: linear-gradient(180deg, #fff4f4 0%, #ffffff 100%);
+}
+
+.scorecard-snapshot-card.is-empty {
+  border-style: dashed;
+}
+
+.scorecard-snapshot-label {
+  color: #40516d;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scorecard-snapshot-value {
+  margin-top: 8px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.scorecard-guide {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scorecard-guide span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f4f7fe;
+  color: #334867;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.scorecard-section-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.scorecard-entry {
+  border: 1px solid #d7dfed;
+  border-radius: 16px;
+  background: #fbfcff;
+  padding: 16px;
+}
+
+.scorecard-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.scorecard-entry-head h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.scorecard-remove-btn {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 0.84rem;
+}
+
+.scorecard-form-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scorecard-span-2 {
+  grid-column: span 2;
+}
+
+.scorecard-reflection-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.is-muted-block textarea,
+.is-muted-block input,
+.is-muted-block select {
+  background: #f6f7fb;
+}
+
+.field.is-muted-block {
+  color: #647186;
+}
+
 .whiteboard-main {
   padding-bottom: 40px;
 }
@@ -2183,6 +2380,18 @@ body.lightbox-open {
 
   .task-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .scorecard-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .scorecard-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scorecard-span-2 {
+    grid-column: auto;
   }
 
   .task-pill {

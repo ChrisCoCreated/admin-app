@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Performance Scorecard</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260313" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container scorecard-main">
+      <section class="hero scorecard-hero">
+        <div class="scorecard-hero-copy">
+          <p class="scorecard-kicker">Leadership Review</p>
+          <h1>Performance &amp; Alignment Scorecard</h1>
+          <p class="muted">
+            Use this page to score how well the organisation is living its values, applying decision principles, and
+            delivering strategic priorities.
+          </p>
+        </div>
+        <div class="scorecard-hero-meta">
+          <label class="field" for="reviewPeriodInput">
+            Review period
+            <input id="reviewPeriodInput" type="text" placeholder="e.g. March 2026" autocomplete="off" />
+          </label>
+          <p class="muted" id="statusMessage">Checking access...</p>
+          <p class="muted" id="saveMessage">Changes save automatically on this device.</p>
+        </div>
+      </section>
+
+      <section class="panel scorecard-overview-panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Overall Alignment Snapshot</h2>
+            <p class="muted">A quick view of scores across values, decisions, strategic objectives, and delivery.</p>
+          </div>
+          <div class="scorecard-rhythm">
+            <span class="scorecard-rhythm-chip">Monthly: goals + principles</span>
+            <span class="scorecard-rhythm-chip">Quarterly: objectives + values</span>
+          </div>
+        </div>
+        <div id="snapshotGrid" class="scorecard-snapshot-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Values Alignment</h2>
+            <p class="muted">Score how consistently day-to-day behaviours reflect each organisational value.</p>
+          </div>
+          <button id="addValueBtn" class="secondary" type="button">Add value</button>
+        </div>
+        <div class="scorecard-guide">
+          <span>1: Not reflected in behaviour</span>
+          <span>3: Sometimes demonstrated</span>
+          <span>5: Consistently embedded</span>
+        </div>
+        <div id="valuesList" class="scorecard-section-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Decision-Making Principles</h2>
+            <p class="muted">Check whether important decisions this period matched the agreed principles.</p>
+          </div>
+          <button id="addPrincipleBtn" class="secondary" type="button">Add principle</button>
+        </div>
+        <div id="principlesList" class="scorecard-section-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Strategic Objectives</h2>
+            <p class="muted">Track progress against the 2 to 4 core business objectives for the year.</p>
+          </div>
+          <button id="addObjectiveBtn" class="secondary" type="button">Add objective</button>
+        </div>
+        <div id="objectivesList" class="scorecard-section-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Active Goals</h2>
+            <p class="muted">Monitor the initiatives delivering each strategic objective.</p>
+          </div>
+          <button id="addGoalBtn" class="secondary" type="button">Add goal</button>
+        </div>
+        <div id="goalsList" class="scorecard-section-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Leadership Reflection</h2>
+            <p class="muted">Capture what is working, what needs attention, and the next corrective action.</p>
+          </div>
+          <button id="resetBtn" class="secondary" type="button">Reset page</button>
+        </div>
+        <div class="scorecard-reflection-grid">
+          <label class="field" for="reflectionGoingWell">
+            What is going well?
+            <textarea id="reflectionGoingWell" placeholder="Highlight strengths, momentum, or wins."></textarea>
+          </label>
+          <label class="field" for="reflectionNeedsAttention">
+            What needs attention?
+            <textarea id="reflectionNeedsAttention" placeholder="Call out drift, blockers, or gaps."></textarea>
+          </label>
+          <label class="field" for="reflectionNextAction">
+            What action will we take next?
+            <textarea id="reflectionNextAction" placeholder="Capture the next leadership action."></textarea>
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./scorecard.js"></script>
+  </body>
+</html>
