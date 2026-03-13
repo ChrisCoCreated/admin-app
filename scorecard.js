@@ -3,7 +3,6 @@ import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260313";
 
-const STORAGE_KEY = "thrive.performance-alignment-scorecard.v1";
 const MIN_ROWS = {
   values: 4,
   principles: 3,
@@ -15,6 +14,7 @@ const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const saveMessage = document.getElementById("saveMessage");
 const reviewPeriodInput = document.getElementById("reviewPeriodInput");
+const loadPeriodBtn = document.getElementById("loadPeriodBtn");
 const valuesList = document.getElementById("valuesList");
 const principlesList = document.getElementById("principlesList");
 const objectivesList = document.getElementById("objectivesList");
@@ -36,7 +36,10 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 
 let state = createDefaultState();
+let activeReviewPeriod = currentReviewPeriod();
 let saveTimer = null;
+let loadingPeriod = false;
+let savingState = false;
 
 function uid(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -91,9 +94,14 @@ function currentReviewPeriod() {
   }).format(new Date());
 }
 
-function createDefaultState() {
+function normalizeReviewPeriod(value) {
+  const reviewPeriod = String(value || "").trim();
+  return reviewPeriod || currentReviewPeriod();
+}
+
+function createDefaultState(reviewPeriod = currentReviewPeriod()) {
   return {
-    reviewPeriod: currentReviewPeriod(),
+    reviewPeriod,
     values: Array.from({ length: MIN_ROWS.values }, () => createValueRow()),
     principles: Array.from({ length: MIN_ROWS.principles }, () => createPrincipleRow()),
     objectives: Array.from({ length: MIN_ROWS.objectives }, () => createObjectiveRow()),
@@ -116,6 +124,23 @@ function setSaveMessage(message, isError = false) {
   saveMessage.classList.toggle("error", isError);
 }
 
+function setBusyState(isBusy) {
+  loadingPeriod = isBusy;
+  if (loadPeriodBtn) {
+    loadPeriodBtn.disabled = isBusy;
+  }
+  if (resetBtn) {
+    resetBtn.disabled = isBusy || savingState;
+  }
+}
+
+function setSavingState(isSaving) {
+  savingState = isSaving;
+  if (resetBtn) {
+    resetBtn.disabled = isSaving || loadingPeriod;
+  }
+}
+
 function cloneRow(factory, raw) {
   return {
     ...factory(),
@@ -131,70 +156,96 @@ function ensureMinimumRows(rows, minimum, factory) {
   return nextRows;
 }
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      state = createDefaultState();
-      return;
-    }
-
-    const parsed = JSON.parse(raw);
-    state = {
-      reviewPeriod: String(parsed?.reviewPeriod || currentReviewPeriod()),
-      values: ensureMinimumRows(
-        Array.isArray(parsed?.values) ? parsed.values.map((row) => cloneRow(createValueRow, row)) : [],
-        MIN_ROWS.values,
-        createValueRow
-      ),
-      principles: ensureMinimumRows(
-        Array.isArray(parsed?.principles) ? parsed.principles.map((row) => cloneRow(createPrincipleRow, row)) : [],
-        MIN_ROWS.principles,
-        createPrincipleRow
-      ),
-      objectives: ensureMinimumRows(
-        Array.isArray(parsed?.objectives) ? parsed.objectives.map((row) => cloneRow(createObjectiveRow, row)) : [],
-        MIN_ROWS.objectives,
-        createObjectiveRow
-      ),
-      goals: ensureMinimumRows(
-        Array.isArray(parsed?.goals) ? parsed.goals.map((row) => cloneRow(createGoalRow, row)) : [],
-        MIN_ROWS.goals,
-        createGoalRow
-      ),
-      reflection: {
-        goingWell: String(parsed?.reflection?.goingWell || ""),
-        needsAttention: String(parsed?.reflection?.needsAttention || ""),
-        nextAction: String(parsed?.reflection?.nextAction || ""),
-      },
-    };
-  } catch (error) {
-    console.error("[scorecard] Failed to load saved state", error);
-    state = createDefaultState();
-    setSaveMessage("Could not load saved scorecard. Showing a fresh page instead.", true);
-  }
+function hydrateState(raw, reviewPeriod) {
+  const parsed = raw && typeof raw === "object" ? raw : {};
+  state = {
+    reviewPeriod,
+    values: ensureMinimumRows(
+      Array.isArray(parsed?.values) ? parsed.values.map((row) => cloneRow(createValueRow, row)) : [],
+      MIN_ROWS.values,
+      createValueRow
+    ),
+    principles: ensureMinimumRows(
+      Array.isArray(parsed?.principles) ? parsed.principles.map((row) => cloneRow(createPrincipleRow, row)) : [],
+      MIN_ROWS.principles,
+      createPrincipleRow
+    ),
+    objectives: ensureMinimumRows(
+      Array.isArray(parsed?.objectives) ? parsed.objectives.map((row) => cloneRow(createObjectiveRow, row)) : [],
+      MIN_ROWS.objectives,
+      createObjectiveRow
+    ),
+    goals: ensureMinimumRows(
+      Array.isArray(parsed?.goals) ? parsed.goals.map((row) => cloneRow(createGoalRow, row)) : [],
+      MIN_ROWS.goals,
+      createGoalRow
+    ),
+    reflection: {
+      goingWell: String(parsed?.reflection?.goingWell || ""),
+      needsAttention: String(parsed?.reflection?.needsAttention || ""),
+      nextAction: String(parsed?.reflection?.nextAction || ""),
+    },
+  };
 }
 
-function persistState() {
+function serializeState() {
+  return {
+    reviewPeriod: state.reviewPeriod,
+    values: state.values,
+    principles: state.principles,
+    objectives: state.objectives,
+    goals: state.goals,
+    reflection: state.reflection,
+  };
+}
+
+function formatMetaMessage(meta) {
+  const updatedAt = meta?.updatedAt ? new Date(meta.updatedAt) : null;
+  if (!updatedAt || Number.isNaN(updatedAt.getTime())) {
+    return "Changes save automatically to the shared scorecard.";
+  }
+  const userLabel = meta?.updatedBy ? ` by ${meta.updatedBy}` : "";
+  return `Saved to the shared scorecard${userLabel} at ${updatedAt.toLocaleString()}.`;
+}
+
+async function persistState() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    const time = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
+    setSavingState(true);
+    const payload = await directoryApi.upsertPerformanceScorecard({
+      reviewPeriod: activeReviewPeriod,
+      scorecard: serializeState(),
     });
-    setSaveMessage(`Saved locally at ${time}.`);
+    hydrateState(payload?.scorecard, normalizeReviewPeriod(payload?.reviewPeriod || activeReviewPeriod));
+    activeReviewPeriod = state.reviewPeriod;
+    render();
+    setSaveMessage(formatMetaMessage(payload?.meta));
   } catch (error) {
     console.error("[scorecard] Failed to save state", error);
-    setSaveMessage("Could not save changes on this device.", true);
+    setSaveMessage(error?.message || "Could not save changes to the shared scorecard.", true);
+  } finally {
+    setSavingState(false);
   }
 }
 
 function scheduleSave() {
-  setSaveMessage("Saving...");
+  if (loadingPeriod) {
+    return;
+  }
+  setSaveMessage("Saving to the shared scorecard...");
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
-    persistState();
+    saveTimer = null;
+    void persistState();
   }, 220);
+}
+
+async function flushPendingSave() {
+  if (!saveTimer) {
+    return;
+  }
+  window.clearTimeout(saveTimer);
+  saveTimer = null;
+  await persistState();
 }
 
 function getObjectiveOptions() {
@@ -566,6 +617,33 @@ function attachCollectionListeners(container, collectionKey) {
   });
 }
 
+async function loadScorecardForPeriod(reviewPeriod) {
+  const nextPeriod = normalizeReviewPeriod(reviewPeriod);
+  try {
+    setBusyState(true);
+    setSaveMessage(`Loading ${nextPeriod}...`);
+    const payload = await directoryApi.getPerformanceScorecard({ reviewPeriod: nextPeriod });
+    hydrateState(payload?.scorecard, normalizeReviewPeriod(payload?.reviewPeriod || nextPeriod));
+    activeReviewPeriod = state.reviewPeriod;
+    render();
+    if (payload?.meta) {
+      setSaveMessage(formatMetaMessage(payload.meta));
+    } else {
+      setSaveMessage(`No shared scorecard yet for ${activeReviewPeriod}. Starting a fresh template.`);
+    }
+  } catch (error) {
+    console.error("[scorecard] Failed to load period", error);
+    if (!snapshotGrid?.children?.length) {
+      hydrateState(null, nextPeriod);
+      activeReviewPeriod = nextPeriod;
+      render();
+    }
+    setSaveMessage(error?.message || `Could not load ${nextPeriod}.`, true);
+  } finally {
+    setBusyState(false);
+  }
+}
+
 function attachListeners() {
   attachCollectionListeners(valuesList, "values");
   attachCollectionListeners(principlesList, "principles");
@@ -577,9 +655,22 @@ function attachListeners() {
   addObjectiveBtn?.addEventListener("click", () => addRow("objectives"));
   addGoalBtn?.addEventListener("click", () => addRow("goals"));
 
-  reviewPeriodInput?.addEventListener("input", () => {
-    state.reviewPeriod = reviewPeriodInput.value;
-    scheduleSave();
+  async function handleLoadPeriod() {
+    const requestedPeriod = normalizeReviewPeriod(reviewPeriodInput?.value);
+    if (requestedPeriod === activeReviewPeriod) {
+      reviewPeriodInput.value = activeReviewPeriod;
+      return;
+    }
+    await flushPendingSave();
+    await loadScorecardForPeriod(requestedPeriod);
+  }
+
+  loadPeriodBtn?.addEventListener("click", () => {
+    void handleLoadPeriod();
+  });
+
+  reviewPeriodInput?.addEventListener("change", () => {
+    void handleLoadPeriod();
   });
 
   reflectionGoingWell?.addEventListener("input", () => {
@@ -596,13 +687,13 @@ function attachListeners() {
   });
 
   resetBtn?.addEventListener("click", () => {
-    const confirmed = window.confirm("Reset this scorecard to a fresh template? This only affects the saved copy on this device.");
+    const confirmed = window.confirm("Reset this scorecard to a fresh template for the current review period?");
     if (!confirmed) {
       return;
     }
-    state = createDefaultState();
+    state = createDefaultState(activeReviewPeriod);
     render();
-    persistState();
+    void persistState();
   });
 }
 
@@ -630,11 +721,10 @@ async function init() {
     }
 
     renderTopNavigation({ role });
-    loadState();
-    render();
 
     const email = String(profile?.email || "").trim();
     setStatus(email ? `Signed in as ${email}` : "Signed in");
+    await loadScorecardForPeriod(currentReviewPeriod());
   } catch (error) {
     console.error("[scorecard] Init failed", error);
     setStatus(error?.message || "Could not initialize scorecard.", true);

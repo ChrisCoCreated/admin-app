@@ -833,35 +833,35 @@ dd {
 }
 
 .wallchart-toolbar {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .quick-date-grid {
-  margin-top: 10px;
+  margin-top: 8px;
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
 }
 
 .quick-date-button {
-  min-height: 64px;
-  padding: 10px 8px;
-  border-radius: 12px;
+  min-height: 52px;
+  padding: 8px 6px;
+  border-radius: 10px;
   background: #f5f8ff;
   color: #1d2a42;
   border: 1px solid #d8e1f0;
   display: grid;
-  gap: 4px;
+  gap: 2px;
   justify-items: center;
 }
 
 .quick-date-button span {
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
 .quick-date-button strong {
-  font-size: 0.95rem;
+  font-size: 0.84rem;
 }
 
 .quick-date-button.active {

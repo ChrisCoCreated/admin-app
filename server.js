@@ -27,6 +27,7 @@ const mapsDriveTimeHandler = require("./api/maps/drive-time");
 const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 const consultantReportDocxHandler = require("./api/consultant/report-docx");
+const scorecardHandler = require("./api/scorecard");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -252,6 +253,14 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/auth/me") {
     await authMeHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/scorecard") {
+    if (req.method === "PUT") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await scorecardHandler(apiReq, apiRes);
     return true;
   }
 

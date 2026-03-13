@@ -81,6 +81,28 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getPerformanceScorecard(query = {}) {
+      const response = await authFetch(buildUrl("/api/scorecard", query));
+      if (!response.ok) {
+        await parseError(response, "Performance scorecard request failed");
+      }
+      return response.json();
+    },
+
+    async upsertPerformanceScorecard(payload = {}) {
+      const response = await authFetch(endpoint("/api/scorecard"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Performance scorecard save failed");
+      }
+      return response.json();
+    },
+
     async listClients(query = {}) {
       const response = await authFetch(buildUrl("/api/clients", query));
       if (!response.ok) {

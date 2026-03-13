@@ -1056,7 +1056,7 @@ function initMap() {
   officeMarker.bindPopup(`<strong>${escapeHtml(activeOffice.name)}</strong><br/>${escapeHtml(activeOffice.postcode)}`);
 
   map.on("click", (event) => {
-    if (!USE_OFFICE_CATCHMENT_MODE) {
+    if (!USE_OFFICE_CATCHMENT_MODE || editingSearchId) {
       return;
     }
     void handleMapClickForCatchment(event.latlng);
@@ -1269,6 +1269,9 @@ function renderCurrentCatchmentShape() {
       }
     ).addTo(map);
     previewPolygon.on("click", (event) => {
+      if (event.originalEvent) {
+        window.L.DomEvent.stopPropagation(event.originalEvent);
+      }
       addPreviewPoint(event.latlng);
     });
   }
@@ -1478,7 +1481,7 @@ function beginEditingSavedSearch(search) {
     }
   }
 
-  setStatus(`Editing '${search.name}'. Click map to add more places or reshape polygon points.`);
+  setStatus(`Editing '${search.name}'. Drag points, click the area edge to add a point, or right-click a point to delete.`);
   if (driveTimeMeta) {
     driveTimeMeta.textContent = formatTravelMetaText();
   }
