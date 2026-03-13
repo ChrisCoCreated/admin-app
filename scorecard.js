@@ -33,6 +33,7 @@ const ENTITY_META = {
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const saveMessage = document.getElementById("saveMessage");
+const saveNowBtn = document.getElementById("saveNowBtn");
 const reviewPeriodInput = document.getElementById("reviewPeriodInput");
 const loadPeriodBtn = document.getElementById("loadPeriodBtn");
 const valuesList = document.getElementById("valuesList");
@@ -103,20 +104,43 @@ function setStatus(message, isError = false) {
   statusMessage.classList.toggle("error", isError);
 }
 
-function setSaveMessage(message, isError = false) {
+function setSaveMessage(message, isError = false, tone = isError ? "error" : "idle") {
   saveMessage.textContent = message;
   saveMessage.classList.toggle("error", isError);
+  saveMessage.dataset.tone = tone;
+}
+
+function setPendingSaveMessage(message) {
+  setSaveMessage(message, false, "pending");
+}
+
+function setSavingMessage(message) {
+  setSaveMessage(message, false, "saving");
+}
+
+function hasPendingDefinitionSaves() {
+  return pendingDefinitionTimers.size > 0;
+}
+
+function hasPendingReviewSave() {
+  return saveTimer != null;
 }
 
 function setBusyState(isBusy) {
   loadingPeriod = isBusy;
   loadPeriodBtn.disabled = isBusy;
   resetBtn.disabled = isBusy || savingReview;
+  if (saveNowBtn) {
+    saveNowBtn.disabled = isBusy || savingReview;
+  }
 }
 
 function setSavingReviewState(isSaving) {
   savingReview = isSaving;
   resetBtn.disabled = isSaving || loadingPeriod;
+  if (saveNowBtn) {
+    saveNowBtn.disabled = isSaving || loadingPeriod;
+  }
 }
 
 function escapeHtml(value) {
@@ -258,6 +282,41 @@ function buildObjectiveSelect(selectedId) {
     );
   }
   return options.join("");
+}
+
+function sortEntityItems(entityType, items) {
+  const labelField = ENTITY_META[entityType].nameField;
+  return [...items].sort((left, right) => {
+    const orderDelta = Number(left.sortOrder || 0) - Number(right.sortOrder || 0);
+    if (orderDelta !== 0) {
+      return orderDelta;
+    }
+    return String(left?.[labelField] || "").localeCompare(String(right?.[labelField] || ""), undefined, {
+      sensitivity: "base",
+    });
+  });
+}
+
+function appendDefinitionToState(entityType, definition) {
+  if (!definition?.id) {
+    return;
+  }
+
+  const listKey = ENTITY_META[entityType].listKey;
+  const existing = state[listKey].filter((item) => item.id !== definition.id);
+  const hydrated =
+    entityType === "goals"
+      ? {
+          ...definition,
+          objectiveTitle: state.objectives.find((item) => item.id === definition.objectiveId)?.title || "",
+          review: null,
+        }
+      : {
+          ...definition,
+          review: null,
+        };
+
+  state[listKey] = sortEntityItems(entityType, [...existing, hydrated]);
 }
 
 function definitionSnapshotNote(item, entityType) {
@@ -403,7 +462,7 @@ function renderObjectives() {
       return buildEntryShell(
         item,
         `Objective ${index + 1}`,
-        "The objective definition is shared across periods. Owner, score, and blockers below are review-specific.",
+        "The objective definition is shared across periods. Creating or renaming it does not create a review period. Owner, score, and blockers below are review-specific.",
         `
           <div class="scorecard-form-grid">
             <label class="field scorecard-span-2">
@@ -445,7 +504,7 @@ function renderGoals() {
       return buildEntryShell(
         item,
         `Goal ${index + 1}`,
-        "The goal definition and linked objective are shared. Status, score, owner, and next action are specific to the selected period.",
+        "The goal definition and linked objective are shared. Creating or renaming it does not create a review period. Status, score, owner, and next action are specific to the selected period.",
         `
           <div class="scorecard-form-grid">
             <label class="field scorecard-span-2">
@@ -580,6 +639,7 @@ function serializeReviewPayload() {
 async function persistReview() {
   try {
     setSavingReviewState(true);
+    setSavingMessage("Saving review...");
     const payload = await directoryApi.upsertPerformanceScorecard({
       reviewPeriod: activeReviewPeriod,
       scorecard: serializeReviewPayload(),
@@ -600,7 +660,7 @@ function scheduleReviewSave() {
   if (loadingPeriod) {
     return;
   }
-  setSaveMessage("Saving review...");
+  setPendingSaveMessage("Unsaved review changes. Saving shortly...");
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     saveTimer = null;
@@ -629,19 +689,20 @@ function queueDefinitionSave(entityType, rowId, patch) {
     window.clearTimeout(existingTimer);
   }
 
-  setSaveMessage("Saving shared definitions...");
+  setPendingSaveMessage("Unsaved definition changes. Saving shortly...");
   const timer = window.setTimeout(async () => {
     pendingDefinitionTimers.delete(key);
     const nextPatch = pendingDefinitionPatches.get(key);
     pendingDefinitionPatches.delete(key);
 
     try {
+      setSavingMessage("Saving shared definitions...");
       await directoryApi.updatePerformanceScorecardDefinition({
         entityType,
         id: rowId,
         patch: nextPatch,
       });
-      setSaveMessage("Shared definitions saved.");
+      setSaveMessage("Shared definitions saved.", false, "saved");
     } catch (error) {
       console.error("[scorecard] Failed to save definition", error);
       setSaveMessage(error?.message || "Could not save shared definition changes.", true);
@@ -670,7 +731,9 @@ async function flushDefinitionSaves() {
   }
 
   if (tasks.length) {
+    setSavingMessage("Saving shared definitions...");
     await Promise.all(tasks);
+    setSaveMessage("Shared definitions saved.", false, "saved");
   }
 }
 
@@ -766,11 +829,13 @@ async function addDefinition(entityType) {
             objective_id: state.objectives[0]?.id || null,
           };
 
-    await directoryApi.createPerformanceScorecardDefinition({
+    const response = await directoryApi.createPerformanceScorecardDefinition({
       entityType,
       definition: payload,
     });
-    await loadScorecardForPeriod(activeReviewPeriod);
+    appendDefinitionToState(entityType, response?.definition || null);
+    render();
+    setSaveMessage(`New ${ENTITY_META[entityType].label} saved.`, false, "saved");
   } catch (error) {
     console.error("[scorecard] Failed to add definition", error);
     setSaveMessage(error?.message || "Could not create the definition.", true);
@@ -781,7 +846,7 @@ async function loadScorecardForPeriod(reviewPeriod) {
   const nextPeriod = normalizeReviewPeriod(reviewPeriod);
   try {
     setBusyState(true);
-    setSaveMessage(`Loading ${nextPeriod}...`);
+    setSavingMessage(`Loading ${nextPeriod}...`);
     const payload = await directoryApi.getPerformanceScorecard({ reviewPeriod: nextPeriod });
     hydrateState(payload, nextPeriod);
     activeReviewPeriod = state.review.reviewPeriod || nextPeriod;
@@ -789,7 +854,11 @@ async function loadScorecardForPeriod(reviewPeriod) {
     if (state.review.updatedAt) {
       setSaveMessage(formatSaveMeta(state.review));
     } else {
-      setSaveMessage(`Loaded ${activeReviewPeriod}. Scores and notes are empty until you assess this period.`);
+      setSaveMessage(
+        `Loaded ${activeReviewPeriod}. Scores and notes are empty until you assess this period.`,
+        false,
+        "idle"
+      );
     }
   } catch (error) {
     console.error("[scorecard] Failed to load period", error);
@@ -907,6 +976,33 @@ function attachListeners() {
     };
     render();
     void persistReview();
+  });
+
+  saveNowBtn?.addEventListener("click", () => {
+    void (async () => {
+      try {
+        const hadPendingDefinitions = hasPendingDefinitionSaves();
+        const hadPendingReview = hasPendingReviewSave();
+
+        if (!hadPendingDefinitions && !hadPendingReview) {
+          setSaveMessage(formatSaveMeta(state.review), false, state.review.updatedAt ? "saved" : "idle");
+          return;
+        }
+        setSavingMessage("Saving changes now...");
+        await flushDefinitionSaves();
+        await flushPendingReviewSave();
+        if (hadPendingReview && !hasPendingReviewSave() && !savingReview) {
+          setSaveMessage(formatSaveMeta(state.review), false, state.review.updatedAt ? "saved" : "idle");
+          return;
+        }
+        if (hadPendingDefinitions && !hasPendingDefinitionSaves()) {
+          setSaveMessage("Shared definitions saved.", false, "saved");
+        }
+      } catch (error) {
+        console.error("[scorecard] Manual save failed", error);
+        setSaveMessage(error?.message || "Could not save changes.", true);
+      }
+    })();
   });
 }
 

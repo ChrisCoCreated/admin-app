@@ -1477,6 +1477,41 @@ body.lightbox-open {
     linear-gradient(180deg, #fbfcff 0%, #ffffff 100%);
 }
 
+.scorecard-savebar {
+  display: grid;
+  gap: 10px;
+}
+
+.scorecard-save-message {
+  margin: 0;
+  padding-left: 16px;
+  position: relative;
+}
+
+.scorecard-save-message::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45rem;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #9aa8bb;
+}
+
+.scorecard-save-message[data-tone="pending"]::before,
+.scorecard-save-message[data-tone="saving"]::before {
+  background: #d7a127;
+}
+
+.scorecard-save-message[data-tone="saved"]::before {
+  background: #33a071;
+}
+
+.scorecard-save-message[data-tone="error"]::before {
+  background: #c95757;
+}
+
 .scorecard-panel-head {
   display: flex;
   flex-wrap: wrap;
