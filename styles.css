@@ -1676,6 +1676,11 @@ body.lightbox-open {
   grid-template-columns: minmax(0, 1fr) 200px auto;
 }
 
+.office-catchment-client-controls {
+  margin-top: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .drive-time-action-group {
   display: inline-flex;
   align-items: center;
@@ -1732,6 +1737,10 @@ body.lightbox-open {
   justify-content: space-between;
 }
 
+.drive-time-filter-field {
+  min-width: 140px;
+}
+
 .drive-time-overlay-grid {
   margin-top: 10px;
   display: grid;
@@ -1750,14 +1759,23 @@ body.lightbox-open {
     #f7fafe;
 }
 
+.drive-time-map-wrap {
+  position: relative;
+}
+
 .map-click-feedback {
-  margin-bottom: 10px;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 700;
   border: 1px solid #cad4e6;
   border-radius: 10px;
   background: #f6f8fd;
   color: #1f2c45;
   font-weight: 700;
   padding: 8px 10px;
+  pointer-events: none;
   opacity: 0;
   transform: translateY(-3px);
   transition: opacity 180ms ease, transform 180ms ease;

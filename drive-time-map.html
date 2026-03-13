@@ -53,6 +53,19 @@
             <button id="customDepartureBtn" class="secondary drive-time-small-btn" type="button">Custom time</button>
           </div>
         </div>
+        <div class="drive-time-controls office-catchment-controls office-catchment-client-controls">
+          <label class="field" for="clientOfficeSelect">
+            Set office from client
+            <select id="clientOfficeSelect">
+              <option value="">Choose client location</option>
+            </select>
+          </label>
+          <div class="drive-time-action-group">
+            <button id="setOfficeFromClientBtn" class="secondary drive-time-small-btn" type="button" disabled>
+              Use client location
+            </button>
+          </div>
+        </div>
         <div id="customDepartureWrap" class="drive-time-custom-time" hidden>
           <label class="field" for="departureDateInput">
             Date
@@ -96,6 +109,14 @@
         </div>
         <div id="savedSearchesContent" hidden>
           <div class="row">
+            <label class="field drive-time-filter-field" for="savedSearchFilterSelect">
+              View
+              <select id="savedSearchFilterSelect">
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+                <option value="all">All</option>
+              </select>
+            </label>
             <button id="showAllSearchesBtn" class="secondary" type="button">Show all</button>
             <button id="hideAllSearchesBtn" class="secondary" type="button">Hide all</button>
             <button id="exportSearchesBtn" class="secondary" type="button">Export</button>
@@ -149,8 +170,10 @@
       </section>
 
       <section class="panel">
-        <div id="mapClickFeedback" class="map-click-feedback" hidden aria-live="polite"></div>
-        <div id="driveTimeMap" class="drive-time-map" role="img" aria-label="Drive-time map"></div>
+        <div class="drive-time-map-wrap">
+          <div id="mapClickFeedback" class="map-click-feedback" hidden aria-live="polite"></div>
+          <div id="driveTimeMap" class="drive-time-map" role="img" aria-label="Drive-time map"></div>
+        </div>
       </section>
     </main>
 

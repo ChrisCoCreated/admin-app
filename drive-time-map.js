@@ -6,6 +6,8 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260311";
 const signOutBtn = document.getElementById("signOutBtn");
 const locationInput = document.getElementById("locationInput");
 const setOfficeBtn = document.getElementById("setOfficeBtn");
+const clientOfficeSelect = document.getElementById("clientOfficeSelect");
+const setOfficeFromClientBtn = document.getElementById("setOfficeFromClientBtn");
 const driveTimeMinutesInput = document.getElementById("driveTimeMinutesInput");
 const customDepartureBtn = document.getElementById("customDepartureBtn");
 const customDepartureWrap = document.getElementById("customDepartureWrap");
@@ -19,6 +21,7 @@ const acceptedPlacesList = document.getElementById("acceptedPlacesList");
 const noAcceptedPlacesMessage = document.getElementById("noAcceptedPlacesMessage");
 const toggleSavedSearchesBtn = document.getElementById("toggleSavedSearchesBtn");
 const savedSearchesContent = document.getElementById("savedSearchesContent");
+const savedSearchFilterSelect = document.getElementById("savedSearchFilterSelect");
 const showAllSearchesBtn = document.getElementById("showAllSearchesBtn");
 const hideAllSearchesBtn = document.getElementById("hideAllSearchesBtn");
 const exportSearchesBtn = document.getElementById("exportSearchesBtn");
@@ -90,6 +93,17 @@ let geocodeCache = {};
 let useCustomDepartureTime = false;
 let currentCatchment = createEmptyCatchment();
 let clickFeedbackTimer = null;
+let savedSearchFilter = "active";
+let clientOfficeOptions = [];
+
+const MAP_PANES = {
+  searchArea: "search-area-pane",
+  searchOffice: "search-office-pane",
+  people: "people-pane",
+  activeArea: "active-area-pane",
+  activeOffice: "active-office-pane",
+  activeVertex: "active-vertex-pane",
+};
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -141,6 +155,9 @@ function setBusy(isBusy) {
   if (setOfficeBtn) {
     setOfficeBtn.disabled = isBusy;
   }
+  if (setOfficeFromClientBtn) {
+    setOfficeFromClientBtn.disabled = isBusy || !String(clientOfficeSelect?.value || "").trim();
+  }
   if (saveSearchBtn) {
     saveSearchBtn.disabled = isBusy || !canSaveCurrentCatchment();
   }
@@ -166,6 +183,13 @@ function setSavedSearchesCollapsed(isCollapsed) {
     toggleSavedSearchesBtn.textContent = isCollapsed ? "Show saved searches" : "Hide saved searches";
     toggleSavedSearchesBtn.setAttribute("aria-expanded", String(!isCollapsed));
   }
+}
+
+function setClientOfficeButtonState() {
+  if (!setOfficeFromClientBtn) {
+    return;
+  }
+  setOfficeFromClientBtn.disabled = !String(clientOfficeSelect?.value || "").trim();
 }
 
 function updateClearAcceptedButtonState() {
@@ -374,6 +398,7 @@ function sanitizeSavedSearch(raw, fallbackIndex = 0) {
     name: normalizeSearchName(raw?.name || "") || `Saved area ${fallbackIndex + 1}`,
     savedAt: String(raw?.savedAt || raw?.createdAt || new Date().toISOString()),
     visible: raw?.visible !== false,
+    archived: raw?.archived === true,
     colorIndex: Number.isInteger(colorIndex) && colorIndex >= 0 ? colorIndex : fallbackIndex,
   };
 
@@ -458,6 +483,16 @@ function persistSavedSearches() {
   }
 }
 
+function getFilteredSavedSearches() {
+  if (savedSearchFilter === "archived") {
+    return savedSearches.filter((search) => search.archived);
+  }
+  if (savedSearchFilter === "all") {
+    return savedSearches;
+  }
+  return savedSearches.filter((search) => !search.archived);
+}
+
 function setPeopleOverlayStatus(message, isError = false) {
   if (!peopleOverlayStatus) {
     return;
@@ -513,6 +548,12 @@ function buildClientQuery(client) {
     return parts.join(", ");
   }
   return normalizeLocation(client?.postcode || client?.location || "");
+}
+
+function buildClientOfficeLabel(client, query) {
+  const name = normalizeLocation(client?.name || "Unnamed client");
+  const location = normalizeLocation(query || buildClientQuery(client));
+  return location ? `${name} - ${location}` : name;
 }
 
 function buildCarerQuery(carer) {
@@ -730,6 +771,7 @@ function ensureOverlayLayer(item) {
     weight: 2,
     fillColor: style.fillColor,
     fillOpacity: 0.85,
+    pane: MAP_PANES.people,
   });
   marker.bindPopup(
     `<strong>${escapeHtml(item.name)}</strong><br/>${escapeHtml(getOverlayTypeLabel(item.type))}<br/>${escapeHtml(item.locationLabel)}<br/>Status: ${escapeHtml(formatStatusLabel(item.status))}`
@@ -916,6 +958,46 @@ async function loadPeopleOverlay() {
   }
 }
 
+async function loadClientOfficeOptions() {
+  if (!clientOfficeSelect) {
+    return;
+  }
+
+  try {
+    const payload = await directoryApi.listOneTouchClients({ limit: 500 });
+    const clients = Array.isArray(payload?.clients) ? payload.clients : [];
+    clientOfficeOptions = clients
+      .map((client, index) => {
+        const query = buildClientQuery(client);
+        if (!query) {
+          return null;
+        }
+        return {
+          id: String(client?.id || `client-${index}`),
+          label: buildClientOfficeLabel(client, query),
+          query,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    clientOfficeSelect.innerHTML = '<option value="">Choose client location</option>';
+    for (const optionData of clientOfficeOptions) {
+      const option = document.createElement("option");
+      option.value = optionData.id;
+      option.textContent = optionData.label;
+      clientOfficeSelect.appendChild(option);
+    }
+    setClientOfficeButtonState();
+  } catch (error) {
+    console.error(error);
+    if (clientOfficeSelect) {
+      clientOfficeSelect.innerHTML = '<option value="">Client locations unavailable</option>';
+    }
+    setClientOfficeButtonState();
+  }
+}
+
 function downloadJson(filename, payload) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -928,6 +1010,26 @@ function downloadJson(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+function createMapPanes() {
+  if (!map) {
+    return;
+  }
+
+  const paneConfig = [
+    { name: MAP_PANES.searchArea, zIndex: 410 },
+    { name: MAP_PANES.searchOffice, zIndex: 420 },
+    { name: MAP_PANES.people, zIndex: 450 },
+    { name: MAP_PANES.activeArea, zIndex: 640 },
+    { name: MAP_PANES.activeOffice, zIndex: 645 },
+    { name: MAP_PANES.activeVertex, zIndex: 650 },
+  ];
+
+  for (const pane of paneConfig) {
+    const layerPane = map.getPane(pane.name) || map.createPane(pane.name);
+    layerPane.style.zIndex = String(pane.zIndex);
+  }
+}
+
 function initMap() {
   if (!driveTimeMapRoot || !window.L) {
     return;
@@ -938,6 +1040,8 @@ function initMap() {
     attributionControl: true,
   }).setView([activeOffice.lat, activeOffice.lng], 11);
 
+  createMapPanes();
+
   window.L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     maxZoom: 19,
     attribution:
@@ -947,6 +1051,7 @@ function initMap() {
   officeMarker = window.L.marker([activeOffice.lat, activeOffice.lng], {
     title: `${activeOffice.name}${activeOffice.postcode ? ` (${activeOffice.postcode})` : ""}`,
     keyboard: false,
+    pane: MAP_PANES.activeOffice,
   }).addTo(map);
   officeMarker.bindPopup(`<strong>${escapeHtml(activeOffice.name)}</strong><br/>${escapeHtml(activeOffice.postcode)}`);
 
@@ -1048,6 +1153,7 @@ function syncPreviewVertexMarkers() {
     const marker = window.L.marker([point.lat, point.lng], {
       draggable: true,
       keyboard: false,
+      pane: MAP_PANES.activeVertex,
       icon: window.L.divIcon({
         className: "drive-time-vertex-icon",
         iconSize: [12, 12],
@@ -1134,6 +1240,7 @@ function renderCurrentCatchmentShape() {
       weight: 2,
       fillColor: "#31b7c8",
       fillOpacity: 0.9,
+      pane: MAP_PANES.activeOffice,
     }).addTo(map);
     marker.bindPopup(
       `<strong>${escapeHtml(place.name)}</strong><br/>${escapeHtml(place.postcode || "No postcode")}<br/>${escapeHtml(
@@ -1158,6 +1265,7 @@ function renderCurrentCatchmentShape() {
         dashArray: "5 5",
         fillColor: "#9db3df",
         fillOpacity: 0.2,
+        pane: MAP_PANES.activeArea,
       }
     ).addTo(map);
     previewPolygon.on("click", (event) => {
@@ -1207,7 +1315,7 @@ function removeAreaLayers(searchId) {
 
 function syncSearchLayer(search) {
   removeAreaLayers(search.id);
-  if (!search.visible || !map || !window.L) {
+  if (!search.visible || search.archived || !map || !window.L) {
     return;
   }
 
@@ -1219,6 +1327,7 @@ function syncSearchLayer(search) {
     weight: 2,
     fillColor: "#fff",
     fillOpacity: 1,
+    pane: MAP_PANES.searchOffice,
   }).addTo(map);
   officeLayer.bindPopup(`${escapeHtml(search.name)}<br/>Office: ${escapeHtml(office.name)}`);
 
@@ -1232,6 +1341,7 @@ function syncSearchLayer(search) {
         opacity: 0.95,
         fillColor: color.fill,
         fillOpacity: 0.2,
+        pane: MAP_PANES.searchArea,
       }
     ).addTo(map);
     polygonLayer.bindPopup(`${escapeHtml(search.name)} (${search.thresholdMinutes} mins)`);
@@ -1380,7 +1490,8 @@ function renderSavedSearches() {
   }
 
   savedSearchesList.innerHTML = "";
-  for (const search of savedSearches) {
+  const filteredSearches = getFilteredSavedSearches();
+  for (const search of filteredSearches) {
     const color = getColorByIndex(search.colorIndex);
     const li = document.createElement("li");
     li.className = "drive-time-search-item";
@@ -1391,6 +1502,7 @@ function renderSavedSearches() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = search.visible;
+    checkbox.disabled = search.archived;
     checkbox.addEventListener("change", () => {
       search.visible = checkbox.checked;
       persistSavedSearches();
@@ -1410,7 +1522,9 @@ function renderSavedSearches() {
     title.textContent = search.name;
     const subtitle = document.createElement("span");
     subtitle.className = "drive-time-search-subtitle";
-    subtitle.textContent = `${search.office.name} | ${search.thresholdMinutes} mins | ${search.acceptedPlaces.length} places`;
+    subtitle.textContent = `${search.office.name} | ${search.thresholdMinutes} mins | ${search.acceptedPlaces.length} places${
+      search.archived ? " | Archived" : ""
+    }`;
     titleWrap.append(title, subtitle);
 
     visibilityLabel.append(checkbox, colorDot, titleWrap);
@@ -1474,12 +1588,36 @@ function renderSavedSearches() {
       setStatus(`Removed '${search.name}'.`);
     });
 
-    actions.append(colourSelect, editBtn, focusBtn, removeBtn);
+    const archiveBtn = document.createElement("button");
+    archiveBtn.type = "button";
+    archiveBtn.className = "secondary";
+    archiveBtn.textContent = search.archived ? "Restore" : "Archive";
+    archiveBtn.addEventListener("click", () => {
+      search.archived = !search.archived;
+      if (search.archived) {
+        search.visible = false;
+        if (editingSearchId === search.id) {
+          resetCurrentCatchment();
+        }
+      }
+      persistSavedSearches();
+      syncSearchLayer(search);
+      renderSavedSearches();
+      setStatus(search.archived ? `Archived '${search.name}'.` : `Restored '${search.name}'.`);
+    });
+
+    actions.append(colourSelect, editBtn, focusBtn, archiveBtn, removeBtn);
     li.append(visibilityLabel, actions);
     savedSearchesList.appendChild(li);
   }
 
-  noSavedSearchesMessage.hidden = savedSearches.length > 0;
+  noSavedSearchesMessage.hidden = filteredSearches.length > 0;
+  noSavedSearchesMessage.textContent =
+    savedSearchFilter === "archived"
+      ? "No archived searches."
+      : savedSearchFilter === "all"
+        ? "No saved searches yet."
+        : "No active searches.";
 }
 
 function resetCurrentCatchment() {
@@ -1529,6 +1667,7 @@ function saveCurrentSearch() {
       },
       savedAt: new Date().toISOString(),
       visible: true,
+      archived: editingTarget?.archived === true,
       colorIndex: editingTarget?.colorIndex ?? savedSearches.length,
       formattedAddress: currentCatchment.office.name,
       query: currentCatchment.office.name,
@@ -1564,10 +1703,11 @@ function saveCurrentSearch() {
 }
 
 function setAllSearchVisibility(isVisible) {
-  if (!savedSearches.length) {
+  const targetSearches = getFilteredSavedSearches().filter((search) => !search.archived);
+  if (!targetSearches.length) {
     return;
   }
-  for (const search of savedSearches) {
+  for (const search of targetSearches) {
     search.visible = isVisible;
     syncSearchLayer(search);
   }
@@ -1767,8 +1907,8 @@ function updateOfficeMarker() {
   );
 }
 
-async function setOfficeFromInput() {
-  const query = normalizeSearchName(locationInput?.value || "");
+async function setOfficeFromQuery(queryValue, sourceLabel = "") {
+  const query = normalizeSearchName(queryValue || "");
   if (!query) {
     setStatus("Enter an office location first.", true);
     return;
@@ -1817,13 +1957,33 @@ async function setOfficeFromInput() {
     if (searchNameInput) {
       searchNameInput.value = `${formatted} catchment`;
     }
-    setStatus(`Office set to ${formatted}. Click map to build catchment.`);
+    setStatus(`Office set to ${formatted}${sourceLabel ? ` from ${sourceLabel}` : ""}. Click map to build catchment.`);
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not set office location.", true);
   } finally {
     setBusy(false);
   }
+}
+
+async function setOfficeFromInput() {
+  await setOfficeFromQuery(locationInput?.value || "");
+}
+
+async function setOfficeFromClientSelection() {
+  const selectedId = String(clientOfficeSelect?.value || "").trim();
+  if (!selectedId) {
+    setStatus("Choose a client location first.", true);
+    return;
+  }
+
+  const selected = clientOfficeOptions.find((option) => option.id === selectedId);
+  if (!selected) {
+    setStatus("That client location is no longer available.", true);
+    return;
+  }
+
+  await setOfficeFromQuery(selected.query, selected.label);
 }
 
 async function init() {
@@ -1853,6 +2013,10 @@ async function init() {
 
     loadGeocodeCache();
     loadSavedSearches();
+    await loadClientOfficeOptions();
+    if (savedSearchFilterSelect) {
+      savedSearchFilterSelect.value = savedSearchFilter;
+    }
     ensureDefaultDepartureInputs();
     setCustomDepartureVisibility(false);
 
@@ -1893,6 +2057,14 @@ saveSearchBtn?.addEventListener("click", () => {
 
 setOfficeBtn?.addEventListener("click", () => {
   void setOfficeFromInput();
+});
+
+setOfficeFromClientBtn?.addEventListener("click", () => {
+  void setOfficeFromClientSelection();
+});
+
+clientOfficeSelect?.addEventListener("change", () => {
+  setClientOfficeButtonState();
 });
 
 clearAcceptedPlacesBtn?.addEventListener("click", () => {
@@ -1957,6 +2129,11 @@ importSearchesFileInput?.addEventListener("change", async () => {
 toggleSavedSearchesBtn?.addEventListener("click", () => {
   const isCollapsed = Boolean(savedSearchesContent?.hidden);
   setSavedSearchesCollapsed(!isCollapsed);
+});
+
+savedSearchFilterSelect?.addEventListener("change", () => {
+  savedSearchFilter = String(savedSearchFilterSelect.value || "active");
+  renderSavedSearches();
 });
 
 driveTimeMinutesInput?.addEventListener("change", () => {
