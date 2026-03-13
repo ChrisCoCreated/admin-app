@@ -28,6 +28,7 @@ const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 const consultantReportDocxHandler = require("./api/consultant/report-docx");
 const scorecardHandler = require("./api/scorecard");
+const scorecardDefinitionsHandler = require("./api/scorecard-definitions");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -261,6 +262,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await scorecardHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/scorecard/definitions") {
+    if (req.method === "POST" || req.method === "PATCH") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await scorecardDefinitionsHandler(apiReq, apiRes);
     return true;
   }
 

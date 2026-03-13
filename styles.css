@@ -277,6 +277,11 @@ button.secondary {
   color: #1c2433;
 }
 
+button.secondary.active {
+  background: #d2f0ea;
+  color: #165f49;
+}
+
 #signOutBtn {
   min-width: 0;
   padding: 10px 16px;
@@ -1592,6 +1597,31 @@ body.lightbox-open {
   font-size: 1rem;
 }
 
+.scorecard-entry-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.scorecard-entry.is-archived {
+  border-style: dashed;
+}
+
+.scorecard-archived-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2f9;
+  color: #4c5d79;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .scorecard-remove-btn {
   min-height: 34px;
   padding: 7px 11px;
@@ -1613,6 +1643,18 @@ body.lightbox-open {
   margin-top: 14px;
   display: grid;
   gap: 12px;
+}
+
+.scorecard-empty-state {
+  margin-top: 14px;
+  border: 1px dashed #d5deee;
+  border-radius: 14px;
+  background: #fbfcff;
+  padding: 16px;
+}
+
+.scorecard-definition-note {
+  margin-top: 6px;
 }
 
 .is-muted-block textarea,

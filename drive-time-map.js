@@ -15,6 +15,7 @@ const departureDateInput = document.getElementById("departureDateInput");
 const departureTimeInput = document.getElementById("departureTimeInput");
 const useDefaultDepartureBtn = document.getElementById("useDefaultDepartureBtn");
 const searchNameInput = document.getElementById("searchNameInput");
+const editAddPlacesBtn = document.getElementById("editAddPlacesBtn");
 const saveSearchBtn = document.getElementById("saveSearchBtn");
 const clearAcceptedPlacesBtn = document.getElementById("clearAcceptedPlacesBtn");
 const acceptedPlacesList = document.getElementById("acceptedPlacesList");
@@ -95,6 +96,7 @@ let currentCatchment = createEmptyCatchment();
 let clickFeedbackTimer = null;
 let savedSearchFilter = "active";
 let clientOfficeOptions = [];
+let editAddPlacesMode = false;
 
 const MAP_PANES = {
   searchArea: "search-area-pane",
@@ -173,6 +175,15 @@ function updateSaveButtonState() {
   }
   saveSearchBtn.disabled = !canSaveCurrentCatchment();
   saveSearchBtn.textContent = editingSearchId ? "Update area" : "Save search";
+}
+
+function updateEditAddPlacesButtonState() {
+  if (!editAddPlacesBtn) {
+    return;
+  }
+  editAddPlacesBtn.disabled = !editingSearchId;
+  editAddPlacesBtn.textContent = editAddPlacesMode ? "Stop adding places" : "Add places";
+  editAddPlacesBtn.classList.toggle("active", editAddPlacesMode);
 }
 
 function setSavedSearchesCollapsed(isCollapsed) {
@@ -491,6 +502,41 @@ function getFilteredSavedSearches() {
     return savedSearches;
   }
   return savedSearches.filter((search) => !search.archived);
+}
+
+function getEditingSearch() {
+  if (!editingSearchId) {
+    return null;
+  }
+  return savedSearches.find((search) => search.id === editingSearchId) || null;
+}
+
+function persistEditingSearchChanges(statusMessage = "") {
+  const editingSearch = getEditingSearch();
+  if (!editingSearch) {
+    return;
+  }
+
+  editingSearch.office = sanitizeOffice(currentCatchment.office);
+  editingSearch.thresholdMinutes = clampMinutes(currentCatchment.thresholdMinutes);
+  editingSearch.acceptedPlaces = sanitizeAcceptedPlaces(currentCatchment.acceptedPlaces);
+  editingSearch.polygon = sanitizePolygon(currentCatchment.polygon);
+  editingSearch.departureTimeMode = currentCatchment.departureTimeMode === "custom" ? "custom" : "default";
+  editingSearch.departureTime = currentCatchment.departureTime || null;
+  editingSearch.formattedAddress = normalizeSearchName(currentCatchment.office.name);
+  editingSearch.query = normalizeSearchName(currentCatchment.office.name);
+  editingSearch.savedAt = new Date().toISOString();
+  editingSearch.qualitySummary = {
+    ...(editingSearch.qualitySummary || {}),
+    acceptedPlaces: editingSearch.acceptedPlaces.length,
+  };
+
+  persistSavedSearches();
+  syncSearchLayer(editingSearch);
+  renderSavedSearches();
+  if (statusMessage) {
+    setStatus(statusMessage);
+  }
 }
 
 function setPeopleOverlayStatus(message, isError = false) {
@@ -1056,7 +1102,10 @@ function initMap() {
   officeMarker.bindPopup(`<strong>${escapeHtml(activeOffice.name)}</strong><br/>${escapeHtml(activeOffice.postcode)}`);
 
   map.on("click", (event) => {
-    if (!USE_OFFICE_CATCHMENT_MODE || editingSearchId) {
+    if (!USE_OFFICE_CATCHMENT_MODE) {
+      return;
+    }
+    if (editingSearchId && !editAddPlacesMode) {
       return;
     }
     void handleMapClickForCatchment(event.latlng);
@@ -1167,6 +1216,10 @@ function syncPreviewVertexMarkers() {
       updatePreviewPolygonShape();
     });
 
+    marker.on("dragend", () => {
+      persistEditingSearchChanges("Point moved. Changes saved.");
+    });
+
     marker.on("contextmenu", () => {
       if (currentCatchment.polygon.length <= MIN_POLYGON_POINTS) {
         setStatus("Area needs at least 3 points.", true);
@@ -1175,7 +1228,7 @@ function syncPreviewVertexMarkers() {
       currentCatchment.polygon.splice(index, 1);
       updatePreviewPolygonShape();
       syncPreviewVertexMarkers();
-      setStatus("Point deleted.");
+      persistEditingSearchChanges("Point deleted. Changes saved.");
     });
 
     previewVertexMarkers.push(marker);
@@ -1224,7 +1277,7 @@ function addPreviewPoint(latlng) {
   currentCatchment.polygon.splice(insertIndex, 0, { lat: latlng.lat, lng: latlng.lng });
   updatePreviewPolygonShape();
   syncPreviewVertexMarkers();
-  setStatus("Point added.");
+  persistEditingSearchChanges("Point added. Changes saved.");
 }
 
 function renderCurrentCatchmentShape() {
@@ -1411,10 +1464,13 @@ function renderAcceptedPlacesList() {
       currentCatchment.acceptedPlaces = currentCatchment.acceptedPlaces.filter((item) => item.key !== place.key);
       recomputeCurrentHullFromAccepted();
       refreshCurrentCatchmentMapAndList();
+      persistEditingSearchChanges("Place removed. Changes saved.");
       if (driveTimeMeta) {
         driveTimeMeta.textContent = formatTravelMetaText();
       }
-      setStatus(`Removed ${place.name}.`);
+      if (!editingSearchId) {
+        setStatus(`Removed ${place.name}.`);
+      }
     });
 
     actions.append(removeBtn);
@@ -1431,6 +1487,7 @@ function beginEditingSavedSearch(search) {
   }
 
   editingSearchId = search.id;
+  editAddPlacesMode = false;
   currentCatchment = {
     office: sanitizeOffice(search.office),
     thresholdMinutes: clampMinutes(search.thresholdMinutes),
@@ -1470,6 +1527,7 @@ function beginEditingSavedSearch(search) {
   refreshCurrentCatchmentMapAndList();
   updateOfficeMarker();
   updateSaveButtonState();
+  updateEditAddPlacesButtonState();
   if (map) {
     if (currentCatchment.polygon.length >= MIN_POLYGON_POINTS) {
       const bounds = window.L.latLngBounds(currentCatchment.polygon.map((point) => [point.lat, point.lng]));
@@ -1481,7 +1539,7 @@ function beginEditingSavedSearch(search) {
     }
   }
 
-  setStatus(`Editing '${search.name}'. Drag points, click the area edge to add a point, or right-click a point to delete.`);
+  setStatus(`Editing '${search.name}'. Drag points, click the area edge to add a point, or right-click a point to delete. Use 'Add places' to grow the catchment.`);
   if (driveTimeMeta) {
     driveTimeMeta.textContent = formatTravelMetaText();
   }
@@ -1625,6 +1683,7 @@ function renderSavedSearches() {
 
 function resetCurrentCatchment() {
   editingSearchId = null;
+  editAddPlacesMode = false;
   currentCatchment = createEmptyCatchment();
   currentCatchment.thresholdMinutes = resolveDriveTimeMinutes();
   if (searchNameInput) {
@@ -1638,6 +1697,7 @@ function resetCurrentCatchment() {
   clearCurrentAcceptedMarkers();
   renderAcceptedPlacesList();
   updateSaveButtonState();
+  updateEditAddPlacesButtonState();
   updateClearAcceptedButtonState();
 }
 
@@ -1865,6 +1925,9 @@ async function handleMapClickForCatchment(latlng) {
       if (driveTimeMeta) {
         driveTimeMeta.textContent = formatTravelMetaText();
       }
+      if (editingSearchId) {
+        persistEditingSearchChanges(`Accepted ${resolved.name || resolved.formattedAddress} and saved changes.`);
+      }
     } else if (duplicateLocal || data?.duplicate) {
       setStatus("Already added.");
       showClickFeedback("Already added.", "info");
@@ -2035,6 +2098,7 @@ async function init() {
     }
 
     updateSaveButtonState();
+    updateEditAddPlacesButtonState();
     updateClearAcceptedButtonState();
     setPeopleOverlayStatus("Overlay not loaded.");
     setStatus("Click map to test a town/village from office.");
@@ -2056,6 +2120,19 @@ async function init() {
 
 saveSearchBtn?.addEventListener("click", () => {
   saveCurrentSearch();
+});
+
+editAddPlacesBtn?.addEventListener("click", () => {
+  if (!editingSearchId) {
+    return;
+  }
+  editAddPlacesMode = !editAddPlacesMode;
+  updateEditAddPlacesButtonState();
+  setStatus(
+    editAddPlacesMode
+      ? "Add places mode enabled. Click the map to test and add places to this saved search."
+      : "Add places mode stopped. Polygon editing remains active."
+  );
 });
 
 setOfficeBtn?.addEventListener("click", () => {

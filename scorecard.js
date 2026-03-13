@@ -3,11 +3,31 @@ import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260313";
 
-const MIN_ROWS = {
-  values: 4,
-  principles: 3,
-  objectives: 3,
-  goals: 4,
+const ENTITY_META = {
+  values: {
+    label: "value",
+    nameField: "name",
+    reviewLabelField: "nameSnapshot",
+    listKey: "values",
+  },
+  principles: {
+    label: "principle",
+    nameField: "name",
+    reviewLabelField: "nameSnapshot",
+    listKey: "principles",
+  },
+  objectives: {
+    label: "objective",
+    nameField: "title",
+    reviewLabelField: "titleSnapshot",
+    listKey: "objectives",
+  },
+  goals: {
+    label: "goal",
+    nameField: "title",
+    reviewLabelField: "titleSnapshot",
+    listKey: "goals",
+  },
 };
 
 const signOutBtn = document.getElementById("signOutBtn");
@@ -35,57 +55,13 @@ const authController = createAuthController({
 });
 const directoryApi = createDirectoryApi(authController);
 
-let state = createDefaultState();
+let state = createEmptyState();
 let activeReviewPeriod = currentReviewPeriod();
 let saveTimer = null;
 let loadingPeriod = false;
-let savingState = false;
-
-function uid(prefix) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function createValueRow() {
-  return {
-    id: uid("value"),
-    value: "",
-    score: "",
-    evidence: "",
-    action: "",
-  };
-}
-
-function createPrincipleRow() {
-  return {
-    id: uid("principle"),
-    principle: "",
-    score: "",
-    example: "",
-    adjustment: "",
-  };
-}
-
-function createObjectiveRow() {
-  return {
-    id: uid("objective"),
-    objective: "",
-    owner: "",
-    score: "",
-    risks: "",
-  };
-}
-
-function createGoalRow() {
-  return {
-    id: uid("goal"),
-    goal: "",
-    linkedObjective: "",
-    owner: "",
-    status: "On track",
-    score: "",
-    nextAction: "",
-  };
-}
+let savingReview = false;
+const pendingDefinitionTimers = new Map();
+const pendingDefinitionPatches = new Map();
 
 function currentReviewPeriod() {
   return new Intl.DateTimeFormat(undefined, {
@@ -99,18 +75,26 @@ function normalizeReviewPeriod(value) {
   return reviewPeriod || currentReviewPeriod();
 }
 
-function createDefaultState(reviewPeriod = currentReviewPeriod()) {
+function createEmptyState(reviewPeriod = currentReviewPeriod()) {
   return {
-    reviewPeriod,
-    values: Array.from({ length: MIN_ROWS.values }, () => createValueRow()),
-    principles: Array.from({ length: MIN_ROWS.principles }, () => createPrincipleRow()),
-    objectives: Array.from({ length: MIN_ROWS.objectives }, () => createObjectiveRow()),
-    goals: Array.from({ length: MIN_ROWS.goals }, () => createGoalRow()),
+    review: {
+      id: null,
+      reviewPeriod,
+      reviewType: null,
+      createdAt: null,
+      updatedAt: null,
+      createdBy: null,
+      updatedBy: null,
+    },
     reflection: {
       goingWell: "",
       needsAttention: "",
       nextAction: "",
     },
+    values: [],
+    principles: [],
+    objectives: [],
+    goals: [],
   };
 }
 
@@ -126,149 +110,98 @@ function setSaveMessage(message, isError = false) {
 
 function setBusyState(isBusy) {
   loadingPeriod = isBusy;
-  if (loadPeriodBtn) {
-    loadPeriodBtn.disabled = isBusy;
-  }
-  if (resetBtn) {
-    resetBtn.disabled = isBusy || savingState;
-  }
+  loadPeriodBtn.disabled = isBusy;
+  resetBtn.disabled = isBusy || savingReview;
 }
 
-function setSavingState(isSaving) {
-  savingState = isSaving;
-  if (resetBtn) {
-    resetBtn.disabled = isSaving || loadingPeriod;
-  }
+function setSavingReviewState(isSaving) {
+  savingReview = isSaving;
+  resetBtn.disabled = isSaving || loadingPeriod;
 }
 
-function cloneRow(factory, raw) {
-  return {
-    ...factory(),
-    ...(raw || {}),
-  };
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
-function ensureMinimumRows(rows, minimum, factory) {
-  const nextRows = Array.isArray(rows) ? [...rows] : [];
-  while (nextRows.length < minimum) {
-    nextRows.push(factory());
-  }
-  return nextRows;
+function cloneReview(review) {
+  return review && typeof review === "object" ? { ...review } : null;
 }
 
-function hydrateState(raw, reviewPeriod) {
-  const parsed = raw && typeof raw === "object" ? raw : {};
+function hydrateState(payload, reviewPeriod) {
+  const next = payload && typeof payload === "object" ? payload : createEmptyState(reviewPeriod);
   state = {
-    reviewPeriod,
-    values: ensureMinimumRows(
-      Array.isArray(parsed?.values) ? parsed.values.map((row) => cloneRow(createValueRow, row)) : [],
-      MIN_ROWS.values,
-      createValueRow
-    ),
-    principles: ensureMinimumRows(
-      Array.isArray(parsed?.principles) ? parsed.principles.map((row) => cloneRow(createPrincipleRow, row)) : [],
-      MIN_ROWS.principles,
-      createPrincipleRow
-    ),
-    objectives: ensureMinimumRows(
-      Array.isArray(parsed?.objectives) ? parsed.objectives.map((row) => cloneRow(createObjectiveRow, row)) : [],
-      MIN_ROWS.objectives,
-      createObjectiveRow
-    ),
-    goals: ensureMinimumRows(
-      Array.isArray(parsed?.goals) ? parsed.goals.map((row) => cloneRow(createGoalRow, row)) : [],
-      MIN_ROWS.goals,
-      createGoalRow
-    ),
-    reflection: {
-      goingWell: String(parsed?.reflection?.goingWell || ""),
-      needsAttention: String(parsed?.reflection?.needsAttention || ""),
-      nextAction: String(parsed?.reflection?.nextAction || ""),
+    review: {
+      id: next.review?.id || null,
+      reviewPeriod: next.review?.reviewPeriod || reviewPeriod,
+      reviewType: next.review?.reviewType || null,
+      createdAt: next.review?.createdAt || null,
+      updatedAt: next.review?.updatedAt || null,
+      createdBy: next.review?.createdBy || null,
+      updatedBy: next.review?.updatedBy || null,
     },
+    reflection: {
+      goingWell: String(next.reflection?.goingWell || ""),
+      needsAttention: String(next.reflection?.needsAttention || ""),
+      nextAction: String(next.reflection?.nextAction || ""),
+    },
+    values: Array.isArray(next.values)
+      ? next.values.map((item) => ({
+          ...item,
+          review: cloneReview(item.review),
+        }))
+      : [],
+    principles: Array.isArray(next.principles)
+      ? next.principles.map((item) => ({
+          ...item,
+          review: cloneReview(item.review),
+        }))
+      : [],
+    objectives: Array.isArray(next.objectives)
+      ? next.objectives.map((item) => ({
+          ...item,
+          review: cloneReview(item.review),
+        }))
+      : [],
+    goals: Array.isArray(next.goals)
+      ? next.goals.map((item) => ({
+          ...item,
+          review: cloneReview(item.review),
+        }))
+      : [],
   };
 }
 
-function serializeState() {
-  return {
-    reviewPeriod: state.reviewPeriod,
-    values: state.values,
-    principles: state.principles,
-    objectives: state.objectives,
-    goals: state.goals,
-    reflection: state.reflection,
-  };
-}
-
-function formatMetaMessage(meta) {
-  const updatedAt = meta?.updatedAt ? new Date(meta.updatedAt) : null;
+function formatSaveMeta(review) {
+  const updatedAt = review?.updatedAt ? new Date(review.updatedAt) : null;
   if (!updatedAt || Number.isNaN(updatedAt.getTime())) {
     return "Changes save automatically to the shared scorecard.";
   }
-  const userLabel = meta?.updatedBy ? ` by ${meta.updatedBy}` : "";
+  const userLabel = review?.updatedBy ? ` by ${review.updatedBy}` : "";
   return `Saved to the shared scorecard${userLabel} at ${updatedAt.toLocaleString()}.`;
 }
 
-async function persistState() {
-  try {
-    setSavingState(true);
-    const payload = await directoryApi.upsertPerformanceScorecard({
-      reviewPeriod: activeReviewPeriod,
-      scorecard: serializeState(),
-    });
-    hydrateState(payload?.scorecard, normalizeReviewPeriod(payload?.reviewPeriod || activeReviewPeriod));
-    activeReviewPeriod = state.reviewPeriod;
-    render();
-    setSaveMessage(formatMetaMessage(payload?.meta));
-  } catch (error) {
-    console.error("[scorecard] Failed to save state", error);
-    setSaveMessage(error?.message || "Could not save changes to the shared scorecard.", true);
-  } finally {
-    setSavingState(false);
+function buildScoreOptions(selected) {
+  const options = ['<option value="">Select score</option>'];
+  for (let score = 1; score <= 5; score += 1) {
+    options.push(`<option value="${score}"${String(selected) === String(score) ? " selected" : ""}>${score}</option>`);
   }
+  return options.join("");
 }
 
-function scheduleSave() {
-  if (loadingPeriod) {
-    return;
+function ensureReviewObject(item) {
+  if (!item.review) {
+    item.review = {};
   }
-  setSaveMessage("Saving to the shared scorecard...");
-  window.clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => {
-    saveTimer = null;
-    void persistState();
-  }, 220);
+  return item.review;
 }
 
-async function flushPendingSave() {
-  if (!saveTimer) {
-    return;
-  }
-  window.clearTimeout(saveTimer);
-  saveTimer = null;
-  await persistState();
-}
-
-function getObjectiveOptions() {
-  return state.objectives
-    .map((row) => String(row?.objective || "").trim())
-    .filter(Boolean);
-}
-
-function averageScore(rows, labelKey) {
-  const scores = rows
-    .filter((row) => String(row?.[labelKey] || "").trim())
-    .map((row) => Number(row?.score))
-    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 5);
-
-  if (!scores.length) {
-    return null;
-  }
-
-  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
-}
-
-function formatAverage(value) {
-  return value == null ? "Not scored" : `${value.toFixed(1)} / 5`;
+function itemDisplayName(item, entityType) {
+  const labelField = ENTITY_META[entityType].nameField;
+  return String(item?.[labelField] || "").trim();
 }
 
 function scoreTone(value) {
@@ -284,25 +217,84 @@ function scoreTone(value) {
   return "is-risk";
 }
 
-function buildScoreOptions(selected) {
-  const options = ['<option value="">Select score</option>'];
-  for (let score = 1; score <= 5; score += 1) {
-    const isSelected = String(selected) === String(score) ? " selected" : "";
-    options.push(`<option value="${score}"${isSelected}>${score}</option>`);
+function formatAverage(value) {
+  return value == null ? "Not scored" : `${value.toFixed(1)} / 5`;
+}
+
+function averageScore(items, reviewField) {
+  const scores = items
+    .map((item) => Number(item?.review?.[reviewField]))
+    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 5);
+
+  if (!scores.length) {
+    return null;
+  }
+
+  return scores.reduce((sum, value) => sum + value, 0) / scores.length;
+}
+
+function countScored(items, reviewField) {
+  return items.filter((item) => {
+    const score = Number(item?.review?.[reviewField]);
+    return Number.isFinite(score) && score >= 1 && score <= 5;
+  }).length;
+}
+
+function getObjectiveOptions() {
+  return state.objectives.map((item) => ({
+    id: item.id,
+    title: item.title || "",
+    isActive: item.isActive !== false,
+  }));
+}
+
+function buildObjectiveSelect(selectedId) {
+  const options = ['<option value="">Choose linked objective</option>'];
+  for (const objective of getObjectiveOptions()) {
+    options.push(
+      `<option value="${escapeHtml(objective.id)}"${objective.id === selectedId ? " selected" : ""}>${escapeHtml(
+        objective.title || "(Untitled objective)"
+      )}</option>`
+    );
   }
   return options.join("");
 }
 
-function buildRowShell(title, description, content, removeLabel, removeDisabled, rowId) {
+function definitionSnapshotNote(item, entityType) {
+  const snapshotField = ENTITY_META[entityType].reviewLabelField;
+  const currentLabel = itemDisplayName(item, entityType);
+  const snapshot = String(item?.review?.[snapshotField] || "").trim();
+  if (!snapshot || snapshot === currentLabel) {
+    return "";
+  }
+  return `<p class="scorecard-definition-note muted">Reviewed as: ${escapeHtml(snapshot)}</p>`;
+}
+
+function goalObjectiveSnapshotNote(item) {
+  const currentTitle = String(item?.objectiveTitle || "").trim();
+  const snapshotTitle = String(item?.review?.objectiveTitleSnapshot || "").trim();
+  if (!snapshotTitle || snapshotTitle === currentTitle) {
+    return "";
+  }
+  return `<p class="scorecard-definition-note muted">Reviewed against objective: ${escapeHtml(snapshotTitle)}</p>`;
+}
+
+function buildEntryShell(item, title, description, content, entityType) {
+  const archiveLabel = item.isActive === false ? "Archived" : "Archive";
   return `
-    <article class="scorecard-entry" data-row-id="${rowId}">
+    <article class="scorecard-entry ${item.isActive === false ? "is-archived" : ""}" data-row-id="${escapeHtml(item.id)}" data-entity="${entityType}">
       <div class="scorecard-entry-head">
         <div>
-          <h3>${title}</h3>
+          <div class="scorecard-entry-title-row">
+            <h3>${title}</h3>
+            ${item.isActive === false ? '<span class="scorecard-archived-chip">Archived</span>' : ""}
+          </div>
           <p class="muted">${description}</p>
+          ${definitionSnapshotNote(item, entityType)}
+          ${entityType === "goals" ? goalObjectiveSnapshotNote(item) : ""}
         </div>
-        <button class="secondary scorecard-remove-btn" type="button" data-action="remove"${removeDisabled ? " disabled" : ""}>
-          ${removeLabel}
+        <button class="secondary scorecard-remove-btn" type="button" data-action="archive"${item.isActive === false ? " disabled" : ""}>
+          ${archiveLabel}
         </button>
       </div>
       ${content}
@@ -311,160 +303,187 @@ function buildRowShell(title, description, content, removeLabel, removeDisabled,
 }
 
 function renderValues() {
+  if (!state.values.length) {
+    valuesList.innerHTML = '<p class="muted scorecard-empty-state">No values defined yet. Add your organisational values to start scoring them each period.</p>';
+    return;
+  }
+
   valuesList.innerHTML = state.values
-    .map((row, index) => {
-      const showAction = Number(row?.score) > 0 && Number(row?.score) < 4;
-      return buildRowShell(
+    .map((item, index) => {
+      const review = ensureReviewObject(item);
+      const showAction = Number(review.score) > 0 && Number(review.score) < 4;
+      return buildEntryShell(
+        item,
         `Value ${index + 1}`,
-        "Score how clearly this value is showing up in behaviour and decisions.",
+        "This definition is shared across all review periods. The score and commentary are specific to the selected period.",
         `
           <div class="scorecard-form-grid">
             <label class="field">
               Value
-              <input data-field="value" type="text" value="${escapeHtml(row.value)}" placeholder="e.g. Accountability" />
+              <input data-scope="definition" data-field="name" type="text" value="${escapeHtml(item.name)}" placeholder="e.g. Accountability" />
             </label>
             <label class="field">
               Score (1-5)
-              <select data-field="score">${buildScoreOptions(row.score)}</select>
+              <select data-scope="review" data-field="score">${buildScoreOptions(review.score)}</select>
             </label>
             <label class="field scorecard-span-2">
               Evidence / examples
-              <textarea data-field="evidence" placeholder="What supports this score?">${escapeHtml(row.evidence)}</textarea>
+              <textarea data-scope="review" data-field="evidence" placeholder="What supports this score?">${escapeHtml(review.evidence || "")}</textarea>
             </label>
             <label class="field scorecard-span-2 ${showAction ? "" : "is-muted-block"}">
               Improvement action ${showAction ? "" : "(only needed below 4)"}
-              <textarea data-field="action" placeholder="What needs to change next?">${escapeHtml(row.action)}</textarea>
+              <textarea data-scope="review" data-field="improvementAction" placeholder="What needs to change next?">${escapeHtml(
+                review.improvementAction || ""
+              )}</textarea>
             </label>
           </div>
         `,
-        "Remove",
-        state.values.length <= MIN_ROWS.values,
-        row.id
+        "values"
       );
     })
     .join("");
 }
 
 function renderPrinciples() {
+  if (!state.principles.length) {
+    principlesList.innerHTML =
+      '<p class="muted scorecard-empty-state">No decision principles defined yet. Add the principles leadership wants to assess consistently.</p>';
+    return;
+  }
+
   principlesList.innerHTML = state.principles
-    .map((row, index) =>
-      buildRowShell(
+    .map((item, index) => {
+      const review = ensureReviewObject(item);
+      return buildEntryShell(
+        item,
         `Principle ${index + 1}`,
-        "Review whether recent decisions were guided by this principle.",
+        "The principle label is shared. The score and examples below belong only to the selected review period.",
         `
           <div class="scorecard-form-grid">
             <label class="field">
               Principle
-              <input data-field="principle" type="text" value="${escapeHtml(row.principle)}" placeholder="e.g. Make decisions close to the client" />
+              <input data-scope="definition" data-field="name" type="text" value="${escapeHtml(
+                item.name
+              )}" placeholder="e.g. Make decisions close to the client" />
             </label>
             <label class="field">
               Score (1-5)
-              <select data-field="score">${buildScoreOptions(row.score)}</select>
+              <select data-scope="review" data-field="score">${buildScoreOptions(review.score)}</select>
             </label>
             <label class="field scorecard-span-2">
               Example decision demonstrating the principle
-              <textarea data-field="example" placeholder="Which recent decision shows this in practice?">${escapeHtml(row.example)}</textarea>
+              <textarea data-scope="review" data-field="exampleDecision" placeholder="Which recent decision shows this in practice?">${escapeHtml(
+                review.exampleDecision || ""
+              )}</textarea>
             </label>
             <label class="field scorecard-span-2">
               Adjustment needed
-              <textarea data-field="adjustment" placeholder="What should we refine next period?">${escapeHtml(row.adjustment)}</textarea>
+              <textarea data-scope="review" data-field="adjustmentNeeded" placeholder="What should we refine next period?">${escapeHtml(
+                review.adjustmentNeeded || ""
+              )}</textarea>
             </label>
           </div>
         `,
-        "Remove",
-        state.principles.length <= MIN_ROWS.principles,
-        row.id
-      )
-    )
+        "principles"
+      );
+    })
     .join("");
 }
 
 function renderObjectives() {
+  if (!state.objectives.length) {
+    objectivesList.innerHTML =
+      '<p class="muted scorecard-empty-state">No strategic objectives defined yet. Add the core objectives for the year first.</p>';
+    return;
+  }
+
   objectivesList.innerHTML = state.objectives
-    .map((row, index) =>
-      buildRowShell(
+    .map((item, index) => {
+      const review = ensureReviewObject(item);
+      return buildEntryShell(
+        item,
         `Objective ${index + 1}`,
-        "Track the strategic objective owner, score, and current blockers.",
+        "The objective definition is shared across periods. Owner, score, and blockers below are review-specific.",
         `
           <div class="scorecard-form-grid">
             <label class="field scorecard-span-2">
               Objective
-              <input data-field="objective" type="text" value="${escapeHtml(row.objective)}" placeholder="Describe the objective" />
+              <input data-scope="definition" data-field="title" type="text" value="${escapeHtml(item.title)}" placeholder="Describe the objective" />
             </label>
             <label class="field">
               Owner
-              <input data-field="owner" type="text" value="${escapeHtml(row.owner)}" placeholder="Owner name" />
+              <input data-scope="review" data-field="owner" type="text" value="${escapeHtml(review.owner || "")}" placeholder="Owner name" />
             </label>
             <label class="field">
               Progress score (1-5)
-              <select data-field="score">${buildScoreOptions(row.score)}</select>
+              <select data-scope="review" data-field="progressScore">${buildScoreOptions(review.progressScore)}</select>
             </label>
             <label class="field scorecard-span-2">
               Key risks or blockers
-              <textarea data-field="risks" placeholder="What is slowing progress or increasing risk?">${escapeHtml(row.risks)}</textarea>
+              <textarea data-scope="review" data-field="risks" placeholder="What is slowing progress or increasing risk?">${escapeHtml(
+                review.risks || ""
+              )}</textarea>
             </label>
           </div>
         `,
-        "Remove",
-        state.objectives.length <= MIN_ROWS.objectives,
-        row.id
-      )
-    )
+        "objectives"
+      );
+    })
     .join("");
 }
 
-function buildObjectiveSelect(selected) {
-  const options = ['<option value="">Choose linked objective</option>'];
-  for (const objective of getObjectiveOptions()) {
-    const isSelected = objective === selected ? " selected" : "";
-    options.push(`<option value="${escapeHtml(objective)}"${isSelected}>${escapeHtml(objective)}</option>`);
-  }
-  return options.join("");
-}
-
 function renderGoals() {
+  if (!state.goals.length) {
+    goalsList.innerHTML =
+      '<p class="muted scorecard-empty-state">No active goals defined yet. Add the initiatives that deliver your objectives.</p>';
+    return;
+  }
+
   goalsList.innerHTML = state.goals
-    .map((row, index) =>
-      buildRowShell(
+    .map((item, index) => {
+      const review = ensureReviewObject(item);
+      return buildEntryShell(
+        item,
         `Goal ${index + 1}`,
-        "Link each delivery goal to a strategic objective and capture the next action.",
+        "The goal definition and linked objective are shared. Status, score, owner, and next action are specific to the selected period.",
         `
           <div class="scorecard-form-grid">
             <label class="field scorecard-span-2">
               Goal
-              <input data-field="goal" type="text" value="${escapeHtml(row.goal)}" placeholder="Describe the initiative or goal" />
+              <input data-scope="definition" data-field="title" type="text" value="${escapeHtml(item.title)}" placeholder="Describe the initiative or goal" />
             </label>
             <label class="field">
               Linked objective
-              <select data-field="linkedObjective">${buildObjectiveSelect(row.linkedObjective)}</select>
+              <select data-scope="definition" data-field="objectiveId">${buildObjectiveSelect(item.objectiveId || "")}</select>
             </label>
             <label class="field">
               Owner
-              <input data-field="owner" type="text" value="${escapeHtml(row.owner)}" placeholder="Owner name" />
+              <input data-scope="review" data-field="owner" type="text" value="${escapeHtml(review.owner || "")}" placeholder="Owner name" />
             </label>
             <label class="field">
               Status
-              <select data-field="status">
-                <option value="On track"${row.status === "On track" ? " selected" : ""}>On track</option>
-                <option value="At risk"${row.status === "At risk" ? " selected" : ""}>At risk</option>
-                <option value="Off track"${row.status === "Off track" ? " selected" : ""}>Off track</option>
+              <select data-scope="review" data-field="status">
+                <option value=""${!review.status ? " selected" : ""}>Select status</option>
+                <option value="On track"${review.status === "On track" ? " selected" : ""}>On track</option>
+                <option value="At risk"${review.status === "At risk" ? " selected" : ""}>At risk</option>
+                <option value="Off track"${review.status === "Off track" ? " selected" : ""}>Off track</option>
               </select>
             </label>
             <label class="field">
               Progress score (1-5)
-              <select data-field="score">${buildScoreOptions(row.score)}</select>
+              <select data-scope="review" data-field="progressScore">${buildScoreOptions(review.progressScore)}</select>
             </label>
             <label class="field scorecard-span-2">
               Next key action
-              <textarea data-field="nextAction" placeholder="What happens next to move this forward?">${escapeHtml(row.nextAction)}</textarea>
+              <textarea data-scope="review" data-field="nextAction" placeholder="What happens next to move this forward?">${escapeHtml(
+                review.nextAction || ""
+              )}</textarea>
             </label>
           </div>
         `,
-        "Remove",
-        state.goals.length <= MIN_ROWS.goals,
-        row.id
-      )
-    )
+        "goals"
+      );
+    })
     .join("");
 }
 
@@ -472,23 +491,23 @@ function renderSnapshot() {
   const cards = [
     {
       label: "Values Score",
-      value: averageScore(state.values, "value"),
-      note: `${countScoredRows(state.values, "value")} values scored`,
+      value: averageScore(state.values, "score"),
+      note: `${countScored(state.values, "score")} values scored`,
     },
     {
       label: "Decision Principles Score",
-      value: averageScore(state.principles, "principle"),
-      note: `${countScoredRows(state.principles, "principle")} principles scored`,
+      value: averageScore(state.principles, "score"),
+      note: `${countScored(state.principles, "score")} principles scored`,
     },
     {
       label: "Strategic Objectives Score",
-      value: averageScore(state.objectives, "objective"),
-      note: `${countScoredRows(state.objectives, "objective")} objectives scored`,
+      value: averageScore(state.objectives, "progressScore"),
+      note: `${countScored(state.objectives, "progressScore")} objectives scored`,
     },
     {
       label: "Goals Delivery Score",
-      value: averageScore(state.goals, "goal"),
-      note: `${countScoredRows(state.goals, "goal")} goals scored`,
+      value: averageScore(state.goals, "progressScore"),
+      note: `${countScored(state.goals, "progressScore")} goals scored`,
     },
   ];
 
@@ -505,16 +524,8 @@ function renderSnapshot() {
     .join("");
 }
 
-function countScoredRows(rows, labelKey) {
-  return rows.filter((row) => {
-    const label = String(row?.[labelKey] || "").trim();
-    const score = Number(row?.score);
-    return label && Number.isFinite(score) && score >= 1 && score <= 5;
-  }).length;
-}
-
 function renderReflection() {
-  reviewPeriodInput.value = state.reviewPeriod;
+  reviewPeriodInput.value = state.review.reviewPeriod || activeReviewPeriod;
   reflectionGoingWell.value = state.reflection.goingWell;
   reflectionNeedsAttention.value = state.reflection.needsAttention;
   reflectionNextAction.value = state.reflection.nextAction;
@@ -529,92 +540,241 @@ function render() {
   renderReflection();
 }
 
-function updateCollectionRow(collectionKey, rowId, field, value) {
-  const collection = state[collectionKey];
-  const row = collection.find((entry) => entry.id === rowId);
-  if (!row) {
+function serializeReviewPayload() {
+  return {
+    reflection: {
+      goingWell: state.reflection.goingWell,
+      needsAttention: state.reflection.needsAttention,
+      nextAction: state.reflection.nextAction,
+      reviewType: state.review.reviewType,
+    },
+    values: state.values.map((item) => ({
+      id: item.id,
+      score: item.review?.score ?? "",
+      evidence: item.review?.evidence || "",
+      improvementAction: item.review?.improvementAction || "",
+    })),
+    principles: state.principles.map((item) => ({
+      id: item.id,
+      score: item.review?.score ?? "",
+      exampleDecision: item.review?.exampleDecision || "",
+      adjustmentNeeded: item.review?.adjustmentNeeded || "",
+    })),
+    objectives: state.objectives.map((item) => ({
+      id: item.id,
+      owner: item.review?.owner || "",
+      progressScore: item.review?.progressScore ?? "",
+      risks: item.review?.risks || "",
+    })),
+    goals: state.goals.map((item) => ({
+      id: item.id,
+      owner: item.review?.owner || "",
+      status: item.review?.status || "",
+      progressScore: item.review?.progressScore ?? "",
+      nextAction: item.review?.nextAction || "",
+      objectiveTitleSnapshot: item.review?.objectiveTitleSnapshot || item.objectiveTitle || "",
+    })),
+  };
+}
+
+async function persistReview() {
+  try {
+    setSavingReviewState(true);
+    const payload = await directoryApi.upsertPerformanceScorecard({
+      reviewPeriod: activeReviewPeriod,
+      scorecard: serializeReviewPayload(),
+    });
+    hydrateState(payload, activeReviewPeriod);
+    activeReviewPeriod = state.review.reviewPeriod || activeReviewPeriod;
+    render();
+    setSaveMessage(formatSaveMeta(state.review));
+  } catch (error) {
+    console.error("[scorecard] Failed to save review", error);
+    setSaveMessage(error?.message || "Could not save review changes.", true);
+  } finally {
+    setSavingReviewState(false);
+  }
+}
+
+function scheduleReviewSave() {
+  if (loadingPeriod) {
     return;
   }
-  row[field] = value;
+  setSaveMessage("Saving review...");
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = null;
+    void persistReview();
+  }, 260);
+}
 
-  if (collectionKey === "objectives" && field === "objective") {
-    for (const goal of state.goals) {
-      if (goal.linkedObjective && !getObjectiveOptions().includes(goal.linkedObjective)) {
-        goal.linkedObjective = "";
-      }
+async function flushPendingReviewSave() {
+  if (!saveTimer) {
+    return;
+  }
+  window.clearTimeout(saveTimer);
+  saveTimer = null;
+  await persistReview();
+}
+
+function queueDefinitionSave(entityType, rowId, patch) {
+  const key = `${entityType}:${rowId}`;
+  pendingDefinitionPatches.set(key, {
+    ...(pendingDefinitionPatches.get(key) || {}),
+    ...patch,
+  });
+
+  const existingTimer = pendingDefinitionTimers.get(key);
+  if (existingTimer) {
+    window.clearTimeout(existingTimer);
+  }
+
+  setSaveMessage("Saving shared definitions...");
+  const timer = window.setTimeout(async () => {
+    pendingDefinitionTimers.delete(key);
+    const nextPatch = pendingDefinitionPatches.get(key);
+    pendingDefinitionPatches.delete(key);
+
+    try {
+      await directoryApi.updatePerformanceScorecardDefinition({
+        entityType,
+        id: rowId,
+        patch: nextPatch,
+      });
+      setSaveMessage("Shared definitions saved.");
+    } catch (error) {
+      console.error("[scorecard] Failed to save definition", error);
+      setSaveMessage(error?.message || "Could not save shared definition changes.", true);
+      await loadScorecardForPeriod(activeReviewPeriod);
     }
+  }, 260);
+
+  pendingDefinitionTimers.set(key, timer);
+}
+
+async function flushDefinitionSaves() {
+  const tasks = [];
+  for (const [key, timer] of pendingDefinitionTimers.entries()) {
+    window.clearTimeout(timer);
+    pendingDefinitionTimers.delete(key);
+    const [entityType, rowId] = key.split(":");
+    const patch = pendingDefinitionPatches.get(key);
+    pendingDefinitionPatches.delete(key);
+    tasks.push(
+      directoryApi.updatePerformanceScorecardDefinition({
+        entityType,
+        id: rowId,
+        patch,
+      })
+    );
+  }
+
+  if (tasks.length) {
+    await Promise.all(tasks);
+  }
+}
+
+function findEntityRow(entityType, rowId) {
+  const list = state[ENTITY_META[entityType].listKey];
+  return list.find((item) => item.id === rowId) || null;
+}
+
+function updateDefinitionField(entityType, rowId, field, value) {
+  const item = findEntityRow(entityType, rowId);
+  if (!item) {
+    return;
+  }
+
+  if (field === "objectiveId") {
+    item.objectiveId = value || null;
     renderGoals();
-    renderSnapshot();
-  } else if (collectionKey === "values" && field === "score") {
+    queueDefinitionSave(entityType, rowId, {
+      objective_id: value || null,
+    });
+    return;
+  }
+
+  item[field] = value;
+
+  queueDefinitionSave(entityType, rowId, {
+    [field === "title" ? "title" : "name"]: value,
+  });
+}
+
+function updateReviewField(entityType, rowId, field, value) {
+  const item = findEntityRow(entityType, rowId);
+  if (!item) {
+    return;
+  }
+
+  ensureReviewObject(item)[field] = value;
+
+  if (entityType === "values" && field === "score") {
     renderValues();
     renderSnapshot();
-  } else {
+  } else if (entityType === "principles" && field === "score") {
+    renderPrinciples();
     renderSnapshot();
-    if (collectionKey === "goals" && field === "status") {
-      renderGoals();
-    }
+  } else if (entityType === "objectives" && field === "progressScore") {
+    renderObjectives();
+    renderSnapshot();
+  } else if (entityType === "goals" && (field === "progressScore" || field === "status")) {
+    renderGoals();
+    renderSnapshot();
   }
 
-  scheduleSave();
+  scheduleReviewSave();
 }
 
-function addRow(collectionKey) {
-  if (collectionKey === "values") {
-    state.values.push(createValueRow());
-  } else if (collectionKey === "principles") {
-    state.principles.push(createPrincipleRow());
-  } else if (collectionKey === "objectives") {
-    state.objectives.push(createObjectiveRow());
-  } else if (collectionKey === "goals") {
-    state.goals.push(createGoalRow());
+async function archiveDefinition(entityType, rowId) {
+  try {
+    await flushPendingReviewSave();
+    await flushDefinitionSaves();
+    setSaveMessage("Archiving shared definition...");
+    await directoryApi.updatePerformanceScorecardDefinition({
+      entityType,
+      id: rowId,
+      patch: {
+        is_active: false,
+      },
+    });
+    await loadScorecardForPeriod(activeReviewPeriod);
+  } catch (error) {
+    console.error("[scorecard] Failed to archive definition", error);
+    setSaveMessage(error?.message || "Could not archive the definition.", true);
   }
-  render();
-  scheduleSave();
 }
 
-function removeRow(collectionKey, rowId) {
-  if (state[collectionKey].length <= MIN_ROWS[collectionKey]) {
-    return;
+async function addDefinition(entityType) {
+  try {
+    await flushDefinitionSaves();
+    if (entityType === "goals" && !state.objectives.length) {
+      setSaveMessage("Add an objective before creating a goal.", true);
+      return;
+    }
+
+    setSaveMessage("Creating shared definition...");
+    const payload =
+      entityType === "values"
+        ? { name: "" }
+        : entityType === "principles"
+        ? { name: "" }
+        : entityType === "objectives"
+        ? { title: "" }
+        : {
+            title: "",
+            objective_id: state.objectives[0]?.id || null,
+          };
+
+    await directoryApi.createPerformanceScorecardDefinition({
+      entityType,
+      definition: payload,
+    });
+    await loadScorecardForPeriod(activeReviewPeriod);
+  } catch (error) {
+    console.error("[scorecard] Failed to add definition", error);
+    setSaveMessage(error?.message || "Could not create the definition.", true);
   }
-
-  state[collectionKey] = state[collectionKey].filter((row) => row.id !== rowId);
-  if (collectionKey === "objectives") {
-    const validObjectives = getObjectiveOptions();
-    for (const goal of state.goals) {
-      if (goal.linkedObjective && !validObjectives.includes(goal.linkedObjective)) {
-        goal.linkedObjective = "";
-      }
-    }
-  }
-  render();
-  scheduleSave();
-}
-
-function attachCollectionListeners(container, collectionKey) {
-  container?.addEventListener("input", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
-      return;
-    }
-    const rowElement = target.closest("[data-row-id]");
-    const field = target.getAttribute("data-field");
-    if (!rowElement || !field) {
-      return;
-    }
-    updateCollectionRow(collectionKey, rowElement.getAttribute("data-row-id"), field, target.value);
-  });
-
-  container?.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLButtonElement) || target.getAttribute("data-action") !== "remove") {
-      return;
-    }
-    const rowElement = target.closest("[data-row-id]");
-    if (!rowElement) {
-      return;
-    }
-    removeRow(collectionKey, rowElement.getAttribute("data-row-id"));
-  });
 }
 
 async function loadScorecardForPeriod(reviewPeriod) {
@@ -623,18 +783,18 @@ async function loadScorecardForPeriod(reviewPeriod) {
     setBusyState(true);
     setSaveMessage(`Loading ${nextPeriod}...`);
     const payload = await directoryApi.getPerformanceScorecard({ reviewPeriod: nextPeriod });
-    hydrateState(payload?.scorecard, normalizeReviewPeriod(payload?.reviewPeriod || nextPeriod));
-    activeReviewPeriod = state.reviewPeriod;
+    hydrateState(payload, nextPeriod);
+    activeReviewPeriod = state.review.reviewPeriod || nextPeriod;
     render();
-    if (payload?.meta) {
-      setSaveMessage(formatMetaMessage(payload.meta));
+    if (state.review.updatedAt) {
+      setSaveMessage(formatSaveMeta(state.review));
     } else {
-      setSaveMessage(`No shared scorecard yet for ${activeReviewPeriod}. Starting a fresh template.`);
+      setSaveMessage(`Loaded ${activeReviewPeriod}. Scores and notes are empty until you assess this period.`);
     }
   } catch (error) {
     console.error("[scorecard] Failed to load period", error);
     if (!snapshotGrid?.children?.length) {
-      hydrateState(null, nextPeriod);
+      hydrateState(createEmptyState(nextPeriod), nextPeriod);
       activeReviewPeriod = nextPeriod;
       render();
     }
@@ -644,16 +804,59 @@ async function loadScorecardForPeriod(reviewPeriod) {
   }
 }
 
-function attachListeners() {
-  attachCollectionListeners(valuesList, "values");
-  attachCollectionListeners(principlesList, "principles");
-  attachCollectionListeners(objectivesList, "objectives");
-  attachCollectionListeners(goalsList, "goals");
+function attachListListeners(container, entityType) {
+  container?.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) {
+      return;
+    }
+    const rowElement = target.closest("[data-row-id]");
+    const scope = target.getAttribute("data-scope");
+    const field = target.getAttribute("data-field");
+    if (!rowElement || !scope || !field) {
+      return;
+    }
 
-  addValueBtn?.addEventListener("click", () => addRow("values"));
-  addPrincipleBtn?.addEventListener("click", () => addRow("principles"));
-  addObjectiveBtn?.addEventListener("click", () => addRow("objectives"));
-  addGoalBtn?.addEventListener("click", () => addRow("goals"));
+    const rowId = rowElement.getAttribute("data-row-id");
+    if (scope === "definition") {
+      updateDefinitionField(entityType, rowId, field, target.value);
+      return;
+    }
+
+    updateReviewField(entityType, rowId, field, target.value);
+  });
+
+  container?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLButtonElement) || target.getAttribute("data-action") !== "archive") {
+      return;
+    }
+    const rowElement = target.closest("[data-row-id]");
+    if (!rowElement) {
+      return;
+    }
+    void archiveDefinition(entityType, rowElement.getAttribute("data-row-id"));
+  });
+}
+
+function attachListeners() {
+  attachListListeners(valuesList, "values");
+  attachListListeners(principlesList, "principles");
+  attachListListeners(objectivesList, "objectives");
+  attachListListeners(goalsList, "goals");
+
+  addValueBtn?.addEventListener("click", () => {
+    void addDefinition("values");
+  });
+  addPrincipleBtn?.addEventListener("click", () => {
+    void addDefinition("principles");
+  });
+  addObjectiveBtn?.addEventListener("click", () => {
+    void addDefinition("objectives");
+  });
+  addGoalBtn?.addEventListener("click", () => {
+    void addDefinition("goals");
+  });
 
   async function handleLoadPeriod() {
     const requestedPeriod = normalizeReviewPeriod(reviewPeriodInput?.value);
@@ -661,7 +864,8 @@ function attachListeners() {
       reviewPeriodInput.value = activeReviewPeriod;
       return;
     }
-    await flushPendingSave();
+    await flushPendingReviewSave();
+    await flushDefinitionSaves();
     await loadScorecardForPeriod(requestedPeriod);
   }
 
@@ -675,34 +879,35 @@ function attachListeners() {
 
   reflectionGoingWell?.addEventListener("input", () => {
     state.reflection.goingWell = reflectionGoingWell.value;
-    scheduleSave();
+    scheduleReviewSave();
   });
   reflectionNeedsAttention?.addEventListener("input", () => {
     state.reflection.needsAttention = reflectionNeedsAttention.value;
-    scheduleSave();
+    scheduleReviewSave();
   });
   reflectionNextAction?.addEventListener("input", () => {
     state.reflection.nextAction = reflectionNextAction.value;
-    scheduleSave();
+    scheduleReviewSave();
   });
 
   resetBtn?.addEventListener("click", () => {
-    const confirmed = window.confirm("Reset this scorecard to a fresh template for the current review period?");
+    const confirmed = window.confirm("Reset this review period's scores and reflection to empty?");
     if (!confirmed) {
       return;
     }
-    state = createDefaultState(activeReviewPeriod);
+    for (const entityType of Object.keys(ENTITY_META)) {
+      for (const item of state[ENTITY_META[entityType].listKey]) {
+        item.review = null;
+      }
+    }
+    state.reflection = {
+      goingWell: "",
+      needsAttention: "",
+      nextAction: "",
+    };
     render();
-    void persistState();
+    void persistReview();
   });
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
 }
 
 async function init() {
@@ -721,7 +926,6 @@ async function init() {
     }
 
     renderTopNavigation({ role });
-
     const email = String(profile?.email || "").trim();
     setStatus(email ? `Signed in as ${email}` : "Signed in");
     await loadScorecardForPeriod(currentReviewPeriod());
