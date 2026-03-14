@@ -344,29 +344,56 @@ function renderAgendaList() {
     if (agenda.id === selectedAgendaId) {
       card.classList.add("is-selected");
     }
-    const people = agenda.members.map((member) => member.displayName || displayNameForEmail(member.userEmail));
+    const detailedAgenda = agendaDetailsById.get(agenda?.id);
+    const members = Array.isArray(agenda?.members) && agenda.members.length
+      ? agenda.members
+      : Array.isArray(detailedAgenda?.members)
+        ? detailedAgenda.members
+        : [];
+    const people = members.map((member) => member.displayName || displayNameForEmail(member.userEmail));
     const title = agendaDisplayTitle(agenda);
-    const privacyBadge = agenda.isPrivate ? '<span class="agenda-list-badge">Private</span>' : "";
-    card.innerHTML = `
-      <div class="agenda-list-card-top">
-        <button type="button" class="agenda-list-card-main">
-          <strong>${escapeHtml(title)}</strong>
-          ${privacyBadge}
-          <small>${escapeHtml(people.join(", ") || "Just you")}</small>
-        </button>
-        ${
-          isOwner
-            ? '<button type="button" class="ghost subtle icon-only agenda-card-edit-btn" aria-label="Edit agenda"><span aria-hidden="true">✎</span></button>'
-            : ""
-        }
-      </div>
-    `;
-    card.querySelector(".agenda-list-card-main")?.addEventListener("click", () => {
+    const top = document.createElement("div");
+    top.className = "agenda-list-card-top";
+
+    const mainButton = document.createElement("button");
+    mainButton.type = "button";
+    mainButton.className = "agenda-list-card-main";
+
+    const titleEl = document.createElement("strong");
+    titleEl.textContent = title;
+    mainButton.appendChild(titleEl);
+
+    if (agenda.isPrivate) {
+      const badge = document.createElement("span");
+      badge.className = "agenda-list-badge";
+      badge.textContent = "Private";
+      mainButton.appendChild(badge);
+    }
+
+    const peopleEl = document.createElement("small");
+    peopleEl.textContent = people.join(", ") || "Just you";
+    mainButton.appendChild(peopleEl);
+    top.appendChild(mainButton);
+
+    if (isOwner) {
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "ghost subtle icon-only agenda-card-edit-btn";
+      editButton.setAttribute("aria-label", "Edit agenda");
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "✎";
+      editButton.appendChild(icon);
+      editButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        void openAgenda(agenda.id, { editSettings: true });
+      });
+      top.appendChild(editButton);
+    }
+
+    card.appendChild(top);
+    mainButton.addEventListener("click", () => {
       void openAgenda(agenda.id);
-    });
-    card.querySelector(".agenda-card-edit-btn")?.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void openAgenda(agenda.id, { editSettings: true });
     });
     agendaList.appendChild(card);
   });
@@ -483,7 +510,7 @@ function renderAgendaItems(agenda) {
     ].join("");
     const previewHtml = itemDetailsExpanded ? item.detailHtml || "<p></p>" : "";
     const draft = taskDraftForItem(item);
-    const linkedTasksHtml = linkedTasks.length
+    const linkedTasksHtml = itemDetailsExpanded && linkedTasks.length
       ? `
         <div class="agenda-linked-task-list">
           ${linkedTasks
