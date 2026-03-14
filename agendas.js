@@ -390,9 +390,16 @@ function renderAgendaList() {
     mainButton.type = "button";
     mainButton.className = "agenda-list-card-main";
 
-    const titleEl = document.createElement("strong");
+    const titleEl = document.createElement("div");
+    titleEl.className = "agenda-list-card-title";
     titleEl.textContent = title;
     mainButton.appendChild(titleEl);
+    logAgendaDebug("Rendered agenda list card.", {
+      agendaId: agenda?.id || "",
+      titleText: titleEl.textContent,
+      peopleText: people.join(", ") || "Just you",
+      isPrivate: agenda?.isPrivate === true,
+    });
 
     if (agenda.isPrivate) {
       const badge = document.createElement("span");

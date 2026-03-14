@@ -2790,9 +2790,13 @@ body.lightbox-open {
   text-align: left;
 }
 
-.agenda-list-card-main strong {
+.agenda-list-card-title {
   font-size: 1rem;
   line-height: 1.25;
+  font-weight: 800;
+  color: #162033;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .agenda-list-badge {
@@ -2806,7 +2810,7 @@ body.lightbox-open {
   font-size: 0.78rem;
 }
 
-.agenda-list-card-main strong,
+.agenda-list-card-title,
 .agenda-list-card-main span,
 .agenda-list-card-main small {
   min-width: 0;
