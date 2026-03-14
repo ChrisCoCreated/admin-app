@@ -61,6 +61,7 @@ const authController = createAuthController({
 });
 const directoryApi = createDirectoryApi(authController);
 const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
+const AGENDA_DEBUG = true;
 
 let currentUser = null;
 let agendas = [];
@@ -79,6 +80,17 @@ let completingTaskKey = "";
 let taskComposerItemId = "";
 const taskDraftsByItemId = new Map();
 const loadingAgendaDetails = new Set();
+
+function logAgendaDebug(message, details) {
+  if (!AGENDA_DEBUG) {
+    return;
+  }
+  if (details === undefined) {
+    console.log(`[agendas] ${message}`);
+    return;
+  }
+  console.log(`[agendas] ${message}`, details);
+}
 
 function setBusy(value) {
   busy = value;
@@ -319,6 +331,12 @@ function agendaDisplayTitle(agenda) {
   const detailedAgenda = agendaDetailsById.get(agenda?.id);
   const title = String(agenda?.title || detailedAgenda?.title || "").trim();
   if (title) {
+    logAgendaDebug("Resolved agenda title.", {
+      agendaId: agenda?.id || "",
+      summaryTitle: String(agenda?.title || ""),
+      detailTitle: String(detailedAgenda?.title || ""),
+      chosenTitle: title,
+    });
     return title;
   }
   const members = Array.isArray(agenda?.members) ? agenda.members : Array.isArray(detailedAgenda?.members) ? detailedAgenda.members : [];
@@ -327,8 +345,21 @@ function agendaDisplayTitle(agenda) {
     .filter(Boolean)
     .join(", ");
   if (memberSummary) {
+    logAgendaDebug("Fell back to member summary for agenda title.", {
+      agendaId: agenda?.id || "",
+      summaryTitle: String(agenda?.title || ""),
+      detailTitle: String(detailedAgenda?.title || ""),
+      memberSummary,
+    });
     return memberSummary;
   }
+  logAgendaDebug("Agenda title missing entirely.", {
+    agendaId: agenda?.id || "",
+    summaryTitle: String(agenda?.title || ""),
+    detailTitle: String(detailedAgenda?.title || ""),
+    agenda,
+    detailedAgenda,
+  });
   return "Untitled agenda";
 }
 
@@ -885,9 +916,13 @@ function mergeAgendaSummaryWithDetail(agenda) {
     return null;
   }
   if (!detailed) {
+    logAgendaDebug("No detail available while merging agenda summary.", {
+      agendaId: agenda?.id || "",
+      summaryTitle: String(agenda?.title || ""),
+    });
     return agenda;
   }
-  return {
+  const merged = {
     ...agenda,
     title: String(agenda.title || detailed.title || "").trim(),
     members: Array.isArray(agenda.members) && agenda.members.length ? agenda.members : detailed.members || [],
@@ -900,6 +935,13 @@ function mergeAgendaSummaryWithDetail(agenda) {
         ? agenda.participantNames
         : detailed.participantNames || [],
   };
+  logAgendaDebug("Merged agenda summary with detail.", {
+    agendaId: agenda?.id || "",
+    summaryTitle: String(agenda?.title || ""),
+    detailTitle: String(detailed?.title || ""),
+    mergedTitle: String(merged?.title || ""),
+  });
+  return merged;
 }
 
 function applyAgendaSummaries(nextAgendas) {
@@ -931,6 +973,11 @@ async function loadAgendaDetail(agendaId, options = {}) {
   try {
     const payload = await directoryApi.getAgendaDetail({ agendaId: normalizedAgendaId });
     const agenda = payload?.agenda || null;
+    logAgendaDebug("Loaded agenda detail payload.", {
+      agendaId: normalizedAgendaId,
+      title: String(agenda?.title || ""),
+      members: Array.isArray(agenda?.members) ? agenda.members.map((member) => member.displayName || member.userEmail) : [],
+    });
     if (agenda?.id) {
       agendaDetailsById.set(agenda.id, agenda);
       agendas = agendas.map((entry) => {
@@ -964,6 +1011,11 @@ async function loadAgendaDetail(agendaId, options = {}) {
 async function loadAgendas(status = "", options = {}) {
   const payload = await directoryApi.listAgendas({ summaryOnly: "true" });
   const nextAgendas = Array.isArray(payload?.agendas) ? payload.agendas : [];
+  logAgendaDebug("Loaded agenda summaries payload.", nextAgendas.map((agenda) => ({
+    id: agenda?.id || "",
+    title: String(agenda?.title || ""),
+    members: Array.isArray(agenda?.members) ? agenda.members.map((member) => member.displayName || member.userEmail) : [],
+  })));
   if (options.selectedAgendaId) {
     selectedAgendaId = options.selectedAgendaId;
   }
