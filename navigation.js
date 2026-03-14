@@ -79,6 +79,8 @@ const PAGE_META = {
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
 };
 
+const ADMIN_HOME_PAGES = ["reports", "agendas", "recruitment", "emailtemplates"];
+
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
 }
@@ -100,6 +102,18 @@ export function canAccessPage(role, pageKey) {
 
 export function getPageMeta(pageKey) {
   return PAGE_META[String(pageKey || "").trim().toLowerCase()] || null;
+}
+
+export function getHomePageTiles(role) {
+  const normalizedRole = normalizeRole(role);
+  const accessiblePages = getAccessiblePages(normalizedRole);
+  if (normalizedRole === "admin") {
+    return ADMIN_HOME_PAGES.filter((pageKey) => accessiblePages.includes(pageKey));
+  }
+  if (accessiblePages.length <= 4) {
+    return accessiblePages;
+  }
+  return [];
 }
 
 export function renderTopNavigation({ role, currentPathname = window.location.pathname } = {}) {

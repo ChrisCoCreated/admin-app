@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { getAccessiblePages, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260311";
+import { getAccessiblePages, getHomePageTiles, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260314";
 
 const signInBtn = document.getElementById("signInBtn");
 const authState = document.getElementById("authState");
@@ -12,6 +12,9 @@ const topbarActions = document.getElementById("topbarActions");
 const heroSignInMessage = document.getElementById("heroSignInMessage");
 const homeUserEmail = document.getElementById("homeUserEmail");
 const homeUserPermissions = document.getElementById("homeUserPermissions");
+const homeQuickLinks = document.getElementById("homeQuickLinks");
+const homeQuickLinksMessage = document.getElementById("homeQuickLinksMessage");
+const homeMenuGrid = document.getElementById("homeMenuGrid");
 if (authCard) {
   authCard.hidden = true;
 }
@@ -35,6 +38,12 @@ function setSignedOutUi() {
   }
   if (heroSignInMessage) {
     heroSignInMessage.hidden = false;
+  }
+  if (homeQuickLinks) {
+    homeQuickLinks.hidden = true;
+  }
+  if (homeMenuGrid) {
+    homeMenuGrid.innerHTML = "";
   }
   if (topbarActions) {
     topbarActions.hidden = true;
@@ -74,6 +83,41 @@ function renderUserSummary(profile) {
   }
 }
 
+function renderHomeQuickLinks(role) {
+  if (!homeQuickLinks || !homeMenuGrid) {
+    return;
+  }
+
+  const pageKeys = getHomePageTiles(role);
+  homeMenuGrid.innerHTML = "";
+
+  if (!pageKeys.length) {
+    homeQuickLinks.hidden = true;
+    return;
+  }
+
+  const isAdmin = String(role || "").trim().toLowerCase() === "admin";
+  if (homeQuickLinksMessage) {
+    homeQuickLinksMessage.textContent = isAdmin
+      ? "Common admin destinations are pinned here for quicker access."
+      : "All of your available pages are shown here because you only have access to a few.";
+  }
+
+  for (const pageKey of pageKeys) {
+    const page = getPageMeta(pageKey);
+    if (!page) {
+      continue;
+    }
+    const link = document.createElement("a");
+    link.className = "home-menu-link";
+    link.href = page.href;
+    link.textContent = page.label;
+    homeMenuGrid.appendChild(link);
+  }
+
+  homeQuickLinks.hidden = !homeMenuGrid.children.length;
+}
+
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
@@ -104,6 +148,7 @@ async function renderRoleMenu() {
   }
   setSignedInUi();
   renderUserSummary(profile);
+  renderHomeQuickLinks(role);
   renderTopNavigation({ role, currentPathname: "./index.html" });
 }
 

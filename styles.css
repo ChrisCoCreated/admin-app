@@ -189,6 +189,13 @@ p {
   padding: 20px;
 }
 
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .auth-card {
   max-width: 560px;
 }
@@ -201,25 +208,35 @@ body.auth-pending .auth-card {
   margin-top: 12px;
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .home-menu-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-  border: 1px solid #ccd5e6;
-  border-radius: 11px;
-  background: #f9fbff;
+  display: flex;
+  align-items: flex-end;
+  min-height: 120px;
+  border: 1px solid #c8d3e6;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(49, 183, 200, 0.16), rgba(255, 255, 255, 0.94) 58%),
+    #f9fbff;
   color: #1d2a42;
   font-weight: 700;
   text-decoration: none;
-  padding: 8px 12px;
+  padding: 16px;
+  box-shadow: 0 10px 24px rgba(17, 20, 26, 0.08);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
 }
 
 .home-menu-link:hover {
-  background: #edf3ff;
+  background:
+    linear-gradient(135deg, rgba(49, 183, 200, 0.22), rgba(255, 255, 255, 0.98) 58%),
+    #edf3ff;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px rgba(17, 20, 26, 0.12);
 }
 
 .row {

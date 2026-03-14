@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260311" />
+    <link rel="stylesheet" href="./styles.css?v=20260314" />
   </head>
   <body class="auth-pending">
     <header class="topbar">
@@ -38,6 +38,16 @@
         <p id="heroSignInMessage">Sign in with your work account to access the menu.</p>
         <p id="homeUserEmail" class="muted" hidden></p>
         <p id="homeUserPermissions" class="muted" hidden></p>
+      </section>
+
+      <section id="homeQuickLinks" class="panel" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Quick links</h2>
+            <p id="homeQuickLinksMessage" class="muted">Open your most relevant pages from the home screen.</p>
+          </div>
+        </div>
+        <div id="homeMenuGrid" class="home-menu-grid" aria-label="Home quick links"></div>
       </section>
 
       <section class="panel auth-card">
