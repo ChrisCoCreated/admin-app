@@ -18,6 +18,7 @@ const actionStatus = document.getElementById("actionStatus");
 const refreshBtn = document.getElementById("refreshBtn");
 const quickAgendaButtons = document.getElementById("quickAgendaButtons");
 const toggleCreatePanelBtn = document.getElementById("toggleCreatePanelBtn");
+const agendaCreatePanel = document.getElementById("agendaCreatePanel");
 const agendaPeoplePicker = document.getElementById("agendaPeoplePicker");
 const agendaCreateForm = document.getElementById("agendaCreateForm");
 const agendaTitleInput = document.getElementById("agendaTitleInput");
@@ -30,17 +31,24 @@ const agendaEmptyState = document.getElementById("agendaEmptyState");
 const agendaDetailWrap = document.getElementById("agendaDetailWrap");
 const agendaTitle = document.getElementById("agendaTitle");
 const agendaMeta = document.getElementById("agendaMeta");
+const editAgendaSettingsBtn = document.getElementById("editAgendaSettingsBtn");
+const agendaSettingsSummary = document.getElementById("agendaSettingsSummary");
+const agendaSettingsTitle = document.getElementById("agendaSettingsTitle");
+const agendaSettingsPeople = document.getElementById("agendaSettingsPeople");
+const agendaSettingsPrivacy = document.getElementById("agendaSettingsPrivacy");
 const agendaSettingsForm = document.getElementById("agendaSettingsForm");
 const agendaTitleEditInput = document.getElementById("agendaTitleEditInput");
 const agendaPeopleSummaryInput = document.getElementById("agendaPeopleSummaryInput");
 const agendaPrivateEditInput = document.getElementById("agendaPrivateEditInput");
 const saveAgendaSettingsBtn = document.getElementById("saveAgendaSettingsBtn");
+const cancelAgendaSettingsBtn = document.getElementById("cancelAgendaSettingsBtn");
 const itemSearchInput = document.getElementById("itemSearchInput");
 const itemStageFilter = document.getElementById("itemStageFilter");
 const agendaItemsList = document.getElementById("agendaItemsList");
 const agendaItemsEmpty = document.getElementById("agendaItemsEmpty");
 const agendaItemForm = document.getElementById("agendaItemForm");
 const itemFormHeading = document.getElementById("itemFormHeading");
+const agendaItemAdvanced = document.getElementById("agendaItemAdvanced");
 const itemTitleInput = document.getElementById("itemTitleInput");
 const itemDetailEditor = document.getElementById("itemDetailEditor");
 const itemStageSelect = document.getElementById("itemStageSelect");
@@ -64,6 +72,8 @@ let selectedItemId = "";
 let busy = false;
 let dragItemId = "";
 let createPanelExpanded = false;
+let agendaSettingsExpanded = false;
+let agendaItemComposerExpanded = false;
 
 function setBusy(value) {
   busy = value;
@@ -79,11 +89,33 @@ function setStatus(message, isError = false) {
 
 function setCreatePanelExpanded(value) {
   createPanelExpanded = value === true;
-  agendaCreateForm.hidden = !createPanelExpanded;
+  agendaCreatePanel.hidden = !createPanelExpanded;
   if (toggleCreatePanelBtn) {
     toggleCreatePanelBtn.textContent = createPanelExpanded ? "Minimise" : "New meeting agenda";
     toggleCreatePanelBtn.setAttribute("aria-expanded", createPanelExpanded ? "true" : "false");
   }
+}
+
+function setAgendaSettingsExpanded(value) {
+  agendaSettingsExpanded = value === true;
+  agendaSettingsSummary.hidden = agendaSettingsExpanded;
+  agendaSettingsForm.hidden = !agendaSettingsExpanded;
+  if (editAgendaSettingsBtn) {
+    editAgendaSettingsBtn.textContent = agendaSettingsExpanded ? "Close settings" : "Edit settings";
+    editAgendaSettingsBtn.setAttribute("aria-expanded", agendaSettingsExpanded ? "true" : "false");
+  }
+}
+
+function hasComposerContent() {
+  const title = String(itemTitleInput?.value || "").trim();
+  const detailText = String(itemDetailEditor?.textContent || "").replace(/\u00a0/g, " ").trim();
+  return Boolean(title || detailText);
+}
+
+function setAgendaItemComposerExpanded(value) {
+  agendaItemComposerExpanded = value === true;
+  agendaItemAdvanced.hidden = !agendaItemComposerExpanded;
+  newAgendaItemBtn.hidden = !agendaItemComposerExpanded;
 }
 
 function setActionStatus(message, isError = false) {
@@ -256,6 +288,7 @@ function resetItemForm() {
   itemPrivateInput.checked = false;
   itemUrgentInput.checked = false;
   itemImportantInput.checked = false;
+  setAgendaItemComposerExpanded(false);
 }
 
 function populateItemForm(item) {
@@ -271,6 +304,7 @@ function populateItemForm(item) {
   itemPrivateInput.checked = item.isPrivate === true;
   itemUrgentInput.checked = item.isUrgent === true;
   itemImportantInput.checked = item.isImportant === true;
+  setAgendaItemComposerExpanded(true);
 }
 
 function participantSummary(agenda) {
@@ -366,16 +400,21 @@ function renderAgendaDetail() {
   const isOwner = normalizeEmail(agenda.ownerEmail) === normalizeEmail(currentUser?.email);
   agendaTitle.textContent = agenda.title || "Agenda";
   agendaMeta.textContent = `${agenda.agendaType === "one_to_one" ? "1:1" : "Meeting"} with ${participantSummary(agenda)}${agenda.isPrivate ? " • Private" : ""}`;
+  agendaSettingsTitle.textContent = agenda.title || "-";
+  agendaSettingsPeople.textContent = participantSummary(agenda) || "Just you";
+  agendaSettingsPrivacy.textContent = agenda.isPrivate ? "Private agenda" : "Shared agenda";
   agendaTitleEditInput.value = agenda.title || "";
   agendaPeopleSummaryInput.value = participantSummary(agenda);
   agendaPrivateEditInput.checked = agenda.isPrivate === true;
   agendaTitleEditInput.disabled = !isOwner;
   agendaPrivateEditInput.disabled = !isOwner;
   saveAgendaSettingsBtn.disabled = !isOwner;
+  editAgendaSettingsBtn.hidden = !isOwner;
 
   if (selectedItemId && !agenda.items.some((item) => item.id === selectedItemId)) {
     selectedItemId = "";
   }
+  setAgendaSettingsExpanded(false);
   populateItemForm(selectedItem());
   renderAgendaItems(agenda);
 }
@@ -453,6 +492,8 @@ async function init() {
     renderQuickCreate();
     renderPeoplePicker();
     setCreatePanelExpanded(false);
+    setAgendaSettingsExpanded(false);
+    setAgendaItemComposerExpanded(false);
     await loadAgendas();
   } catch (error) {
     console.error(error);
@@ -495,6 +536,14 @@ agendaSearchInput?.addEventListener("input", () => {
   renderAgendaList();
 });
 
+editAgendaSettingsBtn?.addEventListener("click", () => {
+  const agenda = selectedAgenda();
+  if (!agenda) {
+    return;
+  }
+  setAgendaSettingsExpanded(!agendaSettingsExpanded);
+});
+
 agendaSettingsForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const agenda = selectedAgenda();
@@ -512,6 +561,7 @@ agendaSettingsForm?.addEventListener("submit", async (event) => {
       participantNames: agenda.participantNames,
       isPrivate: agendaPrivateEditInput.checked,
     });
+    setAgendaSettingsExpanded(false);
     await loadAgendas("Agenda settings saved.");
   } catch (error) {
     console.error(error);
@@ -519,6 +569,17 @@ agendaSettingsForm?.addEventListener("submit", async (event) => {
   } finally {
     setBusy(false);
   }
+});
+
+cancelAgendaSettingsBtn?.addEventListener("click", () => {
+  const agenda = selectedAgenda();
+  if (!agenda) {
+    return;
+  }
+  agendaTitleEditInput.value = agenda.title || "";
+  agendaPeopleSummaryInput.value = participantSummary(agenda);
+  agendaPrivateEditInput.checked = agenda.isPrivate === true;
+  setAgendaSettingsExpanded(false);
 });
 
 agendaItemForm?.addEventListener("submit", async (event) => {
@@ -562,7 +623,23 @@ agendaItemForm?.addEventListener("submit", async (event) => {
 
 newAgendaItemBtn?.addEventListener("click", () => {
   resetItemForm();
-  renderAgendaDetail();
+});
+
+itemTitleInput?.addEventListener("input", () => {
+  if (!agendaItemComposerExpanded && String(itemTitleInput.value || "").trim()) {
+    setAgendaItemComposerExpanded(true);
+  }
+  if (agendaItemComposerExpanded && !selectedItemId && !hasComposerContent()) {
+    setAgendaItemComposerExpanded(false);
+  }
+});
+
+itemTitleInput?.addEventListener("focus", () => {
+  setAgendaItemComposerExpanded(true);
+});
+
+itemDetailEditor?.addEventListener("focus", () => {
+  setAgendaItemComposerExpanded(true);
 });
 
 itemSearchInput?.addEventListener("input", () => {
