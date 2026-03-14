@@ -500,13 +500,15 @@ function renderAgendaItems(agenda) {
                   </div>
                   ${
                     isCompleted
-                      ? '<span class="agenda-task-state is-complete">Completed</span>'
+                      ? '<span class="agenda-task-check is-complete" aria-label="Completed"><span aria-hidden="true">✓</span></span>'
                       : `<button
                           type="button"
-                          class="secondary subtle agenda-task-complete-btn"
+                          class="ghost subtle icon-only agenda-task-complete-btn"
                           data-task-key="${escapeHtml(key)}"
+                          aria-label="Mark task complete"
+                          title="Mark task complete"
                           ${completingTaskKey === key ? "disabled" : ""}
-                        >${completingTaskKey === key ? "Completing..." : "Mark complete"}</button>`
+                        ><span aria-hidden="true">${completingTaskKey === key ? "…" : "✓"}</span></button>`
                   }
                 </div>
               `;

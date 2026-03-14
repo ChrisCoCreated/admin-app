@@ -3019,17 +3019,33 @@ body.lightbox-open {
   font-size: 0.86rem;
 }
 
-.agenda-task-state {
+.agenda-task-complete-btn,
+.agenda-task-check {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0.25rem 0.7rem;
+  justify-content: center;
+  width: 2.1rem;
+  min-width: 2.1rem;
+  height: 2.1rem;
   border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 1rem;
+  flex: 0 0 auto;
 }
 
-.agenda-task-state.is-complete {
+.agenda-task-complete-btn {
+  border: 1px solid rgba(16, 33, 57, 0.18);
+  color: rgba(16, 33, 57, 0.45);
+  background: #fff;
+}
+
+.agenda-task-complete-btn:hover {
+  color: #2a6d41;
+  border-color: rgba(42, 109, 65, 0.34);
+  background: rgba(62, 130, 84, 0.08);
+}
+
+.agenda-task-check {
+  border: 1px solid rgba(42, 109, 65, 0.2);
   background: rgba(62, 130, 84, 0.12);
   color: #2a6d41;
 }
