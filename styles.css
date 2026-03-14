@@ -1646,6 +1646,13 @@ body.lightbox-open {
   gap: 8px;
 }
 
+.scorecard-entry-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .scorecard-entry.is-archived {
   border-style: dashed;
 }

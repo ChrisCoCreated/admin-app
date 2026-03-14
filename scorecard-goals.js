@@ -69,6 +69,48 @@ function sortGoals() {
   });
 }
 
+function syncUpdatedGoal(updated) {
+  if (!updated?.id) {
+    return;
+  }
+  const index = state.goals.findIndex((item) => item.id === updated.id);
+  if (index >= 0) {
+    state.goals[index] = {
+      ...state.goals[index],
+      ...updated,
+    };
+  }
+}
+
+function updateMoveButtons() {
+  const rows = [...goalsList.querySelectorAll("[data-row-id]")];
+  rows.forEach((row, index) => {
+    const upButton = row.querySelector('[data-action="move-up"]');
+    const downButton = row.querySelector('[data-action="move-down"]');
+    if (upButton instanceof HTMLButtonElement) {
+      upButton.disabled = index === 0 || loading || saving;
+    }
+    if (downButton instanceof HTMLButtonElement) {
+      downButton.disabled = index === rows.length - 1 || loading || saving;
+    }
+  });
+}
+
+function updateGoalObjectiveDisplay(rowId) {
+  const row = goalsList.querySelector(`[data-row-id="${CSS.escape(rowId)}"]`);
+  if (!row) {
+    return;
+  }
+  const goal = findGoal(rowId);
+  if (!goal) {
+    return;
+  }
+  const display = row.querySelector('[data-role="objective-title"]');
+  if (display instanceof HTMLInputElement) {
+    display.value = objectiveTitle(goal.objectiveId || "");
+  }
+}
+
 function objectiveOptions(selectedId) {
   const options = ['<option value="">Choose linked objective</option>'];
   for (const objective of state.objectives) {
@@ -130,14 +172,24 @@ function render() {
               </div>
               <p class="muted">This shared goal appears on each review period and stays linked to one objective.</p>
             </div>
-            <button class="secondary scorecard-remove-btn" type="button" data-action="archive"${
-              goal.isActive === false ? " disabled" : ""
-            }>Archive</button>
+            <div class="scorecard-entry-actions">
+              <button class="secondary scorecard-remove-btn" type="button" data-action="move-up">Move up</button>
+              <button class="secondary scorecard-remove-btn" type="button" data-action="move-down">Move down</button>
+              <button class="secondary scorecard-remove-btn" type="button" data-action="archive"${
+                goal.isActive === false ? " disabled" : ""
+              }>Archive</button>
+            </div>
           </div>
           <div class="scorecard-form-grid">
             <label class="field scorecard-span-2">
               Goal
               <input data-field="title" type="text" value="${escapeHtml(goal.title || "")}" placeholder="Describe the goal or initiative" />
+            </label>
+            <label class="field scorecard-span-2">
+              Details
+              <textarea data-field="description" placeholder="Add context, scope, or notes for this shared goal.">${escapeHtml(
+                goal.description || ""
+              )}</textarea>
             </label>
             <label class="field">
               Linked objective
@@ -145,13 +197,15 @@ function render() {
             </label>
             <label class="field is-muted-block">
               Current linked objective
-              <input type="text" value="${escapeHtml(objectiveTitle(goal.objectiveId || ""))}" readonly />
+              <input data-role="objective-title" type="text" value="${escapeHtml(objectiveTitle(goal.objectiveId || ""))}" readonly />
             </label>
           </div>
         </article>
       `
     )
     .join("");
+
+  updateMoveButtons();
 }
 
 function findGoal(id) {
@@ -186,9 +240,7 @@ function queueSave(rowId, patch) {
       if (updated?.id) {
         const index = state.goals.findIndex((item) => item.id === updated.id);
         if (index >= 0) {
-          state.goals[index] = updated;
-          sortGoals();
-          render();
+          syncUpdatedGoal(updated);
         }
       }
       setSaveMessage("Shared goals saved.", "saved");
@@ -222,7 +274,7 @@ async function flushSaves() {
           if (updated?.id) {
             const index = state.goals.findIndex((item) => item.id === updated.id);
             if (index >= 0) {
-              state.goals[index] = updated;
+              syncUpdatedGoal(updated);
             }
           }
         })
@@ -319,7 +371,7 @@ function attachListeners() {
 
   goalsList?.addEventListener("input", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
     const row = target.closest("[data-row-id]");
@@ -334,25 +386,72 @@ function attachListeners() {
     }
     if (field === "objectiveId") {
       goal.objectiveId = target.value || null;
-      render();
+      updateGoalObjectiveDisplay(rowId);
       queueSave(rowId, { objective_id: target.value || null });
       return;
     }
     goal[field] = target.value;
-    queueSave(rowId, { title: target.value });
+    queueSave(rowId, { [field]: target.value });
   });
 
   goalsList?.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLButtonElement) || target.getAttribute("data-action") !== "archive") {
+    if (!(target instanceof HTMLButtonElement)) {
       return;
     }
     const row = target.closest("[data-row-id]");
     if (!row) {
       return;
     }
-    void archiveGoal(row.getAttribute("data-row-id"));
+    const action = target.getAttribute("data-action");
+    const rowId = row.getAttribute("data-row-id");
+    if (action === "archive") {
+      void archiveGoal(rowId);
+      return;
+    }
+    if (action === "move-up" || action === "move-down") {
+      void moveGoal(rowId, action === "move-up" ? -1 : 1);
+    }
   });
+}
+
+async function moveGoal(rowId, offset) {
+  try {
+    await flushSaves();
+    const currentIndex = state.goals.findIndex((item) => item.id === rowId);
+    const targetIndex = currentIndex + offset;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= state.goals.length) {
+      return;
+    }
+
+    const currentGoal = state.goals[currentIndex];
+    const targetGoal = state.goals[targetIndex];
+    const currentOrder = Number(currentGoal.sortOrder || currentIndex);
+    const targetOrder = Number(targetGoal.sortOrder || targetIndex);
+
+    currentGoal.sortOrder = targetOrder;
+    targetGoal.sortOrder = currentOrder;
+    sortGoals();
+    render();
+    setSaveMessage("Saving order...", "saving");
+    await Promise.all([
+      directoryApi.updatePerformanceScorecardDefinition({
+        entityType: "goals",
+        id: currentGoal.id,
+        patch: { sort_order: currentGoal.sortOrder },
+      }),
+      directoryApi.updatePerformanceScorecardDefinition({
+        entityType: "goals",
+        id: targetGoal.id,
+        patch: { sort_order: targetGoal.sortOrder },
+      }),
+    ]);
+    setSaveMessage("Order saved.", "saved");
+  } catch (error) {
+    console.error("[scorecard-goals] Failed to move goal", error);
+    setSaveMessage(error?.message || "Could not update the order.", "error", true);
+    await loadData();
+  }
 }
 
 async function init() {

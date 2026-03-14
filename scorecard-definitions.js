@@ -113,6 +113,53 @@ function sortItems(entityType) {
   });
 }
 
+function itemPatchField(field) {
+  if (field === "title") {
+    return "title";
+  }
+  if (field === "description") {
+    return "description";
+  }
+  return "name";
+}
+
+function syncUpdatedItem(entityType, updated) {
+  if (!updated?.id) {
+    return;
+  }
+  const index = state[entityType].findIndex((item) => item.id === updated.id);
+  if (index >= 0) {
+    state[entityType][index] = {
+      ...state[entityType][index],
+      ...updated,
+    };
+  }
+}
+
+function updateMoveButtons(entityType) {
+  const container = document.getElementById(ENTITY_CONFIG[entityType].listId);
+  if (!container) {
+    return;
+  }
+  const rows = [...container.querySelectorAll("[data-row-id]")];
+  rows.forEach((row, index) => {
+    const upButton = row.querySelector('[data-action="move-up"]');
+    const downButton = row.querySelector('[data-action="move-down"]');
+    if (upButton instanceof HTMLButtonElement) {
+      upButton.disabled = index === 0 || loading || saving;
+    }
+    if (downButton instanceof HTMLButtonElement) {
+      downButton.disabled = index === rows.length - 1 || loading || saving;
+    }
+  });
+}
+
+function renderAllMoveButtons() {
+  for (const entityType of Object.keys(ENTITY_CONFIG)) {
+    updateMoveButtons(entityType);
+  }
+}
+
 async function loadDefinitions() {
   try {
     setBusy(true);
@@ -159,9 +206,13 @@ function renderEntity(entityType) {
               </div>
               <p class="muted">This shared ${config.label} appears on every review period until it is archived.</p>
             </div>
-            <button class="secondary scorecard-remove-btn" type="button" data-action="archive"${
-              item.isActive === false ? " disabled" : ""
-            }>Archive</button>
+            <div class="scorecard-entry-actions">
+              <button class="secondary scorecard-remove-btn" type="button" data-action="move-up">Move up</button>
+              <button class="secondary scorecard-remove-btn" type="button" data-action="move-down">Move down</button>
+              <button class="secondary scorecard-remove-btn" type="button" data-action="archive"${
+                item.isActive === false ? " disabled" : ""
+              }>Archive</button>
+            </div>
           </div>
           <div class="scorecard-form-grid">
             <label class="field ${entityType === "objectives" ? "scorecard-span-2" : ""}">
@@ -173,11 +224,19 @@ function renderEntity(entityType) {
                 placeholder="${escapeHtml(config.placeholder)}"
               />
             </label>
+            <label class="field scorecard-span-2">
+              Details
+              <textarea data-field="description" placeholder="Add context, intent, or notes for this shared ${escapeHtml(
+                config.label
+              )}.">${escapeHtml(item.description || "")}</textarea>
+            </label>
           </div>
         </article>
       `
     )
     .join("");
+
+  updateMoveButtons(entityType);
 }
 
 function render() {
@@ -219,9 +278,7 @@ function queueSave(entityType, rowId, patch) {
       if (updated?.id) {
         const index = state[entityType].findIndex((item) => item.id === updated.id);
         if (index >= 0) {
-          state[entityType][index] = updated;
-          sortItems(entityType);
-          renderEntity(entityType);
+          syncUpdatedItem(entityType, updated);
         }
       }
       setSaveMessage("Shared definitions saved.", "saved");
@@ -256,8 +313,7 @@ async function flushSaves() {
           if (updated?.id) {
             const index = state[entityType].findIndex((item) => item.id === updated.id);
             if (index >= 0) {
-              state[entityType][index] = updated;
-              sortItems(entityType);
+              syncUpdatedItem(entityType, updated);
             }
           }
         })
@@ -338,7 +394,7 @@ function attachEntityListeners(entityType) {
   const container = document.getElementById(ENTITY_CONFIG[entityType].listId);
   container?.addEventListener("input", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
       return;
     }
     const row = target.closest("[data-row-id]");
@@ -353,26 +409,74 @@ function attachEntityListeners(entityType) {
     }
     item[field] = target.value;
     queueSave(entityType, rowId, {
-      [field === "title" ? "title" : "name"]: target.value,
+      [itemPatchField(field)]: target.value,
     });
   });
 
   container?.addEventListener("click", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLButtonElement) || target.getAttribute("data-action") !== "archive") {
+    if (!(target instanceof HTMLButtonElement)) {
       return;
     }
     const row = target.closest("[data-row-id]");
     if (!row) {
       return;
     }
-    void archiveDefinition(entityType, row.getAttribute("data-row-id"));
+    const action = target.getAttribute("data-action");
+    const rowId = row.getAttribute("data-row-id");
+    if (action === "archive") {
+      void archiveDefinition(entityType, rowId);
+      return;
+    }
+    if (action === "move-up" || action === "move-down") {
+      void moveDefinition(entityType, rowId, action === "move-up" ? -1 : 1);
+    }
   });
 
   const addButton = document.getElementById(ENTITY_CONFIG[entityType].addId);
   addButton?.addEventListener("click", () => {
     void createDefinition(entityType);
   });
+}
+
+async function moveDefinition(entityType, rowId, offset) {
+  try {
+    await flushSaves();
+    const list = state[entityType];
+    const currentIndex = list.findIndex((item) => item.id === rowId);
+    const targetIndex = currentIndex + offset;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= list.length) {
+      return;
+    }
+
+    const currentItem = list[currentIndex];
+    const targetItem = list[targetIndex];
+    const currentOrder = Number(currentItem.sortOrder || currentIndex);
+    const targetOrder = Number(targetItem.sortOrder || targetIndex);
+
+    currentItem.sortOrder = targetOrder;
+    targetItem.sortOrder = currentOrder;
+    sortItems(entityType);
+    renderEntity(entityType);
+    setSaveMessage("Saving order...", "saving");
+    await Promise.all([
+      directoryApi.updatePerformanceScorecardDefinition({
+        entityType,
+        id: currentItem.id,
+        patch: { sort_order: currentItem.sortOrder },
+      }),
+      directoryApi.updatePerformanceScorecardDefinition({
+        entityType,
+        id: targetItem.id,
+        patch: { sort_order: targetItem.sortOrder },
+      }),
+    ]);
+    setSaveMessage("Order saved.", "saved");
+  } catch (error) {
+    console.error("[scorecard-definitions] Failed to move definition", error);
+    setSaveMessage(error?.message || "Could not update the order.", "error", true);
+    await loadDefinitions();
+  }
 }
 
 function attachListeners() {

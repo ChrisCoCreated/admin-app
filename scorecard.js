@@ -334,6 +334,14 @@ function goalObjectiveSnapshotNote(item) {
   return `<p class="scorecard-definition-note muted">Reviewed against objective: ${escapeHtml(snapshotTitle)}</p>`;
 }
 
+function definitionDetailNote(item) {
+  const detail = String(item?.description || "").trim();
+  if (!detail) {
+    return "";
+  }
+  return `<p class="scorecard-definition-note muted">${escapeHtml(detail)}</p>`;
+}
+
 function buildEntryShell(item, title, description, content, entityType) {
   const archiveLabel = item.isActive === false ? "Archived" : "Archive";
   return `
@@ -345,6 +353,7 @@ function buildEntryShell(item, title, description, content, entityType) {
             ${item.isActive === false ? '<span class="scorecard-archived-chip">Archived</span>' : ""}
           </div>
           <p class="muted">${description}</p>
+          ${definitionDetailNote(item)}
           ${definitionSnapshotNote(item, entityType)}
           ${entityType === "goals" ? goalObjectiveSnapshotNote(item) : ""}
         </div>
