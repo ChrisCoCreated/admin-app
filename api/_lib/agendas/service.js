@@ -311,6 +311,7 @@ async function createAgendaItemForUser(email, body) {
     sort_order: payload.sortOrder,
     stage_tag: payload.stageTag || "",
     owner_email: payload.ownerEmail,
+    task_map: Object.prototype.hasOwnProperty.call(payload, "taskMap") ? payload.taskMap : null,
   });
 
   await updateAgendaRow(agendaId, { updated_at: new Date().toISOString() });
@@ -344,6 +345,7 @@ async function updateAgendaItemForUser(email, body) {
     ...(Object.prototype.hasOwnProperty.call(payload, "isImportant") ? { is_important: payload.isImportant === true } : {}),
     ...(Object.prototype.hasOwnProperty.call(payload, "sortOrder") ? { sort_order: payload.sortOrder } : {}),
     ...(Object.prototype.hasOwnProperty.call(payload, "stageTag") ? { stage_tag: payload.stageTag || "" } : {}),
+    ...(Object.prototype.hasOwnProperty.call(payload, "taskMap") ? { task_map: payload.taskMap } : {}),
     updated_at: new Date().toISOString(),
   });
   await updateAgendaRow(agenda.id, { updated_at: new Date().toISOString() });

@@ -2923,6 +2923,27 @@ body.lightbox-open {
   color: #805e00;
 }
 
+.agenda-badge.is-task {
+  background: rgba(49, 183, 200, 0.18);
+  color: #14656f;
+}
+
+.agenda-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agenda-task-link-btn {
+  min-height: 34px;
+}
+
+.agenda-task-meta {
+  margin: 0;
+  color: rgba(16, 33, 57, 0.68);
+  font-size: 0.88rem;
+}
+
 .agenda-item-preview {
   color: rgba(16, 33, 57, 0.8);
   min-width: 0;

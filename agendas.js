@@ -74,6 +74,7 @@ let agendaSettingsExpanded = false;
 let agendaItemComposerExpanded = false;
 let itemSearchExpanded = false;
 let itemDetailsExpanded = false;
+let creatingTaskItemId = "";
 const loadingAgendaDetails = new Set();
 
 function setBusy(value) {
@@ -235,6 +236,10 @@ function filteredItems(agenda) {
   });
 }
 
+function hasLinkedTask(item) {
+  return Boolean(item?.taskMap?.provider && item?.taskMap?.externalTaskId);
+}
+
 function agendaDisplayTitle(agenda) {
   const detailedAgenda = agendaDetailsById.get(agenda?.id);
   const title = String(detailedAgenda?.title || agenda?.title || "").trim();
@@ -388,8 +393,18 @@ function renderAgendaItems(agenda) {
       item.isUrgent ? '<span class="agenda-badge is-urgent">Urgent</span>' : "",
       item.isImportant ? '<span class="agenda-badge is-important">Important</span>' : "",
       item.isPrivate ? '<span class="agenda-badge">Private</span>' : "",
+      hasLinkedTask(item) ? '<span class="agenda-badge is-task">Task linked</span>' : "",
     ].join("");
     const previewHtml = itemDetailsExpanded ? item.detailHtml || "<p></p>" : "";
+    const taskOwner = item?.taskMap?.ownerEmail ? displayNameForEmail(item.taskMap.ownerEmail) : "You";
+    const taskLabel = String(item?.taskMap?.title || item?.title || "Task").trim();
+    const taskActionHtml = hasLinkedTask(item)
+      ? `<p class="agenda-task-meta">Task: <strong>${escapeHtml(taskLabel)}</strong> · ${escapeHtml(taskOwner)}</p>`
+      : `<button
+          type="button"
+          class="secondary subtle agenda-task-link-btn"
+          ${creatingTaskItemId === item.id ? "disabled" : ""}
+        >${creatingTaskItemId === item.id ? "Adding task..." : "Add task"}</button>`;
 
     card.innerHTML = `
       <div class="agenda-item-card-head">
@@ -405,6 +420,7 @@ function renderAgendaItems(agenda) {
       </div>
       <div class="agenda-item-badges">${badges}</div>
       ${itemDetailsExpanded ? `<div class="agenda-item-preview">${previewHtml}</div>` : ""}
+      <div class="agenda-item-actions">${taskActionHtml}</div>
     `;
 
     card.addEventListener("click", () => {
@@ -424,10 +440,60 @@ function renderAgendaItems(agenda) {
       dragItemId = "";
       card.classList.remove("is-dragging");
     });
+    card.querySelector(".agenda-task-link-btn")?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await createTaskForAgendaItem(agenda, item);
+    });
 
     agendaItemsList.appendChild(card);
     agendaItemsList.appendChild(buildDropZone(index + 1));
   });
+}
+
+async function createTaskForAgendaItem(agenda, item) {
+  if (!agenda?.id || !item?.id || hasLinkedTask(item)) {
+    return;
+  }
+
+  const title = String(item.title || "").trim();
+  if (!title) {
+    setActionStatus("Item title is required before adding a task.", true);
+    return;
+  }
+
+  try {
+    creatingTaskItemId = item.id;
+    renderAgendaItems(agenda);
+    setActionStatus("Creating task...");
+    const created = await directoryApi.createTask({ title });
+    const createdTask = created?.task || null;
+    if (!createdTask?.provider || !createdTask?.externalTaskId) {
+      throw new Error("Task was created but the link details were missing.");
+    }
+
+    await directoryApi.updateAgendaItem({
+      itemId: item.id,
+      taskMap: {
+        provider: createdTask.provider,
+        externalTaskId: createdTask.externalTaskId,
+        externalContainerId: createdTask.externalContainerId || "",
+        title: createdTask.title || title,
+        ownerEmail: currentUser?.email || "",
+        linkedAt: new Date().toISOString(),
+        source: "agenda_item",
+      },
+    });
+    await refreshAgendas("Task added from agenda item.", { selectedAgendaId: agenda.id });
+  } catch (error) {
+    console.error(error);
+    setActionStatus(error?.message || "Could not add task from agenda item.", true);
+  } finally {
+    creatingTaskItemId = "";
+    const latestAgenda = selectedAgenda();
+    if (latestAgenda?.id === agenda.id) {
+      renderAgendaItems(latestAgenda);
+    }
+  }
 }
 
 function renderAgendaDetail() {
