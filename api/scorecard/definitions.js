@@ -7,7 +7,7 @@ const {
   updateDefinition,
 } = require("../_lib/scorecard-repository");
 
-const ALLOWED_ROLES = ["admin", "care_manager", "operations"];
+const ALLOWED_ROLES = ["admin", "director"];
 
 module.exports = async (req, res) => {
   const method = String(req.method || "GET").toUpperCase();

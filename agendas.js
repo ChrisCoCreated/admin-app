@@ -32,10 +32,6 @@ const agendaDetailWrap = document.getElementById("agendaDetailWrap");
 const agendaTitle = document.getElementById("agendaTitle");
 const agendaMeta = document.getElementById("agendaMeta");
 const editAgendaSettingsBtn = document.getElementById("editAgendaSettingsBtn");
-const agendaSettingsSummary = document.getElementById("agendaSettingsSummary");
-const agendaSettingsTitle = document.getElementById("agendaSettingsTitle");
-const agendaSettingsPeople = document.getElementById("agendaSettingsPeople");
-const agendaSettingsPrivacy = document.getElementById("agendaSettingsPrivacy");
 const agendaSettingsForm = document.getElementById("agendaSettingsForm");
 const agendaTitleEditInput = document.getElementById("agendaTitleEditInput");
 const agendaPeopleSummaryInput = document.getElementById("agendaPeopleSummaryInput");
@@ -98,7 +94,6 @@ function setCreatePanelExpanded(value) {
 
 function setAgendaSettingsExpanded(value) {
   agendaSettingsExpanded = value === true;
-  agendaSettingsSummary.hidden = agendaSettingsExpanded;
   agendaSettingsForm.hidden = !agendaSettingsExpanded;
   if (editAgendaSettingsBtn) {
     editAgendaSettingsBtn.textContent = agendaSettingsExpanded ? "Close settings" : "Edit settings";
@@ -400,9 +395,6 @@ function renderAgendaDetail() {
   const isOwner = normalizeEmail(agenda.ownerEmail) === normalizeEmail(currentUser?.email);
   agendaTitle.textContent = agenda.title || "Agenda";
   agendaMeta.textContent = `${agenda.agendaType === "one_to_one" ? "1:1" : "Meeting"} with ${participantSummary(agenda)}${agenda.isPrivate ? " • Private" : ""}`;
-  agendaSettingsTitle.textContent = agenda.title || "-";
-  agendaSettingsPeople.textContent = participantSummary(agenda) || "Just you";
-  agendaSettingsPrivacy.textContent = agenda.isPrivate ? "Private agenda" : "Shared agenda";
   agendaTitleEditInput.value = agenda.title || "";
   agendaPeopleSummaryInput.value = participantSummary(agenda);
   agendaPrivateEditInput.checked = agenda.isPrivate === true;
