@@ -17,8 +17,6 @@ const ORG_PEOPLE = [
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const actionStatus = document.getElementById("actionStatus");
-const refreshBtn = document.getElementById("refreshBtn");
-const quickAgendaButtons = document.getElementById("quickAgendaButtons");
 const toggleCreatePanelBtn = document.getElementById("toggleCreatePanelBtn");
 const agendaCreatePanel = document.getElementById("agendaCreatePanel");
 const agendaPeoplePicker = document.getElementById("agendaPeoplePicker");
@@ -33,6 +31,7 @@ const agendaEmptyState = document.getElementById("agendaEmptyState");
 const agendaDetailWrap = document.getElementById("agendaDetailWrap");
 const agendaTitle = document.getElementById("agendaTitle");
 const agendaMeta = document.getElementById("agendaMeta");
+const agendaAttendees = document.getElementById("agendaAttendees");
 const editAgendaSettingsBtn = document.getElementById("editAgendaSettingsBtn");
 const agendaSettingsForm = document.getElementById("agendaSettingsForm");
 const agendaTitleEditInput = document.getElementById("agendaTitleEditInput");
@@ -40,6 +39,8 @@ const agendaPeopleSummaryInput = document.getElementById("agendaPeopleSummaryInp
 const agendaPrivateEditInput = document.getElementById("agendaPrivateEditInput");
 const saveAgendaSettingsBtn = document.getElementById("saveAgendaSettingsBtn");
 const cancelAgendaSettingsBtn = document.getElementById("cancelAgendaSettingsBtn");
+const toggleItemSearchBtn = document.getElementById("toggleItemSearchBtn");
+const itemSearchField = document.getElementById("itemSearchField");
 const itemSearchInput = document.getElementById("itemSearchInput");
 const itemStageFilter = document.getElementById("itemStageFilter");
 const agendaItemsList = document.getElementById("agendaItemsList");
@@ -73,11 +74,11 @@ let dragItemId = "";
 let createPanelExpanded = false;
 let agendaSettingsExpanded = false;
 let agendaItemComposerExpanded = false;
+let itemSearchExpanded = false;
 const loadingAgendaDetails = new Set();
 
 function setBusy(value) {
   busy = value;
-  refreshBtn.disabled = value;
   saveAgendaItemBtn.disabled = value;
   saveAgendaSettingsBtn.disabled = value;
 }
@@ -100,8 +101,23 @@ function setAgendaSettingsExpanded(value) {
   agendaSettingsExpanded = value === true;
   agendaSettingsForm.hidden = !agendaSettingsExpanded;
   if (editAgendaSettingsBtn) {
-    editAgendaSettingsBtn.textContent = agendaSettingsExpanded ? "Close settings" : "Edit settings";
+    editAgendaSettingsBtn.textContent = agendaSettingsExpanded ? "Close" : "Edit";
     editAgendaSettingsBtn.setAttribute("aria-expanded", agendaSettingsExpanded ? "true" : "false");
+  }
+}
+
+function setItemSearchExpanded(value) {
+  itemSearchExpanded = value === true;
+  if (itemSearchField) {
+    itemSearchField.hidden = !itemSearchExpanded;
+  }
+  if (toggleItemSearchBtn) {
+    toggleItemSearchBtn.setAttribute("aria-expanded", itemSearchExpanded ? "true" : "false");
+  }
+  if (itemSearchExpanded) {
+    itemSearchInput?.focus();
+  } else if (itemSearchInput) {
+    itemSearchInput.value = "";
   }
 }
 
@@ -167,36 +183,6 @@ function selectedPeopleFromCreateForm() {
       const person = ORG_PEOPLE.find((entry) => normalizeEmail(entry.email) === normalizeEmail(email));
       return person || { email, name: displayNameForEmail(email) };
     });
-}
-
-function renderQuickCreate() {
-  quickAgendaButtons.innerHTML = "";
-  ORG_PEOPLE.forEach((person) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "secondary agenda-quick-card";
-    button.innerHTML = `<strong>1:1 with ${escapeHtml(person.name)}</strong>`;
-    button.addEventListener("click", async () => {
-      try {
-        setBusy(true);
-        await directoryApi.createAgenda({
-          title: `1:1 with ${person.name}`,
-          agendaType: "one_to_one",
-          participantEmails: [person.email],
-          participantNames: [person.name],
-          isPrivate: false,
-        });
-        setCreatePanelExpanded(false);
-        await refreshAgendas(`1:1 with ${person.name} created.`);
-      } catch (error) {
-        console.error(error);
-        setStatus(error?.message || "Could not create 1:1 agenda.", true);
-      } finally {
-        setBusy(false);
-      }
-    });
-    quickAgendaButtons.appendChild(button);
-  });
 }
 
 function renderPeoplePicker() {
@@ -312,6 +298,22 @@ function participantSummary(agenda) {
     .join(", ");
 }
 
+function renderAgendaAttendees(agenda) {
+  if (!agendaAttendees) {
+    return;
+  }
+  const members = Array.isArray(agenda?.members) ? agenda.members : [];
+  agendaAttendees.innerHTML = "";
+  agendaAttendees.hidden = members.length === 0;
+
+  members.forEach((member) => {
+    const pill = document.createElement("span");
+    pill.className = "agenda-attendee-pill";
+    pill.textContent = member.displayName || displayNameForEmail(member.userEmail);
+    agendaAttendees.appendChild(pill);
+  });
+}
+
 function renderAgendaItems(agenda) {
   const items = filteredItems(agenda);
   agendaItemsList.innerHTML = "";
@@ -397,7 +399,8 @@ function renderAgendaDetail() {
 
   const isOwner = normalizeEmail(agenda.ownerEmail) === normalizeEmail(currentUser?.email);
   agendaTitle.textContent = agenda.title || "Agenda";
-  agendaMeta.textContent = `${agenda.agendaType === "one_to_one" ? "1:1" : "Meeting"} with ${participantSummary(agenda)}${agenda.isPrivate ? " • Private" : ""}`;
+  agendaMeta.textContent = `${agenda.agendaType === "one_to_one" ? "1:1" : "Meeting"}${agenda.isPrivate ? " • Private" : ""}`;
+  renderAgendaAttendees(agenda);
   agendaTitleEditInput.value = agenda.title || "";
   agendaPeopleSummaryInput.value = participantSummary(agenda);
   agendaPrivateEditInput.checked = agenda.isPrivate === true;
@@ -596,11 +599,11 @@ async function init() {
     }
 
     renderTopNavigation({ role });
-    renderQuickCreate();
     renderPeoplePicker();
     setCreatePanelExpanded(false);
     setAgendaSettingsExpanded(false);
     setAgendaItemComposerExpanded(false);
+    setItemSearchExpanded(false);
     hydrateAgendasFromCache();
     await loadAgendas();
   } catch (error) {
@@ -754,6 +757,14 @@ itemSearchInput?.addEventListener("input", () => {
   renderAgendaDetail();
 });
 
+toggleItemSearchBtn?.addEventListener("click", () => {
+  const nextExpanded = !itemSearchExpanded;
+  setItemSearchExpanded(nextExpanded);
+  if (!nextExpanded) {
+    renderAgendaDetail();
+  }
+});
+
 itemStageFilter?.addEventListener("change", () => {
   renderAgendaDetail();
 });
@@ -773,18 +784,6 @@ insertLinkBtn?.addEventListener("click", () => {
 
 toggleCreatePanelBtn?.addEventListener("click", () => {
   setCreatePanelExpanded(!createPanelExpanded);
-});
-
-refreshBtn?.addEventListener("click", async () => {
-  try {
-    setBusy(true);
-    await refreshAgendas("Agendas refreshed.", { forceSelectedDetail: true });
-  } catch (error) {
-    console.error(error);
-    setStatus(error?.message || "Could not refresh agendas.", true);
-  } finally {
-    setBusy(false);
-  }
 });
 
 signOutBtn?.addEventListener("click", async () => {

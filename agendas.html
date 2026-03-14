@@ -51,10 +51,9 @@
             <div class="agenda-create-head">
               <div>
                 <h3>Quick Create</h3>
-                <p class="muted">Start a regular 1:1 or create a shared meeting agenda.</p>
+                <p class="muted">Create a shared meeting agenda.</p>
               </div>
             </div>
-            <div id="quickAgendaButtons" class="agenda-quick-grid"></div>
             <form id="agendaCreateForm" class="agenda-create-form">
               <label class="field" for="agendaTitleInput">
                 Agenda title
@@ -93,10 +92,10 @@
               <div>
                 <h2 id="agendaTitle"></h2>
                 <p id="agendaMeta" class="muted"></p>
+                <div id="agendaAttendees" class="agenda-attendees" hidden></div>
               </div>
               <div class="agenda-detail-actions">
-                <button id="editAgendaSettingsBtn" class="ghost" type="button">Edit settings</button>
-                <button id="refreshBtn" class="secondary" type="button">Refresh</button>
+                <button id="editAgendaSettingsBtn" class="ghost subtle" type="button">Edit</button>
               </div>
             </div>
 
@@ -175,10 +174,21 @@
             </form>
 
             <div class="agenda-item-toolbar">
-              <label class="field" for="itemSearchInput">
-                Search items
-                <input id="itemSearchInput" type="search" placeholder="Search title or detail" />
-              </label>
+              <div class="agenda-search-shell">
+                <button
+                  id="toggleItemSearchBtn"
+                  class="ghost subtle icon-only"
+                  type="button"
+                  aria-label="Search items"
+                  aria-expanded="false"
+                >
+                  <span aria-hidden="true">⌕</span>
+                </button>
+                <label id="itemSearchField" class="field agenda-search-field" for="itemSearchInput" hidden>
+                  <span class="sr-only">Search items</span>
+                  <input id="itemSearchInput" type="search" placeholder="Search title or detail" />
+                </label>
+              </div>
               <label class="field" for="itemStageFilter">
                 Stage
                 <select id="itemStageFilter">
