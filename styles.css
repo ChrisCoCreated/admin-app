@@ -3040,6 +3040,19 @@ body.lightbox-open {
   width: min(100%, 420px);
 }
 
+.agenda-task-date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.agenda-task-preset-btn {
+  min-height: 30px;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
 .agenda-task-form-actions {
   display: flex;
   flex-wrap: wrap;

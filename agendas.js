@@ -262,10 +262,33 @@ function formatTaskDueDate(value) {
   return parsed.toLocaleDateString();
 }
 
+function padDatePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function formatDateInputValue(date) {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+}
+
+function todayDateInputValue() {
+  return formatDateInputValue(new Date());
+}
+
+function nextWeekdayDateInputValue(targetDay) {
+  const date = new Date();
+  const currentDay = date.getDay();
+  let offset = (targetDay - currentDay + 7) % 7;
+  if (offset === 0) {
+    offset = 7;
+  }
+  date.setDate(date.getDate() + offset);
+  return formatDateInputValue(date);
+}
+
 function taskDraftForItem(item) {
   const itemId = String(item?.id || "").trim();
   if (!itemId) {
-    return { title: "", dueDate: "" };
+    return { title: "", dueDate: todayDateInputValue() };
   }
   const existing = taskDraftsByItemId.get(itemId);
   if (existing) {
@@ -273,14 +296,14 @@ function taskDraftForItem(item) {
   }
   const initial = {
     title: String(item?.title || "").trim(),
-    dueDate: "",
+    dueDate: todayDateInputValue(),
   };
   taskDraftsByItemId.set(itemId, initial);
   return initial;
 }
 
 function updateTaskDraft(itemId, patch) {
-  const current = taskDraftsByItemId.get(itemId) || { title: "", dueDate: "" };
+  const current = taskDraftsByItemId.get(itemId) || { title: "", dueDate: todayDateInputValue() };
   taskDraftsByItemId.set(itemId, {
     ...current,
     ...patch,
@@ -515,6 +538,12 @@ function renderAgendaItems(agenda) {
                 value="${escapeHtml(draft.dueDate)}"
               />
             </label>
+            <div class="agenda-task-date-presets" role="group" aria-label="Quick due date options">
+              <button type="button" class="ghost subtle agenda-task-preset-btn" data-preset="today">Today</button>
+              <button type="button" class="ghost subtle agenda-task-preset-btn" data-preset="tomorrow">Tomorrow</button>
+              <button type="button" class="ghost subtle agenda-task-preset-btn" data-preset="monday">Monday</button>
+              <button type="button" class="ghost subtle agenda-task-preset-btn" data-preset="wednesday">Wednesday</button>
+            </div>
             <div class="agenda-task-form-actions">
               <button type="submit" ${creatingTaskItemId === item.id ? "disabled" : ""}>
                 ${creatingTaskItemId === item.id ? "Creating..." : "Create task"}
@@ -602,6 +631,27 @@ function renderAgendaItems(agenda) {
     });
     taskForm?.querySelector('[name="taskDueDate"]')?.addEventListener("input", (event) => {
       updateTaskDraft(item.id, { dueDate: String(event.target?.value || "") });
+    });
+    taskForm?.querySelectorAll(".agenda-task-preset-btn").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const preset = String(button.getAttribute("data-preset") || "").trim().toLowerCase();
+        let dueDate = todayDateInputValue();
+        if (preset === "tomorrow") {
+          const date = new Date();
+          date.setDate(date.getDate() + 1);
+          dueDate = formatDateInputValue(date);
+        } else if (preset === "monday") {
+          dueDate = nextWeekdayDateInputValue(1);
+        } else if (preset === "wednesday") {
+          dueDate = nextWeekdayDateInputValue(3);
+        }
+        updateTaskDraft(item.id, { dueDate });
+        const dueInput = taskForm.querySelector('[name="taskDueDate"]');
+        if (dueInput) {
+          dueInput.value = dueDate;
+        }
+      });
     });
     card.querySelector(".agenda-task-cancel-btn")?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -800,8 +850,31 @@ function writeCachedAgendaSummaries() {
   }
 }
 
+function mergeAgendaSummaryWithDetail(agenda) {
+  const detailed = agendaDetailsById.get(agenda?.id);
+  if (!agenda) {
+    return null;
+  }
+  if (!detailed) {
+    return agenda;
+  }
+  return {
+    ...agenda,
+    title: String(agenda.title || detailed.title || "").trim(),
+    members: Array.isArray(agenda.members) && agenda.members.length ? agenda.members : detailed.members || [],
+    participantEmails:
+      Array.isArray(agenda.participantEmails) && agenda.participantEmails.length
+        ? agenda.participantEmails
+        : detailed.participantEmails || [],
+    participantNames:
+      Array.isArray(agenda.participantNames) && agenda.participantNames.length
+        ? agenda.participantNames
+        : detailed.participantNames || [],
+  };
+}
+
 function applyAgendaSummaries(nextAgendas) {
-  agendas = Array.isArray(nextAgendas) ? nextAgendas : [];
+  agendas = (Array.isArray(nextAgendas) ? nextAgendas : []).map((agenda) => mergeAgendaSummaryWithDetail(agenda));
   if (!selectedAgendaId && agendas.length) {
     selectedAgendaId = agendas[0].id;
   }
@@ -831,6 +904,17 @@ async function loadAgendaDetail(agendaId, options = {}) {
     const agenda = payload?.agenda || null;
     if (agenda?.id) {
       agendaDetailsById.set(agenda.id, agenda);
+      agendas = agendas.map((entry) => {
+        if (entry.id !== agenda.id) {
+          return entry;
+        }
+        return {
+          ...entry,
+          ...agenda,
+          title: String(agenda.title || entry.title || "").trim(),
+        };
+      });
+      writeCachedAgendaSummaries();
       renderAgendaList();
       if (agenda.id === selectedAgendaId) {
         renderAgendaDetail();
