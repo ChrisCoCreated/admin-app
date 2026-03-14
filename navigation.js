@@ -2,6 +2,7 @@ const ROLE_PAGES = {
   admin: [
     "clients",
     "carers",
+    "timesheets",
     "recruitment",
     "agendas",
     "scorecard",
@@ -21,6 +22,7 @@ const ROLE_PAGES = {
   care_manager: [
     "clients",
     "carers",
+    "timesheets",
     "recruitment",
     "agendas",
     "scorecard",
@@ -35,6 +37,7 @@ const ROLE_PAGES = {
   operations: [
     "clients",
     "carers",
+    "timesheets",
     "recruitment",
     "agendas",
     "scorecard",
@@ -50,18 +53,19 @@ const ROLE_PAGES = {
   director: ["agendas", "scorecard", "scorecarddefinitions", "scorecardgoals"],
   marketing: ["marketing", "photolayout", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
-  time_only: ["mapping", "drivetime", "agendas"],
-  hr_only: ["carers", "recruitment", "agendas"],
+  time_only: ["timesheets", "mapping", "drivetime", "agendas"],
+  hr_only: ["carers", "timesheets", "recruitment", "agendas"],
   clients_only: ["clients", "agendas"],
-  hr_clients: ["clients", "carers", "recruitment", "agendas"],
-  time_clients: ["clients", "mapping", "drivetime", "agendas"],
-  time_hr: ["carers", "recruitment", "mapping", "drivetime", "agendas"],
-  time_hr_clients: ["clients", "carers", "recruitment", "mapping", "drivetime", "agendas"],
+  hr_clients: ["clients", "carers", "timesheets", "recruitment", "agendas"],
+  time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
+  time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
+  time_hr_clients: ["clients", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
 };
 
 const PAGE_META = {
   clients: { href: "./clients.html", label: "Clients" },
   carers: { href: "./carers.html", label: "Carers" },
+  timesheets: { href: "./timesheets.html", label: "Timesheets" },
   recruitment: { href: "./recruitment.html", label: "Recruitment" },
   agendas: { href: "./agendas.html", label: "Agendas" },
   scorecard: { href: "./scorecard.html", label: "Performance Scorecard" },

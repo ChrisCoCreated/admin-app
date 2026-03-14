@@ -271,6 +271,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listTimesheets(query = {}) {
+      const response = await authFetch(buildUrl("/api/timesheets", query));
+      if (!response.ok) {
+        await parseError(response, "Timesheets request failed");
+      }
+      return response.json();
+    },
+
     async listRecruitment(query = {}) {
       const response = await authFetch(buildUrl("/api/recruitment", query), {
         scopes: FRONTEND_CONFIG.graphTaskScopes,

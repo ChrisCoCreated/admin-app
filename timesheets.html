@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Timesheets</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260314" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <h1>Timesheets</h1>
+        <p>Look up OneTouch carer timesheets using quick periods or a custom date range.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Search</h2>
+            <p class="muted">Choose a carer, then fetch yesterday, last week, last month, or a bespoke range.</p>
+          </div>
+        </div>
+
+        <div class="mapping-form-grid">
+          <label class="field" for="carerSearchInput">
+            Find carer
+            <input id="carerSearchInput" type="search" placeholder="Search by name, id, area or postcode" autocomplete="off" />
+          </label>
+          <label class="field" for="carerSelect">
+            Carer
+            <select id="carerSelect">
+              <option value="">Loading carers...</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="timesheet-preset-row" role="group" aria-label="Quick date ranges">
+          <button class="timesheet-preset-button active" type="button" data-preset="yesterday">Yesterday</button>
+          <button class="timesheet-preset-button" type="button" data-preset="last_week">Last week</button>
+          <button class="timesheet-preset-button" type="button" data-preset="last_month">Last month</button>
+          <button class="timesheet-preset-button" type="button" data-preset="custom">Bespoke range</button>
+        </div>
+
+        <div id="customRangeFields" class="mapping-form-grid" hidden>
+          <label class="field" for="dateStartInput">
+            Start date
+            <input id="dateStartInput" type="date" />
+          </label>
+          <label class="field" for="dateFinishInput">
+            Finish date
+            <input id="dateFinishInput" type="date" />
+          </label>
+        </div>
+
+        <div class="row wrap-row">
+          <button id="fetchTimesheetsBtn" type="button">Get timesheets</button>
+          <span id="selectedRangeMessage" class="muted">Range: yesterday</span>
+        </div>
+
+        <p id="statusMessage" class="muted">Loading carers...</p>
+      </section>
+
+      <section id="summaryPanel" class="panel" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Summary</h2>
+            <p id="summaryMessage" class="muted"></p>
+          </div>
+        </div>
+        <div class="timesheet-summary-grid">
+          <article class="timesheet-summary-card">
+            <h3>Total rows</h3>
+            <p id="summaryTotalRows" class="timesheet-summary-value">0</p>
+          </article>
+          <article class="timesheet-summary-card">
+            <h3>Confirmed</h3>
+            <p id="summaryConfirmed" class="timesheet-summary-value">0</p>
+          </article>
+          <article class="timesheet-summary-card">
+            <h3>Unconfirmed</h3>
+            <p id="summaryUnconfirmed" class="timesheet-summary-value">0</p>
+          </article>
+          <article class="timesheet-summary-card">
+            <h3>Clients</h3>
+            <p id="summaryClients" class="timesheet-summary-value">0</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Timesheet results</h2>
+            <p class="muted">Results are grouped in a single table so they can be copied into follow-up work quickly.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Carer</th>
+                <th>Client</th>
+                <th>Job Type</th>
+                <th>Due In</th>
+                <th>Due Out</th>
+                <th>Log In</th>
+                <th>Log Out</th>
+                <th>Confirmed</th>
+              </tr>
+            </thead>
+            <tbody id="timesheetsTableBody"></tbody>
+          </table>
+        </div>
+        <p id="emptyState" class="muted">Choose a carer and fetch a range to see timesheets.</p>
+      </section>
+    </main>
+
+    <script type="module" src="./timesheets.js"></script>
+  </body>
+</html>

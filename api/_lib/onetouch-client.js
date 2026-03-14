@@ -1033,6 +1033,83 @@ async function listVisits() {
   return records.map(normalizeVisit).filter((visit) => visit.clientId && visit.carerId);
 }
 
+function normalizeTimesheet(record) {
+  return {
+    date: asString(record?.date),
+    carerName: asString(record?.carer_name || record?.carerName),
+    clientName: asString(record?.client_name || record?.clientName),
+    carerId: asString(record?.carer_id || record?.carerId),
+    clientId: asString(record?.client_id || record?.clientId),
+    externalCarer: Boolean(record?.external_carer ?? record?.externalCarer),
+    jobType: asString(record?.job_type || record?.jobType),
+    dueIn: asString(record?.due_in || record?.dueIn),
+    dueOut: asString(record?.due_out || record?.dueOut),
+    logIn: asString(record?.log_in || record?.logIn),
+    logOut: asString(record?.log_out || record?.logOut),
+    timeConfirmed: Boolean(record?.time_confirmed ?? record?.timeConfirmed),
+  };
+}
+
+function getNextPageNumber(payload) {
+  const nextUrl = asString(payload?.next_page_url || payload?.nextPageUrl);
+  if (!nextUrl) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(nextUrl);
+    const page = Number(parsed.searchParams.get("page"));
+    return Number.isFinite(page) && page > 0 ? page : null;
+  } catch {
+    return null;
+  }
+}
+
+async function listTimesheets({ carerId = "", date = "", dateStart = "", dateFinish = "", perPage = 200 } = {}) {
+  const query = {
+    carer_id: asString(carerId),
+    date: asString(date),
+    datestart: asString(dateStart),
+    datefinish: asString(dateFinish),
+    per_page: Number.isFinite(Number(perPage)) ? Math.max(1, Math.min(Number(perPage), 500)) : 200,
+    page: 1,
+  };
+
+  if (!query.carer_id) {
+    throw new Error("A carer id is required to fetch timesheets.");
+  }
+
+  let pagePayload = await callOneTouch("timesheets", query);
+  let records = resolveRecords(pagePayload, ["timesheets", "data.timesheets"]).map(normalizeTimesheet);
+  let nextPage = getNextPageNumber(pagePayload);
+  let pagesFetched = 1;
+
+  while (nextPage && pagesFetched < 50) {
+    pagePayload = await callOneTouch("timesheets", {
+      ...query,
+      page: nextPage,
+    });
+    records = records.concat(
+      resolveRecords(pagePayload, ["timesheets", "data.timesheets"]).map(normalizeTimesheet)
+    );
+    nextPage = getNextPageNumber(pagePayload);
+    pagesFetched += 1;
+  }
+
+  return {
+    timesheets: records,
+    total: Number(pagePayload?.total || records.length) || records.length,
+    pageCount: pagesFetched,
+    filters: {
+      carerId: query.carer_id,
+      date: query.date,
+      dateStart: query.datestart,
+      dateFinish: query.datefinish,
+      perPage: query.per_page,
+    },
+  };
+}
+
 function pickFirstNonEmpty(values) {
   for (const value of values) {
     const text = asString(value);
@@ -1293,6 +1370,7 @@ module.exports = {
   listCarersDetailed,
   listClients,
   listVisits,
+  listTimesheets,
   createCarer,
   resolveOneTouchLocationArea,
   getOneTouchLocationAreaOptions,

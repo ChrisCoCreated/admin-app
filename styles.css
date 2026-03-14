@@ -2478,6 +2478,55 @@ body.lightbox-open {
   border-radius: 8px;
 }
 
+.timesheet-preset-row {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.timesheet-preset-button {
+  border: 1px solid #c9d4e8;
+  border-radius: 999px;
+  background: #f5f8ff;
+  color: #24314a;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.timesheet-preset-button.active {
+  background: #1f3c88;
+  border-color: #1f3c88;
+  color: #fff;
+}
+
+.timesheet-summary-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.timesheet-summary-card {
+  border: 1px solid #d8e0ee;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #fbfdff, #f4f8ff);
+}
+
+.timesheet-summary-card h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4a566d;
+}
+
+.timesheet-summary-value {
+  margin: 8px 0 0;
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #183153;
+}
+
 @media (max-width: 900px) {
   .clients-grid {
     grid-template-columns: 1fr;
