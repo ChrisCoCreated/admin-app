@@ -71,6 +71,13 @@ function sortGoals() {
   });
 }
 
+function resequenceGoals() {
+  state.goals = state.goals.map((goal, index) => ({
+    ...goal,
+    sortOrder: index + 1,
+  }));
+}
+
 function syncUpdatedGoal(updated) {
   if (!updated?.id) {
     return;
@@ -427,27 +434,20 @@ async function moveGoal(rowId, offset) {
     }
 
     const currentGoal = state.goals[currentIndex];
-    const targetGoal = state.goals[targetIndex];
-    const currentOrder = Number(currentGoal.sortOrder || currentIndex);
-    const targetOrder = Number(targetGoal.sortOrder || targetIndex);
-
-    currentGoal.sortOrder = targetOrder;
-    targetGoal.sortOrder = currentOrder;
-    sortGoals();
+    state.goals.splice(currentIndex, 1);
+    state.goals.splice(targetIndex, 0, currentGoal);
+    resequenceGoals();
     render();
     setSaveMessage("Saving order...", "saving");
-    await Promise.all([
-      directoryApi.updatePerformanceScorecardDefinition({
-        entityType: "goals",
-        id: currentGoal.id,
-        patch: { sort_order: currentGoal.sortOrder },
-      }),
-      directoryApi.updatePerformanceScorecardDefinition({
-        entityType: "goals",
-        id: targetGoal.id,
-        patch: { sort_order: targetGoal.sortOrder },
-      }),
-    ]);
+    await Promise.all(
+      state.goals.map((goal) =>
+        directoryApi.updatePerformanceScorecardDefinition({
+          entityType: "goals",
+          id: goal.id,
+          patch: { sort_order: goal.sortOrder },
+        })
+      )
+    );
     setSaveMessage("Order saved.", "saved");
   } catch (error) {
     console.error("[scorecard-goals] Failed to move goal", error);

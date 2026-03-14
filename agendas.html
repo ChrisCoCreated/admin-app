@@ -38,10 +38,13 @@
             <h2>Quick Create</h2>
             <p class="muted">Create the regular 1:1s instantly, or build a shared huddle agenda.</p>
           </div>
-          <p id="statusMessage" class="muted">Loading agendas...</p>
+          <div class="agenda-create-actions">
+            <button id="toggleCreatePanelBtn" class="secondary" type="button" aria-expanded="false">New meeting agenda</button>
+            <p id="statusMessage" class="muted">Loading agendas...</p>
+          </div>
         </div>
         <div id="quickAgendaButtons" class="agenda-quick-grid"></div>
-        <form id="agendaCreateForm" class="agenda-create-form">
+        <form id="agendaCreateForm" class="agenda-create-form" hidden>
           <label class="field" for="agendaTitleInput">
             Agenda title
             <input id="agendaTitleInput" type="text" placeholder="Weekly huddle" />

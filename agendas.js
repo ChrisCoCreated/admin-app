@@ -17,6 +17,7 @@ const statusMessage = document.getElementById("statusMessage");
 const actionStatus = document.getElementById("actionStatus");
 const refreshBtn = document.getElementById("refreshBtn");
 const quickAgendaButtons = document.getElementById("quickAgendaButtons");
+const toggleCreatePanelBtn = document.getElementById("toggleCreatePanelBtn");
 const agendaPeoplePicker = document.getElementById("agendaPeoplePicker");
 const agendaCreateForm = document.getElementById("agendaCreateForm");
 const agendaTitleInput = document.getElementById("agendaTitleInput");
@@ -62,6 +63,7 @@ let selectedAgendaId = "";
 let selectedItemId = "";
 let busy = false;
 let dragItemId = "";
+let createPanelExpanded = false;
 
 function setBusy(value) {
   busy = value;
@@ -73,6 +75,15 @@ function setBusy(value) {
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
+}
+
+function setCreatePanelExpanded(value) {
+  createPanelExpanded = value === true;
+  agendaCreateForm.hidden = !createPanelExpanded;
+  if (toggleCreatePanelBtn) {
+    toggleCreatePanelBtn.textContent = createPanelExpanded ? "Minimise" : "New meeting agenda";
+    toggleCreatePanelBtn.setAttribute("aria-expanded", createPanelExpanded ? "true" : "false");
+  }
 }
 
 function setActionStatus(message, isError = false) {
@@ -144,6 +155,7 @@ function renderQuickCreate() {
           participantNames: [person.name],
           isPrivate: false,
         });
+        setCreatePanelExpanded(false);
         await loadAgendas(`1:1 with ${person.name} created.`);
       } catch (error) {
         console.error(error);
@@ -162,9 +174,13 @@ function renderPeoplePicker() {
     const label = document.createElement("label");
     label.className = "agenda-person-option";
     label.innerHTML = `
-      <input type="checkbox" value="${escapeHtml(person.email)}" />
-      <span>${escapeHtml(person.name)}</span>
-      <small>${escapeHtml(person.email)}</small>
+      <span class="agenda-person-check">
+        <input type="checkbox" value="${escapeHtml(person.email)}" />
+      </span>
+      <span class="agenda-person-copy">
+        <strong>${escapeHtml(person.name)}</strong>
+        <small>${escapeHtml(person.email)}</small>
+      </span>
     `;
     agendaPeoplePicker.appendChild(label);
   });
@@ -269,7 +285,34 @@ function renderAgendaItems(agenda) {
   agendaItemsList.innerHTML = "";
   agendaItemsEmpty.hidden = items.length > 0;
 
-  items.forEach((item) => {
+  function buildDropZone(insertIndex) {
+    const zone = document.createElement("div");
+    zone.className = "agenda-drop-zone";
+    zone.setAttribute("aria-hidden", "true");
+    zone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      zone.classList.add("is-active");
+    });
+    zone.addEventListener("dragleave", () => {
+      zone.classList.remove("is-active");
+    });
+    zone.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      zone.classList.remove("is-active");
+      if (!dragItemId) {
+        return;
+      }
+      await reorderItemToIndex(agenda, dragItemId, insertIndex);
+      dragItemId = "";
+    });
+    return zone;
+  }
+
+  if (items.length) {
+    agendaItemsList.appendChild(buildDropZone(0));
+  }
+
+  items.forEach((item, index) => {
     const card = document.createElement("article");
     card.className = "agenda-item-card";
     card.draggable = true;
@@ -299,25 +342,15 @@ function renderAgendaItems(agenda) {
     });
     card.addEventListener("dragstart", () => {
       dragItemId = item.id;
+      card.classList.add("is-dragging");
     });
-    card.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      card.classList.add("is-drop-target");
-    });
-    card.addEventListener("dragleave", () => {
-      card.classList.remove("is-drop-target");
-    });
-    card.addEventListener("drop", async (event) => {
-      event.preventDefault();
-      card.classList.remove("is-drop-target");
-      if (!dragItemId || dragItemId === item.id) {
-        return;
-      }
-      await reorderItem(agenda, dragItemId, item.id);
+    card.addEventListener("dragend", () => {
       dragItemId = "";
+      card.classList.remove("is-dragging");
     });
 
     agendaItemsList.appendChild(card);
+    agendaItemsList.appendChild(buildDropZone(index + 1));
   });
 }
 
@@ -366,22 +399,29 @@ function editorCommand(command, value = null) {
   document.execCommand(command, false, value);
 }
 
-async function reorderItem(agenda, sourceItemId, targetItemId) {
+async function reorderItemToIndex(agenda, sourceItemId, insertIndex) {
   const items = filteredItems(agenda);
-  const remaining = items.filter((item) => item.id !== sourceItemId);
-  const targetIndex = remaining.findIndex((item) => item.id === targetItemId);
-  if (targetIndex === -1) {
+  const sourceIndex = items.findIndex((item) => item.id === sourceItemId);
+  if (sourceIndex === -1) {
     return;
   }
-  const previous = remaining[targetIndex - 1] || null;
-  const next = remaining[targetIndex] || null;
+  const remaining = items.filter((item) => item.id !== sourceItemId);
+  const normalizedInsertIndex = Math.max(0, Math.min(insertIndex, remaining.length));
+  if (normalizedInsertIndex === sourceIndex || normalizedInsertIndex === sourceIndex + 1) {
+    return;
+  }
+
+  const previous = remaining[normalizedInsertIndex - 1] || null;
+  const next = remaining[normalizedInsertIndex] || null;
   let sortOrder = 0;
-  if (!previous && next) {
-    sortOrder = Number(next.sortOrder || 0) - 1;
+  if (!previous && !next) {
+    sortOrder = 100;
+  } else if (!previous && next) {
+    sortOrder = Number(next.sortOrder || 0) - 100;
   } else if (previous && next) {
     sortOrder = (Number(previous.sortOrder || 0) + Number(next.sortOrder || 0)) / 2;
   } else if (previous) {
-    sortOrder = Number(previous.sortOrder || 0) + 1;
+    sortOrder = Number(previous.sortOrder || 0) + 100;
   }
 
   try {
@@ -412,6 +452,7 @@ async function init() {
     renderTopNavigation({ role });
     renderQuickCreate();
     renderPeoplePicker();
+    setCreatePanelExpanded(false);
     await loadAgendas();
   } catch (error) {
     console.error(error);
@@ -440,6 +481,7 @@ agendaCreateForm?.addEventListener("submit", async (event) => {
       isPrivate: agendaPrivateInput.checked,
     });
     agendaCreateForm.reset();
+    setCreatePanelExpanded(false);
     await loadAgendas("Agenda created.");
   } catch (error) {
     console.error(error);
@@ -542,6 +584,10 @@ insertLinkBtn?.addEventListener("click", () => {
   if (url) {
     editorCommand("createLink", url);
   }
+});
+
+toggleCreatePanelBtn?.addEventListener("click", () => {
+  setCreatePanelExpanded(!createPanelExpanded);
 });
 
 refreshBtn?.addEventListener("click", async () => {

@@ -115,6 +115,13 @@ function sortItems(entityType) {
   });
 }
 
+function resequenceItems(entityType) {
+  state[entityType] = state[entityType].map((item, index) => ({
+    ...item,
+    sortOrder: index + 1,
+  }));
+}
+
 function itemPatchField(field) {
   if (field === "title") {
     return "title";
@@ -453,26 +460,21 @@ async function moveDefinition(entityType, rowId, offset) {
 
     const currentItem = list[currentIndex];
     const targetItem = list[targetIndex];
-    const currentOrder = Number(currentItem.sortOrder || currentIndex);
-    const targetOrder = Number(targetItem.sortOrder || targetIndex);
-
-    currentItem.sortOrder = targetOrder;
-    targetItem.sortOrder = currentOrder;
-    sortItems(entityType);
+    list.splice(currentIndex, 1);
+    list.splice(targetIndex, 0, currentItem);
+    state[entityType] = list;
+    resequenceItems(entityType);
     renderEntity(entityType);
     setSaveMessage("Saving order...", "saving");
-    await Promise.all([
-      directoryApi.updatePerformanceScorecardDefinition({
-        entityType,
-        id: currentItem.id,
-        patch: { sort_order: currentItem.sortOrder },
-      }),
-      directoryApi.updatePerformanceScorecardDefinition({
-        entityType,
-        id: targetItem.id,
-        patch: { sort_order: targetItem.sortOrder },
-      }),
-    ]);
+    await Promise.all(
+      state[entityType].map((item) =>
+        directoryApi.updatePerformanceScorecardDefinition({
+          entityType,
+          id: item.id,
+          patch: { sort_order: item.sortOrder },
+        })
+      )
+    );
     setSaveMessage("Order saved.", "saved");
   } catch (error) {
     console.error("[scorecard-definitions] Failed to move definition", error);
