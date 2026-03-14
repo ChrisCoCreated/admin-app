@@ -2507,6 +2507,14 @@ body.lightbox-open {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
+.timesheet-manual-contract {
+  margin-top: 14px;
+  border: 1px dashed #c9d8f3;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #f8fbff;
+}
+
 .timesheet-summary-card {
   border: 1px solid #d8e0ee;
   border-radius: 14px;
@@ -2535,6 +2543,25 @@ body.lightbox-open {
 
 .timesheet-detail-body {
   margin-top: 14px;
+}
+
+.timesheet-raw-panel {
+  margin-top: 14px;
+  border: 1px solid #d8e0ee;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: #fbfcff;
+}
+
+.timesheet-raw-output {
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #0f172a;
+  color: #e8eefc;
+  overflow: auto;
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 .timesheet-total-row td {

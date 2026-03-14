@@ -91,6 +91,7 @@
             <h2>Summary</h2>
             <p id="summaryMessage" class="muted"></p>
           </div>
+          <button id="addToReportBtn" class="secondary" type="button" disabled>Add to report</button>
         </div>
         <div class="timesheet-summary-grid">
           <article class="timesheet-summary-card">
@@ -109,6 +110,40 @@
             <h3>Actualisation</h3>
             <p id="summaryClients" class="timesheet-summary-value">0</p>
           </article>
+        </div>
+        <div id="manualContractPanel" class="timesheet-manual-contract" hidden>
+          <label class="field" for="manualContractHoursInput">
+            Contracted hours for this period
+            <input id="manualContractHoursInput" type="number" min="0" step="0.25" placeholder="e.g. 40" />
+          </label>
+          <p class="muted">No contracted hours were found for this carer, so you can enter the period total manually.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Report rows</h2>
+            <p class="muted">Saved locally in this browser so you can build up a report table.</p>
+          </div>
+          <button id="clearReportBtn" class="secondary" type="button" disabled>Clear report</button>
+        </div>
+        <p id="reportStatus" class="muted">No report rows saved yet.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Carer</th>
+                <th>Range</th>
+                <th>Scheduled</th>
+                <th>Actual</th>
+                <th>Contracted</th>
+                <th>Actualisation</th>
+                <th>Saved</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
         </div>
       </section>
 
@@ -149,6 +184,15 @@
                   </tr>
                 </tfoot>
               </table>
+            </div>
+            <div id="timesheetRawPanel" class="timesheet-raw-panel" hidden>
+              <div class="panel-head">
+                <div>
+                  <h3>Raw timesheet object</h3>
+                  <p class="muted">Click any detail row to inspect the original response payload.</p>
+                </div>
+              </div>
+              <pre id="timesheetRawOutput" class="timesheet-raw-output"></pre>
             </div>
           </div>
         </details>

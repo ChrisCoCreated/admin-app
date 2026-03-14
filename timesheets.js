@@ -17,13 +17,21 @@ const selectedRangeMessage = document.getElementById("selectedRangeMessage");
 const statusMessage = document.getElementById("statusMessage");
 const summaryPanel = document.getElementById("summaryPanel");
 const summaryMessage = document.getElementById("summaryMessage");
+const addToReportBtn = document.getElementById("addToReportBtn");
 const summaryTotalRows = document.getElementById("summaryTotalRows");
 const summaryConfirmed = document.getElementById("summaryConfirmed");
 const summaryUnconfirmed = document.getElementById("summaryUnconfirmed");
 const summaryClients = document.getElementById("summaryClients");
+const manualContractPanel = document.getElementById("manualContractPanel");
+const manualContractHoursInput = document.getElementById("manualContractHoursInput");
+const clearReportBtn = document.getElementById("clearReportBtn");
+const reportStatus = document.getElementById("reportStatus");
+const reportTableBody = document.getElementById("reportTableBody");
 const timesheetsTableBody = document.getElementById("timesheetsTableBody");
 const timesheetsTableFoot = document.getElementById("timesheetsTableFoot");
 const timesheetDetailsPanel = document.getElementById("timesheetDetailsPanel");
+const timesheetRawPanel = document.getElementById("timesheetRawPanel");
+const timesheetRawOutput = document.getElementById("timesheetRawOutput");
 const totalsScheduledCell = document.getElementById("totalsScheduledCell");
 const totalsActualCell = document.getElementById("totalsActualCell");
 const totalsVarianceCell = document.getElementById("totalsVarianceCell");
@@ -36,10 +44,13 @@ const authController = createAuthController({
   clientId: FRONTEND_CONFIG.spaClientId,
 });
 const directoryApi = createDirectoryApi(authController);
+const SAVED_REPORT_KEY = "thrive.timesheets.report.v1";
 
 let allCarers = [];
 let filteredCarers = [];
 let selectedPreset = "yesterday";
+let savedReportRows = [];
+let lastSummaryRecord = null;
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -204,6 +215,14 @@ function formatPercentage(value) {
   return `${numeric.toFixed(1)}%`;
 }
 
+function formatHoursValue(hours) {
+  const numeric = Number(hours);
+  if (!Number.isFinite(numeric)) {
+    return "0.00";
+  }
+  return numeric.toFixed(2);
+}
+
 function getActualisationPercent(actualMinutes, scheduledMinutes) {
   if (!scheduledMinutes) {
     return 0;
@@ -263,6 +282,14 @@ function getContractedMinutesForPeriod(carer, appliedQuery) {
   return (weeklyHours * 60 * getInclusiveDayCount(range.start, range.finish)) / 7;
 }
 
+function getRangeLabel(appliedQuery) {
+  return appliedQuery.date
+    ? formatReadableDate(new Date(`${appliedQuery.date}T00:00:00`))
+    : `${formatReadableDate(new Date(`${appliedQuery.datestart}T00:00:00`))} to ${formatReadableDate(
+        new Date(`${appliedQuery.datefinish}T00:00:00`)
+      )}`;
+}
+
 function enrichTimesheet(item) {
   const scheduledMinutes = getDurationMinutesFromClockTimes(item.dueIn, item.dueOut);
   const actualMinutes = getDurationMinutesFromDateTimes(item.logIn, item.logOut);
@@ -281,6 +308,78 @@ function getCarerLabel(carer) {
   const id = String(carer?.id || "").trim();
   const area = String(carer?.area || "").trim();
   return [name, id ? `#${id}` : "", area].filter(Boolean).join(" - ");
+}
+
+function updateReportStatus() {
+  if (!reportStatus || !clearReportBtn) {
+    return;
+  }
+  const count = savedReportRows.length;
+  reportStatus.textContent = count === 0 ? "No report rows saved yet." : `${count} report row(s) saved locally.`;
+  clearReportBtn.disabled = count === 0;
+}
+
+function renderReportTable() {
+  if (!reportTableBody) {
+    return;
+  }
+  reportTableBody.innerHTML = "";
+
+  if (!savedReportRows.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="7" class="muted">No saved report rows.</td>';
+    reportTableBody.appendChild(tr);
+    updateReportStatus();
+    return;
+  }
+
+  for (const row of savedReportRows) {
+    const savedAt = new Date(row.savedAt);
+    const savedText = Number.isNaN(savedAt.getTime()) ? String(row.savedAt || "") : savedAt.toLocaleString("en-GB");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(row.carerName || "-")}</td>
+      <td>${escapeHtml(row.rangeLabel || "-")}</td>
+      <td>${escapeHtml(row.scheduledHours || "0.00")}h</td>
+      <td>${escapeHtml(row.actualHours || "0.00")}h</td>
+      <td>${escapeHtml(row.contractedHours || "0.00")}h</td>
+      <td>${escapeHtml(row.actualisation || "0.0%")}</td>
+      <td>${escapeHtml(savedText)}</td>
+    `;
+    reportTableBody.appendChild(tr);
+  }
+
+  updateReportStatus();
+}
+
+function loadSavedReportRows() {
+  try {
+    const raw = localStorage.getItem(SAVED_REPORT_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    savedReportRows = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    savedReportRows = [];
+  }
+  renderReportTable();
+}
+
+function persistSavedReportRows() {
+  try {
+    localStorage.setItem(SAVED_REPORT_KEY, JSON.stringify(savedReportRows));
+    renderReportTable();
+  } catch {
+    setStatus("Could not save report rows locally.", true);
+  }
+}
+
+function updateManualContractState(contractedMinutes) {
+  const needsManual = !(Number.isFinite(contractedMinutes) && contractedMinutes > 0);
+  if (manualContractPanel) {
+    manualContractPanel.hidden = !needsManual;
+  }
+  if (manualContractHoursInput && !needsManual) {
+    manualContractHoursInput.value = "";
+  }
 }
 
 function renderCarerOptions() {
@@ -417,18 +516,26 @@ function renderSummary(timesheets, selectedCarer, appliedQuery) {
   const actualMinutes = timesheets.reduce((sum, item) => sum + item.actualMinutes, 0);
   const contractedMinutes = getContractedMinutesForPeriod(selectedCarer, appliedQuery);
   const actualisationPercent = getActualisationPercent(actualMinutes, scheduledMinutes);
-
-  const rangeText = appliedQuery.date
-    ? formatReadableDate(new Date(`${appliedQuery.date}T00:00:00`))
-    : `${formatReadableDate(new Date(`${appliedQuery.datestart}T00:00:00`))} to ${formatReadableDate(
-        new Date(`${appliedQuery.datefinish}T00:00:00`)
-      )}`;
+  const rangeText = getRangeLabel(appliedQuery);
 
   summaryTotalRows.textContent = formatDuration(scheduledMinutes);
   summaryConfirmed.textContent = formatDuration(actualMinutes);
   summaryUnconfirmed.textContent = formatDuration(contractedMinutes);
   summaryClients.textContent = formatPercentage(actualisationPercent);
   summaryMessage.textContent = `${selectedCarer?.name || "Selected carer"} for ${rangeText}. ${timesheets.length} row(s), ${uniqueClients.size} client(s), ${confirmedCount} confirmed.`;
+  updateManualContractState(contractedMinutes);
+  lastSummaryRecord = {
+    carerId: String(selectedCarer?.id || ""),
+    carerName: String(selectedCarer?.name || ""),
+    rangeLabel: rangeText,
+    scheduledMinutes,
+    actualMinutes,
+    contractedMinutes,
+    actualisationPercent,
+  };
+  if (addToReportBtn) {
+    addToReportBtn.disabled = false;
+  }
   summaryPanel.hidden = false;
 }
 
@@ -437,12 +544,25 @@ function renderTimesheets(timesheets) {
   if (timesheetsTableFoot) {
     timesheetsTableFoot.hidden = true;
   }
+  if (timesheetRawPanel) {
+    timesheetRawPanel.hidden = true;
+  }
+  if (timesheetRawOutput) {
+    timesheetRawOutput.textContent = "";
+  }
 
   if (!timesheets.length) {
     emptyState.textContent = "No timesheets were returned for that selection.";
     if (timesheetDetailsPanel) {
       timesheetDetailsPanel.open = false;
     }
+    if (addToReportBtn) {
+      addToReportBtn.disabled = true;
+    }
+    if (manualContractPanel) {
+      manualContractPanel.hidden = true;
+    }
+    lastSummaryRecord = null;
     summaryPanel.hidden = true;
     return;
   }
@@ -469,6 +589,17 @@ function renderTimesheets(timesheets) {
       <td>${escapeHtml(formatPercentage(item.actualisationPercent))}</td>
       <td>${item.timeConfirmed ? "Yes" : "No"}</td>
     `;
+    tr.addEventListener("click", () => {
+      if (timesheetRawOutput) {
+        timesheetRawOutput.textContent = JSON.stringify(item.raw || item, null, 2);
+      }
+      if (timesheetRawPanel) {
+        timesheetRawPanel.hidden = false;
+      }
+      if (timesheetDetailsPanel) {
+        timesheetDetailsPanel.open = true;
+      }
+    });
     timesheetsTableBody.appendChild(tr);
   }
 
@@ -492,6 +623,38 @@ function renderTimesheets(timesheets) {
   }
 }
 
+function addCurrentSummaryToReport() {
+  if (!lastSummaryRecord) {
+    setStatus("Fetch a summary before adding it to the report.", true);
+    return;
+  }
+
+  let contractedMinutes = Number(lastSummaryRecord.contractedMinutes || 0);
+  if (!(contractedMinutes > 0)) {
+    const manualHours = Number(manualContractHoursInput?.value || 0);
+    if (!Number.isFinite(manualHours) || manualHours <= 0) {
+      setStatus("Enter manual contracted hours for this period before adding to the report.", true);
+      return;
+    }
+    contractedMinutes = manualHours * 60;
+  }
+
+  const record = {
+    carerId: lastSummaryRecord.carerId,
+    carerName: lastSummaryRecord.carerName,
+    rangeLabel: lastSummaryRecord.rangeLabel,
+    scheduledHours: formatHoursValue(lastSummaryRecord.scheduledMinutes / 60),
+    actualHours: formatHoursValue(lastSummaryRecord.actualMinutes / 60),
+    contractedHours: formatHoursValue(contractedMinutes / 60),
+    actualisation: formatPercentage(lastSummaryRecord.actualisationPercent),
+    savedAt: new Date().toISOString(),
+  };
+
+  savedReportRows.push(record);
+  persistSavedReportRows();
+  setStatus(`Added ${record.carerName || "summary"} to the local report.`);
+}
+
 async function fetchTimesheets() {
   const selectedCarer = getSelectedCarer();
   if (!selectedCarer) {
@@ -501,6 +664,9 @@ async function fetchTimesheets() {
 
   try {
     fetchTimesheetsBtn.disabled = true;
+    if (addToReportBtn) {
+      addToReportBtn.disabled = true;
+    }
     const query = getRequestQuery();
     console.log("[Timesheets] Selected carer object", selectedCarer);
     setStatus(`Loading timesheets for ${selectedCarer.name || "selected carer"}...`);
@@ -522,6 +688,13 @@ async function fetchTimesheets() {
     console.error(error);
     timesheetsTableBody.innerHTML = "";
     summaryPanel.hidden = true;
+    lastSummaryRecord = null;
+    if (addToReportBtn) {
+      addToReportBtn.disabled = true;
+    }
+    if (manualContractPanel) {
+      manualContractPanel.hidden = true;
+    }
     if (timesheetDetailsPanel) {
       timesheetDetailsPanel.open = false;
     }
@@ -552,6 +725,7 @@ async function init() {
 
     const carersPayload = await directoryApi.listCarers({ limit: 500 });
     allCarers = Array.isArray(carersPayload?.carers) ? carersPayload.carers : [];
+    loadSavedReportRows();
     renderCarerOptions();
     setStatus(`Loaded ${allCarers.length} carer(s). Choose one to begin.`);
   } catch (error) {
@@ -567,6 +741,12 @@ dateStartInput?.addEventListener("change", updateRangeMessage);
 dateFinishInput?.addEventListener("change", updateRangeMessage);
 fetchTimesheetsBtn?.addEventListener("click", () => {
   void fetchTimesheets();
+});
+addToReportBtn?.addEventListener("click", addCurrentSummaryToReport);
+clearReportBtn?.addEventListener("click", () => {
+  savedReportRows = [];
+  persistSavedReportRows();
+  setStatus("Cleared the local report.");
 });
 
 for (const button of presetButtons) {
