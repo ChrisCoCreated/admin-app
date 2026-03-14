@@ -2527,6 +2527,12 @@ body.lightbox-open {
   color: #183153;
 }
 
+.timesheet-total-row td {
+  font-weight: 800;
+  background: #f4f8ff;
+  border-top: 2px solid #c9d8f3;
+}
+
 @media (max-width: 900px) {
   .clients-grid {
     grid-template-columns: 1fr;

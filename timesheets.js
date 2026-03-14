@@ -22,6 +22,12 @@ const summaryConfirmed = document.getElementById("summaryConfirmed");
 const summaryUnconfirmed = document.getElementById("summaryUnconfirmed");
 const summaryClients = document.getElementById("summaryClients");
 const timesheetsTableBody = document.getElementById("timesheetsTableBody");
+const timesheetsTableFoot = document.getElementById("timesheetsTableFoot");
+const totalsScheduledCell = document.getElementById("totalsScheduledCell");
+const totalsActualCell = document.getElementById("totalsActualCell");
+const totalsVarianceCell = document.getElementById("totalsVarianceCell");
+const totalsActualisationCell = document.getElementById("totalsActualisationCell");
+const totalsConfirmedCell = document.getElementById("totalsConfirmedCell");
 const emptyState = document.getElementById("emptyState");
 
 const authController = createAuthController({
@@ -129,11 +135,136 @@ function formatDateTime(value) {
   });
 }
 
-function getCarerLabel(carer) {
-  const name = String(carer?.name || "Unnamed carer").trim();
-  const id = String(carer?.id || "").trim();
-  const area = String(carer?.area || "").trim();
-  return [name, id ? `#${id}` : "", area].filter(Boolean).join(" - ");
+function parseDateValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+  const parsed = new Date(raw.includes("T") ? raw : `${raw}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseTimeToMinutes(value) {
+  const raw = String(value || "").trim();
+  const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(raw);
+  if (!match) {
+    return null;
+  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+  return hours * 60 + minutes;
+}
+
+function getDurationMinutesFromClockTimes(startValue, endValue) {
+  const start = parseTimeToMinutes(startValue);
+  const end = parseTimeToMinutes(endValue);
+  if (start === null || end === null) {
+    return 0;
+  }
+  const diff = end - start;
+  return diff >= 0 ? diff : 0;
+}
+
+function getDurationMinutesFromDateTimes(startValue, endValue) {
+  const start = parseDateValue(startValue);
+  const end = parseDateValue(endValue);
+  if (!start || !end) {
+    return 0;
+  }
+  const diff = Math.round((end.getTime() - start.getTime()) / 60_000);
+  return diff >= 0 ? diff : 0;
+}
+
+function formatDuration(minutes) {
+  const totalMinutes = Math.max(0, Math.round(Number(minutes) || 0));
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  return `${hours}h ${String(remainingMinutes).padStart(2, "0")}m`;
+}
+
+function formatVariance(minutes) {
+  const numeric = Math.round(Number(minutes) || 0);
+  if (numeric === 0) {
+    return "0h 00m";
+  }
+  const sign = numeric > 0 ? "+" : "-";
+  return `${sign}${formatDuration(Math.abs(numeric))}`;
+}
+
+function formatPercentage(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "-";
+  }
+  return `${numeric.toFixed(1)}%`;
+}
+
+function getActualisationPercent(actualMinutes, scheduledMinutes) {
+  if (!scheduledMinutes) {
+    return 0;
+  }
+  return (actualMinutes / scheduledMinutes) * 100;
+}
+
+function getAppliedRange(appliedQuery) {
+  if (appliedQuery?.date) {
+    const date = parseDateValue(appliedQuery.date);
+    return date ? { start: date, finish: date } : null;
+  }
+  const start = parseDateValue(appliedQuery?.datestart);
+  const finish = parseDateValue(appliedQuery?.datefinish);
+  if (!start || !finish) {
+    return null;
+  }
+  return { start, finish };
+}
+
+function getContractedMinutesForPeriod(carer, appliedQuery) {
+  const range = getAppliedRange(appliedQuery);
+  if (!range) {
+    return 0;
+  }
+
+  const contracted = carer?.raw?.contracted_hrs || carer?.raw?.contracted_hours || null;
+  const weekdayMinutes = {
+    0: Number(contracted?.sunday || 0) * 60,
+    1: Number(contracted?.monday || 0) * 60,
+    2: Number(contracted?.tuesday || 0) * 60,
+    3: Number(contracted?.wednesday || 0) * 60,
+    4: Number(contracted?.thursday || 0) * 60,
+    5: Number(contracted?.friday || 0) * 60,
+    6: Number(contracted?.saturday || 0) * 60,
+  };
+
+  if (Object.values(weekdayMinutes).some((value) => Number.isFinite(value) && value > 0)) {
+    let total = 0;
+    for (let cursor = new Date(range.start); cursor.getTime() <= range.finish.getTime(); cursor = addDays(cursor, 1)) {
+      total += Number(weekdayMinutes[cursor.getDay()] || 0);
+    }
+    return total;
+  }
+
+  const weeklyHours = Number(carer?.contractedHours || 0);
+  if (!Number.isFinite(weeklyHours) || weeklyHours <= 0) {
+    return 0;
+  }
+  return (weeklyHours * 60 * getInclusiveDayCount(range.start, range.finish)) / 7;
+}
+
+function enrichTimesheet(item) {
+  const scheduledMinutes = getDurationMinutesFromClockTimes(item.dueIn, item.dueOut);
+  const actualMinutes = getDurationMinutesFromDateTimes(item.logIn, item.logOut);
+  const varianceMinutes = actualMinutes - scheduledMinutes;
+  return {
+    ...item,
+    scheduledMinutes,
+    actualMinutes,
+    varianceMinutes,
+    actualisationPercent: getActualisationPercent(actualMinutes, scheduledMinutes),
+  };
 }
 
 function renderCarerOptions() {
@@ -266,6 +397,10 @@ function renderSummary(timesheets, selectedCarer, appliedQuery) {
   const uniqueClients = new Set(
     timesheets.map((item) => String(item.clientId || item.clientName || "").trim()).filter(Boolean)
   );
+  const scheduledMinutes = timesheets.reduce((sum, item) => sum + item.scheduledMinutes, 0);
+  const actualMinutes = timesheets.reduce((sum, item) => sum + item.actualMinutes, 0);
+  const contractedMinutes = getContractedMinutesForPeriod(selectedCarer, appliedQuery);
+  const actualisationPercent = getActualisationPercent(actualMinutes, scheduledMinutes);
 
   const rangeText = appliedQuery.date
     ? formatReadableDate(new Date(`${appliedQuery.date}T00:00:00`))
@@ -273,16 +408,19 @@ function renderSummary(timesheets, selectedCarer, appliedQuery) {
         new Date(`${appliedQuery.datefinish}T00:00:00`)
       )}`;
 
-  summaryTotalRows.textContent = String(timesheets.length);
-  summaryConfirmed.textContent = String(confirmedCount);
-  summaryUnconfirmed.textContent = String(timesheets.length - confirmedCount);
-  summaryClients.textContent = String(uniqueClients.size);
-  summaryMessage.textContent = `${selectedCarer?.name || "Selected carer"} for ${rangeText}`;
+  summaryTotalRows.textContent = formatDuration(scheduledMinutes);
+  summaryConfirmed.textContent = formatDuration(actualMinutes);
+  summaryUnconfirmed.textContent = formatDuration(contractedMinutes);
+  summaryClients.textContent = formatPercentage(actualisationPercent);
+  summaryMessage.textContent = `${selectedCarer?.name || "Selected carer"} for ${rangeText}. ${timesheets.length} row(s), ${uniqueClients.size} client(s), ${confirmedCount} confirmed.`;
   summaryPanel.hidden = false;
 }
 
 function renderTimesheets(timesheets) {
   timesheetsTableBody.innerHTML = "";
+  if (timesheetsTableFoot) {
+    timesheetsTableFoot.hidden = true;
+  }
 
   if (!timesheets.length) {
     emptyState.textContent = "No timesheets were returned for that selection.";
@@ -291,6 +429,10 @@ function renderTimesheets(timesheets) {
   }
 
   emptyState.textContent = "";
+  const scheduledTotal = timesheets.reduce((sum, item) => sum + item.scheduledMinutes, 0);
+  const actualTotal = timesheets.reduce((sum, item) => sum + item.actualMinutes, 0);
+  const varianceTotal = actualTotal - scheduledTotal;
+  const confirmedCount = timesheets.filter((item) => item.timeConfirmed).length;
 
   for (const item of timesheets) {
     const tr = document.createElement("tr");
@@ -299,13 +441,32 @@ function renderTimesheets(timesheets) {
       <td>${escapeHtml(item.carerName || "-")}</td>
       <td>${escapeHtml(item.clientName || "-")}</td>
       <td>${escapeHtml(item.jobType || "-")}</td>
-      <td>${escapeHtml(item.dueIn || "-")}</td>
-      <td>${escapeHtml(item.dueOut || "-")}</td>
-      <td>${escapeHtml(formatDateTime(item.logIn))}</td>
-      <td>${escapeHtml(formatDateTime(item.logOut))}</td>
+      <td>${escapeHtml(formatDuration(item.scheduledMinutes))}</td>
+      <td>${escapeHtml(formatDuration(item.actualMinutes))}</td>
+      <td>${escapeHtml(formatVariance(item.varianceMinutes))}</td>
+      <td>${escapeHtml(formatPercentage(item.actualisationPercent))}</td>
       <td>${item.timeConfirmed ? "Yes" : "No"}</td>
     `;
     timesheetsTableBody.appendChild(tr);
+  }
+
+  if (timesheetsTableFoot) {
+    timesheetsTableFoot.hidden = false;
+  }
+  if (totalsScheduledCell) {
+    totalsScheduledCell.textContent = formatDuration(scheduledTotal);
+  }
+  if (totalsActualCell) {
+    totalsActualCell.textContent = formatDuration(actualTotal);
+  }
+  if (totalsVarianceCell) {
+    totalsVarianceCell.textContent = formatVariance(varianceTotal);
+  }
+  if (totalsActualisationCell) {
+    totalsActualisationCell.textContent = formatPercentage(getActualisationPercent(actualTotal, scheduledTotal));
+  }
+  if (totalsConfirmedCell) {
+    totalsConfirmedCell.textContent = `${confirmedCount}/${timesheets.length}`;
   }
 }
 
@@ -325,7 +486,7 @@ async function fetchTimesheets() {
       ...query,
       per_page: 200,
     });
-    const timesheets = Array.isArray(payload?.timesheets) ? payload.timesheets : [];
+    const timesheets = Array.isArray(payload?.timesheets) ? payload.timesheets.map(enrichTimesheet) : [];
 
     renderTimesheets(timesheets);
     if (timesheets.length) {

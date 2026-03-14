@@ -94,19 +94,19 @@
         </div>
         <div class="timesheet-summary-grid">
           <article class="timesheet-summary-card">
-            <h3>Total rows</h3>
+            <h3>Scheduled</h3>
             <p id="summaryTotalRows" class="timesheet-summary-value">0</p>
           </article>
           <article class="timesheet-summary-card">
-            <h3>Confirmed</h3>
+            <h3>Actual</h3>
             <p id="summaryConfirmed" class="timesheet-summary-value">0</p>
           </article>
           <article class="timesheet-summary-card">
-            <h3>Unconfirmed</h3>
+            <h3>Contracted</h3>
             <p id="summaryUnconfirmed" class="timesheet-summary-value">0</p>
           </article>
           <article class="timesheet-summary-card">
-            <h3>Clients</h3>
+            <h3>Actualisation</h3>
             <p id="summaryClients" class="timesheet-summary-value">0</p>
           </article>
         </div>
@@ -127,14 +127,24 @@
                 <th>Carer</th>
                 <th>Client</th>
                 <th>Job Type</th>
-                <th>Due In</th>
-                <th>Due Out</th>
-                <th>Log In</th>
-                <th>Log Out</th>
+                <th>Scheduled</th>
+                <th>Actual</th>
+                <th>Variance</th>
+                <th>Actualisation</th>
                 <th>Confirmed</th>
               </tr>
             </thead>
             <tbody id="timesheetsTableBody"></tbody>
+            <tfoot id="timesheetsTableFoot" hidden>
+              <tr class="timesheet-total-row">
+                <td colspan="4">Totals</td>
+                <td id="totalsScheduledCell">0h 00m</td>
+                <td id="totalsActualCell">0h 00m</td>
+                <td id="totalsVarianceCell">0h 00m</td>
+                <td id="totalsActualisationCell">0%</td>
+                <td id="totalsConfirmedCell">0/0</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <p id="emptyState" class="muted">Choose a carer and fetch a range to see timesheets.</p>
