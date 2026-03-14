@@ -75,6 +75,9 @@ let agendaItemComposerExpanded = false;
 let itemSearchExpanded = false;
 let itemDetailsExpanded = false;
 let creatingTaskItemId = "";
+let completingTaskKey = "";
+let taskComposerItemId = "";
+const taskDraftsByItemId = new Map();
 const loadingAgendaDetails = new Set();
 
 function setBusy(value) {
@@ -236,15 +239,72 @@ function filteredItems(agenda) {
   });
 }
 
+function agendaTasksForItem(item) {
+  return Array.isArray(item?.taskMaps) ? item.taskMaps : [];
+}
+
 function hasLinkedTask(item) {
-  return Boolean(item?.taskMap?.provider && item?.taskMap?.externalTaskId);
+  return agendaTasksForItem(item).length > 0;
+}
+
+function taskLinkKey(task) {
+  return `${String(task?.provider || "").trim().toLowerCase()}|${String(task?.externalTaskId || "").trim()}`;
+}
+
+function formatTaskDueDate(value) {
+  if (!value) {
+    return "No due date";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+  return parsed.toLocaleDateString();
+}
+
+function taskDraftForItem(item) {
+  const itemId = String(item?.id || "").trim();
+  if (!itemId) {
+    return { title: "", dueDate: "" };
+  }
+  const existing = taskDraftsByItemId.get(itemId);
+  if (existing) {
+    return existing;
+  }
+  const initial = {
+    title: String(item?.title || "").trim(),
+    dueDate: "",
+  };
+  taskDraftsByItemId.set(itemId, initial);
+  return initial;
+}
+
+function updateTaskDraft(itemId, patch) {
+  const current = taskDraftsByItemId.get(itemId) || { title: "", dueDate: "" };
+  taskDraftsByItemId.set(itemId, {
+    ...current,
+    ...patch,
+  });
+}
+
+function dueDateTimeUtcFromDateInput(value) {
+  const date = String(value || "").trim();
+  return date ? `${date}T12:00:00.000Z` : null;
 }
 
 function agendaDisplayTitle(agenda) {
   const detailedAgenda = agendaDetailsById.get(agenda?.id);
-  const title = String(detailedAgenda?.title || agenda?.title || "").trim();
+  const title = String(agenda?.title || detailedAgenda?.title || "").trim();
   if (title) {
     return title;
+  }
+  const members = Array.isArray(agenda?.members) ? agenda.members : Array.isArray(detailedAgenda?.members) ? detailedAgenda.members : [];
+  const memberSummary = members
+    .map((member) => member.displayName || displayNameForEmail(member.userEmail))
+    .filter(Boolean)
+    .join(", ");
+  if (memberSummary) {
+    return memberSummary;
   }
   return "Untitled agenda";
 }
@@ -262,11 +322,13 @@ function renderAgendaList() {
       card.classList.add("is-selected");
     }
     const people = agenda.members.map((member) => member.displayName || displayNameForEmail(member.userEmail));
+    const title = agendaDisplayTitle(agenda);
+    const privacyBadge = agenda.isPrivate ? '<span class="agenda-list-badge">Private</span>' : "";
     card.innerHTML = `
       <div class="agenda-list-card-top">
         <button type="button" class="agenda-list-card-main">
-          <strong>${escapeHtml(agendaDisplayTitle(agenda))}</strong>
-          <span>${agenda.isPrivate ? "Private" : ""}</span>
+          <strong>${escapeHtml(title)}</strong>
+          ${privacyBadge}
           <small>${escapeHtml(people.join(", ") || "Just you")}</small>
         </button>
         ${
@@ -388,39 +450,112 @@ function renderAgendaItems(agenda) {
       card.classList.add("is-selected");
     }
 
+    const linkedTasks = agendaTasksForItem(item);
     const badges = [
       item.stageTag ? `<span class="agenda-badge">${escapeHtml(item.stageTag)}</span>` : "",
       item.isUrgent ? '<span class="agenda-badge is-urgent">Urgent</span>' : "",
       item.isImportant ? '<span class="agenda-badge is-important">Important</span>' : "",
       item.isPrivate ? '<span class="agenda-badge">Private</span>' : "",
-      hasLinkedTask(item) ? '<span class="agenda-badge is-task">Task linked</span>' : "",
+      linkedTasks.length ? `<span class="agenda-badge is-task">${linkedTasks.length} task${linkedTasks.length === 1 ? "" : "s"}</span>` : "",
     ].join("");
     const previewHtml = itemDetailsExpanded ? item.detailHtml || "<p></p>" : "";
-    const taskOwner = item?.taskMap?.ownerEmail ? displayNameForEmail(item.taskMap.ownerEmail) : "You";
-    const taskLabel = String(item?.taskMap?.title || item?.title || "Task").trim();
-    const taskActionHtml = hasLinkedTask(item)
-      ? `<p class="agenda-task-meta">Task: <strong>${escapeHtml(taskLabel)}</strong> · ${escapeHtml(taskOwner)}</p>`
-      : `<button
-          type="button"
-          class="secondary subtle agenda-task-link-btn"
-          ${creatingTaskItemId === item.id ? "disabled" : ""}
-        >${creatingTaskItemId === item.id ? "Adding task..." : "Add task"}</button>`;
+    const draft = taskDraftForItem(item);
+    const linkedTasksHtml = linkedTasks.length
+      ? `
+        <div class="agenda-linked-task-list">
+          ${linkedTasks
+            .map((task) => {
+              const isCompleted = task?.isCompleted === true;
+              const key = taskLinkKey(task);
+              return `
+                <div class="agenda-linked-task-row">
+                  <div class="agenda-linked-task-copy">
+                    <strong>${escapeHtml(task.title || item.title || "Task")}</strong>
+                    <span>${escapeHtml(formatTaskDueDate(task.dueDateTimeUtc))} · ${escapeHtml(
+                      task.ownerEmail ? displayNameForEmail(task.ownerEmail) : "You"
+                    )}</span>
+                  </div>
+                  ${
+                    isCompleted
+                      ? '<span class="agenda-task-state is-complete">Completed</span>'
+                      : `<button
+                          type="button"
+                          class="secondary subtle agenda-task-complete-btn"
+                          data-task-key="${escapeHtml(key)}"
+                          ${completingTaskKey === key ? "disabled" : ""}
+                        >${completingTaskKey === key ? "Completing..." : "Mark complete"}</button>`
+                  }
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `
+      : "";
+    const taskComposerHtml =
+      taskComposerItemId === item.id
+        ? `
+          <form class="agenda-task-create-form" data-item-id="${escapeHtml(item.id)}">
+            <label class="field" for="agendaTaskTitle-${escapeHtml(item.id)}">
+              Task title
+              <input
+                id="agendaTaskTitle-${escapeHtml(item.id)}"
+                name="taskTitle"
+                type="text"
+                value="${escapeHtml(draft.title)}"
+                placeholder="Task title"
+              />
+            </label>
+            <label class="field" for="agendaTaskDue-${escapeHtml(item.id)}">
+              Due date
+              <input
+                id="agendaTaskDue-${escapeHtml(item.id)}"
+                name="taskDueDate"
+                type="date"
+                value="${escapeHtml(draft.dueDate)}"
+              />
+            </label>
+            <div class="agenda-task-form-actions">
+              <button type="submit" ${creatingTaskItemId === item.id ? "disabled" : ""}>
+                ${creatingTaskItemId === item.id ? "Creating..." : "Create task"}
+              </button>
+              <button type="button" class="ghost agenda-task-cancel-btn">Cancel</button>
+            </div>
+          </form>
+        `
+        : "";
+    const showAddTaskIcon = taskComposerItemId !== item.id;
 
     card.innerHTML = `
       <div class="agenda-item-card-head">
         <strong>${escapeHtml(item.title)}</strong>
-        <button
-          type="button"
-          class="agenda-expand-toggle"
-          aria-label="${itemDetailsExpanded ? "Hide item details" : "Show item details"}"
-          aria-expanded="${itemDetailsExpanded ? "true" : "false"}"
-        >
-          <span aria-hidden="true">${itemDetailsExpanded ? "⌃" : "⌄"}</span>
-        </button>
+        <div class="agenda-item-card-head-actions">
+          ${
+            showAddTaskIcon
+              ? `<button
+                  type="button"
+                  class="ghost subtle icon-only agenda-task-link-icon"
+                  aria-label="Add task"
+                  title="Add task"
+                >
+                  <span aria-hidden="true">+</span>
+                </button>`
+              : ""
+          }
+          <button
+            type="button"
+            class="agenda-expand-toggle"
+            aria-label="${itemDetailsExpanded ? "Hide item details" : "Show item details"}"
+            aria-expanded="${itemDetailsExpanded ? "true" : "false"}"
+          >
+            <span aria-hidden="true">${itemDetailsExpanded ? "⌃" : "⌄"}</span>
+          </button>
+        </div>
       </div>
       <div class="agenda-item-badges">${badges}</div>
       ${itemDetailsExpanded ? `<div class="agenda-item-preview">${previewHtml}</div>` : ""}
-      <div class="agenda-item-actions">${taskActionHtml}</div>
+      ${linkedTasksHtml}
+      <div class="agenda-item-actions">${taskComposerHtml}</div>
     `;
 
     card.addEventListener("click", () => {
@@ -440,9 +575,49 @@ function renderAgendaItems(agenda) {
       dragItemId = "";
       card.classList.remove("is-dragging");
     });
-    card.querySelector(".agenda-task-link-btn")?.addEventListener("click", async (event) => {
+    card.querySelector(".agenda-item-actions")?.addEventListener("click", (event) => {
       event.stopPropagation();
+    });
+    card.querySelector(".agenda-linked-task-list")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    card.querySelector(".agenda-task-link-icon")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      taskComposerItemId = item.id;
+      renderAgendaItems(agenda);
+    });
+    const taskForm = card.querySelector(".agenda-task-create-form");
+    taskForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const formData = new FormData(taskForm);
+      updateTaskDraft(item.id, {
+        title: String(formData.get("taskTitle") || "").trim(),
+        dueDate: String(formData.get("taskDueDate") || "").trim(),
+      });
       await createTaskForAgendaItem(agenda, item);
+    });
+    taskForm?.querySelector('[name="taskTitle"]')?.addEventListener("input", (event) => {
+      updateTaskDraft(item.id, { title: String(event.target?.value || "") });
+    });
+    taskForm?.querySelector('[name="taskDueDate"]')?.addEventListener("input", (event) => {
+      updateTaskDraft(item.id, { dueDate: String(event.target?.value || "") });
+    });
+    card.querySelector(".agenda-task-cancel-btn")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      taskComposerItemId = "";
+      renderAgendaItems(agenda);
+    });
+    card.querySelectorAll(".agenda-task-complete-btn").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const key = String(button.getAttribute("data-task-key") || "").trim();
+        const task = linkedTasks.find((entry) => taskLinkKey(entry) === key);
+        if (!task) {
+          return;
+        }
+        await markAgendaTaskComplete(agenda, item, task);
+      });
     });
 
     agendaItemsList.appendChild(card);
@@ -451,44 +626,104 @@ function renderAgendaItems(agenda) {
 }
 
 async function createTaskForAgendaItem(agenda, item) {
-  if (!agenda?.id || !item?.id || hasLinkedTask(item)) {
+  if (!agenda?.id || !item?.id) {
     return;
   }
 
-  const title = String(item.title || "").trim();
+  const draft = taskDraftForItem(item);
+  const title = String(draft.title || item.title || "").trim();
   if (!title) {
     setActionStatus("Item title is required before adding a task.", true);
     return;
   }
 
+  const dueDateTimeUtc = dueDateTimeUtcFromDateInput(draft.dueDate);
+  const nextTaskMaps = [
+    ...agendaTasksForItem(item),
+  ];
+
   try {
     creatingTaskItemId = item.id;
     renderAgendaItems(agenda);
     setActionStatus("Creating task...");
-    const created = await directoryApi.createTask({ title });
+    const created = await directoryApi.createTask({
+      title,
+      ...(dueDateTimeUtc ? { dueDateTimeUtc } : {}),
+    });
     const createdTask = created?.task || null;
     if (!createdTask?.provider || !createdTask?.externalTaskId) {
       throw new Error("Task was created but the link details were missing.");
     }
 
+    nextTaskMaps.push({
+      provider: createdTask.provider,
+      externalTaskId: createdTask.externalTaskId,
+      externalContainerId: createdTask.externalContainerId || "",
+      title: createdTask.title || title,
+      ownerEmail: currentUser?.email || "",
+      linkedAt: new Date().toISOString(),
+      dueDateTimeUtc: createdTask.dueDateTimeUtc || dueDateTimeUtc || null,
+      isCompleted: false,
+      source: "agenda_item",
+    });
+
     await directoryApi.updateAgendaItem({
       itemId: item.id,
-      taskMap: {
-        provider: createdTask.provider,
-        externalTaskId: createdTask.externalTaskId,
-        externalContainerId: createdTask.externalContainerId || "",
-        title: createdTask.title || title,
-        ownerEmail: currentUser?.email || "",
-        linkedAt: new Date().toISOString(),
-        source: "agenda_item",
-      },
+      taskMaps: nextTaskMaps,
     });
+    taskComposerItemId = "";
     await refreshAgendas("Task added from agenda item.", { selectedAgendaId: agenda.id });
   } catch (error) {
     console.error(error);
     setActionStatus(error?.message || "Could not add task from agenda item.", true);
   } finally {
     creatingTaskItemId = "";
+    const latestAgenda = selectedAgenda();
+    if (latestAgenda?.id === agenda.id) {
+      renderAgendaItems(latestAgenda);
+    }
+  }
+}
+
+async function markAgendaTaskComplete(agenda, item, task) {
+  const key = taskLinkKey(task);
+  if (!agenda?.id || !item?.id || !key) {
+    return;
+  }
+
+  try {
+    completingTaskKey = key;
+    renderAgendaItems(agenda);
+    setActionStatus("Completing task...");
+    const updated = await directoryApi.updateTask({
+      provider: task.provider,
+      externalTaskId: task.externalTaskId,
+      externalContainerId: task.externalContainerId || "",
+      isCompleted: true,
+    });
+    const updatedTask = updated?.task || null;
+    const nextTaskMaps = agendaTasksForItem(item).map((entry) => {
+      if (taskLinkKey(entry) !== key) {
+        return entry;
+      }
+      return {
+        ...entry,
+        isCompleted: true,
+        title: updatedTask?.title || entry.title,
+        dueDateTimeUtc: updatedTask?.dueDateTimeUtc || entry.dueDateTimeUtc || null,
+        completedDateTimeUtc: updatedTask?.completedDateTimeUtc || new Date().toISOString(),
+      };
+    });
+    await directoryApi.updateAgendaItem({
+      itemId: item.id,
+      taskMaps: nextTaskMaps,
+    });
+    await refreshAgendas("Task marked complete.", { selectedAgendaId: agenda.id });
+  } catch (error) {
+    console.error(error);
+    setActionStatus(error?.message || "Could not mark task complete.", true);
+  } finally {
+    completingTaskKey = "";
     const latestAgenda = selectedAgenda();
     if (latestAgenda?.id === agenda.id) {
       renderAgendaItems(latestAgenda);

@@ -19,6 +19,7 @@ const {
   normalizeProvider,
   sanitizeOverlayPatch,
   toGraphOverlayFields,
+  toUtcIsoOrNull,
 } = require("./unified-model");
 
 const unifiedTasksCache = new Map();
@@ -801,6 +802,82 @@ async function createWhiteboardTask({ graphAccessToken, claims, body }) {
   };
 }
 
+async function updateWhiteboardTask({ graphAccessToken, body }) {
+  const provider = normalizeProvider(body?.provider);
+  if (provider !== "todo") {
+    const error = new Error("Only Microsoft To Do tasks can be updated here.");
+    error.status = 400;
+    error.code = "UNSUPPORTED_TASK_PROVIDER";
+    throw error;
+  }
+
+  const externalTaskId = normalizeExternalTaskId(body?.externalTaskId);
+  const title = Object.prototype.hasOwnProperty.call(body || {}, "title")
+    ? String(body?.title || "").trim()
+    : "";
+  if (Object.prototype.hasOwnProperty.call(body || {}, "title") && !title) {
+    const error = new Error("title cannot be empty.");
+    error.status = 400;
+    error.code = "INVALID_TITLE";
+    throw error;
+  }
+
+  const hasDueDate = Object.prototype.hasOwnProperty.call(body || {}, "dueDateTimeUtc");
+  const hasCompleted = Object.prototype.hasOwnProperty.call(body || {}, "isCompleted");
+  if (!Object.prototype.hasOwnProperty.call(body || {}, "title") && !hasDueDate && !hasCompleted) {
+    const error = new Error("No task updates were provided.");
+    error.status = 400;
+    error.code = "NO_TASK_UPDATES";
+    throw error;
+  }
+
+  const graphClient = createGraphDelegatedClient(graphAccessToken);
+  const listId = String(body?.externalContainerId || "").trim() || (await resolveDefaultTodoListId(graphClient));
+  const patch = {};
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "title")) {
+    patch.title = title;
+  }
+
+  if (hasDueDate) {
+    patch.dueDateTime = body?.dueDateTimeUtc ? toTodoDueDatePayload(body.dueDateTimeUtc) : null;
+  }
+
+  if (hasCompleted) {
+    patch.status = body?.isCompleted ? "completed" : "notStarted";
+  }
+
+  let updatedTask = await graphClient.fetchJson(
+    `https://graph.microsoft.com/v1.0/me/todo/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(externalTaskId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(patch),
+    }
+  );
+  if (!updatedTask) {
+    updatedTask = await graphClient.fetchJson(
+      `https://graph.microsoft.com/v1.0/me/todo/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(externalTaskId)}`
+    );
+  }
+
+  const isCompleted = String(updatedTask?.status || "").trim().toLowerCase() === "completed";
+
+  return {
+    task: {
+      provider: "todo",
+      externalTaskId,
+      externalContainerId: listId,
+      title: String(updatedTask?.title || title || "").trim(),
+      dueDateTimeUtc: toUtcIsoOrNull(updatedTask?.dueDateTime?.dateTime),
+      isCompleted,
+      completedDateTimeUtc: toUtcIsoOrNull(updatedTask?.completedDateTime?.dateTime),
+    },
+  };
+}
+
 module.exports = {
   clearWhiteboardTasksCache,
   clearUnifiedTasksCache,
@@ -810,5 +887,6 @@ module.exports = {
   getWhiteboardTasks,
   mapGraphError,
   syncWhiteboardTasks,
+  updateWhiteboardTask,
   upsertOverlay,
 };

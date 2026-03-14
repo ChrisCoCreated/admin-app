@@ -2778,6 +2778,17 @@ body.lightbox-open {
   line-height: 1.25;
 }
 
+.agenda-list-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(16, 33, 57, 0.08);
+  color: rgba(16, 33, 57, 0.72);
+  font-size: 0.78rem;
+}
+
 .agenda-list-card-main strong,
 .agenda-list-card-main span,
 .agenda-list-card-main small {
@@ -2877,6 +2888,13 @@ body.lightbox-open {
   overflow-wrap: anywhere;
 }
 
+.agenda-item-card-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+
 .agenda-expand-toggle {
   display: inline-flex;
   align-items: center;
@@ -2890,6 +2908,19 @@ body.lightbox-open {
   color: rgba(16, 33, 57, 0.46);
   flex: 0 0 auto;
   font-size: 1rem;
+}
+
+.agenda-task-link-icon {
+  width: 1.9rem;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border-radius: 999px;
+  color: rgba(16, 33, 57, 0.46);
+}
+
+.agenda-task-link-icon:hover {
+  color: rgba(16, 33, 57, 0.68);
 }
 
 .agenda-expand-toggle:hover {
@@ -2938,10 +2969,64 @@ body.lightbox-open {
   min-height: 34px;
 }
 
-.agenda-task-meta {
-  margin: 0;
+.agenda-linked-task-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+}
+
+.agenda-linked-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(16, 33, 57, 0.04);
+}
+
+.agenda-linked-task-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.agenda-linked-task-copy strong,
+.agenda-linked-task-copy span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agenda-linked-task-copy span {
   color: rgba(16, 33, 57, 0.68);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
+}
+
+.agenda-task-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.agenda-task-state.is-complete {
+  background: rgba(62, 130, 84, 0.12);
+  color: #2a6d41;
+}
+
+.agenda-task-create-form {
+  display: grid;
+  gap: 0.75rem;
+  width: min(100%, 420px);
+}
+
+.agenda-task-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .agenda-item-preview {

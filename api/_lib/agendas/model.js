@@ -43,17 +43,13 @@ function normalizeTaskProvider(value) {
   return new Set(["todo", "planner"]).has(provider) ? provider : "";
 }
 
-function sanitizeAgendaTaskMap(value, fallbackOwnerEmail = "") {
-  if (value === null) {
-    return null;
-  }
+function sanitizeAgendaTaskEntry(value, fallbackOwnerEmail = "") {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    const error = new Error("Agenda task map must be an object.");
+    const error = new Error("Agenda task entry must be an object.");
     error.status = 400;
     error.code = "INVALID_AGENDA_TASK_MAP";
     throw error;
   }
-
   const provider = normalizeTaskProvider(value.provider);
   const externalTaskId = String(value.externalTaskId || "").trim();
   if (!provider || !externalTaskId) {
@@ -88,12 +84,42 @@ function sanitizeAgendaTaskMap(value, fallbackOwnerEmail = "") {
     output.linkedAt = linkedAt;
   }
 
+  if (Object.prototype.hasOwnProperty.call(value, "isCompleted")) {
+    output.isCompleted = parseBoolean(value.isCompleted);
+  }
+
+  const completedDateTimeUtc = String(value.completedDateTimeUtc || "").trim();
+  if (completedDateTimeUtc) {
+    output.completedDateTimeUtc = completedDateTimeUtc;
+  }
+
+  const dueDateTimeUtc = String(value.dueDateTimeUtc || "").trim();
+  if (dueDateTimeUtc) {
+    output.dueDateTimeUtc = dueDateTimeUtc;
+  }
+
   const source = String(value.source || "").trim().toLowerCase();
   if (source) {
     output.source = source;
   }
 
   return output;
+}
+
+function sanitizeAgendaTaskMaps(value, fallbackOwnerEmail = "") {
+  if (value === null) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeAgendaTaskEntry(entry, fallbackOwnerEmail));
+  }
+  if (value && typeof value === "object") {
+    return [sanitizeAgendaTaskEntry(value, fallbackOwnerEmail)];
+  }
+  const error = new Error("Agenda task map must be an object or array.");
+  error.status = 400;
+  error.code = "INVALID_AGENDA_TASK_MAP";
+  throw error;
 }
 
 function dedupeParticipants(emails, names, ownerEmail) {
@@ -173,8 +199,11 @@ function sanitizeAgendaItemInput(input, ownerEmail, mode = "create") {
     ...(Object.prototype.hasOwnProperty.call(input, "stageTag")
       ? { stageTag: normalizeStageTag(input.stageTag) }
       : {}),
-    ...(Object.prototype.hasOwnProperty.call(input, "taskMap")
-      ? { taskMap: sanitizeAgendaTaskMap(input.taskMap, ownerEmail) }
+    ...(Object.prototype.hasOwnProperty.call(input, "taskMaps") || Object.prototype.hasOwnProperty.call(input, "taskMap")
+      ? { taskMaps: sanitizeAgendaTaskMaps(
+          Object.prototype.hasOwnProperty.call(input, "taskMaps") ? input.taskMaps : input.taskMap,
+          ownerEmail
+        ) }
       : {}),
   };
 
@@ -220,7 +249,7 @@ function mapAgendaItemRow(row) {
     sortOrder: parseNumber(row?.sort_order, 0),
     stageTag: normalizeStageTag(row?.stage_tag),
     ownerEmail: normalizeEmail(row?.owner_email),
-    taskMap: row?.task_map ? sanitizeAgendaTaskMap(row.task_map, row?.owner_email) : null,
+    taskMaps: row?.task_map ? sanitizeAgendaTaskMaps(row.task_map, row?.owner_email) : [],
     createdAt: row?.created_at || null,
     updatedAt: row?.updated_at || null,
   };
