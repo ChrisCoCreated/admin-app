@@ -35,6 +35,10 @@
             Use this page to score how well the organisation is living its values, applying decision principles, and
             delivering strategic priorities.
           </p>
+          <div class="scorecard-page-links">
+            <a class="secondary button-link" href="./scorecard-definitions.html">Manage values, principles, objectives</a>
+            <a class="secondary button-link" href="./scorecard-goals.html">Manage goals</a>
+          </div>
         </div>
         <div class="scorecard-hero-meta">
           <label class="field" for="reviewPeriodInput">
@@ -47,7 +51,7 @@
           <p class="muted" id="statusMessage">Checking access...</p>
           <div class="scorecard-savebar">
             <p class="muted scorecard-save-message" id="saveMessage" aria-live="polite">
-              Changes save automatically to the shared scorecard.
+              Review changes save automatically to the shared scorecard.
             </p>
             <button id="saveNowBtn" class="secondary" type="button">Save now</button>
           </div>
@@ -74,7 +78,6 @@
             <h2>Values Alignment</h2>
             <p class="muted">Score how consistently day-to-day behaviours reflect each organisational value.</p>
           </div>
-          <button id="addValueBtn" class="secondary" type="button">Add shared value</button>
         </div>
         <div class="scorecard-guide">
           <span>1: Not reflected in behaviour</span>
@@ -90,7 +93,6 @@
             <h2>Decision-Making Principles</h2>
             <p class="muted">Check whether important decisions this period matched the agreed principles.</p>
           </div>
-          <button id="addPrincipleBtn" class="secondary" type="button">Add shared principle</button>
         </div>
         <div id="principlesList" class="scorecard-section-list"></div>
       </section>
@@ -101,7 +103,6 @@
             <h2>Strategic Objectives</h2>
             <p class="muted">Track progress against the 2 to 4 core business objectives for the year.</p>
           </div>
-          <button id="addObjectiveBtn" class="secondary" type="button">Add shared objective</button>
         </div>
         <div id="objectivesList" class="scorecard-section-list"></div>
       </section>
@@ -112,7 +113,6 @@
             <h2>Active Goals</h2>
             <p class="muted">Monitor the initiatives delivering each strategic objective.</p>
           </div>
-          <button id="addGoalBtn" class="secondary" type="button">Add shared goal</button>
         </div>
         <div id="goalsList" class="scorecard-section-list"></div>
       </section>

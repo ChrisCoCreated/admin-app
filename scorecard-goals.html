@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Goal Setup</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260314" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container scorecard-main">
+      <section class="hero scorecard-hero">
+        <div class="scorecard-hero-copy">
+          <p class="scorecard-kicker">Shared Library</p>
+          <h1>Goal Setup</h1>
+          <p class="muted">
+            Create and maintain the shared delivery goals that roll up to your strategic objectives on the scorecard.
+          </p>
+          <div class="scorecard-page-links">
+            <a class="secondary button-link" href="./scorecard.html">Open performance scoring</a>
+            <a class="secondary button-link" href="./scorecard-definitions.html">Open scorecard setup</a>
+          </div>
+        </div>
+        <div class="scorecard-hero-meta">
+          <p class="muted" id="statusMessage">Checking access...</p>
+          <div class="scorecard-savebar">
+            <p class="muted scorecard-save-message" id="saveMessage" aria-live="polite">
+              Shared goal changes save automatically.
+            </p>
+            <button id="saveNowBtn" class="secondary" type="button">Save now</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Goals</h2>
+            <p class="muted">Each goal should stay linked to one strategic objective from the shared setup library.</p>
+          </div>
+          <button id="addGoalBtn" class="secondary" type="button">Add goal</button>
+        </div>
+        <div id="goalsList" class="scorecard-section-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./scorecard-goals.js"></script>
+  </body>
+</html>

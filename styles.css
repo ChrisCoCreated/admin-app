@@ -1462,6 +1462,13 @@ body.lightbox-open {
   gap: 8px;
 }
 
+.scorecard-page-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 .scorecard-hero-meta {
   display: grid;
   gap: 10px;

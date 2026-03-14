@@ -117,6 +117,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listPerformanceScorecardDefinitions(query = {}) {
+      const response = await authFetch(buildUrl("/api/scorecard/definitions", query));
+      if (!response.ok) {
+        await parseError(response, "Performance scorecard definitions request failed");
+      }
+      return response.json();
+    },
+
     async updatePerformanceScorecardDefinition(payload = {}) {
       const response = await authFetch(endpoint("/api/scorecard/definitions"), {
         method: "PATCH",

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Scorecard Setup</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260314" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container scorecard-main">
+      <section class="hero scorecard-hero">
+        <div class="scorecard-hero-copy">
+          <p class="scorecard-kicker">Shared Library</p>
+          <h1>Scorecard Setup</h1>
+          <p class="muted">
+            Create and maintain the shared values, decision principles, and strategic objectives used on the
+            performance scorecard.
+          </p>
+          <div class="scorecard-page-links">
+            <a class="secondary button-link" href="./scorecard.html">Open performance scoring</a>
+            <a class="secondary button-link" href="./scorecard-goals.html">Open goal setup</a>
+          </div>
+        </div>
+        <div class="scorecard-hero-meta">
+          <p class="muted" id="statusMessage">Checking access...</p>
+          <div class="scorecard-savebar">
+            <p class="muted scorecard-save-message" id="saveMessage" aria-live="polite">
+              Shared definition changes save automatically.
+            </p>
+            <button id="saveNowBtn" class="secondary" type="button">Save now</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Values</h2>
+            <p class="muted">These appear on every review period as the shared organisational values.</p>
+          </div>
+          <button id="addValueBtn" class="secondary" type="button">Add value</button>
+        </div>
+        <div id="valuesList" class="scorecard-section-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Decision Principles</h2>
+            <p class="muted">These are the standard principles leadership will score each review period.</p>
+          </div>
+          <button id="addPrincipleBtn" class="secondary" type="button">Add principle</button>
+        </div>
+        <div id="principlesList" class="scorecard-section-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="scorecard-panel-head">
+          <div>
+            <h2>Strategic Objectives</h2>
+            <p class="muted">These annual objectives are reused across periods and linked to goals.</p>
+          </div>
+          <button id="addObjectiveBtn" class="secondary" type="button">Add objective</button>
+        </div>
+        <div id="objectivesList" class="scorecard-section-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./scorecard-definitions.js"></script>
+  </body>
+</html>

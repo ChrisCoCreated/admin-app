@@ -41,10 +41,6 @@ const principlesList = document.getElementById("principlesList");
 const objectivesList = document.getElementById("objectivesList");
 const goalsList = document.getElementById("goalsList");
 const snapshotGrid = document.getElementById("snapshotGrid");
-const addValueBtn = document.getElementById("addValueBtn");
-const addPrincipleBtn = document.getElementById("addPrincipleBtn");
-const addObjectiveBtn = document.getElementById("addObjectiveBtn");
-const addGoalBtn = document.getElementById("addGoalBtn");
 const resetBtn = document.getElementById("resetBtn");
 const reflectionGoingWell = document.getElementById("reflectionGoingWell");
 const reflectionNeedsAttention = document.getElementById("reflectionNeedsAttention");
@@ -202,7 +198,7 @@ function hydrateState(payload, reviewPeriod) {
 function formatSaveMeta(review) {
   const updatedAt = review?.updatedAt ? new Date(review.updatedAt) : null;
   if (!updatedAt || Number.isNaN(updatedAt.getTime())) {
-    return "Changes save automatically to the shared scorecard.";
+    return "Review changes save automatically to the shared scorecard.";
   }
   const userLabel = review?.updatedBy ? ` by ${review.updatedBy}` : "";
   return `Saved to the shared scorecard${userLabel} at ${updatedAt.toLocaleString()}.`;
@@ -373,14 +369,10 @@ function renderValues() {
       const showAction = Number(review.score) > 0 && Number(review.score) < 4;
       return buildEntryShell(
         item,
-        `Value ${index + 1}`,
-        "This definition is shared across all review periods. The score and commentary are specific to the selected period.",
+        escapeHtml(item.name || `Value ${index + 1}`),
+        "Scores and commentary on this page are specific to the selected review period. Rename shared values from Scorecard Setup.",
         `
           <div class="scorecard-form-grid">
-            <label class="field">
-              Value
-              <input data-scope="definition" data-field="name" type="text" value="${escapeHtml(item.name)}" placeholder="e.g. Accountability" />
-            </label>
             <label class="field">
               Score (1-5)
               <select data-scope="review" data-field="score">${buildScoreOptions(review.score)}</select>
@@ -415,16 +407,10 @@ function renderPrinciples() {
       const review = ensureReviewObject(item);
       return buildEntryShell(
         item,
-        `Principle ${index + 1}`,
-        "The principle label is shared. The score and examples below belong only to the selected review period.",
+        escapeHtml(item.name || `Principle ${index + 1}`),
+        "Scores and examples below belong only to the selected review period. Edit shared principles from Scorecard Setup.",
         `
           <div class="scorecard-form-grid">
-            <label class="field">
-              Principle
-              <input data-scope="definition" data-field="name" type="text" value="${escapeHtml(
-                item.name
-              )}" placeholder="e.g. Make decisions close to the client" />
-            </label>
             <label class="field">
               Score (1-5)
               <select data-scope="review" data-field="score">${buildScoreOptions(review.score)}</select>
@@ -461,14 +447,10 @@ function renderObjectives() {
       const review = ensureReviewObject(item);
       return buildEntryShell(
         item,
-        `Objective ${index + 1}`,
-        "The objective definition is shared across periods. Creating or renaming it does not create a review period. Owner, score, and blockers below are review-specific.",
+        escapeHtml(item.title || `Objective ${index + 1}`),
+        "Owner, score, and blockers below are review-specific. Edit shared objectives from Scorecard Setup.",
         `
           <div class="scorecard-form-grid">
-            <label class="field scorecard-span-2">
-              Objective
-              <input data-scope="definition" data-field="title" type="text" value="${escapeHtml(item.title)}" placeholder="Describe the objective" />
-            </label>
             <label class="field">
               Owner
               <input data-scope="review" data-field="owner" type="text" value="${escapeHtml(review.owner || "")}" placeholder="Owner name" />
@@ -503,17 +485,13 @@ function renderGoals() {
       const review = ensureReviewObject(item);
       return buildEntryShell(
         item,
-        `Goal ${index + 1}`,
-        "The goal definition and linked objective are shared. Creating or renaming it does not create a review period. Status, score, owner, and next action are specific to the selected period.",
+        escapeHtml(item.title || `Goal ${index + 1}`),
+        "Status, score, owner, and next action are specific to the selected review period. Edit shared goals from Goal Setup.",
         `
           <div class="scorecard-form-grid">
-            <label class="field scorecard-span-2">
-              Goal
-              <input data-scope="definition" data-field="title" type="text" value="${escapeHtml(item.title)}" placeholder="Describe the initiative or goal" />
-            </label>
-            <label class="field">
+            <label class="field scorecard-span-2 is-muted-block">
               Linked objective
-              <select data-scope="definition" data-field="objectiveId">${buildObjectiveSelect(item.objectiveId || "")}</select>
+              <input type="text" value="${escapeHtml(item.objectiveTitle || "")}" readonly />
             </label>
             <label class="field">
               Owner
@@ -913,19 +891,6 @@ function attachListeners() {
   attachListListeners(principlesList, "principles");
   attachListListeners(objectivesList, "objectives");
   attachListListeners(goalsList, "goals");
-
-  addValueBtn?.addEventListener("click", () => {
-    void addDefinition("values");
-  });
-  addPrincipleBtn?.addEventListener("click", () => {
-    void addDefinition("principles");
-  });
-  addObjectiveBtn?.addEventListener("click", () => {
-    void addDefinition("objectives");
-  });
-  addGoalBtn?.addEventListener("click", () => {
-    void addDefinition("goals");
-  });
 
   async function handleLoadPeriod() {
     const requestedPeriod = normalizeReviewPeriod(reviewPeriodInput?.value);
