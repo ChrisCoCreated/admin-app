@@ -116,8 +116,13 @@ function setItemSearchExpanded(value) {
   }
   if (itemSearchExpanded) {
     itemSearchInput?.focus();
-  } else if (itemSearchInput) {
-    itemSearchInput.value = "";
+  } else {
+    if (itemSearchInput) {
+      itemSearchInput.value = "";
+    }
+    if (itemStageFilter) {
+      itemStageFilter.value = "";
+    }
   }
 }
 
@@ -251,7 +256,7 @@ function renderAgendaList() {
     const people = agenda.members.map((member) => member.displayName || displayNameForEmail(member.userEmail));
     button.innerHTML = `
       <strong>${escapeHtml(agenda.title)}</strong>
-      <span>${escapeHtml(agenda.agendaType === "one_to_one" ? "1:1" : "Meeting")}${agenda.isPrivate ? " • Private" : ""}</span>
+      <span>${agenda.isPrivate ? "Private" : ""}</span>
       <small>${escapeHtml(people.join(", ") || "Just you")}</small>
     `;
     button.addEventListener("click", () => {
@@ -399,7 +404,8 @@ function renderAgendaDetail() {
 
   const isOwner = normalizeEmail(agenda.ownerEmail) === normalizeEmail(currentUser?.email);
   agendaTitle.textContent = agenda.title || "Agenda";
-  agendaMeta.textContent = `${agenda.agendaType === "one_to_one" ? "1:1" : "Meeting"}${agenda.isPrivate ? " • Private" : ""}`;
+  agendaMeta.textContent = agenda.isPrivate ? "Private" : "";
+  agendaMeta.hidden = !agendaMeta.textContent;
   renderAgendaAttendees(agenda);
   agendaTitleEditInput.value = agenda.title || "";
   agendaPeopleSummaryInput.value = participantSummary(agenda);

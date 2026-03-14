@@ -89,10 +89,10 @@
 
           <div id="agendaDetailWrap" hidden>
             <div class="agenda-detail-head">
-              <div>
+              <div class="agenda-detail-identity">
                 <h2 id="agendaTitle"></h2>
-                <p id="agendaMeta" class="muted"></p>
                 <div id="agendaAttendees" class="agenda-attendees" hidden></div>
+                <p id="agendaMeta" class="muted"></p>
               </div>
               <div class="agenda-detail-actions">
                 <button id="editAgendaSettingsBtn" class="ghost subtle" type="button">Edit</button>
@@ -121,10 +121,38 @@
             </section>
 
             <form id="agendaItemForm" class="agenda-item-composer">
-              <label class="field" for="itemTitleInput">
-                <span class="sr-only">New item title</span>
-                <input id="itemTitleInput" type="text" placeholder="Add a talking point" />
-              </label>
+              <div class="agenda-item-entry">
+                <label class="field" for="itemTitleInput">
+                  <span class="sr-only">New item title</span>
+                  <input id="itemTitleInput" type="text" placeholder="Add a talking point" />
+                </label>
+                <button
+                  id="toggleItemSearchBtn"
+                  class="ghost subtle icon-only"
+                  type="button"
+                  aria-label="Search and filter items"
+                  aria-expanded="false"
+                >
+                  <span aria-hidden="true">⌕</span>
+                </button>
+              </div>
+
+              <div id="itemSearchField" class="agenda-search-panel" hidden>
+                <label class="field agenda-search-field" for="itemSearchInput">
+                  <span class="sr-only">Search items</span>
+                  <input id="itemSearchInput" type="search" placeholder="Search title or detail" />
+                </label>
+                <label class="field agenda-stage-field" for="itemStageFilter">
+                  <span class="sr-only">Filter by stage</span>
+                  <select id="itemStageFilter">
+                    <option value="">All stages</option>
+                    <option value="incubating">Incubating</option>
+                    <option value="ready">Ready</option>
+                    <option value="decision">Decision</option>
+                    <option value="blocked">Blocked</option>
+                  </select>
+                </label>
+              </div>
 
               <div id="agendaItemAdvanced" class="agenda-item-advanced" hidden>
                 <div class="editor-shell">
@@ -172,34 +200,6 @@
               </div>
               <p id="actionStatus" class="muted"></p>
             </form>
-
-            <div class="agenda-item-toolbar">
-              <div class="agenda-search-shell">
-                <button
-                  id="toggleItemSearchBtn"
-                  class="ghost subtle icon-only"
-                  type="button"
-                  aria-label="Search items"
-                  aria-expanded="false"
-                >
-                  <span aria-hidden="true">⌕</span>
-                </button>
-                <label id="itemSearchField" class="field agenda-search-field" for="itemSearchInput" hidden>
-                  <span class="sr-only">Search items</span>
-                  <input id="itemSearchInput" type="search" placeholder="Search title or detail" />
-                </label>
-              </div>
-              <label class="field" for="itemStageFilter">
-                Stage
-                <select id="itemStageFilter">
-                  <option value="">All</option>
-                  <option value="incubating">Incubating</option>
-                  <option value="ready">Ready</option>
-                  <option value="decision">Decision</option>
-                  <option value="blocked">Blocked</option>
-                </select>
-              </label>
-            </div>
 
             <section class="agenda-items-panel">
               <div id="agendaItemsList" class="agenda-items-list"></div>
