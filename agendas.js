@@ -251,6 +251,42 @@ function filteredItems(agenda) {
   });
 }
 
+function sortAgendaItemsLocally(items) {
+  return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+    const orderDelta = Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0);
+    if (orderDelta !== 0) {
+      return orderDelta;
+    }
+    const aUpdated = Date.parse(a?.updatedAt || "") || 0;
+    const bUpdated = Date.parse(b?.updatedAt || "") || 0;
+    return bUpdated - aUpdated;
+  });
+}
+
+function applyLocalAgendaItems(agendaId, items) {
+  const normalizedAgendaId = String(agendaId || "").trim();
+  if (!normalizedAgendaId) {
+    return;
+  }
+  const nextItems = sortAgendaItemsLocally(items);
+  const detailedAgenda = agendaDetailsById.get(normalizedAgendaId);
+  if (detailedAgenda) {
+    agendaDetailsById.set(normalizedAgendaId, {
+      ...detailedAgenda,
+      items: nextItems,
+    });
+  }
+  agendas = agendas.map((agenda) => {
+    if (agenda.id !== normalizedAgendaId) {
+      return agenda;
+    }
+    return {
+      ...agenda,
+      items: nextItems,
+    };
+  });
+}
+
 function agendaTasksForItem(item) {
   return Array.isArray(item?.taskMaps) ? item.taskMaps : [];
 }
@@ -1095,11 +1131,29 @@ async function reorderItemToIndex(agenda, sourceItemId, insertIndex) {
     sortOrder = Number(previous.sortOrder || 0) + 100;
   }
 
+  const allItems = Array.isArray(agenda?.items) ? agenda.items : [];
+  const previousItems = allItems.map((item) => ({ ...item }));
+  const nextItems = allItems.map((item) => {
+    if (item.id !== sourceItemId) {
+      return item;
+    }
+    return {
+      ...item,
+      sortOrder,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
   try {
-    setActionStatus("Reordering item...");
+    applyLocalAgendaItems(agenda.id, nextItems);
+    renderAgendaItems(selectedAgenda() || agenda);
+    setActionStatus("");
     await directoryApi.updateAgendaItem({ itemId: sourceItemId, sortOrder });
-    await refreshAgendas("Agenda order updated.", { selectedAgendaId: agenda.id });
+    await refreshAgendas("", { selectedAgendaId: agenda.id });
+    setActionStatus("");
   } catch (error) {
+    applyLocalAgendaItems(agenda.id, previousItems);
+    renderAgendaItems(selectedAgenda() || agenda);
     console.error(error);
     setActionStatus(error?.message || "Could not reorder item.", true);
   }

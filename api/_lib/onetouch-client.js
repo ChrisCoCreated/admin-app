@@ -1041,12 +1041,23 @@ function normalizeTimesheet(record) {
     carerId: asString(record?.carer_id || record?.carerId),
     clientId: asString(record?.client_id || record?.clientId),
     externalCarer: Boolean(record?.external_carer ?? record?.externalCarer),
-    jobType: asString(record?.job_type || record?.jobType),
-    dueIn: asString(record?.due_in || record?.dueIn),
-    dueOut: asString(record?.due_out || record?.dueOut),
-    logIn: asString(record?.log_in || record?.logIn),
-    logOut: asString(record?.log_out || record?.logOut),
-    timeConfirmed: Boolean(record?.time_confirmed ?? record?.timeConfirmed),
+    jobType: asString(record?.jobtype || record?.job_type || record?.jobType),
+    dueIn: asString(record?.scheduled_start || record?.due_in || record?.dueIn),
+    dueOut: asString(record?.scheduled_finish || record?.due_out || record?.dueOut),
+    logIn: asString(record?.full_start || record?.log_in || record?.logIn || record?.actual_start),
+    logOut: asString(record?.full_finish || record?.log_out || record?.logOut || record?.actual_finish),
+    timeConfirmed: Boolean(
+      record?.time_confirmed ??
+        record?.timeConfirmed ??
+        String(record?.shift_status || "").trim().toLowerCase() === "complete"
+    ),
+    billing: asString(record?.billing),
+    pay: asString(record?.pay),
+    travelPay: asString(record?.travel_pay || record?.travelPay),
+    branch: asString(record?.branch),
+    area: asString(record?.area),
+    shiftStatus: asString(record?.shift_status || record?.shiftStatus),
+    raw: record,
   };
 }
 
@@ -1079,19 +1090,17 @@ async function listTimesheets({ carerId = "", date = "", dateStart = "", dateFin
     throw new Error("A carer id is required to fetch timesheets.");
   }
 
-  let pagePayload = await callOneTouch("timesheets", query);
-  let records = resolveRecords(pagePayload, ["timesheets", "data.timesheets"]).map(normalizeTimesheet);
+  let pagePayload = await callOneTouch("finance/summary", query);
+  let records = resolveRecords(pagePayload, ["data"]).map(normalizeTimesheet);
   let nextPage = getNextPageNumber(pagePayload);
   let pagesFetched = 1;
 
   while (nextPage && pagesFetched < 50) {
-    pagePayload = await callOneTouch("timesheets", {
+    pagePayload = await callOneTouch("finance/summary", {
       ...query,
       page: nextPage,
     });
-    records = records.concat(
-      resolveRecords(pagePayload, ["timesheets", "data.timesheets"]).map(normalizeTimesheet)
-    );
+    records = records.concat(resolveRecords(pagePayload, ["data"]).map(normalizeTimesheet));
     nextPage = getNextPageNumber(pagePayload);
     pagesFetched += 1;
   }

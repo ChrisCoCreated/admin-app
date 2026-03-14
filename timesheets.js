@@ -22,6 +22,9 @@ const summaryTotalRows = document.getElementById("summaryTotalRows");
 const summaryConfirmed = document.getElementById("summaryConfirmed");
 const summaryUnconfirmed = document.getElementById("summaryUnconfirmed");
 const summaryClients = document.getElementById("summaryClients");
+const summaryBilling = document.getElementById("summaryBilling");
+const summaryPay = document.getElementById("summaryPay");
+const summaryTravelPay = document.getElementById("summaryTravelPay");
 const manualContractPanel = document.getElementById("manualContractPanel");
 const manualContractHoursInput = document.getElementById("manualContractHoursInput");
 const clearReportBtn = document.getElementById("clearReportBtn");
@@ -36,6 +39,9 @@ const totalsScheduledCell = document.getElementById("totalsScheduledCell");
 const totalsActualCell = document.getElementById("totalsActualCell");
 const totalsVarianceCell = document.getElementById("totalsVarianceCell");
 const totalsActualisationCell = document.getElementById("totalsActualisationCell");
+const totalsBillingCell = document.getElementById("totalsBillingCell");
+const totalsPayCell = document.getElementById("totalsPayCell");
+const totalsTravelPayCell = document.getElementById("totalsTravelPayCell");
 const totalsConfirmedCell = document.getElementById("totalsConfirmedCell");
 const emptyState = document.getElementById("emptyState");
 
@@ -178,7 +184,7 @@ function getDurationMinutesFromClockTimes(startValue, endValue) {
     return 0;
   }
   const diff = end - start;
-  return diff >= 0 ? diff : 0;
+  return diff >= 0 ? diff : diff + 24 * 60;
 }
 
 function getDurationMinutesFromDateTimes(startValue, endValue) {
@@ -188,7 +194,7 @@ function getDurationMinutesFromDateTimes(startValue, endValue) {
     return 0;
   }
   const diff = Math.round((end.getTime() - start.getTime()) / 60_000);
-  return diff >= 0 ? diff : 0;
+  return diff >= 0 ? diff : diff + 24 * 60;
 }
 
 function formatDuration(minutes) {
@@ -221,6 +227,22 @@ function formatHoursValue(hours) {
     return "0.00";
   }
   return numeric.toFixed(2);
+}
+
+function parseMoney(value) {
+  const numeric = Number(String(value || "").trim());
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function formatCurrency(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return "GBP 0.00";
+  }
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+  }).format(numeric);
 }
 
 function getActualisationPercent(actualMinutes, scheduledMinutes) {
@@ -300,6 +322,9 @@ function enrichTimesheet(item) {
     actualMinutes,
     varianceMinutes,
     actualisationPercent: getActualisationPercent(actualMinutes, scheduledMinutes),
+    billingAmount: parseMoney(item.billing),
+    payAmount: parseMoney(item.pay),
+    travelPayAmount: parseMoney(item.travelPay),
   };
 }
 
@@ -327,7 +352,7 @@ function renderReportTable() {
 
   if (!savedReportRows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="7" class="muted">No saved report rows.</td>';
+    tr.innerHTML = '<td colspan="10" class="muted">No saved report rows.</td>';
     reportTableBody.appendChild(tr);
     updateReportStatus();
     return;
@@ -344,6 +369,9 @@ function renderReportTable() {
       <td>${escapeHtml(row.actualHours || "0.00")}h</td>
       <td>${escapeHtml(row.contractedHours || "0.00")}h</td>
       <td>${escapeHtml(row.actualisation || "0.0%")}</td>
+      <td>${escapeHtml(row.billing || formatCurrency(0))}</td>
+      <td>${escapeHtml(row.pay || formatCurrency(0))}</td>
+      <td>${escapeHtml(row.travelPay || formatCurrency(0))}</td>
       <td>${escapeHtml(savedText)}</td>
     `;
     reportTableBody.appendChild(tr);
@@ -516,12 +544,24 @@ function renderSummary(timesheets, selectedCarer, appliedQuery) {
   const actualMinutes = timesheets.reduce((sum, item) => sum + item.actualMinutes, 0);
   const contractedMinutes = getContractedMinutesForPeriod(selectedCarer, appliedQuery);
   const actualisationPercent = getActualisationPercent(actualMinutes, scheduledMinutes);
+  const billingTotal = timesheets.reduce((sum, item) => sum + item.billingAmount, 0);
+  const payTotal = timesheets.reduce((sum, item) => sum + item.payAmount, 0);
+  const travelPayTotal = timesheets.reduce((sum, item) => sum + item.travelPayAmount, 0);
   const rangeText = getRangeLabel(appliedQuery);
 
   summaryTotalRows.textContent = formatDuration(scheduledMinutes);
   summaryConfirmed.textContent = formatDuration(actualMinutes);
   summaryUnconfirmed.textContent = formatDuration(contractedMinutes);
   summaryClients.textContent = formatPercentage(actualisationPercent);
+  if (summaryBilling) {
+    summaryBilling.textContent = formatCurrency(billingTotal);
+  }
+  if (summaryPay) {
+    summaryPay.textContent = formatCurrency(payTotal);
+  }
+  if (summaryTravelPay) {
+    summaryTravelPay.textContent = formatCurrency(travelPayTotal);
+  }
   summaryMessage.textContent = `${selectedCarer?.name || "Selected carer"} for ${rangeText}. ${timesheets.length} row(s), ${uniqueClients.size} client(s), ${confirmedCount} confirmed.`;
   updateManualContractState(contractedMinutes);
   lastSummaryRecord = {
@@ -532,6 +572,9 @@ function renderSummary(timesheets, selectedCarer, appliedQuery) {
     actualMinutes,
     contractedMinutes,
     actualisationPercent,
+    billingTotal,
+    payTotal,
+    travelPayTotal,
   };
   if (addToReportBtn) {
     addToReportBtn.disabled = false;
@@ -575,6 +618,9 @@ function renderTimesheets(timesheets) {
   const actualTotal = timesheets.reduce((sum, item) => sum + item.actualMinutes, 0);
   const varianceTotal = actualTotal - scheduledTotal;
   const confirmedCount = timesheets.filter((item) => item.timeConfirmed).length;
+  const billingTotal = timesheets.reduce((sum, item) => sum + item.billingAmount, 0);
+  const payTotal = timesheets.reduce((sum, item) => sum + item.payAmount, 0);
+  const travelPayTotal = timesheets.reduce((sum, item) => sum + item.travelPayAmount, 0);
 
   for (const item of timesheets) {
     const tr = document.createElement("tr");
@@ -587,6 +633,9 @@ function renderTimesheets(timesheets) {
       <td>${escapeHtml(formatDuration(item.actualMinutes))}</td>
       <td>${escapeHtml(formatVariance(item.varianceMinutes))}</td>
       <td>${escapeHtml(formatPercentage(item.actualisationPercent))}</td>
+      <td>${escapeHtml(formatCurrency(item.billingAmount))}</td>
+      <td>${escapeHtml(formatCurrency(item.payAmount))}</td>
+      <td>${escapeHtml(formatCurrency(item.travelPayAmount))}</td>
       <td>${item.timeConfirmed ? "Yes" : "No"}</td>
     `;
     tr.addEventListener("click", () => {
@@ -618,6 +667,15 @@ function renderTimesheets(timesheets) {
   if (totalsActualisationCell) {
     totalsActualisationCell.textContent = formatPercentage(getActualisationPercent(actualTotal, scheduledTotal));
   }
+  if (totalsBillingCell) {
+    totalsBillingCell.textContent = formatCurrency(billingTotal);
+  }
+  if (totalsPayCell) {
+    totalsPayCell.textContent = formatCurrency(payTotal);
+  }
+  if (totalsTravelPayCell) {
+    totalsTravelPayCell.textContent = formatCurrency(travelPayTotal);
+  }
   if (totalsConfirmedCell) {
     totalsConfirmedCell.textContent = `${confirmedCount}/${timesheets.length}`;
   }
@@ -647,6 +705,9 @@ function addCurrentSummaryToReport() {
     actualHours: formatHoursValue(lastSummaryRecord.actualMinutes / 60),
     contractedHours: formatHoursValue(contractedMinutes / 60),
     actualisation: formatPercentage(lastSummaryRecord.actualisationPercent),
+    billing: formatCurrency(lastSummaryRecord.billingTotal),
+    pay: formatCurrency(lastSummaryRecord.payTotal),
+    travelPay: formatCurrency(lastSummaryRecord.travelPayTotal),
     savedAt: new Date().toISOString(),
   };
 
