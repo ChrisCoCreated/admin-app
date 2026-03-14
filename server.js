@@ -19,6 +19,7 @@ const routesRunHandler = require("./api/routes/run");
 const marketingPhotosHandler = require("./api/marketing/photos");
 const marketingMediaHandler = require("./api/marketing/media");
 const agendasHandler = require("./api/agendas");
+const agendaByIdHandler = require("./api/agendas/[id]");
 const agendaItemsHandler = require("./api/agendas/items");
 const tasksUnifiedHandler = require("./api/tasks/unified");
 const tasksOverlayHandler = require("./api/tasks/overlay");
@@ -264,6 +265,11 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await agendasHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/agendas/detail") {
+    await agendaByIdHandler(apiReq, apiRes);
     return true;
   }
 

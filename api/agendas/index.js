@@ -1,5 +1,11 @@
 const { requireApiAuth } = require("../_lib/require-api-auth");
-const { createAgendaForUser, listAgendasForUser, mapAgendaError, updateAgendaForUser } = require("../_lib/agendas/service");
+const {
+  createAgendaForUser,
+  listAgendasForUser,
+  listAgendaSummariesForUser,
+  mapAgendaError,
+  updateAgendaForUser,
+} = require("../_lib/agendas/service");
 
 module.exports = async (req, res) => {
   if (!(await requireApiAuth(req, res))) {
@@ -8,7 +14,10 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === "GET") {
-      const payload = await listAgendasForUser(req.authUser?.email || "");
+      const summaryOnly = String(req.query?.summaryOnly || "").trim().toLowerCase() === "true";
+      const payload = summaryOnly
+        ? await listAgendaSummariesForUser(req.authUser?.email || "")
+        : await listAgendasForUser(req.authUser?.email || "");
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json(payload);
       return;

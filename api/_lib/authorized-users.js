@@ -1,7 +1,6 @@
-const authorizedUsersConfig = require("../../data/authorized-users.json");
-
 const ACCESS_ENV_KEYS = [
   "ACCESS_FULL_EMAILS",
+  "ACCESS_DIRECTOR_EMAILS",
   "ACCESS_MARKETING_EMAILS",
   "ACCESS_PHOTO_LAYOUT_EMAILS",
   "ACCESS_TIME_EMAILS",
@@ -58,6 +57,10 @@ function resolveRoleFromFlags(flags) {
     return "admin";
   }
 
+  if (flags.director) {
+    return "director";
+  }
+
   const pages = [];
   if (flags.marketing) {
     pages.push("marketing", "photolayout");
@@ -89,6 +92,7 @@ function buildAuthorizedUsersFromEnv() {
     for (const email of emails) {
       const existing = flagsByEmail.get(email) || {
         full: false,
+        director: false,
         marketing: false,
         photoLayout: false,
         time: false,
@@ -102,6 +106,7 @@ function buildAuthorizedUsersFromEnv() {
   }
 
   mark(parseEmailList(process.env.ACCESS_FULL_EMAILS), "full");
+  mark(parseEmailList(process.env.ACCESS_DIRECTOR_EMAILS), "director");
   mark(parseEmailList(process.env.ACCESS_MARKETING_EMAILS), "marketing");
   mark(parseEmailList(process.env.ACCESS_PHOTO_LAYOUT_EMAILS), "photoLayout");
   mark(parseEmailList(process.env.ACCESS_TIME_EMAILS), "time");
@@ -120,29 +125,11 @@ function buildAuthorizedUsersFromEnv() {
 
   return map;
 }
-
-function buildAuthorizedUsersFromFile() {
-  return new Map(
-    (Array.isArray(authorizedUsersConfig?.users) ? authorizedUsersConfig.users : [])
-      .map((entry) => {
-        const email = canonicalizeEmail(entry?.email);
-        const role = String(entry?.role || "")
-          .trim()
-          .toLowerCase();
-        if (!email || !role) {
-          return null;
-        }
-        return [email, role];
-      })
-      .filter(Boolean)
-  );
-}
-
 function getAuthorizedUsersMap() {
-  if (hasAccessEnvConfig()) {
-    return buildAuthorizedUsersFromEnv();
+  if (!hasAccessEnvConfig()) {
+    return new Map();
   }
-  return buildAuthorizedUsersFromFile();
+  return buildAuthorizedUsersFromEnv();
 }
 
 module.exports = {

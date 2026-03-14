@@ -139,10 +139,18 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
-    async listAgendas() {
-      const response = await authFetch(endpoint("/api/agendas"));
+    async listAgendas(query = {}) {
+      const response = await authFetch(buildUrl("/api/agendas", query));
       if (!response.ok) {
         await parseError(response, "Agendas request failed");
+      }
+      return response.json();
+    },
+
+    async getAgendaDetail(query = {}) {
+      const response = await authFetch(buildUrl("/api/agendas/detail", query));
+      if (!response.ok) {
+        await parseError(response, "Agenda detail request failed");
       }
       return response.json();
     },

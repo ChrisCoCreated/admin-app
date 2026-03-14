@@ -35,19 +35,64 @@ function buildMemberRows(agendaId, ownerEmail, participantEmails = [], participa
   return rows;
 }
 
-async function loadVisibleAgendaContext(userEmail) {
+async function loadVisibleAgendaContext(userEmail, options = {}) {
+  const includeItems = options.includeItems !== false;
   const memberships = await listMembershipsByUser(userEmail);
   const agendaIds = Array.from(new Set(memberships.map((row) => String(row.agenda_id || "").trim()).filter(Boolean)));
   if (!agendaIds.length) {
     return { agendas: [] };
   }
 
-  const [agendaRows, memberRows, itemRows] = await Promise.all([
-    listAgendasByIds(agendaIds),
-    listAgendaMembersByAgendaIds(agendaIds),
-    listAgendaItemsByAgendaIds(agendaIds),
-  ]);
+  const fetches = [listAgendasByIds(agendaIds), listAgendaMembersByAgendaIds(agendaIds)];
+  if (includeItems) {
+    fetches.push(listAgendaItemsByAgendaIds(agendaIds));
+  }
+  const [agendaRows, memberRows, itemRows = []] = await Promise.all(fetches);
 
+  const membersByAgenda = new Map();
+  const itemsByAgenda = new Map();
+
+  memberRows.forEach((row) => {
+    const key = String(row.agenda_id || "").trim();
+    if (!membersByAgenda.has(key)) {
+      membersByAgenda.set(key, []);
+    }
+    membersByAgenda.get(key).push(row);
+  });
+
+  itemRows.forEach((row) => {
+    const key = String(row.agenda_id || "").trim();
+    if (!itemsByAgenda.has(key)) {
+      itemsByAgenda.set(key, []);
+    }
+    itemsByAgenda.get(key).push(mapAgendaItemRow(row));
+  });
+
+  const agendas = agendaRows
+    .map((row) => mapAgendaRow(row, membersByAgenda.get(String(row.id || "").trim()) || [], itemsByAgenda.get(String(row.id || "").trim()) || []))
+    .filter((agenda) => agenda && agenda.id);
+
+  return { agendas };
+}
+
+async function loadVisibleAgendaContextForIds(userEmail, agendaIds = [], options = {}) {
+  const includeItems = options.includeItems !== false;
+  const memberships = await listMembershipsByUser(userEmail);
+  const visibleAgendaIds = new Set(memberships.map((row) => String(row.agenda_id || "").trim()).filter(Boolean));
+  const requestedIds = (Array.isArray(agendaIds) ? agendaIds : [])
+    .map((id) => String(id || "").trim())
+    .filter((id) => visibleAgendaIds.has(id));
+
+  if (!requestedIds.length) {
+    return { agendas: [] };
+  }
+
+  const fetches = [listAgendasByIds(requestedIds), listAgendaMembersByAgendaIds(requestedIds)];
+  if (includeItems) {
+    fetches.push(listAgendaItemsByAgendaIds(requestedIds));
+  }
+
+  const [agendaRows, memberRows, itemRows = []] = await Promise.all(fetches);
   const membersByAgenda = new Map();
   const itemsByAgenda = new Map();
 
@@ -145,6 +190,44 @@ async function listAgendasForUser(email) {
       totalAgendas: visibleAgendas.length,
       totalItems: visibleAgendas.reduce((sum, agenda) => sum + agenda.items.length, 0),
       currentUserEmail: normalizeEmail(email),
+    },
+  };
+}
+
+async function listAgendaSummariesForUser(email) {
+  const context = await loadVisibleAgendaContext(email, { includeItems: false });
+  const visibleAgendas = sortAgendas(
+    context.agendas
+      .filter((agenda) => canViewAgenda(agenda, email))
+      .map((agenda) => ({
+        ...agenda,
+        items: [],
+      }))
+  );
+
+  return {
+    agendas: visibleAgendas,
+    meta: {
+      totalAgendas: visibleAgendas.length,
+      currentUserEmail: normalizeEmail(email),
+    },
+  };
+}
+
+async function getAgendaDetailForUser(email, agendaId) {
+  const context = await loadVisibleAgendaContextForIds(email, [agendaId], { includeItems: true });
+  const agenda = context.agendas.find((entry) => entry.id === ensureUuid(agendaId, "Agenda"));
+  if (!agenda || !canViewAgenda(agenda, email)) {
+    const error = new Error("Agenda not found.");
+    error.status = 404;
+    error.code = "AGENDA_NOT_FOUND";
+    throw error;
+  }
+
+  return {
+    agenda: {
+      ...agenda,
+      items: sortItems(agenda.items.filter((item) => canViewAgendaItem(item, agenda, email))),
     },
   };
 }
@@ -282,7 +365,9 @@ function mapAgendaError(error) {
 module.exports = {
   createAgendaForUser,
   createAgendaItemForUser,
+  getAgendaDetailForUser,
   listAgendasForUser,
+  listAgendaSummariesForUser,
   mapAgendaError,
   updateAgendaForUser,
   updateAgendaItemForUser,

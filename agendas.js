@@ -60,9 +60,11 @@ const authController = createAuthController({
   clientId: FRONTEND_CONFIG.spaClientId,
 });
 const directoryApi = createDirectoryApi(authController);
+const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
 
 let currentUser = null;
 let agendas = [];
+let agendaDetailsById = new Map();
 let selectedAgendaId = "";
 let selectedItemId = "";
 let busy = false;
@@ -70,6 +72,7 @@ let dragItemId = "";
 let createPanelExpanded = false;
 let agendaSettingsExpanded = false;
 let agendaItemComposerExpanded = false;
+const loadingAgendaDetails = new Set();
 
 function setBusy(value) {
   busy = value;
@@ -145,7 +148,7 @@ function displayNameForEmail(email) {
 }
 
 function selectedAgenda() {
-  return agendas.find((agenda) => agenda.id === selectedAgendaId) || null;
+  return agendaDetailsById.get(selectedAgendaId) || agendas.find((agenda) => agenda.id === selectedAgendaId) || null;
 }
 
 function selectedItem() {
@@ -183,7 +186,7 @@ function renderQuickCreate() {
           isPrivate: false,
         });
         setCreatePanelExpanded(false);
-        await loadAgendas(`1:1 with ${person.name} created.`);
+        await refreshAgendas(`1:1 with ${person.name} created.`);
       } catch (error) {
         console.error(error);
         setStatus(error?.message || "Could not create 1:1 agenda.", true);
@@ -232,9 +235,10 @@ function filteredAgendas() {
 }
 
 function filteredItems(agenda) {
+  const allItems = Array.isArray(agenda?.items) ? agenda.items : [];
   const query = String(itemSearchInput.value || "").trim().toLowerCase();
   const stage = String(itemStageFilter.value || "").trim().toLowerCase();
-  return agenda.items.filter((item) => {
+  return allItems.filter((item) => {
     if (stage && String(item.stageTag || "").trim().toLowerCase() !== stage) {
       return false;
     }
@@ -269,6 +273,7 @@ function renderAgendaList() {
       selectedItemId = "";
       renderAgendaList();
       renderAgendaDetail();
+      void loadAgendaDetail(agenda.id);
     });
     agendaList.appendChild(button);
   });
@@ -403,26 +408,138 @@ function renderAgendaDetail() {
   saveAgendaSettingsBtn.disabled = !isOwner;
   editAgendaSettingsBtn.hidden = !isOwner;
 
-  if (selectedItemId && !agenda.items.some((item) => item.id === selectedItemId)) {
+  const detailLoaded = agendaDetailsById.has(agenda.id);
+  const agendaItems = Array.isArray(agenda.items) ? agenda.items : [];
+
+  if (selectedItemId && !agendaItems.some((item) => item.id === selectedItemId)) {
     selectedItemId = "";
   }
   setAgendaSettingsExpanded(false);
-  populateItemForm(selectedItem());
+  populateItemForm(detailLoaded ? selectedItem() : null);
+
+  if (!detailLoaded) {
+    agendaItemsList.innerHTML = '<p class="muted scorecard-empty-state">Loading agenda items...</p>';
+    agendaItemsEmpty.hidden = true;
+    return;
+  }
+
   renderAgendaItems(agenda);
 }
 
-async function loadAgendas(status = "") {
-  const payload = await directoryApi.listAgendas();
-  agendas = Array.isArray(payload?.agendas) ? payload.agendas : [];
+function agendaSummaryCacheKey(email) {
+  return `${AGENDA_SUMMARY_CACHE_PREFIX}:${normalizeEmail(email)}`;
+}
+
+function readCachedAgendaSummaries() {
+  try {
+    const raw = window.localStorage.getItem(agendaSummaryCacheKey(currentUser?.email || ""));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.agendas) ? parsed.agendas : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedAgendaSummaries() {
+  try {
+    window.localStorage.setItem(
+      agendaSummaryCacheKey(currentUser?.email || ""),
+      JSON.stringify({
+        agendas,
+        cachedAt: new Date().toISOString(),
+      })
+    );
+  } catch {
+    // Ignore cache write errors.
+  }
+}
+
+function applyAgendaSummaries(nextAgendas) {
+  agendas = Array.isArray(nextAgendas) ? nextAgendas : [];
   if (!selectedAgendaId && agendas.length) {
     selectedAgendaId = agendas[0].id;
   }
   if (selectedAgendaId && !agendas.some((agenda) => agenda.id === selectedAgendaId)) {
     selectedAgendaId = agendas[0]?.id || "";
+    selectedItemId = "";
   }
+  const visibleIds = new Set(agendas.map((agenda) => agenda.id));
+  agendaDetailsById = new Map([...agendaDetailsById.entries()].filter(([agendaId]) => visibleIds.has(agendaId)));
+}
+
+async function loadAgendaDetail(agendaId, options = {}) {
+  const normalizedAgendaId = String(agendaId || "").trim();
+  if (!normalizedAgendaId) {
+    return null;
+  }
+  if (loadingAgendaDetails.has(normalizedAgendaId)) {
+    return agendaDetailsById.get(normalizedAgendaId) || null;
+  }
+  if (!options.force && agendaDetailsById.has(normalizedAgendaId)) {
+    return agendaDetailsById.get(normalizedAgendaId) || null;
+  }
+
+  loadingAgendaDetails.add(normalizedAgendaId);
+  try {
+    const payload = await directoryApi.getAgendaDetail({ agendaId: normalizedAgendaId });
+    const agenda = payload?.agenda || null;
+    if (agenda?.id) {
+      agendaDetailsById.set(agenda.id, agenda);
+      if (agenda.id === selectedAgendaId) {
+        renderAgendaDetail();
+      }
+    }
+    return agenda;
+  } catch (error) {
+    console.error(error);
+    if (normalizedAgendaId === selectedAgendaId) {
+      setActionStatus(error?.message || "Could not load agenda details.", true);
+    }
+    return null;
+  } finally {
+    loadingAgendaDetails.delete(normalizedAgendaId);
+  }
+}
+
+async function loadAgendas(status = "", options = {}) {
+  const payload = await directoryApi.listAgendas({ summaryOnly: "true" });
+  const nextAgendas = Array.isArray(payload?.agendas) ? payload.agendas : [];
+  if (options.selectedAgendaId) {
+    selectedAgendaId = options.selectedAgendaId;
+  }
+  applyAgendaSummaries(nextAgendas);
+  writeCachedAgendaSummaries();
   renderAgendaList();
   renderAgendaDetail();
+  if (selectedAgendaId) {
+    void loadAgendaDetail(selectedAgendaId, { force: options.forceSelectedDetail === true });
+  }
   setStatus(status || `Loaded ${agendas.length} agenda${agendas.length === 1 ? "" : "s"}.`);
+}
+
+function hydrateAgendasFromCache() {
+  const cachedAgendas = readCachedAgendaSummaries();
+  if (!cachedAgendas.length) {
+    return false;
+  }
+  applyAgendaSummaries(cachedAgendas);
+  renderAgendaList();
+  renderAgendaDetail();
+  setStatus(`Loaded ${cachedAgendas.length} cached agenda${cachedAgendas.length === 1 ? "" : "s"}. Refreshing...`);
+  if (selectedAgendaId) {
+    void loadAgendaDetail(selectedAgendaId);
+  }
+  return true;
+}
+
+async function refreshAgendas(status = "", options = {}) {
+  await loadAgendas(status, options);
+  if (selectedAgendaId) {
+    await loadAgendaDetail(selectedAgendaId, { force: true });
+  }
 }
 
 function editorCommand(command, value = null) {
@@ -458,7 +575,7 @@ async function reorderItemToIndex(agenda, sourceItemId, insertIndex) {
   try {
     setActionStatus("Reordering item...");
     await directoryApi.updateAgendaItem({ itemId: sourceItemId, sortOrder });
-    await loadAgendas("Agenda order updated.");
+    await refreshAgendas("Agenda order updated.", { selectedAgendaId: agenda.id });
   } catch (error) {
     console.error(error);
     setActionStatus(error?.message || "Could not reorder item.", true);
@@ -486,6 +603,7 @@ async function init() {
     setCreatePanelExpanded(false);
     setAgendaSettingsExpanded(false);
     setAgendaItemComposerExpanded(false);
+    hydrateAgendasFromCache();
     await loadAgendas();
   } catch (error) {
     console.error(error);
@@ -515,7 +633,7 @@ agendaCreateForm?.addEventListener("submit", async (event) => {
     });
     agendaCreateForm.reset();
     setCreatePanelExpanded(false);
-    await loadAgendas("Agenda created.");
+    await refreshAgendas("Agenda created.");
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not create agenda.", true);
@@ -554,7 +672,7 @@ agendaSettingsForm?.addEventListener("submit", async (event) => {
       isPrivate: agendaPrivateEditInput.checked,
     });
     setAgendaSettingsExpanded(false);
-    await loadAgendas("Agenda settings saved.");
+    await refreshAgendas("Agenda settings saved.", { selectedAgendaId: agenda.id });
   } catch (error) {
     console.error(error);
     setActionStatus(error?.message || "Could not save agenda settings.", true);
@@ -599,10 +717,10 @@ agendaItemForm?.addEventListener("submit", async (event) => {
     setBusy(true);
     if (selectedItemId) {
       await directoryApi.updateAgendaItem({ itemId: selectedItemId, ...payload });
-      await loadAgendas("Agenda item updated.");
+      await refreshAgendas("Agenda item updated.", { selectedAgendaId: agenda.id });
     } else {
       await directoryApi.createAgendaItem({ agendaId: agenda.id, ...payload });
-      await loadAgendas("Agenda item created.");
+      await refreshAgendas("Agenda item created.", { selectedAgendaId: agenda.id });
     }
     resetItemForm();
   } catch (error) {
@@ -662,7 +780,7 @@ toggleCreatePanelBtn?.addEventListener("click", () => {
 refreshBtn?.addEventListener("click", async () => {
   try {
     setBusy(true);
-    await loadAgendas("Agendas refreshed.");
+    await refreshAgendas("Agendas refreshed.", { forceSelectedDetail: true });
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not refresh agendas.", true);

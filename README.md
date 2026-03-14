@@ -69,6 +69,7 @@ Set values in `frontend-config.js`:
 - `AZURE_TENANT_ID`
 - `AZURE_API_AUDIENCE` or `AZURE_API_CLIENT_ID`
 - `AZURE_REQUIRED_SCOPE` (default `client.read`)
+- At least one app access env var such as `ACCESS_FULL_EMAILS` or `ACCESS_DIRECTOR_EMAILS`
 - `SHAREPOINT_SITE_URL`
 - `SHAREPOINT_TASK_OVERLAY_LIST_NAME` (optional; default `TaskOverlay`)
 - `GRAPH_TOKEN_AUDIENCE` (optional override; defaults include Graph audiences)
@@ -96,6 +97,21 @@ Run costing vars (for Time Mapping):
 - `MAX_TIME` (minutes; used only if `MAX_DISTANCE` is empty)
 - `TRAVEL_PAY` (hourly rate for paid travel time)
 - `PER_MILE` (rate per paid mile)
+
+## App access roles
+
+Access is environment-driven only. `data/authorized-users.json` is not used for runtime authorization.
+
+Set comma-separated email lists with these env vars:
+
+- `ACCESS_FULL_EMAILS` for `admin`
+- `ACCESS_DIRECTOR_EMAILS` for `director`
+- `ACCESS_MARKETING_EMAILS` for `marketing`
+- `ACCESS_PHOTO_LAYOUT_EMAILS` for `photo_layout`
+- `ACCESS_TIME_EMAILS` for time-mapping roles
+- `ACCESS_HR_EMAILS` for HR roles
+- `ACCESS_CLIENTS_EMAILS` for client roles
+- `ACCESS_CONSULTANT_EMAILS` for `consultant`
 
 ## Redirect URI notes
 
