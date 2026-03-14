@@ -32,7 +32,6 @@ const agendaDetailWrap = document.getElementById("agendaDetailWrap");
 const agendaTitle = document.getElementById("agendaTitle");
 const agendaMeta = document.getElementById("agendaMeta");
 const agendaAttendees = document.getElementById("agendaAttendees");
-const editAgendaSettingsBtn = document.getElementById("editAgendaSettingsBtn");
 const agendaSettingsForm = document.getElementById("agendaSettingsForm");
 const agendaTitleEditInput = document.getElementById("agendaTitleEditInput");
 const agendaPeopleSummaryInput = document.getElementById("agendaPeopleSummaryInput");
@@ -54,7 +53,6 @@ const itemPrivateInput = document.getElementById("itemPrivateInput");
 const itemUrgentInput = document.getElementById("itemUrgentInput");
 const itemImportantInput = document.getElementById("itemImportantInput");
 const saveAgendaItemBtn = document.getElementById("saveAgendaItemBtn");
-const newAgendaItemBtn = document.getElementById("newAgendaItemBtn");
 const insertLinkBtn = document.getElementById("insertLinkBtn");
 
 const authController = createAuthController({
@@ -75,6 +73,7 @@ let createPanelExpanded = false;
 let agendaSettingsExpanded = false;
 let agendaItemComposerExpanded = false;
 let itemSearchExpanded = false;
+let itemDetailsExpanded = false;
 const loadingAgendaDetails = new Set();
 
 function setBusy(value) {
@@ -100,10 +99,6 @@ function setCreatePanelExpanded(value) {
 function setAgendaSettingsExpanded(value) {
   agendaSettingsExpanded = value === true;
   agendaSettingsForm.hidden = !agendaSettingsExpanded;
-  if (editAgendaSettingsBtn) {
-    editAgendaSettingsBtn.textContent = agendaSettingsExpanded ? "Close" : "Edit";
-    editAgendaSettingsBtn.setAttribute("aria-expanded", agendaSettingsExpanded ? "true" : "false");
-  }
 }
 
 function setItemSearchExpanded(value) {
@@ -135,7 +130,6 @@ function hasComposerContent() {
 function setAgendaItemComposerExpanded(value) {
   agendaItemComposerExpanded = value === true;
   agendaItemAdvanced.hidden = !agendaItemComposerExpanded;
-  newAgendaItemBtn.hidden = !agendaItemComposerExpanded;
 }
 
 function setActionStatus(message, isError = false) {
@@ -241,33 +235,62 @@ function filteredItems(agenda) {
   });
 }
 
+function agendaDisplayTitle(agenda) {
+  const detailedAgenda = agendaDetailsById.get(agenda?.id);
+  const title = String(detailedAgenda?.title || agenda?.title || "").trim();
+  if (title) {
+    return title;
+  }
+  const people = Array.isArray(agenda?.members)
+    ? agenda.members.map((member) => member.displayName || displayNameForEmail(member.userEmail)).filter(Boolean)
+    : [];
+  return people.join(", ") || "Agenda";
+}
+
 function renderAgendaList() {
   const list = filteredAgendas();
   agendaList.innerHTML = "";
   agendaListEmpty.hidden = list.length > 0;
 
   list.forEach((agenda) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "agenda-list-card";
+    const isOwner = normalizeEmail(agenda.ownerEmail) === normalizeEmail(currentUser?.email);
+    const card = document.createElement("article");
+    card.className = "agenda-list-card";
     if (agenda.id === selectedAgendaId) {
-      button.classList.add("is-selected");
+      card.classList.add("is-selected");
     }
     const people = agenda.members.map((member) => member.displayName || displayNameForEmail(member.userEmail));
-    button.innerHTML = `
-      <strong>${escapeHtml(agenda.title)}</strong>
-      <span>${agenda.isPrivate ? "Private" : ""}</span>
-      <small>${escapeHtml(people.join(", ") || "Just you")}</small>
+    card.innerHTML = `
+      <div class="agenda-list-card-top">
+        <button type="button" class="agenda-list-card-main">
+          <strong>${escapeHtml(agendaDisplayTitle(agenda))}</strong>
+          <span>${agenda.isPrivate ? "Private" : ""}</span>
+          <small>${escapeHtml(people.join(", ") || "Just you")}</small>
+        </button>
+        ${isOwner ? '<button type="button" class="ghost subtle agenda-card-edit-btn">Edit</button>' : ""}
+      </div>
     `;
-    button.addEventListener("click", () => {
-      selectedAgendaId = agenda.id;
-      selectedItemId = "";
-      renderAgendaList();
-      renderAgendaDetail();
-      void loadAgendaDetail(agenda.id);
+    card.querySelector(".agenda-list-card-main")?.addEventListener("click", () => {
+      void openAgenda(agenda.id);
     });
-    agendaList.appendChild(button);
+    card.querySelector(".agenda-card-edit-btn")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void openAgenda(agenda.id, { editSettings: true });
+    });
+    agendaList.appendChild(card);
   });
+}
+
+async function openAgenda(agendaId, options = {}) {
+  selectedAgendaId = agendaId;
+  selectedItemId = "";
+  setAgendaSettingsExpanded(options.editSettings === true);
+  renderAgendaList();
+  renderAgendaDetail();
+  await loadAgendaDetail(agendaId);
+  if (options.editSettings === true) {
+    setAgendaSettingsExpanded(true);
+  }
 }
 
 function resetItemForm() {
@@ -365,18 +388,31 @@ function renderAgendaItems(agenda) {
       item.isImportant ? '<span class="agenda-badge is-important">Important</span>' : "",
       item.isPrivate ? '<span class="agenda-badge">Private</span>' : "",
     ].join("");
+    const previewHtml = itemDetailsExpanded ? item.detailHtml || "<p></p>" : "";
 
     card.innerHTML = `
       <div class="agenda-item-card-head">
         <strong>${escapeHtml(item.title)}</strong>
-        <span class="agenda-drag-handle">Drag</span>
+        <button
+          type="button"
+          class="agenda-expand-toggle"
+          aria-label="${itemDetailsExpanded ? "Hide item details" : "Show item details"}"
+          aria-expanded="${itemDetailsExpanded ? "true" : "false"}"
+        >
+          <span aria-hidden="true">${itemDetailsExpanded ? "⌃" : "⌄"}</span>
+        </button>
       </div>
       <div class="agenda-item-badges">${badges}</div>
-      <div class="agenda-item-preview">${item.detailHtml || "<p></p>"}</div>
+      ${itemDetailsExpanded ? `<div class="agenda-item-preview">${previewHtml}</div>` : ""}
     `;
 
     card.addEventListener("click", () => {
       populateItemForm(item);
+      renderAgendaItems(agenda);
+    });
+    card.querySelector(".agenda-expand-toggle")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      itemDetailsExpanded = !itemDetailsExpanded;
       renderAgendaItems(agenda);
     });
     card.addEventListener("dragstart", () => {
@@ -413,7 +449,6 @@ function renderAgendaDetail() {
   agendaTitleEditInput.disabled = !isOwner;
   agendaPrivateEditInput.disabled = !isOwner;
   saveAgendaSettingsBtn.disabled = !isOwner;
-  editAgendaSettingsBtn.hidden = !isOwner;
 
   const detailLoaded = agendaDetailsById.has(agenda.id);
   const agendaItems = Array.isArray(agenda.items) ? agenda.items : [];
@@ -421,7 +456,6 @@ function renderAgendaDetail() {
   if (selectedItemId && !agendaItems.some((item) => item.id === selectedItemId)) {
     selectedItemId = "";
   }
-  setAgendaSettingsExpanded(false);
   populateItemForm(detailLoaded ? selectedItem() : null);
 
   if (!detailLoaded) {
@@ -495,6 +529,7 @@ async function loadAgendaDetail(agendaId, options = {}) {
     const agenda = payload?.agenda || null;
     if (agenda?.id) {
       agendaDetailsById.set(agenda.id, agenda);
+      renderAgendaList();
       if (agenda.id === selectedAgendaId) {
         renderAgendaDetail();
       }
@@ -653,14 +688,6 @@ agendaSearchInput?.addEventListener("input", () => {
   renderAgendaList();
 });
 
-editAgendaSettingsBtn?.addEventListener("click", () => {
-  const agenda = selectedAgenda();
-  if (!agenda) {
-    return;
-  }
-  setAgendaSettingsExpanded(!agendaSettingsExpanded);
-});
-
 agendaSettingsForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const agenda = selectedAgenda();
@@ -736,10 +763,6 @@ agendaItemForm?.addEventListener("submit", async (event) => {
   } finally {
     setBusy(false);
   }
-});
-
-newAgendaItemBtn?.addEventListener("click", () => {
-  resetItemForm();
 });
 
 itemTitleInput?.addEventListener("input", () => {
