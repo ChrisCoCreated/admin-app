@@ -241,10 +241,7 @@ function agendaDisplayTitle(agenda) {
   if (title) {
     return title;
   }
-  const people = Array.isArray(agenda?.members)
-    ? agenda.members.map((member) => member.displayName || displayNameForEmail(member.userEmail)).filter(Boolean)
-    : [];
-  return people.join(", ") || "Agenda";
+  return "Untitled agenda";
 }
 
 function renderAgendaList() {
@@ -267,7 +264,11 @@ function renderAgendaList() {
           <span>${agenda.isPrivate ? "Private" : ""}</span>
           <small>${escapeHtml(people.join(", ") || "Just you")}</small>
         </button>
-        ${isOwner ? '<button type="button" class="ghost subtle agenda-card-edit-btn">Edit</button>' : ""}
+        ${
+          isOwner
+            ? '<button type="button" class="ghost subtle icon-only agenda-card-edit-btn" aria-label="Edit agenda"><span aria-hidden="true">✎</span></button>'
+            : ""
+        }
       </div>
     `;
     card.querySelector(".agenda-list-card-main")?.addEventListener("click", () => {
@@ -559,6 +560,11 @@ async function loadAgendas(status = "", options = {}) {
   if (selectedAgendaId) {
     void loadAgendaDetail(selectedAgendaId, { force: options.forceSelectedDetail === true });
   }
+  agendas.forEach((agenda) => {
+    if (agenda.id && agenda.id !== selectedAgendaId) {
+      void loadAgendaDetail(agenda.id);
+    }
+  });
   setStatus(status || `Loaded ${agendas.length} agenda${agendas.length === 1 ? "" : "s"}.`);
 }
 
@@ -571,9 +577,11 @@ function hydrateAgendasFromCache() {
   renderAgendaList();
   renderAgendaDetail();
   setStatus(`Loaded ${cachedAgendas.length} cached agenda${cachedAgendas.length === 1 ? "" : "s"}. Refreshing...`);
-  if (selectedAgendaId) {
-    void loadAgendaDetail(selectedAgendaId);
-  }
+  agendas.forEach((agenda) => {
+    if (agenda.id) {
+      void loadAgendaDetail(agenda.id);
+    }
+  });
   return true;
 }
 

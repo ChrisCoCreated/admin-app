@@ -2773,6 +2773,11 @@ body.lightbox-open {
   text-align: left;
 }
 
+.agenda-list-card-main strong {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
 .agenda-list-card-main strong,
 .agenda-list-card-main span,
 .agenda-list-card-main small {
@@ -2787,6 +2792,10 @@ body.lightbox-open {
 
 .agenda-card-edit-btn {
   margin-top: 0.05rem;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
 }
 
 .agenda-list-card.is-selected {
