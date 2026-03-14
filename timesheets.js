@@ -23,6 +23,7 @@ const summaryUnconfirmed = document.getElementById("summaryUnconfirmed");
 const summaryClients = document.getElementById("summaryClients");
 const timesheetsTableBody = document.getElementById("timesheetsTableBody");
 const timesheetsTableFoot = document.getElementById("timesheetsTableFoot");
+const timesheetDetailsPanel = document.getElementById("timesheetDetailsPanel");
 const totalsScheduledCell = document.getElementById("totalsScheduledCell");
 const totalsActualCell = document.getElementById("totalsActualCell");
 const totalsVarianceCell = document.getElementById("totalsVarianceCell");
@@ -140,7 +141,8 @@ function parseDateValue(value) {
   if (!raw) {
     return null;
   }
-  const parsed = new Date(raw.includes("T") ? raw : `${raw}T00:00:00`);
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00` : raw.replace(" ", "T");
+  const parsed = new Date(normalized);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
@@ -229,6 +231,13 @@ function getContractedMinutesForPeriod(carer, appliedQuery) {
   }
 
   const contracted = carer?.raw?.contracted_hrs || carer?.raw?.contracted_hours || null;
+  const totalWeeklyFromRaw = Number(
+    contracted?.total_weekly ??
+      carer?.raw?.contracted_hrs_total ??
+      carer?.raw?.contracted_hours_total ??
+      carer?.contractedHours ??
+      0
+  );
   const weekdayMinutes = {
     0: Number(contracted?.sunday || 0) * 60,
     1: Number(contracted?.monday || 0) * 60,
@@ -247,7 +256,7 @@ function getContractedMinutesForPeriod(carer, appliedQuery) {
     return total;
   }
 
-  const weeklyHours = Number(carer?.contractedHours || 0);
+  const weeklyHours = Number.isFinite(totalWeeklyFromRaw) ? totalWeeklyFromRaw : Number(carer?.contractedHours || 0);
   if (!Number.isFinite(weeklyHours) || weeklyHours <= 0) {
     return 0;
   }
@@ -431,11 +440,17 @@ function renderTimesheets(timesheets) {
 
   if (!timesheets.length) {
     emptyState.textContent = "No timesheets were returned for that selection.";
+    if (timesheetDetailsPanel) {
+      timesheetDetailsPanel.open = false;
+    }
     summaryPanel.hidden = true;
     return;
   }
 
   emptyState.textContent = "";
+  if (timesheetDetailsPanel) {
+    timesheetDetailsPanel.open = false;
+  }
   const scheduledTotal = timesheets.reduce((sum, item) => sum + item.scheduledMinutes, 0);
   const actualTotal = timesheets.reduce((sum, item) => sum + item.actualMinutes, 0);
   const varianceTotal = actualTotal - scheduledTotal;
@@ -506,7 +521,10 @@ async function fetchTimesheets() {
     console.error(error);
     timesheetsTableBody.innerHTML = "";
     summaryPanel.hidden = true;
-    emptyState.textContent = "Choose a carer and fetch a range to see timesheets.";
+    if (timesheetDetailsPanel) {
+      timesheetDetailsPanel.open = false;
+    }
+    emptyState.textContent = "Choose a carer and fetch a range to see totals.";
     setStatus(error?.message || "Could not load timesheets.", true);
   } finally {
     fetchTimesheetsBtn.disabled = false;

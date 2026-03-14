@@ -113,41 +113,46 @@
       </section>
 
       <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Timesheet results</h2>
-            <p class="muted">Results are grouped in a single table so they can be copied into follow-up work quickly.</p>
+        <details id="timesheetDetailsPanel">
+          <summary class="timesheet-detail-summary">Show visit detail</summary>
+          <div class="timesheet-detail-body">
+            <div class="panel-head">
+              <div>
+                <h2>Timesheet detail</h2>
+                <p class="muted">Open this only when you need the visit-by-visit breakdown.</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Carer</th>
+                    <th>Client</th>
+                    <th>Job Type</th>
+                    <th>Scheduled</th>
+                    <th>Actual</th>
+                    <th>Variance</th>
+                    <th>Actualisation</th>
+                    <th>Confirmed</th>
+                  </tr>
+                </thead>
+                <tbody id="timesheetsTableBody"></tbody>
+                <tfoot id="timesheetsTableFoot" hidden>
+                  <tr class="timesheet-total-row">
+                    <td colspan="4">Totals</td>
+                    <td id="totalsScheduledCell">0h 00m</td>
+                    <td id="totalsActualCell">0h 00m</td>
+                    <td id="totalsVarianceCell">0h 00m</td>
+                    <td id="totalsActualisationCell">0%</td>
+                    <td id="totalsConfirmedCell">0/0</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Carer</th>
-                <th>Client</th>
-                <th>Job Type</th>
-                <th>Scheduled</th>
-                <th>Actual</th>
-                <th>Variance</th>
-                <th>Actualisation</th>
-                <th>Confirmed</th>
-              </tr>
-            </thead>
-            <tbody id="timesheetsTableBody"></tbody>
-            <tfoot id="timesheetsTableFoot" hidden>
-              <tr class="timesheet-total-row">
-                <td colspan="4">Totals</td>
-                <td id="totalsScheduledCell">0h 00m</td>
-                <td id="totalsActualCell">0h 00m</td>
-                <td id="totalsVarianceCell">0h 00m</td>
-                <td id="totalsActualisationCell">0%</td>
-                <td id="totalsConfirmedCell">0/0</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        <p id="emptyState" class="muted">Choose a carer and fetch a range to see timesheets.</p>
+        </details>
+        <p id="emptyState" class="muted">Choose a carer and fetch a range to see totals.</p>
       </section>
     </main>
 
