@@ -139,6 +139,70 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listAgendas() {
+      const response = await authFetch(endpoint("/api/agendas"));
+      if (!response.ok) {
+        await parseError(response, "Agendas request failed");
+      }
+      return response.json();
+    },
+
+    async createAgenda(payload = {}) {
+      const response = await authFetch(endpoint("/api/agendas"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Agenda create failed");
+      }
+      return response.json();
+    },
+
+    async updateAgenda(payload = {}) {
+      const response = await authFetch(endpoint("/api/agendas"), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Agenda update failed");
+      }
+      return response.json();
+    },
+
+    async createAgendaItem(payload = {}) {
+      const response = await authFetch(endpoint("/api/agendas/items"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Agenda item create failed");
+      }
+      return response.json();
+    },
+
+    async updateAgendaItem(payload = {}) {
+      const response = await authFetch(endpoint("/api/agendas/items"), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Agenda item update failed");
+      }
+      return response.json();
+    },
+
     async listClients(query = {}) {
       const response = await authFetch(buildUrl("/api/clients", query));
       if (!response.ok) {

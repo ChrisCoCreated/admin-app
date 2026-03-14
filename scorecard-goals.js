@@ -41,12 +41,14 @@ function setBusy(isBusy) {
   loading = isBusy;
   addGoalBtn.disabled = isBusy || saving;
   saveNowBtn.disabled = isBusy || saving;
+  updateMoveButtons();
 }
 
 function setSaving(isSaving) {
   saving = isSaving;
   addGoalBtn.disabled = loading || isSaving;
   saveNowBtn.disabled = loading || isSaving;
+  updateMoveButtons();
 }
 
 function escapeHtml(value) {

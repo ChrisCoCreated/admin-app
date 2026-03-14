@@ -18,6 +18,8 @@ const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
 const marketingPhotosHandler = require("./api/marketing/photos");
 const marketingMediaHandler = require("./api/marketing/media");
+const agendasHandler = require("./api/agendas");
+const agendaItemsHandler = require("./api/agendas/items");
 const tasksUnifiedHandler = require("./api/tasks/unified");
 const tasksOverlayHandler = require("./api/tasks/overlay");
 const tasksWhiteboardHandler = require("./api/tasks/whiteboard");
@@ -254,6 +256,22 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/auth/me") {
     await authMeHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/agendas") {
+    if (req.method === "POST" || req.method === "PATCH") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await agendasHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/agendas/items") {
+    if (req.method === "POST" || req.method === "PATCH") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await agendaItemsHandler(apiReq, apiRes);
     return true;
   }
 

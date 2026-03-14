@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Agendas</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/thrive-mascot-RGB.svg?v=teal" />
+    <link rel="alternate icon" href="./favicon.ico?v=teal" sizes="any" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260314a" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container agendas-main">
+      <section class="hero compact">
+        <h1>Shared Agendas</h1>
+        <p>Run 1:1s and group meeting agendas together, while keeping private agendas and private items visible only to their owner.</p>
+      </section>
+
+      <section class="panel agenda-create-panel">
+        <div class="agenda-create-head">
+          <div>
+            <h2>Quick Create</h2>
+            <p class="muted">Create the regular 1:1s instantly, or build a shared huddle agenda.</p>
+          </div>
+          <p id="statusMessage" class="muted">Loading agendas...</p>
+        </div>
+        <div id="quickAgendaButtons" class="agenda-quick-grid"></div>
+        <form id="agendaCreateForm" class="agenda-create-form">
+          <label class="field" for="agendaTitleInput">
+            Agenda title
+            <input id="agendaTitleInput" type="text" placeholder="Weekly huddle" />
+          </label>
+          <label class="field" for="agendaTypeSelect">
+            Agenda type
+            <select id="agendaTypeSelect">
+              <option value="meeting">Meeting</option>
+              <option value="one_to_one">1:1</option>
+            </select>
+          </label>
+          <fieldset class="agenda-people-picker">
+            <legend>People</legend>
+            <div id="agendaPeoplePicker" class="agenda-people-grid"></div>
+          </fieldset>
+          <label class="checkbox-row" for="agendaPrivateInput">
+            <input id="agendaPrivateInput" type="checkbox" />
+            Private agenda
+          </label>
+          <button id="createAgendaBtn" type="submit">Create agenda</button>
+        </form>
+      </section>
+
+      <section class="agendas-layout">
+        <article class="panel agenda-list-panel">
+          <div class="agenda-list-head">
+            <h2>Your agendas</h2>
+            <label class="field" for="agendaSearchInput">
+              Search
+              <input id="agendaSearchInput" type="search" placeholder="Search agendas" />
+            </label>
+          </div>
+          <div id="agendaList" class="agenda-list"></div>
+          <p id="agendaListEmpty" class="muted" hidden>No agendas yet.</p>
+        </article>
+
+        <article class="panel agenda-detail-panel">
+          <div id="agendaEmptyState" class="agenda-empty-state">
+            <h2>Select an agenda</h2>
+            <p class="muted">Pick an agenda on the left to review and add talking points.</p>
+          </div>
+
+          <div id="agendaDetailWrap" hidden>
+            <div class="agenda-detail-head">
+              <div>
+                <h2 id="agendaTitle"></h2>
+                <p id="agendaMeta" class="muted"></p>
+              </div>
+              <button id="refreshBtn" class="secondary" type="button">Refresh</button>
+            </div>
+
+            <form id="agendaSettingsForm" class="agenda-settings-form">
+              <label class="field" for="agendaTitleEditInput">
+                Title
+                <input id="agendaTitleEditInput" type="text" />
+              </label>
+              <label class="field" for="agendaPeopleSummaryInput">
+                People
+                <input id="agendaPeopleSummaryInput" type="text" readonly />
+              </label>
+              <label class="checkbox-row" for="agendaPrivateEditInput">
+                <input id="agendaPrivateEditInput" type="checkbox" />
+                Private agenda
+              </label>
+              <button id="saveAgendaSettingsBtn" class="secondary" type="submit">Save agenda settings</button>
+            </form>
+
+            <div class="agenda-item-toolbar">
+              <label class="field" for="itemSearchInput">
+                Search items
+                <input id="itemSearchInput" type="search" placeholder="Search title or detail" />
+              </label>
+              <label class="field" for="itemStageFilter">
+                Stage
+                <select id="itemStageFilter">
+                  <option value="">All</option>
+                  <option value="incubating">Incubating</option>
+                  <option value="ready">Ready</option>
+                  <option value="decision">Decision</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="agenda-items-grid">
+              <div>
+                <h3>Items</h3>
+                <div id="agendaItemsList" class="agenda-items-list"></div>
+                <p id="agendaItemsEmpty" class="muted" hidden>No agenda items yet.</p>
+              </div>
+
+              <form id="agendaItemForm" class="agenda-item-form">
+                <h3 id="itemFormHeading">New item</h3>
+                <label class="field" for="itemTitleInput">
+                  Title
+                  <input id="itemTitleInput" type="text" placeholder="Topic or talking point" />
+                </label>
+
+                <div class="editor-shell">
+                  <div class="editor-toolbar">
+                    <button type="button" class="editor-btn" data-cmd="bold">Bold</button>
+                    <button type="button" class="editor-btn" data-cmd="italic">Italic</button>
+                    <button type="button" class="editor-btn" data-cmd="insertUnorderedList">Bullets</button>
+                    <button type="button" id="insertLinkBtn" class="editor-btn">Link</button>
+                  </div>
+                  <div id="itemDetailEditor" class="editor-surface" contenteditable="true"></div>
+                </div>
+
+                <label class="field" for="itemStageSelect">
+                  Stage
+                  <select id="itemStageSelect">
+                    <option value="">None</option>
+                    <option value="incubating">Incubating</option>
+                    <option value="ready">Ready</option>
+                    <option value="decision">Decision</option>
+                    <option value="blocked">Blocked</option>
+                  </select>
+                </label>
+
+                <div class="agenda-flag-row">
+                  <label class="checkbox-row" for="itemPrivateInput">
+                    <input id="itemPrivateInput" type="checkbox" />
+                    Private item
+                  </label>
+                  <label class="checkbox-row" for="itemUrgentInput">
+                    <input id="itemUrgentInput" type="checkbox" />
+                    Urgent
+                  </label>
+                  <label class="checkbox-row" for="itemImportantInput">
+                    <input id="itemImportantInput" type="checkbox" />
+                    Important
+                  </label>
+                </div>
+
+                <div class="row wrap-row">
+                  <button id="saveAgendaItemBtn" type="submit">Save item</button>
+                  <button id="newAgendaItemBtn" class="secondary" type="button">New item</button>
+                </div>
+                <p id="actionStatus" class="muted"></p>
+              </form>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./agendas.js"></script>
+  </body>
+</html>

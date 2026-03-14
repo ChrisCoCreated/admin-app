@@ -77,6 +77,7 @@ function setBusy(isBusy) {
   if (saveNowBtn) {
     saveNowBtn.disabled = isBusy || saving;
   }
+  renderAllMoveButtons();
 }
 
 function setSaving(isSaving) {
@@ -90,6 +91,7 @@ function setSaving(isSaving) {
   if (saveNowBtn) {
     saveNowBtn.disabled = loading || isSaving;
   }
+  renderAllMoveButtons();
 }
 
 function escapeHtml(value) {
