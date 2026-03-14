@@ -267,6 +267,13 @@ function enrichTimesheet(item) {
   };
 }
 
+function getCarerLabel(carer) {
+  const name = String(carer?.name || "Unnamed carer").trim();
+  const id = String(carer?.id || "").trim();
+  const area = String(carer?.area || "").trim();
+  return [name, id ? `#${id}` : "", area].filter(Boolean).join(" - ");
+}
+
 function renderCarerOptions() {
   const existingValue = String(carerSelect?.value || "");
   const query = normalizeText(carerSearchInput?.value);
