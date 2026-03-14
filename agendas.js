@@ -10,6 +10,8 @@ const ORG_PEOPLE = [
   { name: "Agota", email: "agota@planwithcare.co.uk" },
   { name: "Miska", email: "michalina@thrivehomecare.co.uk" },
   { name: "Claire", email: "claire@planwithcare.co.uk" },
+  { name: "Alise", email: "alise@planwithcare.co.uk" },
+  { name: "Paul", email: "paul@planwithcare.co.uk" },
 ];
 
 const signOutBtn = document.getElementById("signOutBtn");
@@ -43,7 +45,6 @@ const itemStageFilter = document.getElementById("itemStageFilter");
 const agendaItemsList = document.getElementById("agendaItemsList");
 const agendaItemsEmpty = document.getElementById("agendaItemsEmpty");
 const agendaItemForm = document.getElementById("agendaItemForm");
-const itemFormHeading = document.getElementById("itemFormHeading");
 const agendaItemAdvanced = document.getElementById("agendaItemAdvanced");
 const itemTitleInput = document.getElementById("itemTitleInput");
 const itemDetailEditor = document.getElementById("itemDetailEditor");
@@ -174,7 +175,7 @@ function renderQuickCreate() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "secondary agenda-quick-card";
-    button.innerHTML = `<strong>1:1 with ${escapeHtml(person.name)}</strong><span>${escapeHtml(person.email)}</span>`;
+    button.innerHTML = `<strong>1:1 with ${escapeHtml(person.name)}</strong>`;
     button.addEventListener("click", async () => {
       try {
         setBusy(true);
@@ -209,7 +210,6 @@ function renderPeoplePicker() {
       </span>
       <span class="agenda-person-copy">
         <strong>${escapeHtml(person.name)}</strong>
-        <small>${escapeHtml(person.email)}</small>
       </span>
     `;
     agendaPeoplePicker.appendChild(label);
@@ -281,7 +281,6 @@ function renderAgendaList() {
 
 function resetItemForm() {
   selectedItemId = "";
-  itemFormHeading.textContent = "New item";
   itemTitleInput.value = "";
   itemDetailEditor.innerHTML = "<p></p>";
   itemStageSelect.value = "";
@@ -297,7 +296,6 @@ function populateItemForm(item) {
     return;
   }
   selectedItemId = item.id;
-  itemFormHeading.textContent = "Edit item";
   itemTitleInput.value = item.title || "";
   itemDetailEditor.innerHTML = item.detailHtml || "<p></p>";
   itemStageSelect.value = item.stageTag || "";

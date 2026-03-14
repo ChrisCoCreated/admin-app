@@ -2703,7 +2703,7 @@ body.lightbox-open {
 .agenda-settings-panel,
 .agenda-items-panel {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.35rem;
 }
 
 .agenda-people-picker {
@@ -2736,18 +2736,12 @@ body.lightbox-open {
 
 .agenda-person-copy {
   display: grid;
-  gap: 0.2rem;
+  gap: 0;
   min-width: 0;
 }
 
 .agenda-person-copy strong {
   line-height: 1.2;
-}
-
-.agenda-person-option small {
-  opacity: 0.7;
-  overflow-wrap: anywhere;
-  line-height: 1.25;
 }
 
 .agendas-layout {
@@ -2816,7 +2810,7 @@ body.lightbox-open {
 .agenda-item-toolbar {
   grid-template-columns: minmax(0, 1fr) 220px;
   align-items: end;
-  margin-top: 0.15rem;
+  margin-top: 0.1rem;
 }
 
 .agenda-items-list {
@@ -2952,17 +2946,9 @@ body.lightbox-open {
 }
 
 .agenda-item-composer {
-  padding: 0.8rem 0.95rem;
-  border-radius: 18px;
-  border: 1px solid rgba(16, 33, 57, 0.08);
-  background: rgba(247, 250, 252, 0.78);
-}
-
-.agenda-item-composer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .agenda-item-composer .field {
@@ -3003,8 +2989,7 @@ body.lightbox-open {
 }
 
 @media (max-width: 900px) {
-  .agendas-layout,
-  .agenda-settings-summary {
+  .agendas-layout {
     grid-template-columns: 1fr;
   }
 

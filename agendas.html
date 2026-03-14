@@ -122,10 +122,6 @@
             </section>
 
             <form id="agendaItemForm" class="agenda-item-composer">
-              <div class="agenda-item-composer-head">
-                <h3 id="itemFormHeading">New item</h3>
-                <button id="newAgendaItemBtn" class="ghost" type="button" hidden>Clear</button>
-              </div>
               <label class="field" for="itemTitleInput">
                 <span class="sr-only">New item title</span>
                 <input id="itemTitleInput" type="text" placeholder="Add a talking point" />
@@ -171,6 +167,7 @@
                 </div>
 
                 <div class="row wrap-row">
+                  <button id="newAgendaItemBtn" class="ghost" type="button" hidden>Clear</button>
                   <button id="saveAgendaItemBtn" type="submit">Save item</button>
                 </div>
               </div>
@@ -195,7 +192,6 @@
             </div>
 
             <section class="agenda-items-panel">
-              <h3>Items</h3>
               <div id="agendaItemsList" class="agenda-items-list"></div>
               <p id="agendaItemsEmpty" class="muted" hidden>No agenda items yet.</p>
             </section>
