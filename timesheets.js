@@ -502,6 +502,7 @@ async function fetchTimesheets() {
   try {
     fetchTimesheetsBtn.disabled = true;
     const query = getRequestQuery();
+    console.log("[Timesheets] Selected carer object", selectedCarer);
     setStatus(`Loading timesheets for ${selectedCarer.name || "selected carer"}...`);
     const payload = await directoryApi.listTimesheets({
       carer_id: selectedCarer.id,
