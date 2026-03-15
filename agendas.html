@@ -41,16 +41,35 @@
       <section class="agendas-layout">
         <article class="panel agenda-list-panel">
           <div class="agenda-list-head">
-            <div>
+            <div class="agenda-list-title-row">
               <h2>Your agendas</h2>
-              <p id="statusMessage" class="muted">Loading agendas...</p>
+              <div class="agenda-list-icon-actions">
+                <button
+                  id="toggleAgendaSearchBtn"
+                  class="ghost subtle icon-only"
+                  type="button"
+                  aria-label="Search agendas"
+                  aria-expanded="false"
+                >
+                  <span aria-hidden="true">⌕</span>
+                </button>
+                <button
+                  id="toggleCreatePanelBtn"
+                  class="ghost subtle icon-only"
+                  type="button"
+                  aria-label="New meeting agenda"
+                  aria-expanded="false"
+                >
+                  <span aria-hidden="true">＋</span>
+                </button>
+              </div>
             </div>
-            <div class="agenda-list-actions">
+            <p id="statusMessage" class="muted">Loading agendas...</p>
+            <div id="agendaSearchField" class="agenda-list-search-field" hidden>
               <label class="field" for="agendaSearchInput">
-                Search
+                <span class="sr-only">Search agendas</span>
                 <input id="agendaSearchInput" type="search" placeholder="Search agendas" />
               </label>
-              <button id="toggleCreatePanelBtn" class="secondary" type="button" aria-expanded="false">New meeting agenda</button>
             </div>
           </div>
           <section id="agendaCreatePanel" class="agenda-inline-create" hidden>

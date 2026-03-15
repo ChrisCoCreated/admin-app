@@ -17,6 +17,7 @@ const ORG_PEOPLE = [
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const actionStatus = document.getElementById("actionStatus");
+const toggleAgendaSearchBtn = document.getElementById("toggleAgendaSearchBtn");
 const toggleCreatePanelBtn = document.getElementById("toggleCreatePanelBtn");
 const agendaCreatePanel = document.getElementById("agendaCreatePanel");
 const agendaPeoplePicker = document.getElementById("agendaPeoplePicker");
@@ -24,6 +25,7 @@ const agendaCreateForm = document.getElementById("agendaCreateForm");
 const agendaTitleInput = document.getElementById("agendaTitleInput");
 const agendaTypeSelect = document.getElementById("agendaTypeSelect");
 const agendaPrivateInput = document.getElementById("agendaPrivateInput");
+const agendaSearchField = document.getElementById("agendaSearchField");
 const agendaSearchInput = document.getElementById("agendaSearchInput");
 const agendaList = document.getElementById("agendaList");
 const agendaListEmpty = document.getElementById("agendaListEmpty");
@@ -73,6 +75,7 @@ let selectedItemId = "";
 let busy = false;
 let dragItemId = "";
 let createPanelExpanded = false;
+let agendaSearchExpanded = false;
 let agendaSettingsExpanded = false;
 let agendaItemComposerExpanded = false;
 let itemSearchExpanded = false;
@@ -112,8 +115,24 @@ function setCreatePanelExpanded(value) {
   createPanelExpanded = value === true;
   agendaCreatePanel.hidden = !createPanelExpanded;
   if (toggleCreatePanelBtn) {
-    toggleCreatePanelBtn.textContent = createPanelExpanded ? "Minimise" : "New meeting agenda";
     toggleCreatePanelBtn.setAttribute("aria-expanded", createPanelExpanded ? "true" : "false");
+  }
+}
+
+function setAgendaSearchExpanded(value) {
+  agendaSearchExpanded = value === true;
+  if (agendaSearchField) {
+    agendaSearchField.hidden = !agendaSearchExpanded;
+  }
+  if (toggleAgendaSearchBtn) {
+    toggleAgendaSearchBtn.setAttribute("aria-expanded", agendaSearchExpanded ? "true" : "false");
+  }
+  if (agendaSearchExpanded) {
+    agendaSearchInput?.focus();
+    return;
+  }
+  if (agendaSearchInput) {
+    agendaSearchInput.value = "";
   }
 }
 
@@ -1457,6 +1476,14 @@ agendaCreateForm?.addEventListener("submit", async (event) => {
 
 agendaSearchInput?.addEventListener("input", () => {
   renderAgendaList();
+});
+
+toggleAgendaSearchBtn?.addEventListener("click", () => {
+  const nextExpanded = !agendaSearchExpanded;
+  setAgendaSearchExpanded(nextExpanded);
+  if (!nextExpanded) {
+    renderAgendaList();
+  }
 });
 
 agendaSettingsForm?.addEventListener("submit", async (event) => {

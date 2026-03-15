@@ -2756,24 +2756,25 @@ body.lightbox-open {
   gap: 0.85rem;
 }
 
-.agenda-list-actions {
+.agenda-list-title-row {
   display: flex;
-  align-items: start;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.75rem;
-  flex-wrap: wrap;
 }
 
-.agenda-list-actions {
-  display: grid;
-  gap: 0.75rem;
-  justify-items: start;
+.agenda-list-icon-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
-.agenda-list-actions .field {
+.agenda-list-search-field .field {
   width: min(100%, 420px);
 }
 
-.agenda-list-actions .field input {
+.agenda-list-search-field .field input {
   width: 100%;
 }
 
@@ -3459,11 +3460,19 @@ body.lightbox-open {
     flex-direction: column;
   }
 
-  .agenda-list-actions,
   .agenda-create-actions {
     width: 100%;
     justify-content: space-between;
     grid-template-columns: 1fr;
+  }
+
+  .agenda-list-title-row {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .agenda-list-icon-actions {
+    align-self: flex-start;
   }
 
   .agenda-list-panel,
