@@ -310,6 +310,7 @@ async function createAgendaItemForUser(email, body) {
     is_important: payload.isImportant === true,
     sort_order: payload.sortOrder,
     stage_tag: payload.stageTag || "",
+    status: payload.status || "active",
     owner_email: payload.ownerEmail,
     task_map: Object.prototype.hasOwnProperty.call(payload, "taskMaps") ? payload.taskMaps : null,
   });
@@ -345,6 +346,7 @@ async function updateAgendaItemForUser(email, body) {
     ...(Object.prototype.hasOwnProperty.call(payload, "isImportant") ? { is_important: payload.isImportant === true } : {}),
     ...(Object.prototype.hasOwnProperty.call(payload, "sortOrder") ? { sort_order: payload.sortOrder } : {}),
     ...(Object.prototype.hasOwnProperty.call(payload, "stageTag") ? { stage_tag: payload.stageTag || "" } : {}),
+    ...(Object.prototype.hasOwnProperty.call(payload, "status") ? { status: payload.status || "active" } : {}),
     ...(Object.prototype.hasOwnProperty.call(payload, "taskMaps") ? { task_map: payload.taskMaps } : {}),
     updated_at: new Date().toISOString(),
   });

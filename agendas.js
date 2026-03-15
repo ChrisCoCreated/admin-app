@@ -32,6 +32,8 @@ const agendaDetailWrap = document.getElementById("agendaDetailWrap");
 const agendaTitle = document.getElementById("agendaTitle");
 const agendaMeta = document.getElementById("agendaMeta");
 const agendaAttendees = document.getElementById("agendaAttendees");
+const copyAgendaExportBtn = document.getElementById("copyAgendaExportBtn");
+const meetingModeInput = document.getElementById("meetingModeInput");
 const agendaSettingsForm = document.getElementById("agendaSettingsForm");
 const agendaTitleEditInput = document.getElementById("agendaTitleEditInput");
 const agendaPeopleSummaryInput = document.getElementById("agendaPeopleSummaryInput");
@@ -61,7 +63,7 @@ const authController = createAuthController({
 });
 const directoryApi = createDirectoryApi(authController);
 const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
-const AGENDA_DEBUG = true;
+const AGENDA_DEBUG = false;
 
 let currentUser = null;
 let agendas = [];
@@ -78,6 +80,9 @@ let itemDetailsExpanded = false;
 let creatingTaskItemId = "";
 let completingTaskKey = "";
 let taskComposerItemId = "";
+let meetingModeEnabled = false;
+let parkedSectionExpanded = false;
+let completedSectionExpanded = false;
 const taskDraftsByItemId = new Map();
 const loadingAgendaDetails = new Set();
 
@@ -251,6 +256,23 @@ function filteredItems(agenda) {
   });
 }
 
+function normalizeAgendaItemStatus(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return new Set(["active", "discussed", "completed", "parked"]).has(normalized) ? normalized : "active";
+}
+
+function classifyAgendaItems(agenda) {
+  const matchingItems = filteredItems(agenda);
+  return {
+    live: matchingItems.filter((item) => {
+      const status = normalizeAgendaItemStatus(item?.status);
+      return status === "active" || status === "discussed";
+    }),
+    parked: matchingItems.filter((item) => normalizeAgendaItemStatus(item?.status) === "parked"),
+    completed: matchingItems.filter((item) => normalizeAgendaItemStatus(item?.status) === "completed"),
+  };
+}
+
 function sortAgendaItemsLocally(items) {
   return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
     const orderDelta = Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0);
@@ -287,6 +309,22 @@ function applyLocalAgendaItems(agendaId, items) {
   });
 }
 
+function patchAgendaItemLocally(agendaId, itemId, patch) {
+  const agenda = selectedAgenda();
+  const sourceItems = Array.isArray(agenda?.items) ? agenda.items : [];
+  const nextItems = sourceItems.map((item) => {
+    if (item.id !== itemId) {
+      return item;
+    }
+    return {
+      ...item,
+      ...patch,
+      updatedAt: patch?.updatedAt || new Date().toISOString(),
+    };
+  });
+  applyLocalAgendaItems(agendaId, nextItems);
+}
+
 function agendaTasksForItem(item) {
   return Array.isArray(item?.taskMaps) ? item.taskMaps : [];
 }
@@ -308,6 +346,52 @@ function formatTaskDueDate(value) {
     return String(value);
   }
   return parsed.toLocaleDateString();
+}
+
+function detailHtmlToPlainText(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(String(html || ""), "text/html");
+  const text = String(doc.body?.textContent || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text;
+}
+
+function buildAgendaExportText(agenda) {
+  const { live } = classifyAgendaItems(agenda);
+  return live
+    .map((item) => {
+      const status = normalizeAgendaItemStatus(item?.status);
+      const checkbox = status === "discussed" ? "- [x]" : "- [ ]";
+      const lines = [`${checkbox} ${String(item?.title || "").trim() || "Untitled item"}`];
+      const detail = detailHtmlToPlainText(item?.detailHtml);
+      if (detail) {
+        lines.push(detail);
+      }
+      return lines.join("\n");
+    })
+    .join("\n\n")
+    .trim();
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const input = document.createElement("textarea");
+  input.value = text;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(input);
+  if (!copied) {
+    throw new Error("Copy failed.");
+  }
 }
 
 function padDatePart(value) {
@@ -535,9 +619,10 @@ function renderAgendaAttendees(agenda) {
 }
 
 function renderAgendaItems(agenda) {
-  const items = filteredItems(agenda);
+  const { live, parked, completed } = classifyAgendaItems(agenda);
+  const totalItems = live.length + parked.length + completed.length;
   agendaItemsList.innerHTML = "";
-  agendaItemsEmpty.hidden = items.length > 0;
+  agendaItemsEmpty.hidden = totalItems > 0;
 
   function buildDropZone(insertIndex) {
     const zone = document.createElement("div");
@@ -562,14 +647,41 @@ function renderAgendaItems(agenda) {
     return zone;
   }
 
-  if (items.length) {
-    agendaItemsList.appendChild(buildDropZone(0));
+  function lifecycleActionButtons(item) {
+    const status = normalizeAgendaItemStatus(item?.status);
+    if (status === "parked" || status === "completed") {
+      return `
+        <button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="active">Restore</button>
+      `;
+    }
+    return `
+      ${status === "active" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="discussed">Discussed</button>' : ""}
+      ${status !== "completed" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="completed">Complete</button>' : ""}
+      ${status !== "parked" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="parked">Park</button>' : ""}
+    `;
   }
 
-  items.forEach((item, index) => {
+  function buildSectionToggle(label, count, expanded, key) {
+    return `
+      <button type="button" class="agenda-section-toggle" data-section-key="${escapeHtml(key)}" aria-expanded="${expanded ? "true" : "false"}">
+        <span>${escapeHtml(label)} (${count})</span>
+        <span aria-hidden="true">${expanded ? "⌃" : "⌄"}</span>
+      </button>
+    `;
+  }
+
+  function renderItemCard(item, index, items, options = {}) {
     const card = document.createElement("article");
     card.className = "agenda-item-card";
-    card.draggable = true;
+    const status = normalizeAgendaItemStatus(item?.status);
+    card.draggable = options.reorderable === true;
+    if (options.reorderable !== true) {
+      card.classList.add("is-static");
+    }
+    card.dataset.itemStatus = status;
+    if (status === "discussed") {
+      card.classList.add("is-discussed");
+    }
     if (item.id === selectedItemId) {
       card.classList.add("is-selected");
     }
@@ -580,6 +692,7 @@ function renderAgendaItems(agenda) {
       item.isUrgent ? '<span class="agenda-badge is-urgent">Urgent</span>' : "",
       item.isImportant ? '<span class="agenda-badge is-important">Important</span>' : "",
       item.isPrivate ? '<span class="agenda-badge">Private</span>' : "",
+      status === "discussed" ? '<span class="agenda-badge is-discussed">Discussed</span>' : "",
       linkedTasks.length ? `<span class="agenda-badge is-task">${linkedTasks.length} task${linkedTasks.length === 1 ? "" : "s"}</span>` : "",
     ].join("");
     const previewHtml = itemDetailsExpanded ? item.detailHtml || "<p></p>" : "";
@@ -656,12 +769,25 @@ function renderAgendaItems(agenda) {
           </form>
         `
         : "";
-    const showAddTaskIcon = taskComposerItemId !== item.id;
+    const showAddTaskIcon = taskComposerItemId !== item.id && status !== "completed";
+    const showMeetingTick = meetingModeEnabled && status === "active";
 
     card.innerHTML = `
       <div class="agenda-item-card-head">
         <strong>${escapeHtml(item.title)}</strong>
         <div class="agenda-item-card-head-actions">
+          ${
+            showMeetingTick
+              ? `<button
+                  type="button"
+                  class="ghost subtle icon-only agenda-meeting-tick-btn"
+                  aria-label="Mark discussed"
+                  title="Mark discussed"
+                >
+                  <span aria-hidden="true">✓</span>
+                </button>`
+              : ""
+          }
           ${
             showAddTaskIcon
               ? `<button
@@ -687,6 +813,7 @@ function renderAgendaItems(agenda) {
       <div class="agenda-item-badges">${badges}</div>
       ${itemDetailsExpanded ? `<div class="agenda-item-preview">${previewHtml}</div>` : ""}
       ${linkedTasksHtml}
+      <div class="agenda-lifecycle-actions">${lifecycleActionButtons(item)}</div>
       <div class="agenda-item-actions">${taskComposerHtml}</div>
     `;
 
@@ -699,19 +826,28 @@ function renderAgendaItems(agenda) {
       itemDetailsExpanded = !itemDetailsExpanded;
       renderAgendaItems(agenda);
     });
-    card.addEventListener("dragstart", () => {
-      dragItemId = item.id;
-      card.classList.add("is-dragging");
-    });
-    card.addEventListener("dragend", () => {
-      dragItemId = "";
-      card.classList.remove("is-dragging");
-    });
+    if (options.reorderable === true) {
+      card.addEventListener("dragstart", () => {
+        dragItemId = item.id;
+        card.classList.add("is-dragging");
+      });
+      card.addEventListener("dragend", () => {
+        dragItemId = "";
+        card.classList.remove("is-dragging");
+      });
+    }
     card.querySelector(".agenda-item-actions")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    card.querySelector(".agenda-lifecycle-actions")?.addEventListener("click", (event) => {
       event.stopPropagation();
     });
     card.querySelector(".agenda-linked-task-list")?.addEventListener("click", (event) => {
       event.stopPropagation();
+    });
+    card.querySelector(".agenda-meeting-tick-btn")?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await updateAgendaItemStatus(agenda, item, "discussed", { optimisticMessage: "" });
     });
     card.querySelector(".agenda-task-link-icon")?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -772,10 +908,102 @@ function renderAgendaItems(agenda) {
         await markAgendaTaskComplete(agenda, item, task);
       });
     });
+    card.querySelectorAll(".agenda-lifecycle-btn").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const nextStatus = String(button.getAttribute("data-status") || "").trim().toLowerCase();
+        await updateAgendaItemStatus(agenda, item, nextStatus);
+      });
+    });
+    return card;
+  }
 
-    agendaItemsList.appendChild(card);
-    agendaItemsList.appendChild(buildDropZone(index + 1));
-  });
+  function appendLiveSection(items) {
+    if (items.length) {
+      agendaItemsList.appendChild(buildDropZone(0));
+    }
+    items.forEach((item, index) => {
+      agendaItemsList.appendChild(renderItemCard(item, index, items, { reorderable: true }));
+      agendaItemsList.appendChild(buildDropZone(index + 1));
+    });
+  }
+
+  function appendArchiveSection(label, items, expanded, key) {
+    if (!items.length) {
+      return;
+    }
+    const section = document.createElement("section");
+    section.className = "agenda-archive-section";
+    section.innerHTML = `
+      ${buildSectionToggle(label, items.length, expanded, key)}
+      <div class="agenda-archive-items" ${expanded ? "" : "hidden"}></div>
+    `;
+    section.querySelector(".agenda-section-toggle")?.addEventListener("click", () => {
+      if (key === "parked") {
+        parkedSectionExpanded = !parkedSectionExpanded;
+      } else {
+        completedSectionExpanded = !completedSectionExpanded;
+      }
+      renderAgendaItems(agenda);
+    });
+    const wrap = section.querySelector(".agenda-archive-items");
+    items.forEach((item, index) => {
+      wrap.appendChild(renderItemCard(item, index, items, { reorderable: false }));
+    });
+    agendaItemsList.appendChild(section);
+  }
+
+  appendLiveSection(live);
+  appendArchiveSection("Parked", parked, parkedSectionExpanded, "parked");
+  appendArchiveSection("Completed", completed, completedSectionExpanded, "completed");
+}
+
+async function updateAgendaItemStatus(agenda, item, nextStatus, options = {}) {
+  const normalizedStatus = normalizeAgendaItemStatus(nextStatus);
+  if (!agenda?.id || !item?.id || normalizeAgendaItemStatus(item?.status) === normalizedStatus) {
+    return;
+  }
+
+  const previousAgenda = selectedAgenda();
+  const previousItems = Array.isArray(previousAgenda?.items) ? previousAgenda.items.map((entry) => ({ ...entry })) : [];
+
+  try {
+    patchAgendaItemLocally(agenda.id, item.id, { status: normalizedStatus });
+    renderAgendaItems(selectedAgenda() || agenda);
+    if (options.optimisticMessage !== undefined) {
+      setActionStatus(options.optimisticMessage);
+    }
+    await directoryApi.updateAgendaItem({
+      itemId: item.id,
+      status: normalizedStatus,
+    });
+    await refreshAgendas("", { selectedAgendaId: agenda.id });
+    setActionStatus("");
+  } catch (error) {
+    applyLocalAgendaItems(agenda.id, previousItems);
+    renderAgendaItems(selectedAgenda() || agenda);
+    console.error(error);
+    setActionStatus(error?.message || "Could not update agenda item status.", true);
+  }
+}
+
+async function copyAgendaForLoop(agenda) {
+  if (!agenda?.id) {
+    return;
+  }
+  const detailAgenda = agendaDetailsById.get(agenda.id) || (await loadAgendaDetail(agenda.id, { force: true })) || agenda;
+  const exportText = buildAgendaExportText(detailAgenda);
+  if (!exportText) {
+    setActionStatus("No active agenda items to export.");
+    return;
+  }
+  try {
+    await copyTextToClipboard(exportText);
+    setActionStatus("Agenda copied for Loop.");
+  } catch (error) {
+    console.error(error);
+    setActionStatus(error?.message || "Could not copy agenda.", true);
+  }
 }
 
 async function createTaskForAgendaItem(agenda, item) {
@@ -888,6 +1116,14 @@ function renderAgendaDetail() {
   const agenda = selectedAgenda();
   agendaEmptyState.hidden = Boolean(agenda);
   agendaDetailWrap.hidden = !agenda;
+
+  if (copyAgendaExportBtn) {
+    copyAgendaExportBtn.disabled = !agenda;
+  }
+  if (meetingModeInput) {
+    meetingModeInput.disabled = !agenda;
+    meetingModeInput.checked = meetingModeEnabled;
+  }
 
   if (!agenda) {
     return;
@@ -1107,7 +1343,7 @@ function editorCommand(command, value = null) {
 }
 
 async function reorderItemToIndex(agenda, sourceItemId, insertIndex) {
-  const items = filteredItems(agenda);
+  const items = classifyAgendaItems(agenda).live;
   const sourceIndex = items.findIndex((item) => item.id === sourceItemId);
   if (sourceIndex === -1) {
     return;
@@ -1275,6 +1511,7 @@ agendaItemForm?.addEventListener("submit", async (event) => {
     isPrivate: itemPrivateInput.checked,
     isUrgent: itemUrgentInput.checked,
     isImportant: itemImportantInput.checked,
+    status: selectedItem()?.status || "active",
   };
 
   if (!payload.title) {
@@ -1288,6 +1525,7 @@ agendaItemForm?.addEventListener("submit", async (event) => {
       await directoryApi.updateAgendaItem({ itemId: selectedItemId, ...payload });
       await refreshAgendas("Agenda item updated.", { selectedAgendaId: agenda.id });
     } else {
+      payload.status = "active";
       await directoryApi.createAgendaItem({ agendaId: agenda.id, ...payload });
       await refreshAgendas("Agenda item created.", { selectedAgendaId: agenda.id });
     }
@@ -1344,6 +1582,19 @@ insertLinkBtn?.addEventListener("click", () => {
   if (url) {
     editorCommand("createLink", url);
   }
+});
+
+copyAgendaExportBtn?.addEventListener("click", async () => {
+  const agenda = selectedAgenda();
+  if (!agenda) {
+    return;
+  }
+  await copyAgendaForLoop(agenda);
+});
+
+meetingModeInput?.addEventListener("change", () => {
+  meetingModeEnabled = meetingModeInput.checked;
+  renderAgendaDetail();
 });
 
 toggleCreatePanelBtn?.addEventListener("click", () => {

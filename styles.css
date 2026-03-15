@@ -2739,6 +2739,18 @@ body.lightbox-open {
   gap: 1rem;
 }
 
+.agenda-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.agenda-meeting-toggle {
+  margin: 0;
+}
+
 .agenda-list-head {
   display: grid;
   gap: 0.85rem;
@@ -2988,6 +3000,15 @@ body.lightbox-open {
   opacity: 0.55;
 }
 
+.agenda-item-card.is-static {
+  cursor: default;
+}
+
+.agenda-item-card.is-discussed {
+  border-color: rgba(92, 140, 82, 0.24);
+  background: linear-gradient(180deg, rgba(251, 255, 249, 0.98), rgba(241, 248, 238, 0.98));
+}
+
 .agenda-item-card-head {
   display: flex;
   justify-content: space-between;
@@ -3036,6 +3057,19 @@ body.lightbox-open {
   color: rgba(16, 33, 57, 0.68);
 }
 
+.agenda-meeting-tick-btn {
+  width: 1.9rem;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border-radius: 999px;
+  color: rgba(42, 109, 65, 0.72);
+}
+
+.agenda-meeting-tick-btn:hover {
+  color: #2a6d41;
+}
+
 .agenda-expand-toggle:hover {
   background: rgba(16, 33, 57, 0.05);
   color: rgba(16, 33, 57, 0.68);
@@ -3072,14 +3106,58 @@ body.lightbox-open {
   color: #14656f;
 }
 
+.agenda-badge.is-discussed {
+  background: rgba(92, 140, 82, 0.14);
+  color: #426a39;
+}
+
 .agenda-item-actions {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
+.agenda-lifecycle-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.agenda-lifecycle-btn {
+  min-height: 30px;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
 .agenda-task-link-btn {
   min-height: 34px;
+}
+
+.agenda-archive-section {
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 0.35rem;
+}
+
+.agenda-archive-items {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.agenda-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(16, 33, 57, 0.1);
+  border-radius: 14px;
+  background: rgba(245, 248, 252, 0.82);
+  color: #162033;
+  font-weight: 700;
+  text-align: left;
 }
 
 .agenda-linked-task-list {

@@ -1079,9 +1079,12 @@ function getNextPageNumber(payload) {
 async function listTimesheets({ carerId = "", date = "", dateStart = "", dateFinish = "", perPage = 200 } = {}) {
   const query = {
     carer_id: asString(carerId),
+    carerId: asString(carerId),
     date: asString(date),
     datestart: asString(dateStart),
     datefinish: asString(dateFinish),
+    date_start: asString(dateStart),
+    date_finish: asString(dateFinish),
     per_page: Number.isFinite(Number(perPage)) ? Math.max(1, Math.min(Number(perPage), 500)) : 200,
     page: 1,
   };
@@ -1104,6 +1107,15 @@ async function listTimesheets({ carerId = "", date = "", dateStart = "", dateFin
     nextPage = getNextPageNumber(pagePayload);
     pagesFetched += 1;
   }
+
+  console.info("[OneTouch] finance/summary response", {
+    carerId: query.carer_id,
+    date: query.date,
+    dateStart: query.datestart || query.date_start,
+    dateFinish: query.datefinish || query.date_finish,
+    records: records.length,
+    pagesFetched,
+  });
 
   return {
     timesheets: records,

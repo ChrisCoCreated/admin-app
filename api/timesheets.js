@@ -114,6 +114,15 @@ module.exports = async (req, res) => {
       perPage,
     });
 
+    console.info("[timesheets] API result", {
+      carerId,
+      date,
+      dateStart,
+      dateFinish,
+      total: payload?.total || 0,
+      rows: Array.isArray(payload?.timesheets) ? payload.timesheets.length : 0,
+    });
+
     res.setHeader("Cache-Control", "private, max-age=30");
     res.status(200).json(payload);
   } catch (error) {

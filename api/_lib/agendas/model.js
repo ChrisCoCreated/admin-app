@@ -28,6 +28,11 @@ function normalizeStageTag(value) {
   return new Set(["", "incubating", "ready", "decision", "blocked"]).has(normalized) ? normalized : "";
 }
 
+function normalizeAgendaItemStatus(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return new Set(["active", "discussed", "completed", "parked"]).has(normalized) ? normalized : "active";
+}
+
 function parseStringArray(value) {
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry || "").trim()).filter(Boolean);
@@ -199,6 +204,9 @@ function sanitizeAgendaItemInput(input, ownerEmail, mode = "create") {
     ...(Object.prototype.hasOwnProperty.call(input, "stageTag")
       ? { stageTag: normalizeStageTag(input.stageTag) }
       : {}),
+    ...(Object.prototype.hasOwnProperty.call(input, "status")
+      ? { status: normalizeAgendaItemStatus(input.status) }
+      : {}),
     ...(Object.prototype.hasOwnProperty.call(input, "taskMaps") || Object.prototype.hasOwnProperty.call(input, "taskMap")
       ? { taskMaps: sanitizeAgendaTaskMaps(
           Object.prototype.hasOwnProperty.call(input, "taskMaps") ? input.taskMaps : input.taskMap,
@@ -248,6 +256,7 @@ function mapAgendaItemRow(row) {
     isImportant: row?.is_important === true,
     sortOrder: parseNumber(row?.sort_order, 0),
     stageTag: normalizeStageTag(row?.stage_tag),
+    status: normalizeAgendaItemStatus(row?.status),
     ownerEmail: normalizeEmail(row?.owner_email),
     taskMaps: row?.task_map ? sanitizeAgendaTaskMaps(row.task_map, row?.owner_email) : [],
     createdAt: row?.created_at || null,
