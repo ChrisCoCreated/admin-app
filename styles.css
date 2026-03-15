@@ -3001,6 +3001,61 @@ body.lightbox-open {
   min-width: 0;
 }
 
+.agenda-staging-panel {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.agenda-staging-body {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.agenda-staging-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.agenda-staging-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.agenda-staging-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 14px;
+  border: 1px dashed rgba(16, 33, 57, 0.18);
+  background: rgba(247, 249, 252, 0.92);
+  cursor: grab;
+}
+
+.agenda-staging-card.is-dragging {
+  opacity: 0.55;
+}
+
+.agenda-staging-card-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.agenda-staging-remove-btn {
+  width: 1.9rem;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  color: rgba(16, 33, 57, 0.42);
+}
+
+.agenda-staging-remove-btn:hover {
+  color: rgba(16, 33, 57, 0.7);
+}
+
 .agenda-items-list {
   display: grid;
   gap: 0.65rem;
@@ -3012,6 +3067,23 @@ body.lightbox-open {
   border-radius: 999px;
   background: transparent;
   transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.agenda-drop-zone.is-empty {
+  display: grid;
+  place-items: center;
+  min-height: 92px;
+  height: auto;
+  padding: 1rem;
+  border: 1px dashed rgba(26, 123, 150, 0.26);
+  border-radius: 18px;
+  background: rgba(247, 252, 253, 0.8);
+}
+
+.agenda-drop-zone.is-empty p {
+  margin: 0;
+  color: rgba(16, 33, 57, 0.64);
+  text-align: center;
 }
 
 .agenda-drop-zone.is-active {
@@ -3159,15 +3231,17 @@ body.lightbox-open {
 .agenda-lifecycle-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.45rem;
   flex-wrap: wrap;
 }
 
 .agenda-lifecycle-btn {
-  min-height: 30px;
-  padding: 0.3rem 0.7rem;
+  min-height: 26px;
+  padding: 0.18rem 0.58rem;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
+  line-height: 1;
 }
 
 .agenda-task-link-btn {
@@ -3537,6 +3611,10 @@ body.lightbox-open {
   }
 
   .agenda-search-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .agenda-staging-form {
     grid-template-columns: 1fr;
   }
 

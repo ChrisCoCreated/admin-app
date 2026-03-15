@@ -46,6 +46,13 @@ const toggleItemSearchBtn = document.getElementById("toggleItemSearchBtn");
 const itemSearchField = document.getElementById("itemSearchField");
 const itemSearchInput = document.getElementById("itemSearchInput");
 const itemStageFilter = document.getElementById("itemStageFilter");
+const agendaStagingPanel = document.getElementById("agendaStagingPanel");
+const toggleAgendaStagingBtn = document.getElementById("toggleAgendaStagingBtn");
+const agendaStagingBody = document.getElementById("agendaStagingBody");
+const agendaStagingForm = document.getElementById("agendaStagingForm");
+const agendaStagingInput = document.getElementById("agendaStagingInput");
+const agendaStagingList = document.getElementById("agendaStagingList");
+const agendaStagingEmpty = document.getElementById("agendaStagingEmpty");
 const agendaItemsList = document.getElementById("agendaItemsList");
 const agendaItemsEmpty = document.getElementById("agendaItemsEmpty");
 const agendaItemForm = document.getElementById("agendaItemForm");
@@ -65,6 +72,7 @@ const authController = createAuthController({
 });
 const directoryApi = createDirectoryApi(authController);
 const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
+const AGENDA_STAGING_CACHE_PREFIX = "thrive.agendas.staging.v1";
 const AGENDA_DEBUG = false;
 
 let currentUser = null;
@@ -73,7 +81,7 @@ let agendaDetailsById = new Map();
 let selectedAgendaId = "";
 let selectedItemId = "";
 let busy = false;
-let dragItemId = "";
+let dragState = null;
 let createPanelExpanded = false;
 let agendaSearchExpanded = false;
 let agendaSettingsExpanded = false;
@@ -86,8 +94,10 @@ let taskComposerItemId = "";
 let meetingModeEnabled = false;
 let parkedSectionExpanded = false;
 let completedSectionExpanded = false;
+let agendaStagingExpanded = true;
 const taskDraftsByItemId = new Map();
 const loadingAgendaDetails = new Set();
+let stagedAgendaItemsById = new Map();
 
 function logAgendaDebug(message, details) {
   if (!AGENDA_DEBUG) {
@@ -116,6 +126,20 @@ function setCreatePanelExpanded(value) {
   agendaCreatePanel.hidden = !createPanelExpanded;
   if (toggleCreatePanelBtn) {
     toggleCreatePanelBtn.setAttribute("aria-expanded", createPanelExpanded ? "true" : "false");
+  }
+}
+
+function setAgendaStagingExpanded(value) {
+  agendaStagingExpanded = value === true;
+  if (agendaStagingBody) {
+    agendaStagingBody.hidden = !agendaStagingExpanded;
+  }
+  if (toggleAgendaStagingBtn) {
+    toggleAgendaStagingBtn.setAttribute("aria-expanded", agendaStagingExpanded ? "true" : "false");
+    const icon = toggleAgendaStagingBtn.querySelector('[aria-hidden="true"]');
+    if (icon) {
+      icon.textContent = agendaStagingExpanded ? "⌃" : "⌄";
+    }
   }
 }
 
@@ -179,6 +203,68 @@ function setActionStatus(message, isError = false) {
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function agendaStagingCacheKey(email) {
+  return `${AGENDA_STAGING_CACHE_PREFIX}:${normalizeEmail(email)}`;
+}
+
+function readStagedAgendaItemsFromCache() {
+  try {
+    const raw = window.localStorage.getItem(agendaStagingCacheKey(currentUser?.email || ""));
+    if (!raw) {
+      return new Map();
+    }
+    const parsed = JSON.parse(raw);
+    const entries = Object.entries(parsed && typeof parsed === "object" ? parsed : {});
+    return new Map(
+      entries.map(([agendaId, items]) => [
+        agendaId,
+        Array.isArray(items) ? items.filter((item) => String(item?.id || "").trim() && String(item?.title || "").trim()) : [],
+      ])
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function writeStagedAgendaItemsToCache() {
+  try {
+    const payload = Object.fromEntries(
+      [...stagedAgendaItemsById.entries()].filter(([, items]) => Array.isArray(items) && items.length)
+    );
+    window.localStorage.setItem(agendaStagingCacheKey(currentUser?.email || ""), JSON.stringify(payload));
+  } catch {
+    // Ignore cache write errors.
+  }
+}
+
+function stagedItemsForAgenda(agendaId) {
+  return Array.isArray(stagedAgendaItemsById.get(String(agendaId || "").trim()))
+    ? stagedAgendaItemsById.get(String(agendaId || "").trim())
+    : [];
+}
+
+function setStagedItemsForAgenda(agendaId, items) {
+  const normalizedAgendaId = String(agendaId || "").trim();
+  if (!normalizedAgendaId) {
+    return;
+  }
+  const nextItems = Array.isArray(items) ? items : [];
+  if (nextItems.length) {
+    stagedAgendaItemsById.set(normalizedAgendaId, nextItems);
+  } else {
+    stagedAgendaItemsById.delete(normalizedAgendaId);
+  }
+  writeStagedAgendaItemsToCache();
+}
+
+function createStagedAgendaItem(title) {
+  return {
+    id: `staged-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: String(title || "").trim(),
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function escapeHtml(value) {
@@ -377,6 +463,22 @@ function detailHtmlToPlainText(html) {
   return text;
 }
 
+function computeInsertedSortOrder(items, insertIndex) {
+  const normalizedInsertIndex = Math.max(0, Math.min(insertIndex, items.length));
+  const previous = items[normalizedInsertIndex - 1] || null;
+  const next = items[normalizedInsertIndex] || null;
+  if (!previous && !next) {
+    return 100;
+  }
+  if (!previous && next) {
+    return Number(next.sortOrder || 0) - 100;
+  }
+  if (previous && next) {
+    return (Number(previous.sortOrder || 0) + Number(next.sortOrder || 0)) / 2;
+  }
+  return Number(previous?.sortOrder || 0) + 100;
+}
+
 function buildAgendaExportText(agenda) {
   const { live } = classifyAgendaItems(agenda);
   return live
@@ -392,6 +494,58 @@ function buildAgendaExportText(agenda) {
     })
     .join("\n\n")
     .trim();
+}
+
+function renderAgendaStaging(agenda) {
+  if (!agendaStagingPanel || !toggleAgendaStagingBtn || !agendaStagingList || !agendaStagingEmpty) {
+    return;
+  }
+  const agendaId = String(agenda?.id || "").trim();
+  const stagedItems = agendaId ? stagedItemsForAgenda(agendaId) : [];
+  agendaStagingPanel.hidden = !agendaId;
+  const label = toggleAgendaStagingBtn.querySelector("span");
+  if (label) {
+    label.textContent = `To add to agenda (${stagedItems.length})`;
+  }
+  agendaStagingList.innerHTML = "";
+  agendaStagingEmpty.hidden = stagedItems.length > 0;
+
+  stagedItems.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "agenda-staging-card";
+    card.draggable = true;
+    card.innerHTML = `
+      <span class="agenda-staging-card-title">${escapeHtml(item.title)}</span>
+      <button
+        type="button"
+        class="ghost subtle icon-only agenda-staging-remove-btn"
+        aria-label="Remove from to add list"
+        title="Remove from to add list"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+    `;
+    card.addEventListener("dragstart", () => {
+      dragState = {
+        type: "staged-item",
+        agendaId,
+        stagedItemId: item.id,
+      };
+      card.classList.add("is-dragging");
+    });
+    card.addEventListener("dragend", () => {
+      dragState = null;
+      card.classList.remove("is-dragging");
+    });
+    card.querySelector(".agenda-staging-remove-btn")?.addEventListener("click", () => {
+      setStagedItemsForAgenda(
+        agendaId,
+        stagedItems.filter((entry) => entry.id !== item.id)
+      );
+      renderAgendaStaging(agenda);
+    });
+    agendaStagingList.appendChild(card);
+  });
 }
 
 async function copyTextToClipboard(text) {
@@ -641,13 +795,22 @@ function renderAgendaItems(agenda) {
   const { live, parked, completed } = classifyAgendaItems(agenda);
   const totalItems = live.length + parked.length + completed.length;
   agendaItemsList.innerHTML = "";
-  agendaItemsEmpty.hidden = totalItems > 0;
+  agendaItemsEmpty.hidden = true;
 
-  function buildDropZone(insertIndex) {
+  function buildDropZone(insertIndex, options = {}) {
     const zone = document.createElement("div");
     zone.className = "agenda-drop-zone";
+    if (options.empty === true) {
+      zone.classList.add("is-empty");
+      zone.innerHTML = `
+        <p>${escapeHtml(options.label || "Drag staged items here to add them to your agenda.")}</p>
+      `;
+    }
     zone.setAttribute("aria-hidden", "true");
     zone.addEventListener("dragover", (event) => {
+      if (!dragState) {
+        return;
+      }
       event.preventDefault();
       zone.classList.add("is-active");
     });
@@ -657,11 +820,18 @@ function renderAgendaItems(agenda) {
     zone.addEventListener("drop", async (event) => {
       event.preventDefault();
       zone.classList.remove("is-active");
-      if (!dragItemId) {
+      if (!dragState) {
         return;
       }
-      await reorderItemToIndex(agenda, dragItemId, insertIndex);
-      dragItemId = "";
+      const currentDrag = dragState;
+      dragState = null;
+      if (currentDrag.type === "agenda-item") {
+        await reorderItemToIndex(agenda, currentDrag.itemId, insertIndex);
+        return;
+      }
+      if (currentDrag.type === "staged-item" && currentDrag.agendaId === agenda.id) {
+        await addStagedItemToAgendaAtIndex(agenda, currentDrag.stagedItemId, insertIndex);
+      }
     });
     return zone;
   }
@@ -847,11 +1017,15 @@ function renderAgendaItems(agenda) {
     });
     if (options.reorderable === true) {
       card.addEventListener("dragstart", () => {
-        dragItemId = item.id;
+        dragState = {
+          type: "agenda-item",
+          agendaId: agenda.id,
+          itemId: item.id,
+        };
         card.classList.add("is-dragging");
       });
       card.addEventListener("dragend", () => {
-        dragItemId = "";
+        dragState = null;
         card.classList.remove("is-dragging");
       });
     }
@@ -938,9 +1112,18 @@ function renderAgendaItems(agenda) {
   }
 
   function appendLiveSection(items) {
-    if (items.length) {
-      agendaItemsList.appendChild(buildDropZone(0));
+    if (!items.length) {
+      agendaItemsList.appendChild(
+        buildDropZone(0, {
+          empty: true,
+          label: totalItems
+            ? "Drag staged items here to bring them back into the live agenda."
+            : "No agenda items yet. Drag from the list above or add one directly.",
+        })
+      );
+      return;
     }
+    agendaItemsList.appendChild(buildDropZone(0));
     items.forEach((item, index) => {
       agendaItemsList.appendChild(renderItemCard(item, index, items, { reorderable: true }));
       agendaItemsList.appendChild(buildDropZone(index + 1));
@@ -1131,6 +1314,62 @@ async function markAgendaTaskComplete(agenda, item, task) {
   }
 }
 
+async function addStagedItemToAgendaAtIndex(agenda, stagedItemId, insertIndex) {
+  const agendaId = String(agenda?.id || "").trim();
+  const stagedItems = stagedItemsForAgenda(agendaId);
+  const stagedItem = stagedItems.find((item) => item.id === stagedItemId);
+  if (!agendaId || !stagedItem) {
+    return;
+  }
+
+  const liveItems = classifyAgendaItems(agenda).live;
+  const sortOrder = computeInsertedSortOrder(liveItems, insertIndex);
+  const previousItems = Array.isArray(agenda?.items) ? agenda.items.map((item) => ({ ...item })) : [];
+  const previousStagedItems = stagedItems.map((item) => ({ ...item }));
+  const optimisticId = `pending-${stagedItem.id}`;
+  const optimisticItem = {
+    id: optimisticId,
+    title: stagedItem.title,
+    detailHtml: "<p></p>",
+    stageTag: "",
+    isPrivate: false,
+    isUrgent: false,
+    isImportant: false,
+    sortOrder,
+    status: "active",
+    ownerEmail: currentUser?.email || "",
+    taskMaps: [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  try {
+    setStagedItemsForAgenda(
+      agendaId,
+      stagedItems.filter((item) => item.id !== stagedItemId)
+    );
+    applyLocalAgendaItems(agendaId, [...previousItems, optimisticItem]);
+    renderAgendaStaging(selectedAgenda() || agenda);
+    renderAgendaItems(selectedAgenda() || agenda);
+    setActionStatus("Adding item to agenda...");
+    await directoryApi.createAgendaItem({
+      agendaId,
+      title: stagedItem.title,
+      detailHtml: "<p></p>",
+      status: "active",
+      sortOrder,
+    });
+    await refreshAgendas("Item added to agenda.", { selectedAgendaId: agendaId });
+    setActionStatus("");
+  } catch (error) {
+    setStagedItemsForAgenda(agendaId, previousStagedItems);
+    applyLocalAgendaItems(agendaId, previousItems);
+    renderAgendaStaging(selectedAgenda() || agenda);
+    renderAgendaItems(selectedAgenda() || agenda);
+    console.error(error);
+    setActionStatus(error?.message || "Could not add staged item to agenda.", true);
+  }
+}
+
 function renderAgendaDetail() {
   const agenda = selectedAgenda();
   agendaEmptyState.hidden = Boolean(agenda);
@@ -1145,6 +1384,9 @@ function renderAgendaDetail() {
   }
 
   if (!agenda) {
+    if (agendaStagingPanel) {
+      agendaStagingPanel.hidden = true;
+    }
     return;
   }
 
@@ -1167,6 +1409,7 @@ function renderAgendaDetail() {
     selectedItemId = "";
   }
   populateItemForm(detailLoaded ? selectedItem() : null);
+  renderAgendaStaging(agenda);
 
   if (!detailLoaded) {
     agendaItemsList.innerHTML = '<p class="muted scorecard-empty-state">Loading agenda items...</p>';
@@ -1373,18 +1616,7 @@ async function reorderItemToIndex(agenda, sourceItemId, insertIndex) {
     return;
   }
 
-  const previous = remaining[normalizedInsertIndex - 1] || null;
-  const next = remaining[normalizedInsertIndex] || null;
-  let sortOrder = 0;
-  if (!previous && !next) {
-    sortOrder = 100;
-  } else if (!previous && next) {
-    sortOrder = Number(next.sortOrder || 0) - 100;
-  } else if (previous && next) {
-    sortOrder = (Number(previous.sortOrder || 0) + Number(next.sortOrder || 0)) / 2;
-  } else if (previous) {
-    sortOrder = Number(previous.sortOrder || 0) + 100;
-  }
+  const sortOrder = computeInsertedSortOrder(remaining, normalizedInsertIndex);
 
   const allItems = Array.isArray(agenda?.items) ? agenda.items : [];
   const previousItems = allItems.map((item) => ({ ...item }));
@@ -1423,6 +1655,7 @@ async function init() {
     }
 
     currentUser = await directoryApi.getCurrentUser();
+    stagedAgendaItemsById = readStagedAgendaItemsFromCache();
     const role = String(currentUser?.role || "").trim().toLowerCase();
     if (!canAccessPage(role, "agendas")) {
       window.location.href = "./unauthorized.html?page=agendas";
@@ -1435,6 +1668,7 @@ async function init() {
     setAgendaSettingsExpanded(false);
     setAgendaItemComposerExpanded(false);
     setItemSearchExpanded(false);
+    setAgendaStagingExpanded(true);
     hydrateAgendasFromCache();
     await loadAgendas();
   } catch (error) {
@@ -1565,6 +1799,26 @@ agendaItemForm?.addEventListener("submit", async (event) => {
   }
 });
 
+agendaStagingForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const agenda = selectedAgenda();
+  const agendaId = String(agenda?.id || "").trim();
+  const title = String(agendaStagingInput?.value || "").trim();
+  if (!agendaId) {
+    return;
+  }
+  if (!title) {
+    setActionStatus("Add a title before sending it to the agenda shortlist.", true);
+    return;
+  }
+  setStagedItemsForAgenda(agendaId, [...stagedItemsForAgenda(agendaId), createStagedAgendaItem(title)]);
+  if (agendaStagingInput) {
+    agendaStagingInput.value = "";
+  }
+  setActionStatus("");
+  renderAgendaStaging(agenda);
+});
+
 itemTitleInput?.addEventListener("input", () => {
   if (!agendaItemComposerExpanded && String(itemTitleInput.value || "").trim()) {
     setAgendaItemComposerExpanded(true);
@@ -1592,6 +1846,10 @@ toggleItemSearchBtn?.addEventListener("click", () => {
   if (!nextExpanded) {
     renderAgendaDetail();
   }
+});
+
+toggleAgendaStagingBtn?.addEventListener("click", () => {
+  setAgendaStagingExpanded(!agendaStagingExpanded);
 });
 
 itemStageFilter?.addEventListener("change", () => {

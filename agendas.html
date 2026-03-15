@@ -230,6 +230,28 @@
             </form>
 
             <section class="agenda-items-panel">
+              <section id="agendaStagingPanel" class="agenda-staging-panel">
+                <button
+                  id="toggleAgendaStagingBtn"
+                  type="button"
+                  class="agenda-section-toggle"
+                  aria-expanded="true"
+                >
+                  <span>To add to agenda (0)</span>
+                  <span aria-hidden="true">⌃</span>
+                </button>
+                <div id="agendaStagingBody" class="agenda-staging-body">
+                  <form id="agendaStagingForm" class="agenda-staging-form">
+                    <label class="field" for="agendaStagingInput">
+                      <span class="sr-only">Add an item to the staging list</span>
+                      <input id="agendaStagingInput" type="text" placeholder="Add to the agenda shortlist" />
+                    </label>
+                    <button type="submit" class="secondary">Add</button>
+                  </form>
+                  <div id="agendaStagingList" class="agenda-staging-list"></div>
+                  <p id="agendaStagingEmpty" class="muted">Nothing waiting to add.</p>
+                </div>
+              </section>
               <div id="agendaItemsList" class="agenda-items-list"></div>
               <p id="agendaItemsEmpty" class="muted" hidden>No agenda items yet.</p>
             </section>
