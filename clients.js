@@ -7,6 +7,12 @@ const searchInput = document.getElementById("searchInput");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientStatusFilters = document.getElementById("clientStatusFilters");
+const bulkTagSelect = document.getElementById("bulkTagSelect");
+const selectedCountLabel = document.getElementById("selectedCountLabel");
+const selectVisibleBtn = document.getElementById("selectVisibleBtn");
+const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+const applyBulkTagBtn = document.getElementById("applyBulkTagBtn");
+const bulkTagStatus = document.getElementById("bulkTagStatus");
 const clientsTableBody = document.getElementById("clientsTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
@@ -49,6 +55,9 @@ let reconcileBusy = false;
 let isDetailOpen = false;
 let isReconcileCollapsed = true;
 let copyStatusResetTimer = null;
+let selectedClientIds = new Set();
+let availableTags = [];
+let bulkTagBusy = false;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -71,6 +80,14 @@ function redirectToUnauthorized(pageKey) {
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
+}
+
+function setBulkTagStatus(message, isError = false) {
+  if (!bulkTagStatus) {
+    return;
+  }
+  bulkTagStatus.textContent = message;
+  bulkTagStatus.classList.toggle("error", isError);
 }
 
 function showCopyStatus(message, isError = false) {
@@ -324,6 +341,45 @@ function renderStatusFilters() {
   clientStatusFilters.appendChild(allBtn);
 }
 
+function renderBulkTagOptions() {
+  if (!bulkTagSelect) {
+    return;
+  }
+  const currentValue = String(bulkTagSelect.value || "");
+  bulkTagSelect.innerHTML = '<option value="">Select a tag</option>';
+  for (const tag of availableTags) {
+    const option = document.createElement("option");
+    option.value = String(tag.id);
+    option.textContent = tag.name || `Tag ${tag.id}`;
+    bulkTagSelect.appendChild(option);
+  }
+  bulkTagSelect.value = availableTags.some((tag) => String(tag.id) === currentValue) ? currentValue : "";
+}
+
+function updateBulkTagControls() {
+  const selectedCount = selectedClientIds.size;
+  if (selectedCountLabel) {
+    selectedCountLabel.textContent = `${selectedCount} selected`;
+  }
+  if (clearSelectionBtn) {
+    clearSelectionBtn.disabled = selectedCount === 0 || bulkTagBusy;
+  }
+  if (selectVisibleBtn) {
+    selectVisibleBtn.disabled = getFilteredClients().length === 0 || bulkTagBusy;
+  }
+  if (applyBulkTagBtn) {
+    applyBulkTagBtn.disabled = bulkTagBusy || selectedCount === 0 || !String(bulkTagSelect?.value || "").trim();
+  }
+}
+
+function setBulkTagBusy(isBusy) {
+  bulkTagBusy = Boolean(isBusy);
+  if (bulkTagSelect) {
+    bulkTagSelect.disabled = bulkTagBusy;
+  }
+  updateBulkTagControls();
+}
+
 function getFilteredClients() {
   const query = String(searchInput.value || "").trim().toLowerCase();
   return allClients.filter((client) => {
@@ -461,13 +517,19 @@ async function refreshClientsData() {
   setStatus("Loading clients...");
   const payload = await directoryApi.listOneTouchClients({ limit: 500 });
   allClients = Array.isArray(payload?.clients) ? payload.clients : [];
-  console.log("[Clients Debug] First 5 client records:", allClients.slice(0, 5));
   const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
   warningState.hidden = warnings.length === 0;
   warningState.textContent = warnings.join(" ");
   renderStatusFilters();
   setStatus(`Loaded ${allClients.length} client(s).`);
   renderClients();
+}
+
+async function loadTagCatalog() {
+  const payload = await directoryApi.getOneTouchTags();
+  availableTags = Array.isArray(payload?.tags) ? payload.tags : [];
+  renderBulkTagOptions();
+  updateBulkTagControls();
 }
 
 async function loadReconcilePreview() {
@@ -818,6 +880,7 @@ function renderClients() {
   if (!filtered.length) {
     emptyState.hidden = false;
     closeDetail();
+    updateBulkTagControls();
     return;
   }
 
@@ -832,6 +895,7 @@ function renderClients() {
     tr.classList.toggle("selected", isDetailOpen && client.id === selectedClientId);
 
     tr.innerHTML = `
+      <td class="selection-cell"></td>
       <td>${escapeHtml(client.id)}</td>
       <td>${escapeHtml(client.name)}</td>
       <td>${escapeHtml(getClientLocation(client))}</td>
@@ -850,6 +914,25 @@ function renderClients() {
       });
     }
 
+    const selectionCell = tr.querySelector(".selection-cell");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = selectedClientIds.has(client.id);
+    checkbox.disabled = bulkTagBusy;
+    checkbox.setAttribute("aria-label", `Select ${client.name || client.id || "client"}`);
+    checkbox.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        selectedClientIds.add(client.id);
+      } else {
+        selectedClientIds.delete(client.id);
+      }
+      updateBulkTagControls();
+    });
+    selectionCell?.appendChild(checkbox);
+
     tr.addEventListener("click", () => {
       if (isDetailOpen && selectedClientId === client.id) {
         closeDetail();
@@ -861,6 +944,8 @@ function renderClients() {
 
     clientsTableBody.appendChild(tr);
   }
+
+  updateBulkTagControls();
 }
 
 async function init() {
@@ -881,7 +966,7 @@ async function init() {
     }
     renderTopNavigation({ role });
 
-    await refreshClientsData();
+    await Promise.all([refreshClientsData(), loadTagCatalog()]);
 
     if (reconcilePanel) {
       reconcilePanel.hidden = !canManageReconciliation();
@@ -905,6 +990,72 @@ async function init() {
 
 searchInput?.addEventListener("input", () => {
   renderClients();
+});
+
+bulkTagSelect?.addEventListener("change", () => {
+  updateBulkTagControls();
+});
+
+selectVisibleBtn?.addEventListener("click", () => {
+  for (const client of getFilteredClients()) {
+    selectedClientIds.add(client.id);
+  }
+  setBulkTagStatus(`Selected ${selectedClientIds.size} client(s).`);
+  renderClients();
+  updateBulkTagControls();
+});
+
+clearSelectionBtn?.addEventListener("click", () => {
+  selectedClientIds = new Set();
+  setBulkTagStatus("Selection cleared.");
+  renderClients();
+  updateBulkTagControls();
+});
+
+applyBulkTagBtn?.addEventListener("click", async () => {
+  const recordIds = Array.from(selectedClientIds);
+  const tagId = Number(bulkTagSelect?.value || 0);
+  if (!recordIds.length || !Number.isFinite(tagId) || tagId <= 0) {
+    updateBulkTagControls();
+    return;
+  }
+
+  setBulkTagBusy(true);
+  setBulkTagStatus(`Applying tag to ${recordIds.length} client(s)...`);
+  try {
+    const result = await directoryApi.applyBulkClientTag({ recordIds, tagId });
+    await refreshClientsData();
+    const failed = Number(result?.failed || 0);
+    const succeeded = Number(result?.succeeded || 0);
+    if (failed > 0) {
+      selectedClientIds = new Set(
+        Array.isArray(result?.results) ? result.results.filter((item) => !item?.ok).map((item) => item?.id).filter(Boolean) : []
+      );
+      const failedNames = Array.isArray(result?.results)
+        ? result.results
+            .filter((item) => !item?.ok)
+            .slice(0, 3)
+            .map((item) => item?.name || item?.id || "Unknown")
+            .join(", ")
+        : "";
+      setBulkTagStatus(
+        `Bulk tag complete: ${succeeded} succeeded, ${failed} failed.${failedNames ? ` Failed: ${failedNames}` : ""}`,
+        true
+      );
+    } else {
+      selectedClientIds = new Set();
+      setBulkTagStatus(`Bulk tag complete: ${succeeded} client(s) updated.`);
+    }
+    if (bulkTagSelect) {
+      bulkTagSelect.value = "";
+    }
+    renderClients();
+  } catch (error) {
+    console.error(error);
+    setBulkTagStatus(error?.message || "Could not apply bulk tag.", true);
+  } finally {
+    setBulkTagBusy(false);
+  }
 });
 
 reconcileHeader?.addEventListener("click", () => {

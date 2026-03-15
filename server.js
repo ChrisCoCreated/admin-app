@@ -8,8 +8,11 @@ const clientsIndexHandler = require("./api/clients/index");
 const clientsByIdHandler = require("./api/clients/[id]");
 const clientsReconcilePreviewHandler = require("./api/clients/reconcile/preview");
 const clientsReconcileApplyHandler = require("./api/clients/reconcile/apply");
+const clientsTagsBulkHandler = require("./api/clients/tags/bulk");
 const carersIndexHandler = require("./api/carers/index");
+const carersTagsBulkHandler = require("./api/carers/tags/bulk");
 const oneTouchClientsHandler = require("./api/onetouch/clients");
+const oneTouchTagsHandler = require("./api/onetouch/tags");
 const recruitmentHandler = require("./api/recruitment");
 const recruitmentImportHandler = require("./api/recruitment/import");
 const recruitmentOneTouchOptionsHandler = require("./api/recruitment/onetouch-options");
@@ -216,13 +219,34 @@ async function handleApi(req, res, reqUrl) {
     return true;
   }
 
+  if (reqUrl.pathname === "/api/clients/tags/bulk") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await clientsTagsBulkHandler(apiReq, apiRes);
+    return true;
+  }
+
   if (reqUrl.pathname === "/api/carers") {
     await carersIndexHandler(apiReq, apiRes);
     return true;
   }
 
+  if (reqUrl.pathname === "/api/carers/tags/bulk") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await carersTagsBulkHandler(apiReq, apiRes);
+    return true;
+  }
+
   if (reqUrl.pathname === "/api/onetouch/clients") {
     await oneTouchClientsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/onetouch/tags") {
+    await oneTouchTagsHandler(apiReq, apiRes);
     return true;
   }
 

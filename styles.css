@@ -390,6 +390,30 @@ button.is-generating::after {
   border-radius: 12px;
 }
 
+.bulk-tag-panel {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d8e0ee;
+  border-radius: 12px;
+  background: #fbfcff;
+  padding: 14px;
+}
+
+.bulk-tag-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulk-tag-controls {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -421,6 +445,16 @@ tbody tr:hover {
 
 tbody tr.selected {
   background: #eaf5ff;
+}
+
+.selection-cell {
+  width: 52px;
+  text-align: center;
+}
+
+.selection-cell input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
 }
 
 .xero-link-btn {
@@ -2571,6 +2605,10 @@ body.lightbox-open {
 }
 
 @media (max-width: 900px) {
+  .bulk-tag-controls {
+    grid-template-columns: 1fr;
+  }
+
   .clients-grid {
     grid-template-columns: 1fr;
   }

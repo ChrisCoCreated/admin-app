@@ -227,6 +227,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getOneTouchTags() {
+      const response = await authFetch(endpoint("/api/onetouch/tags"));
+      if (!response.ok) {
+        await parseError(response, "OneTouch tags request failed");
+      }
+      return response.json();
+    },
+
     async exportConsultantReportDocx(payload = {}) {
       const response = await authFetch(endpoint("/api/consultant/report-docx"), {
         method: "POST",
@@ -263,10 +271,38 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async applyBulkClientTag(payload = {}) {
+      const response = await authFetch(endpoint("/api/clients/tags/bulk"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Bulk client tag request failed");
+      }
+      return response.json();
+    },
+
     async listCarers(query = {}) {
       const response = await authFetch(buildUrl("/api/carers", query));
       if (!response.ok) {
         await parseError(response, "Carers request failed");
+      }
+      return response.json();
+    },
+
+    async applyBulkCarerTag(payload = {}) {
+      const response = await authFetch(endpoint("/api/carers/tags/bulk"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Bulk carer tag request failed");
       }
       return response.json();
     },

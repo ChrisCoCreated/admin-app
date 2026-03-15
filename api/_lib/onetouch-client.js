@@ -498,6 +498,15 @@ function normalizeGeneralArea(record) {
   return { name };
 }
 
+function normalizeOneTouchTag(record) {
+  return {
+    id: Number(record?.id || record?.tagId || 0),
+    name: asString(record?.name || record?.tag),
+    category: asString(record?.category),
+    color: asString(record?.color),
+  };
+}
+
 async function fetchGeneralLocationsAndAreas() {
   const now = Date.now();
   if (generalLocationAreaCache.expiresAtMs > now && generalLocationAreaCache.locations.length) {
@@ -543,6 +552,28 @@ async function getOneTouchAreaOptions() {
   const areaRecords = resolveRecords(payload, ["areas", "data.areas", "result.areas"]);
   const areas = areaRecords.map(normalizeGeneralArea).map((row) => asString(row?.name)).filter(Boolean);
   return Array.from(new Set(areas)).sort((a, b) => a.localeCompare(b));
+}
+
+async function listOneTouchTags() {
+  const payload = await callOneTouch("tags/view/all");
+  const records = resolveRecords(payload, ["tags"]);
+  return records
+    .map(normalizeOneTouchTag)
+    .filter((tag) => Number.isFinite(tag.id) && tag.id > 0 && tag.name);
+}
+
+async function assignTagsToCarer(externalId, { tagsToAssign = [], tagsToRemove = [] } = {}) {
+  return postOneTouch(`tags/assign/carer/${encodeURIComponent(asString(externalId))}`, {
+    tags_to_assign: Array.isArray(tagsToAssign) ? tagsToAssign : [],
+    tags_to_remove: Array.isArray(tagsToRemove) ? tagsToRemove : [],
+  });
+}
+
+async function assignTagsToClient(externalId, { tagsToAssign = [], tagsToRemove = [] } = {}) {
+  return postOneTouch(`tags/assign/client/${encodeURIComponent(asString(externalId))}`, {
+    tags_to_assign: Array.isArray(tagsToAssign) ? tagsToAssign : [],
+    tags_to_remove: Array.isArray(tagsToRemove) ? tagsToRemove : [],
+  });
 }
 
 function normalizeRecruitmentSource(record) {
@@ -1387,6 +1418,9 @@ async function createCarer(payload = {}) {
 }
 
 module.exports = {
+  assignTagsToCarer,
+  assignTagsToClient,
+  listOneTouchTags,
   listCarers,
   listCarersDetailed,
   listClients,

@@ -57,6 +57,23 @@
             </select>
           </label>
         </div>
+        <div id="bulkTagPanel" class="bulk-tag-panel">
+          <div class="bulk-tag-summary">
+            <strong id="selectedCountLabel">0 selected</strong>
+            <button id="selectVisibleBtn" class="secondary" type="button">Select visible</button>
+            <button id="clearSelectionBtn" class="secondary" type="button">Clear selection</button>
+          </div>
+          <div class="bulk-tag-controls">
+            <label class="field" for="bulkTagSelect">
+              Bulk add tag
+              <select id="bulkTagSelect">
+                <option value="">Select a tag</option>
+              </select>
+            </label>
+            <button id="applyBulkTagBtn" type="button" disabled>Apply tag</button>
+          </div>
+          <p id="bulkTagStatus" class="muted">Select one or more carers to add a tag.</p>
+        </div>
         <p id="statusMessage" class="muted">Loading carers...</p>
         <p id="warningState" class="muted" hidden></p>
       </section>
@@ -68,6 +85,7 @@
             <table>
               <thead>
                 <tr>
+                  <th>Select</th>
                   <th>ID</th>
                   <th>Name</th>
                   <th>Area</th>

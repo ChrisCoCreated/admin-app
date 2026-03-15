@@ -8,6 +8,12 @@ const areaFilterSelect = document.getElementById("areaFilterSelect");
 const careCompFilterSelect = document.getElementById("careCompFilterSelect");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
+const bulkTagSelect = document.getElementById("bulkTagSelect");
+const selectedCountLabel = document.getElementById("selectedCountLabel");
+const selectVisibleBtn = document.getElementById("selectVisibleBtn");
+const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+const applyBulkTagBtn = document.getElementById("applyBulkTagBtn");
+const bulkTagStatus = document.getElementById("bulkTagStatus");
 const carersTableBody = document.getElementById("carersTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
@@ -27,6 +33,9 @@ const detailFields = {
 
 let allCarers = [];
 let selectedCarerId = "";
+let selectedCarerIds = new Set();
+let availableTags = [];
+let bulkTagBusy = false;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -56,6 +65,14 @@ function setStatus(message, isError = false) {
   statusMessage.classList.toggle("error", isError);
 }
 
+function setBulkTagStatus(message, isError = false) {
+  if (!bulkTagStatus) {
+    return;
+  }
+  bulkTagStatus.textContent = message;
+  bulkTagStatus.classList.toggle("error", isError);
+}
+
 function getAreaLabel(carer) {
   return normalizeValue(carer.area) || "Unassigned";
 }
@@ -75,6 +92,45 @@ function formatHours(value) {
     return "0";
   }
   return numeric % 1 === 0 ? String(numeric) : numeric.toFixed(1);
+}
+
+function renderBulkTagOptions() {
+  if (!bulkTagSelect) {
+    return;
+  }
+  const currentValue = String(bulkTagSelect.value || "");
+  bulkTagSelect.innerHTML = '<option value="">Select a tag</option>';
+  for (const tag of availableTags) {
+    const option = document.createElement("option");
+    option.value = String(tag.id);
+    option.textContent = tag.name || `Tag ${tag.id}`;
+    bulkTagSelect.appendChild(option);
+  }
+  bulkTagSelect.value = availableTags.some((tag) => String(tag.id) === currentValue) ? currentValue : "";
+}
+
+function updateBulkTagControls() {
+  const selectedCount = selectedCarerIds.size;
+  if (selectedCountLabel) {
+    selectedCountLabel.textContent = `${selectedCount} selected`;
+  }
+  if (clearSelectionBtn) {
+    clearSelectionBtn.disabled = selectedCount === 0 || bulkTagBusy;
+  }
+  if (selectVisibleBtn) {
+    selectVisibleBtn.disabled = getFilteredCarers().length === 0 || bulkTagBusy;
+  }
+  if (applyBulkTagBtn) {
+    applyBulkTagBtn.disabled = bulkTagBusy || selectedCount === 0 || !String(bulkTagSelect?.value || "").trim();
+  }
+}
+
+function setBulkTagBusy(isBusy) {
+  bulkTagBusy = Boolean(isBusy);
+  if (bulkTagSelect) {
+    bulkTagSelect.disabled = bulkTagBusy;
+  }
+  updateBulkTagControls();
 }
 
 function setDetail(carer) {
@@ -164,6 +220,7 @@ function renderCarers() {
   if (!filtered.length) {
     emptyState.hidden = false;
     setDetail(null);
+    updateBulkTagControls();
     return;
   }
 
@@ -176,12 +233,32 @@ function renderCarers() {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", carer.id === selectedCarerId);
     tr.innerHTML = `
+      <td class="selection-cell"></td>
       <td>${escapeHtml(carer.id)}</td>
       <td>${escapeHtml(carer.name)}</td>
       <td>${escapeHtml(getAreaLabel(carer))}</td>
       <td>${escapeHtml(getCareCompLabel(carer))}</td>
       <td>${escapeHtml(formatHours(carer.contractedHours))}</td>
     `;
+
+    const selectionCell = tr.querySelector(".selection-cell");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = selectedCarerIds.has(carer.id);
+    checkbox.disabled = bulkTagBusy;
+    checkbox.setAttribute("aria-label", `Select ${carer.name || carer.id || "carer"}`);
+    checkbox.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        selectedCarerIds.add(carer.id);
+      } else {
+        selectedCarerIds.delete(carer.id);
+      }
+      updateBulkTagControls();
+    });
+    selectionCell?.appendChild(checkbox);
 
     tr.addEventListener("click", () => {
       selectedCarerId = carer.id;
@@ -193,6 +270,26 @@ function renderCarers() {
   }
 
   setDetail(selected);
+  updateBulkTagControls();
+}
+
+async function refreshCarersData() {
+  setStatus("Loading carers...");
+  const payload = await directoryApi.listCarers({ limit: 500 });
+  allCarers = Array.isArray(payload?.carers) ? payload.carers : [];
+  const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
+  warningState.hidden = warnings.length === 0;
+  warningState.textContent = warnings.join(" ");
+  renderFilterOptions();
+  renderCarers();
+  setStatus(`Loaded ${allCarers.length} carer(s).`);
+}
+
+async function loadTagCatalog() {
+  const payload = await directoryApi.getOneTouchTags();
+  availableTags = Array.isArray(payload?.tags) ? payload.tags : [];
+  renderBulkTagOptions();
+  updateBulkTagControls();
 }
 
 async function init() {
@@ -211,17 +308,7 @@ async function init() {
     }
     renderTopNavigation({ role });
 
-    setStatus("Loading carers...");
-    const payload = await directoryApi.listCarers({ limit: 500 });
-    allCarers = Array.isArray(payload?.carers) ? payload.carers : [];
-
-    const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
-    warningState.hidden = warnings.length === 0;
-    warningState.textContent = warnings.join(" ");
-
-    renderFilterOptions();
-    renderCarers();
-    setStatus(`Loaded ${allCarers.length} carer(s).`);
+    await Promise.all([refreshCarersData(), loadTagCatalog()]);
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not load carers.", true);
@@ -234,6 +321,69 @@ async function init() {
 searchInput?.addEventListener("input", renderCarers);
 areaFilterSelect?.addEventListener("change", renderCarers);
 careCompFilterSelect?.addEventListener("change", renderCarers);
+bulkTagSelect?.addEventListener("change", updateBulkTagControls);
+
+selectVisibleBtn?.addEventListener("click", () => {
+  for (const carer of getFilteredCarers()) {
+    selectedCarerIds.add(carer.id);
+  }
+  setBulkTagStatus(`Selected ${selectedCarerIds.size} carer(s).`);
+  renderCarers();
+  updateBulkTagControls();
+});
+
+clearSelectionBtn?.addEventListener("click", () => {
+  selectedCarerIds = new Set();
+  setBulkTagStatus("Selection cleared.");
+  renderCarers();
+  updateBulkTagControls();
+});
+
+applyBulkTagBtn?.addEventListener("click", async () => {
+  const recordIds = Array.from(selectedCarerIds);
+  const tagId = Number(bulkTagSelect?.value || 0);
+  if (!recordIds.length || !Number.isFinite(tagId) || tagId <= 0) {
+    updateBulkTagControls();
+    return;
+  }
+
+  setBulkTagBusy(true);
+  setBulkTagStatus(`Applying tag to ${recordIds.length} carer(s)...`);
+  try {
+    const result = await directoryApi.applyBulkCarerTag({ recordIds, tagId });
+    await refreshCarersData();
+    const failed = Number(result?.failed || 0);
+    const succeeded = Number(result?.succeeded || 0);
+    if (failed > 0) {
+      selectedCarerIds = new Set(
+        Array.isArray(result?.results) ? result.results.filter((item) => !item?.ok).map((item) => item?.id).filter(Boolean) : []
+      );
+      const failedNames = Array.isArray(result?.results)
+        ? result.results
+            .filter((item) => !item?.ok)
+            .slice(0, 3)
+            .map((item) => item?.name || item?.id || "Unknown")
+            .join(", ")
+        : "";
+      setBulkTagStatus(
+        `Bulk tag complete: ${succeeded} succeeded, ${failed} failed.${failedNames ? ` Failed: ${failedNames}` : ""}`,
+        true
+      );
+    } else {
+      selectedCarerIds = new Set();
+      setBulkTagStatus(`Bulk tag complete: ${succeeded} carer(s) updated.`);
+    }
+    if (bulkTagSelect) {
+      bulkTagSelect.value = "";
+    }
+    renderCarers();
+  } catch (error) {
+    console.error(error);
+    setBulkTagStatus(error?.message || "Could not apply bulk tag.", true);
+  } finally {
+    setBulkTagBusy(false);
+  }
+});
 
 signOutBtn?.addEventListener("click", async () => {
   try {
