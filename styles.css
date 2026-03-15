@@ -2923,6 +2923,12 @@ body.lightbox-open {
   gap: 0.6rem;
 }
 
+.agenda-list-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .agenda-list-card-main {
   display: grid;
   gap: 0.3rem;
@@ -2965,6 +2971,7 @@ body.lightbox-open {
   white-space: nowrap;
 }
 
+.agenda-card-copy-btn,
 .agenda-card-edit-btn {
   margin-top: 0.05rem;
   width: 2.25rem;
@@ -3601,6 +3608,11 @@ body.lightbox-open {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .agenda-list-card-actions {
+    justify-self: start;
+  }
+
+  .agenda-card-copy-btn,
   .agenda-card-edit-btn {
     justify-self: start;
   }

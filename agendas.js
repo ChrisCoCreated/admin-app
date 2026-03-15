@@ -34,7 +34,6 @@ const agendaDetailWrap = document.getElementById("agendaDetailWrap");
 const agendaTitle = document.getElementById("agendaTitle");
 const agendaMeta = document.getElementById("agendaMeta");
 const agendaAttendees = document.getElementById("agendaAttendees");
-const copyAgendaExportBtn = document.getElementById("copyAgendaExportBtn");
 const meetingModeInput = document.getElementById("meetingModeInput");
 const agendaSettingsForm = document.getElementById("agendaSettingsForm");
 const agendaTitleEditInput = document.getElementById("agendaTitleEditInput");
@@ -679,6 +678,9 @@ function renderAgendaList() {
     const top = document.createElement("div");
     top.className = "agenda-list-card-top";
 
+    const cardActions = document.createElement("div");
+    cardActions.className = "agenda-list-card-actions";
+
     const mainButton = document.createElement("button");
     mainButton.type = "button";
     mainButton.className = "agenda-list-card-main";
@@ -706,6 +708,20 @@ function renderAgendaList() {
     mainButton.appendChild(peopleEl);
     top.appendChild(mainButton);
 
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "ghost subtle icon-only agenda-card-copy-btn";
+    copyButton.setAttribute("aria-label", "Copy agenda for Loop");
+    const copyIcon = document.createElement("span");
+    copyIcon.setAttribute("aria-hidden", "true");
+    copyIcon.textContent = "⧉";
+    copyButton.appendChild(copyIcon);
+    copyButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await copyAgendaForLoop(agenda);
+    });
+    cardActions.appendChild(copyButton);
+
     if (isOwner) {
       const editButton = document.createElement("button");
       editButton.type = "button";
@@ -719,7 +735,11 @@ function renderAgendaList() {
         event.stopPropagation();
         void openAgenda(agenda.id, { editSettings: true });
       });
-      top.appendChild(editButton);
+      cardActions.appendChild(editButton);
+    }
+
+    if (cardActions.childElementCount > 0) {
+      top.appendChild(cardActions);
     }
 
     card.appendChild(top);
@@ -1375,9 +1395,6 @@ function renderAgendaDetail() {
   agendaEmptyState.hidden = Boolean(agenda);
   agendaDetailWrap.hidden = !agenda;
 
-  if (copyAgendaExportBtn) {
-    copyAgendaExportBtn.disabled = !agenda;
-  }
   if (meetingModeInput) {
     meetingModeInput.disabled = !agenda;
     meetingModeInput.checked = meetingModeEnabled;
@@ -1867,14 +1884,6 @@ insertLinkBtn?.addEventListener("click", () => {
   if (url) {
     editorCommand("createLink", url);
   }
-});
-
-copyAgendaExportBtn?.addEventListener("click", async () => {
-  const agenda = selectedAgenda();
-  if (!agenda) {
-    return;
-  }
-  await copyAgendaForLoop(agenda);
 });
 
 meetingModeInput?.addEventListener("change", () => {
