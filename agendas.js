@@ -34,7 +34,6 @@ const agendaDetailWrap = document.getElementById("agendaDetailWrap");
 const agendaTitle = document.getElementById("agendaTitle");
 const agendaMeta = document.getElementById("agendaMeta");
 const agendaAttendees = document.getElementById("agendaAttendees");
-const meetingModeInput = document.getElementById("meetingModeInput");
 const agendaSettingsForm = document.getElementById("agendaSettingsForm");
 const agendaTitleEditInput = document.getElementById("agendaTitleEditInput");
 const agendaPeopleSummaryInput = document.getElementById("agendaPeopleSummaryInput");
@@ -63,6 +62,7 @@ const itemPrivateInput = document.getElementById("itemPrivateInput");
 const itemUrgentInput = document.getElementById("itemUrgentInput");
 const itemImportantInput = document.getElementById("itemImportantInput");
 const saveAgendaItemBtn = document.getElementById("saveAgendaItemBtn");
+const cancelAgendaItemEditBtn = document.getElementById("cancelAgendaItemEditBtn");
 const insertLinkBtn = document.getElementById("insertLinkBtn");
 
 const authController = createAuthController({
@@ -90,7 +90,6 @@ let itemDetailsExpanded = false;
 let creatingTaskItemId = "";
 let completingTaskKey = "";
 let taskComposerItemId = "";
-let meetingModeEnabled = false;
 let parkedSectionExpanded = false;
 let completedSectionExpanded = false;
 let agendaStagingExpanded = true;
@@ -198,6 +197,15 @@ function setAgendaItemComposerExpanded(value) {
 function setActionStatus(message, isError = false) {
   actionStatus.textContent = message;
   actionStatus.classList.toggle("error", isError);
+}
+
+function syncAgendaItemEditorState() {
+  if (saveAgendaItemBtn) {
+    saveAgendaItemBtn.textContent = selectedItemId ? "Save changes" : "Save item";
+  }
+  if (cancelAgendaItemEditBtn) {
+    cancelAgendaItemEditBtn.hidden = !selectedItemId;
+  }
 }
 
 function normalizeEmail(value) {
@@ -771,6 +779,7 @@ function resetItemForm() {
   itemUrgentInput.checked = false;
   itemImportantInput.checked = false;
   setAgendaItemComposerExpanded(false);
+  syncAgendaItemEditorState();
 }
 
 function populateItemForm(item) {
@@ -786,6 +795,7 @@ function populateItemForm(item) {
   itemUrgentInput.checked = item.isUrgent === true;
   itemImportantInput.checked = item.isImportant === true;
   setAgendaItemComposerExpanded(true);
+  syncAgendaItemEditorState();
 }
 
 function participantSummary(agenda) {
@@ -864,7 +874,11 @@ function renderAgendaItems(agenda) {
       `;
     }
     return `
-      ${status === "active" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="discussed">Discussed</button>' : ""}
+      ${
+        status === "active"
+          ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="discussed">Discussed</button>'
+          : '<span class="agenda-lifecycle-label">Discussed</span><button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="active">Undiscuss</button>'
+      }
       ${status !== "completed" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="completed">Complete</button>' : ""}
       ${status !== "parked" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="parked">Park</button>' : ""}
     `;
@@ -979,24 +993,19 @@ function renderAgendaItems(agenda) {
         `
         : "";
     const showAddTaskIcon = taskComposerItemId !== item.id && status !== "completed";
-    const showMeetingTick = meetingModeEnabled && status === "active";
 
     card.innerHTML = `
       <div class="agenda-item-card-head">
         <strong>${escapeHtml(item.title)}</strong>
         <div class="agenda-item-card-head-actions">
-          ${
-            showMeetingTick
-              ? `<button
-                  type="button"
-                  class="ghost subtle icon-only agenda-meeting-tick-btn"
-                  aria-label="Mark discussed"
-                  title="Mark discussed"
-                >
-                  <span aria-hidden="true">✓</span>
-                </button>`
-              : ""
-          }
+          <button
+            type="button"
+            class="ghost subtle icon-only agenda-item-edit-icon"
+            aria-label="Edit item"
+            title="Edit item"
+          >
+            <span aria-hidden="true">✎</span>
+          </button>
           ${
             showAddTaskIcon
               ? `<button
@@ -1026,13 +1035,15 @@ function renderAgendaItems(agenda) {
       <div class="agenda-item-actions">${taskComposerHtml}</div>
     `;
 
-    card.addEventListener("click", () => {
-      populateItemForm(item);
-      renderAgendaItems(agenda);
-    });
     card.querySelector(".agenda-expand-toggle")?.addEventListener("click", (event) => {
       event.stopPropagation();
       itemDetailsExpanded = !itemDetailsExpanded;
+      renderAgendaItems(agenda);
+    });
+    card.querySelector(".agenda-item-edit-icon")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      populateItemForm(item);
+      setActionStatus("");
       renderAgendaItems(agenda);
     });
     if (options.reorderable === true) {
@@ -1057,10 +1068,6 @@ function renderAgendaItems(agenda) {
     });
     card.querySelector(".agenda-linked-task-list")?.addEventListener("click", (event) => {
       event.stopPropagation();
-    });
-    card.querySelector(".agenda-meeting-tick-btn")?.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      await updateAgendaItemStatus(agenda, item, "discussed", { optimisticMessage: "" });
     });
     card.querySelector(".agenda-task-link-icon")?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1395,11 +1402,6 @@ function renderAgendaDetail() {
   agendaEmptyState.hidden = Boolean(agenda);
   agendaDetailWrap.hidden = !agenda;
 
-  if (meetingModeInput) {
-    meetingModeInput.disabled = !agenda;
-    meetingModeInput.checked = meetingModeEnabled;
-  }
-
   if (!agenda) {
     if (agendaStagingPanel) {
       agendaStagingPanel.hidden = true;
@@ -1686,6 +1688,7 @@ async function init() {
     setAgendaItemComposerExpanded(false);
     setItemSearchExpanded(false);
     setAgendaStagingExpanded(true);
+    syncAgendaItemEditorState();
     hydrateAgendasFromCache();
     await loadAgendas();
   } catch (error) {
@@ -1773,6 +1776,12 @@ cancelAgendaSettingsBtn?.addEventListener("click", () => {
   agendaPeopleSummaryInput.value = participantSummary(agenda);
   agendaPrivateEditInput.checked = agenda.isPrivate === true;
   setAgendaSettingsExpanded(false);
+});
+
+cancelAgendaItemEditBtn?.addEventListener("click", () => {
+  resetItemForm();
+  setActionStatus("");
+  renderAgendaDetail();
 });
 
 agendaItemForm?.addEventListener("submit", async (event) => {
@@ -1884,11 +1893,6 @@ insertLinkBtn?.addEventListener("click", () => {
   if (url) {
     editorCommand("createLink", url);
   }
-});
-
-meetingModeInput?.addEventListener("change", () => {
-  meetingModeEnabled = meetingModeInput.checked;
-  renderAgendaDetail();
 });
 
 toggleCreatePanelBtn?.addEventListener("click", () => {

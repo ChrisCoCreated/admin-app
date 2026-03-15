@@ -2777,18 +2777,6 @@ body.lightbox-open {
   gap: 1rem;
 }
 
-.agenda-detail-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.agenda-meeting-toggle {
-  margin: 0;
-}
-
 .agenda-list-head {
   display: grid;
   gap: 0.85rem;
@@ -3171,21 +3159,18 @@ body.lightbox-open {
   color: rgba(16, 33, 57, 0.46);
 }
 
-.agenda-task-link-icon:hover {
-  color: rgba(16, 33, 57, 0.68);
-}
-
-.agenda-meeting-tick-btn {
+.agenda-item-edit-icon {
   width: 1.9rem;
   min-width: 1.9rem;
   height: 1.9rem;
   padding: 0;
   border-radius: 999px;
-  color: rgba(42, 109, 65, 0.72);
+  color: rgba(16, 33, 57, 0.46);
 }
 
-.agenda-meeting-tick-btn:hover {
-  color: #2a6d41;
+.agenda-item-edit-icon:hover,
+.agenda-task-link-icon:hover {
+  color: rgba(16, 33, 57, 0.68);
 }
 
 .agenda-expand-toggle:hover {
@@ -3248,6 +3233,13 @@ body.lightbox-open {
   padding: 0.18rem 0.58rem;
   border-radius: 999px;
   font-size: 0.76rem;
+  line-height: 1;
+}
+
+.agenda-lifecycle-label {
+  color: #426a39;
+  font-size: 0.76rem;
+  font-weight: 700;
   line-height: 1;
 }
 
