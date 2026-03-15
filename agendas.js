@@ -72,6 +72,7 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
 const AGENDA_STAGING_CACHE_PREFIX = "thrive.agendas.staging.v1";
+const GLOBAL_AGENDA_STAGING_KEY = "__global__";
 const AGENDA_DEBUG = false;
 
 let currentUser = null;
@@ -223,12 +224,22 @@ function readStagedAgendaItemsFromCache() {
       return new Map();
     }
     const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Map([
+        [
+          GLOBAL_AGENDA_STAGING_KEY,
+          parsed.filter((item) => String(item?.id || "").trim() && String(item?.title || "").trim()),
+        ],
+      ]);
+    }
     const entries = Object.entries(parsed && typeof parsed === "object" ? parsed : {});
+    const flattened = entries.flatMap(([, items]) =>
+      Array.isArray(items) ? items.filter((item) => String(item?.id || "").trim() && String(item?.title || "").trim()) : []
+    );
     return new Map(
-      entries.map(([agendaId, items]) => [
-        agendaId,
-        Array.isArray(items) ? items.filter((item) => String(item?.id || "").trim() && String(item?.title || "").trim()) : [],
-      ])
+      flattened.length
+        ? [[GLOBAL_AGENDA_STAGING_KEY, flattened]]
+        : []
     );
   } catch {
     return new Map();
@@ -237,31 +248,25 @@ function readStagedAgendaItemsFromCache() {
 
 function writeStagedAgendaItemsToCache() {
   try {
-    const payload = Object.fromEntries(
-      [...stagedAgendaItemsById.entries()].filter(([, items]) => Array.isArray(items) && items.length)
-    );
+    const payload = stagedItemsForAgenda();
     window.localStorage.setItem(agendaStagingCacheKey(currentUser?.email || ""), JSON.stringify(payload));
   } catch {
     // Ignore cache write errors.
   }
 }
 
-function stagedItemsForAgenda(agendaId) {
-  return Array.isArray(stagedAgendaItemsById.get(String(agendaId || "").trim()))
-    ? stagedAgendaItemsById.get(String(agendaId || "").trim())
+function stagedItemsForAgenda() {
+  return Array.isArray(stagedAgendaItemsById.get(GLOBAL_AGENDA_STAGING_KEY))
+    ? stagedAgendaItemsById.get(GLOBAL_AGENDA_STAGING_KEY)
     : [];
 }
 
-function setStagedItemsForAgenda(agendaId, items) {
-  const normalizedAgendaId = String(agendaId || "").trim();
-  if (!normalizedAgendaId) {
-    return;
-  }
+function setStagedItemsForAgenda(_agendaId, items) {
   const nextItems = Array.isArray(items) ? items : [];
   if (nextItems.length) {
-    stagedAgendaItemsById.set(normalizedAgendaId, nextItems);
+    stagedAgendaItemsById.set(GLOBAL_AGENDA_STAGING_KEY, nextItems);
   } else {
-    stagedAgendaItemsById.delete(normalizedAgendaId);
+    stagedAgendaItemsById.delete(GLOBAL_AGENDA_STAGING_KEY);
   }
   writeStagedAgendaItemsToCache();
 }
@@ -272,6 +277,33 @@ function createStagedAgendaItem(title) {
     title: String(title || "").trim(),
     createdAt: new Date().toISOString(),
   };
+}
+
+function setNativeDragData(event, payload) {
+  try {
+    event.dataTransfer?.setData("text/plain", JSON.stringify(payload));
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+    }
+  } catch {
+    // Ignore drag payload errors.
+  }
+}
+
+function resolveDragState(event) {
+  if (dragState) {
+    return dragState;
+  }
+  const raw = event?.dataTransfer?.getData("text/plain");
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function escapeHtml(value) {
@@ -507,9 +539,8 @@ function renderAgendaStaging(agenda) {
   if (!agendaStagingPanel || !toggleAgendaStagingBtn || !agendaStagingList || !agendaStagingEmpty) {
     return;
   }
-  const agendaId = String(agenda?.id || "").trim();
-  const stagedItems = agendaId ? stagedItemsForAgenda(agendaId) : [];
-  agendaStagingPanel.hidden = !agendaId;
+  const stagedItems = stagedItemsForAgenda();
+  agendaStagingPanel.hidden = false;
   const label = toggleAgendaStagingBtn.querySelector("span");
   if (label) {
     label.textContent = `To add to agenda (${stagedItems.length})`;
@@ -532,12 +563,12 @@ function renderAgendaStaging(agenda) {
         <span aria-hidden="true">×</span>
       </button>
     `;
-    card.addEventListener("dragstart", () => {
+    card.addEventListener("dragstart", (event) => {
       dragState = {
         type: "staged-item",
-        agendaId,
         stagedItemId: item.id,
       };
+      setNativeDragData(event, dragState);
       card.classList.add("is-dragging");
     });
     card.addEventListener("dragend", () => {
@@ -546,7 +577,6 @@ function renderAgendaStaging(agenda) {
     });
     card.querySelector(".agenda-staging-remove-btn")?.addEventListener("click", () => {
       setStagedItemsForAgenda(
-        agendaId,
         stagedItems.filter((entry) => entry.id !== item.id)
       );
       renderAgendaStaging(agenda);
@@ -850,16 +880,16 @@ function renderAgendaItems(agenda) {
     zone.addEventListener("drop", async (event) => {
       event.preventDefault();
       zone.classList.remove("is-active");
-      if (!dragState) {
+      const currentDrag = resolveDragState(event);
+      if (!currentDrag) {
         return;
       }
-      const currentDrag = dragState;
       dragState = null;
       if (currentDrag.type === "agenda-item") {
         await reorderItemToIndex(agenda, currentDrag.itemId, insertIndex);
         return;
       }
-      if (currentDrag.type === "staged-item" && currentDrag.agendaId === agenda.id) {
+      if (currentDrag.type === "staged-item") {
         await addStagedItemToAgendaAtIndex(agenda, currentDrag.stagedItemId, insertIndex);
       }
     });
@@ -877,7 +907,7 @@ function renderAgendaItems(agenda) {
       ${
         status === "active"
           ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="discussed">Discussed</button>'
-          : '<span class="agenda-lifecycle-label">Discussed</span><button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="active">Undiscuss</button>'
+          : '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="active">Undiscuss</button>'
       }
       ${status !== "completed" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="completed">Complete</button>' : ""}
       ${status !== "parked" ? '<button type="button" class="ghost subtle agenda-lifecycle-btn" data-status="parked">Park</button>' : ""}
@@ -1047,12 +1077,13 @@ function renderAgendaItems(agenda) {
       renderAgendaItems(agenda);
     });
     if (options.reorderable === true) {
-      card.addEventListener("dragstart", () => {
+      card.addEventListener("dragstart", (event) => {
         dragState = {
           type: "agenda-item",
           agendaId: agenda.id,
           itemId: item.id,
         };
+        setNativeDragData(event, dragState);
         card.classList.add("is-dragging");
       });
       card.addEventListener("dragend", () => {
@@ -1343,7 +1374,7 @@ async function markAgendaTaskComplete(agenda, item, task) {
 
 async function addStagedItemToAgendaAtIndex(agenda, stagedItemId, insertIndex) {
   const agendaId = String(agenda?.id || "").trim();
-  const stagedItems = stagedItemsForAgenda(agendaId);
+  const stagedItems = stagedItemsForAgenda();
   const stagedItem = stagedItems.find((item) => item.id === stagedItemId);
   if (!agendaId || !stagedItem) {
     return;
@@ -1371,7 +1402,6 @@ async function addStagedItemToAgendaAtIndex(agenda, stagedItemId, insertIndex) {
 
   try {
     setStagedItemsForAgenda(
-      agendaId,
       stagedItems.filter((item) => item.id !== stagedItemId)
     );
     applyLocalAgendaItems(agendaId, [...previousItems, optimisticItem]);
@@ -1401,11 +1431,9 @@ function renderAgendaDetail() {
   const agenda = selectedAgenda();
   agendaEmptyState.hidden = Boolean(agenda);
   agendaDetailWrap.hidden = !agenda;
+  renderAgendaStaging(agenda);
 
   if (!agenda) {
-    if (agendaStagingPanel) {
-      agendaStagingPanel.hidden = true;
-    }
     return;
   }
 
@@ -1428,7 +1456,6 @@ function renderAgendaDetail() {
     selectedItemId = "";
   }
   populateItemForm(detailLoaded ? selectedItem() : null);
-  renderAgendaStaging(agenda);
 
   if (!detailLoaded) {
     agendaItemsList.innerHTML = '<p class="muted scorecard-empty-state">Loading agenda items...</p>';
@@ -1827,22 +1854,17 @@ agendaItemForm?.addEventListener("submit", async (event) => {
 
 agendaStagingForm?.addEventListener("submit", (event) => {
   event.preventDefault();
-  const agenda = selectedAgenda();
-  const agendaId = String(agenda?.id || "").trim();
   const title = String(agendaStagingInput?.value || "").trim();
-  if (!agendaId) {
-    return;
-  }
   if (!title) {
     setActionStatus("Add a title before sending it to the agenda shortlist.", true);
     return;
   }
-  setStagedItemsForAgenda(agendaId, [...stagedItemsForAgenda(agendaId), createStagedAgendaItem(title)]);
+  setStagedItemsForAgenda("", [...stagedItemsForAgenda(), createStagedAgendaItem(title)]);
   if (agendaStagingInput) {
     agendaStagingInput.value = "";
   }
   setActionStatus("");
-  renderAgendaStaging(agenda);
+  renderAgendaStaging(selectedAgenda());
 });
 
 itemTitleInput?.addEventListener("input", () => {
