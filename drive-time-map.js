@@ -23,6 +23,8 @@ const noAcceptedPlacesMessage = document.getElementById("noAcceptedPlacesMessage
 const toggleSavedSearchesBtn = document.getElementById("toggleSavedSearchesBtn");
 const savedSearchesContent = document.getElementById("savedSearchesContent");
 const savedSearchFilterSelect = document.getElementById("savedSearchFilterSelect");
+const duplicateSelectedSearchesBtn = document.getElementById("duplicateSelectedSearchesBtn");
+const mergeSelectedSearchesBtn = document.getElementById("mergeSelectedSearchesBtn");
 const showAllSearchesBtn = document.getElementById("showAllSearchesBtn");
 const hideAllSearchesBtn = document.getElementById("hideAllSearchesBtn");
 const exportSearchesBtn = document.getElementById("exportSearchesBtn");
@@ -100,6 +102,7 @@ let clickFeedbackTimer = null;
 let savedSearchFilter = "active";
 let clientOfficeOptions = [];
 let editAddPlacesMode = false;
+let selectedSavedSearchIds = new Set();
 
 const MAP_PANES = {
   searchArea: "search-area-pane",
@@ -505,6 +508,20 @@ function getFilteredSavedSearches() {
     return savedSearches;
   }
   return savedSearches.filter((search) => !search.archived);
+}
+
+function getSelectedSavedSearches() {
+  return savedSearches.filter((search) => selectedSavedSearchIds.has(search.id));
+}
+
+function updateSavedSearchSelectionActions() {
+  const selectedCount = getSelectedSavedSearches().length;
+  if (duplicateSelectedSearchesBtn) {
+    duplicateSelectedSearchesBtn.disabled = selectedCount < 1;
+  }
+  if (mergeSelectedSearchesBtn) {
+    mergeSelectedSearchesBtn.disabled = selectedCount < 2;
+  }
 }
 
 function getEditingSearch() {
@@ -1640,6 +1657,19 @@ function renderSavedSearches() {
     const visibilityLabel = document.createElement("label");
     visibilityLabel.className = "drive-time-search-visibility";
 
+    const selectCheckbox = document.createElement("input");
+    selectCheckbox.type = "checkbox";
+    selectCheckbox.checked = selectedSavedSearchIds.has(search.id);
+    selectCheckbox.setAttribute("aria-label", `Select ${search.name}`);
+    selectCheckbox.addEventListener("change", () => {
+      if (selectCheckbox.checked) {
+        selectedSavedSearchIds.add(search.id);
+      } else {
+        selectedSavedSearchIds.delete(search.id);
+      }
+      updateSavedSearchSelectionActions();
+    });
+
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = search.visible;
@@ -1668,7 +1698,7 @@ function renderSavedSearches() {
     }`;
     titleWrap.append(title, subtitle);
 
-    visibilityLabel.append(checkbox, colorDot, titleWrap);
+    visibilityLabel.append(selectCheckbox, checkbox, colorDot, titleWrap);
 
     const actions = document.createElement("div");
     actions.className = "drive-time-search-actions";
@@ -1759,6 +1789,7 @@ function renderSavedSearches() {
       : savedSearchFilter === "all"
         ? "No saved searches yet."
         : "No active searches.";
+  updateSavedSearchSelectionActions();
 }
 
 function resetCurrentCatchment() {
@@ -1780,6 +1811,105 @@ function resetCurrentCatchment() {
   updateSaveButtonState();
   updateEditAddPlacesButtonState();
   updateClearAcceptedButtonState();
+}
+
+function duplicateSelectedSearches() {
+  const selected = getSelectedSavedSearches();
+  if (!selected.length) {
+    setStatus("Select at least one search to duplicate.", true);
+    return;
+  }
+
+  const duplicates = selected.map((search, index) =>
+    sanitizeSavedSearch(
+      {
+        ...search,
+        id: createSearchId(),
+        name: `${search.name} (Copy)`,
+        savedAt: new Date().toISOString(),
+        visible: false,
+      },
+      savedSearches.length + index
+    )
+  ).filter(Boolean);
+
+  if (!duplicates.length) {
+    setStatus("Could not duplicate selected searches.", true);
+    return;
+  }
+
+  savedSearches = [...duplicates, ...savedSearches].slice(0, 100);
+  persistSavedSearches();
+  renderSavedSearches();
+  syncAllSearchLayers();
+  setStatus(`Duplicated ${duplicates.length} search${duplicates.length === 1 ? "" : "es"}.`);
+}
+
+function mergeSelectedSearches() {
+  const selected = getSelectedSavedSearches();
+  if (selected.length < 2) {
+    setStatus("Select at least two searches to merge.", true);
+    return;
+  }
+
+  const primary = selected[0];
+  const acceptedByKey = new Map();
+  const hullSourcePoints = [];
+
+  for (const search of selected) {
+    const office = sanitizeOffice(search.office);
+    hullSourcePoints.push({ lat: office.lat, lng: office.lng });
+
+    for (const point of sanitizePolygon(search.polygon)) {
+      hullSourcePoints.push(point);
+    }
+
+    for (const place of sanitizeAcceptedPlaces(search.acceptedPlaces)) {
+      if (!acceptedByKey.has(place.key)) {
+        acceptedByKey.set(place.key, place);
+      }
+      hullSourcePoints.push({ lat: place.lat, lng: place.lng });
+    }
+  }
+
+  const mergedPolygon = convexHull(hullSourcePoints);
+  const mergedSearch = sanitizeSavedSearch(
+    {
+      id: createSearchId(),
+      name: `Merged: ${selected.map((search) => search.name).join(" + ")}`,
+      office: sanitizeOffice(primary.office),
+      thresholdMinutes: Math.max(...selected.map((search) => clampMinutes(search.thresholdMinutes))),
+      departureTimeMode: primary.departureTimeMode || "default",
+      departureTime: primary.departureTime || null,
+      acceptedPlaces: Array.from(acceptedByKey.values()),
+      polygon: mergedPolygon,
+      qualitySummary: {
+        mergedFrom: selected.length,
+        acceptedPlaces: acceptedByKey.size,
+      },
+      savedAt: new Date().toISOString(),
+      visible: true,
+      archived: false,
+      colorIndex: savedSearches.length,
+      formattedAddress: primary.formattedAddress || primary.office?.name || "Merged search",
+      query: primary.query || primary.office?.name || "Merged search",
+    },
+    savedSearches.length
+  );
+
+  if (!mergedSearch) {
+    setStatus("Could not merge selected searches.", true);
+    return;
+  }
+
+  savedSearches.unshift(mergedSearch);
+  savedSearches = savedSearches.slice(0, 100);
+  selectedSavedSearchIds.clear();
+  persistSavedSearches();
+  renderSavedSearches();
+  syncAllSearchLayers();
+  fitToSearch(mergedSearch);
+  setStatus(`Merged ${selected.length} searches into '${mergedSearch.name}'.`);
 }
 
 function saveCurrentSearch() {
@@ -2227,6 +2357,14 @@ saveSearchBtn?.addEventListener("click", () => {
   saveCurrentSearch();
 });
 
+duplicateSelectedSearchesBtn?.addEventListener("click", () => {
+  duplicateSelectedSearches();
+});
+
+mergeSelectedSearchesBtn?.addEventListener("click", () => {
+  mergeSelectedSearches();
+});
+
 editAddPlacesBtn?.addEventListener("click", () => {
   if (!editingSearchId) {
     return;
@@ -2315,6 +2453,7 @@ toggleSavedSearchesBtn?.addEventListener("click", () => {
 savedSearchFilterSelect?.addEventListener("change", () => {
   savedSearchFilter = String(savedSearchFilterSelect.value || "active");
   renderSavedSearches();
+  updateSavedSearchSelectionActions();
 });
 
 driveTimeMinutesInput?.addEventListener("change", () => {

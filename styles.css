@@ -2267,7 +2267,7 @@ body.lightbox-open {
 
 .drive-time-search-visibility {
   display: inline-grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
 }
