@@ -32,7 +32,8 @@ const loadPeopleOverlayBtn = document.getElementById("loadPeopleOverlayBtn");
 const showPeopleOverlayInput = document.getElementById("showPeopleOverlayInput");
 const overlayTypeSelect = document.getElementById("overlayTypeSelect");
 const overlayLocationSelect = document.getElementById("overlayLocationSelect");
-const overlayCompanionAreaSelect = document.getElementById("overlayCompanionAreaSelect");
+const overlayClientAreaFilters = document.getElementById("overlayClientAreaFilters");
+const overlayCompanionAreaFilters = document.getElementById("overlayCompanionAreaFilters");
 const overlayCompanionCareCompSelect = document.getElementById("overlayCompanionCareCompSelect");
 const overlayStatusFilters = document.getElementById("overlayStatusFilters");
 const peopleOverlayStatus = document.getElementById("peopleOverlayStatus");
@@ -76,7 +77,7 @@ const OFFICE = {
   lat: Number(FRONTEND_CONFIG.mapOffice?.lat ?? 51.2802),
   lng: Number(FRONTEND_CONFIG.mapOffice?.lng ?? 1.0789),
 };
-let activeOffice = { ...OFFICE };
+let activeOffice = null;
 
 let map = null;
 let officeMarker = null;
@@ -89,6 +90,8 @@ const areaLayers = new Map();
 let peopleOverlayData = [];
 const peopleOverlayLayers = new Map();
 let overlayStatusSet = new Set();
+let overlayClientAreaSet = new Set();
+let overlayCompanionAreaSet = new Set();
 let overlayLoaded = false;
 let geocodeCache = {};
 let useCustomDepartureTime = false;
@@ -115,7 +118,7 @@ const directoryApi = createDirectoryApi(authController);
 
 function createEmptyCatchment() {
   return {
-    office: { ...activeOffice },
+    office: activeOffice ? { ...activeOffice } : null,
     thresholdMinutes: DEFAULT_DRIVE_TIME_MINUTES,
     acceptedPlaces: [],
     polygon: [],
@@ -659,6 +662,16 @@ function deriveCompanionAreaOptions(items) {
   return Array.from(values).sort((a, b) => a.localeCompare(b));
 }
 
+function deriveClientAreaOptions(items) {
+  const values = new Set(
+    items
+      .filter((item) => item.type === "client")
+      .map((item) => normalizeLocation(item.areaLabel))
+      .filter(Boolean)
+  );
+  return Array.from(values).sort((a, b) => a.localeCompare(b));
+}
+
 function deriveCompanionCareCompOptions(items) {
   const values = new Set(
     items
@@ -743,23 +756,86 @@ function renderOverlayLocationOptions() {
   overlayLocationSelect.value = options.includes(current) ? current : "all";
 }
 
-function renderCompanionOverlayOptions() {
-  if (!overlayCompanionAreaSelect || !overlayCompanionCareCompSelect) {
+function renderAreaFilterButtons(root, options, selectedSet, onChange, emptyLabel) {
+  if (!root) {
+    return;
+  }
+  if (!selectedSet.size) {
+    for (const option of options) {
+      selectedSet.add(option);
+    }
+  }
+  selectedSet.forEach((value) => {
+    if (!options.includes(value)) {
+      selectedSet.delete(value);
+    }
+  });
+  if (!selectedSet.size) {
+    for (const option of options) {
+      selectedSet.add(option);
+    }
+  }
+
+  root.innerHTML = "";
+  if (!options.length) {
+    const empty = document.createElement("span");
+    empty.className = "muted";
+    empty.textContent = emptyLabel;
+    root.appendChild(empty);
     return;
   }
 
-  const currentArea = String(overlayCompanionAreaSelect.value || "all");
+  for (const optionValue of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `area-filter-btn${selectedSet.has(optionValue) ? " active" : ""}`;
+    btn.textContent = optionValue;
+    btn.addEventListener("click", () => {
+      if (selectedSet.has(optionValue)) {
+        selectedSet.delete(optionValue);
+      } else {
+        selectedSet.add(optionValue);
+      }
+      if (!selectedSet.size) {
+        selectedSet.add(optionValue);
+      }
+      onChange();
+    });
+    root.appendChild(btn);
+  }
+}
+
+function renderCompanionOverlayOptions() {
+  if (!overlayCompanionCareCompSelect) {
+    return;
+  }
+
   const currentCareComp = String(overlayCompanionCareCompSelect.value || "all");
-  const areaOptions = deriveCompanionAreaOptions(peopleOverlayData);
+  const clientAreaOptions = deriveClientAreaOptions(peopleOverlayData);
+  const companionAreaOptions = deriveCompanionAreaOptions(peopleOverlayData);
   const careCompOptions = deriveCompanionCareCompOptions(peopleOverlayData);
 
-  overlayCompanionAreaSelect.innerHTML = '<option value="all">All areas</option>';
-  for (const area of areaOptions) {
-    const option = document.createElement("option");
-    option.value = area;
-    option.textContent = area;
-    overlayCompanionAreaSelect.appendChild(option);
-  }
+  renderAreaFilterButtons(
+    overlayClientAreaFilters,
+    clientAreaOptions,
+    overlayClientAreaSet,
+    () => {
+      renderCompanionOverlayOptions();
+      applyPeopleOverlayFilters();
+    },
+    "No client areas"
+  );
+
+  renderAreaFilterButtons(
+    overlayCompanionAreaFilters,
+    companionAreaOptions,
+    overlayCompanionAreaSet,
+    () => {
+      renderCompanionOverlayOptions();
+      applyPeopleOverlayFilters();
+    },
+    "No companion areas"
+  );
 
   overlayCompanionCareCompSelect.innerHTML = '<option value="all">All tags</option>';
   for (const tag of careCompOptions) {
@@ -769,14 +845,12 @@ function renderCompanionOverlayOptions() {
     overlayCompanionCareCompSelect.appendChild(option);
   }
 
-  overlayCompanionAreaSelect.value = areaOptions.includes(currentArea) ? currentArea : "all";
   overlayCompanionCareCompSelect.value = careCompOptions.includes(currentCareComp) ? currentCareComp : "all";
 }
 
 function getFilteredOverlayPeople() {
   const typeFilter = String(overlayTypeSelect?.value || "all");
   const locationFilter = String(overlayLocationSelect?.value || "all");
-  const companionAreaFilter = String(overlayCompanionAreaSelect?.value || "all");
   const companionCareCompFilter = String(overlayCompanionCareCompSelect?.value || "all");
   return peopleOverlayData.filter((item) => {
     const matchesType = typeFilter === "all" || item.type === typeFilter;
@@ -786,11 +860,16 @@ function getFilteredOverlayPeople() {
       return false;
     }
 
+    const normalizedArea = normalizeLocation(item.areaLabel);
+    if (item.type === "client") {
+      return !overlayClientAreaSet.size || overlayClientAreaSet.has(normalizedArea);
+    }
+
     if (item.type !== "companion") {
       return true;
     }
 
-    if (companionAreaFilter !== "all" && normalizeLocation(item.areaLabel) !== companionAreaFilter) {
+    if (overlayCompanionAreaSet.size && !overlayCompanionAreaSet.has(normalizedArea)) {
       return false;
     }
     if (companionCareCompFilter !== "all" && normalizeLocation(item.careCompTag) !== companionCareCompFilter) {
@@ -875,6 +954,7 @@ function buildOverlayItems(clientsPayload, carersPayload) {
       name: normalizeLocation(client.name || "Unnamed client"),
       status: normalizeStatus(client.status),
       locationLabel: buildClientLocationLabel(client),
+      areaLabel: normalizeLocation(client.area || client.location || client.town || ""),
       geocodeQuery: query,
     });
     index += 1;
@@ -1087,7 +1167,7 @@ function initMap() {
   map = window.L.map(driveTimeMapRoot, {
     zoomControl: true,
     attributionControl: true,
-  }).setView([activeOffice.lat, activeOffice.lng], 11);
+  }).setView([OFFICE.lat, OFFICE.lng], 11);
 
   createMapPanes();
 
@@ -1096,13 +1176,6 @@ function initMap() {
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
   }).addTo(map);
-
-  officeMarker = window.L.marker([activeOffice.lat, activeOffice.lng], {
-    title: `${activeOffice.name}${activeOffice.postcode ? ` (${activeOffice.postcode})` : ""}`,
-    keyboard: false,
-    pane: MAP_PANES.activeOffice,
-  }).addTo(map);
-  officeMarker.bindPopup(`<strong>${escapeHtml(activeOffice.name)}</strong><br/>${escapeHtml(activeOffice.postcode)}`);
 
   map.on("click", (event) => {
     if (!USE_OFFICE_CATCHMENT_MODE) {
@@ -1166,6 +1239,10 @@ function convexHull(points) {
 }
 
 function recomputeCurrentHullFromAccepted() {
+  if (!currentCatchment.office) {
+    currentCatchment.polygon = [];
+    return;
+  }
   const source = [
     { lat: currentCatchment.office.lat, lng: currentCatchment.office.lng },
     ...currentCatchment.acceptedPlaces.map((place) => ({ lat: place.lat, lng: place.lng })),
@@ -1690,7 +1767,7 @@ function resetCurrentCatchment() {
   currentCatchment = createEmptyCatchment();
   currentCatchment.thresholdMinutes = resolveDriveTimeMinutes();
   if (searchNameInput) {
-    searchNameInput.value = `${activeOffice.name} catchment`;
+    searchNameInput.value = activeOffice ? `${activeOffice.name} catchment` : "";
   }
   clearPreviewVertexMarkers();
   if (previewPolygon) {
@@ -1698,6 +1775,7 @@ function resetCurrentCatchment() {
     previewPolygon = null;
   }
   clearCurrentAcceptedMarkers();
+  updateOfficeMarker();
   renderAcceptedPlacesList();
   updateSaveButtonState();
   updateEditAddPlacesButtonState();
@@ -1705,6 +1783,10 @@ function resetCurrentCatchment() {
 }
 
 function saveCurrentSearch() {
+  if (!currentCatchment.office) {
+    setStatus("Set an office location before saving a catchment.", true);
+    return;
+  }
   if (!canSaveCurrentCatchment()) {
     setStatus("Add at least one accepted place before saving.", true);
     return;
@@ -1851,6 +1933,10 @@ async function handleMapClickForCatchment(latlng) {
   if (!map || !USE_OFFICE_CATCHMENT_MODE) {
     return;
   }
+  if (!currentCatchment.office) {
+    setStatus("Set an office location before testing places.", true);
+    return;
+  }
 
   const thresholdMinutes = resolveDriveTimeMinutes();
   let departure = null;
@@ -1967,11 +2053,26 @@ function clearAcceptedPlaces() {
 }
 
 function updateOfficeMarker() {
-  if (!officeMarker || !map || !window.L) {
+  if (!map || !window.L) {
     return;
   }
-  officeMarker.setLatLng([currentCatchment.office.lat, currentCatchment.office.lng]);
-  officeMarker.setPopupContent(
+  if (!currentCatchment.office) {
+    if (officeMarker) {
+      officeMarker.remove();
+      officeMarker = null;
+    }
+    return;
+  }
+  if (!officeMarker) {
+    officeMarker = window.L.marker([currentCatchment.office.lat, currentCatchment.office.lng], {
+      title: `${currentCatchment.office.name}${currentCatchment.office.postcode ? ` (${currentCatchment.office.postcode})` : ""}`,
+      keyboard: false,
+      pane: MAP_PANES.activeOffice,
+    }).addTo(map);
+  } else {
+    officeMarker.setLatLng([currentCatchment.office.lat, currentCatchment.office.lng]);
+  }
+  officeMarker.bindPopup(
     `<strong>${escapeHtml(currentCatchment.office.name)}</strong><br/>${escapeHtml(currentCatchment.office.postcode || "")}`
   );
 }
@@ -2077,7 +2178,7 @@ async function init() {
     }
 
     if (locationInput) {
-      locationInput.value = `${activeOffice.name}${activeOffice.postcode ? ` (${activeOffice.postcode})` : ""}`;
+      locationInput.value = "";
     }
 
     loadGeocodeCache();
@@ -2091,20 +2192,21 @@ async function init() {
 
     currentCatchment = createEmptyCatchment();
     currentCatchment.thresholdMinutes = resolveDriveTimeMinutes();
+    updateOfficeMarker();
     renderAcceptedPlacesList();
     renderSavedSearches();
     setSavedSearchesCollapsed(true);
     syncAllSearchLayers();
 
     if (searchNameInput) {
-      searchNameInput.value = `${activeOffice.name} catchment`;
+      searchNameInput.value = "";
     }
 
     updateSaveButtonState();
     updateEditAddPlacesButtonState();
     updateClearAcceptedButtonState();
     setPeopleOverlayStatus("Overlay not loaded.");
-    setStatus("Click map to test a town/village from office.");
+    setStatus("Set an office location to start building a catchment.");
     document.body.classList.toggle("office-click-mode", USE_OFFICE_CATCHMENT_MODE);
     if (!USE_OFFICE_CATCHMENT_MODE) {
       setStatus("Office catchment mode is disabled in config.", true);
@@ -2175,10 +2277,6 @@ overlayTypeSelect?.addEventListener("change", () => {
 });
 
 overlayLocationSelect?.addEventListener("change", () => {
-  applyPeopleOverlayFilters();
-});
-
-overlayCompanionAreaSelect?.addEventListener("change", () => {
   applyPeopleOverlayFilters();
 });
 
