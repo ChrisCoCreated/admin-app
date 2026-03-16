@@ -2,6 +2,7 @@ const {
   createAgendaMembers,
   createAgendaItemRow,
   createAgendaRow,
+  deleteAgendaRow,
   ensureUuid,
   listAgendaItemsByAgendaIds,
   listAgendaMembersByAgendaIds,
@@ -152,6 +153,10 @@ function canEditAgendaItem(item, agenda, userEmail) {
 
 function sortAgendas(agendas) {
   return [...agendas].sort((a, b) => {
+    const orderDelta = Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+    if (orderDelta !== 0) {
+      return orderDelta;
+    }
     const aUpdated = Date.parse(a.updatedAt || "") || 0;
     const bUpdated = Date.parse(b.updatedAt || "") || 0;
     if (aUpdated !== bUpdated) {
@@ -233,12 +238,15 @@ async function getAgendaDetailForUser(email, agendaId) {
 }
 
 async function createAgendaForUser(email, body) {
+  const current = await listAgendasForUser(email);
+  const maxSortOrder = current.agendas.reduce((max, agenda) => Math.max(max, Number(agenda.sortOrder || 0)), 0);
   const payload = sanitizeAgendaInput(body, email, "create");
   const created = await createAgendaRow({
     title: payload.title,
     agenda_type: payload.agendaType,
     owner_email: payload.ownerEmail,
     is_private: payload.isPrivate,
+    sort_order: Object.prototype.hasOwnProperty.call(payload, "sortOrder") ? payload.sortOrder : maxSortOrder + 100,
   });
   const agendaId = ensureUuid(created?.id, "Agenda");
   await createAgendaMembers(buildMemberRows(agendaId, payload.ownerEmail, payload.participantEmails, payload.participantNames));
@@ -255,21 +263,55 @@ async function updateAgendaForUser(email, body) {
     error.code = "AGENDA_NOT_FOUND";
     throw error;
   }
-  if (!canEditAgenda(agenda, email) || normalizeEmail(agenda.ownerEmail) !== normalizeEmail(email)) {
+  const patch = sanitizeAgendaInput({ ...agenda, ...body }, agenda.ownerEmail, "update");
+  const changingStructure =
+    Object.prototype.hasOwnProperty.call(body || {}, "title") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "agendaType") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "participantEmails") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "participantNames") ||
+    Object.prototype.hasOwnProperty.call(body || {}, "isPrivate");
+  const needsOwner = changingStructure;
+
+  if (!canEditAgenda(agenda, email) || (needsOwner && normalizeEmail(agenda.ownerEmail) !== normalizeEmail(email))) {
     const error = new Error("Forbidden.");
     error.status = 403;
     error.code = "FORBIDDEN";
     throw error;
   }
 
-  const patch = sanitizeAgendaInput({ ...agenda, ...body }, agenda.ownerEmail, "update");
   await updateAgendaRow(agendaId, {
     ...(patch.title ? { title: patch.title } : {}),
     agenda_type: patch.agendaType,
     is_private: patch.isPrivate,
+    ...(Object.prototype.hasOwnProperty.call(patch, "sortOrder") ? { sort_order: patch.sortOrder } : {}),
     updated_at: new Date().toISOString(),
   });
-  await replaceAgendaMembers(agendaId, buildMemberRows(agendaId, agenda.ownerEmail, patch.participantEmails, patch.participantNames).filter((member) => !member.is_owner));
+  if (changingStructure) {
+    await replaceAgendaMembers(
+      agendaId,
+      buildMemberRows(agendaId, agenda.ownerEmail, patch.participantEmails, patch.participantNames).filter((member) => !member.is_owner)
+    );
+  }
+  return { ok: true };
+}
+
+async function deleteAgendaForUser(email, agendaId) {
+  const current = await listAgendasForUser(email);
+  const normalizedAgendaId = ensureUuid(agendaId, "Agenda");
+  const agenda = current.agendas.find((entry) => entry.id === normalizedAgendaId);
+  if (!agenda) {
+    const error = new Error("Agenda not found.");
+    error.status = 404;
+    error.code = "AGENDA_NOT_FOUND";
+    throw error;
+  }
+  if (normalizeEmail(agenda.ownerEmail) !== normalizeEmail(email)) {
+    const error = new Error("Forbidden.");
+    error.status = 403;
+    error.code = "FORBIDDEN";
+    throw error;
+  }
+  await deleteAgendaRow(normalizedAgendaId);
   return { ok: true };
 }
 
@@ -369,6 +411,7 @@ function mapAgendaError(error) {
 module.exports = {
   createAgendaForUser,
   createAgendaItemForUser,
+  deleteAgendaForUser,
   getAgendaDetailForUser,
   listAgendasForUser,
   listAgendaSummariesForUser,

@@ -6,6 +6,7 @@ import { renderTopNavigation } from "./navigation.js?v=20260311";
 const searchInput = document.getElementById("searchInput");
 const areaFilterSelect = document.getElementById("areaFilterSelect");
 const careCompFilterSelect = document.getElementById("careCompFilterSelect");
+const statusFilterSelect = document.getElementById("statusFilterSelect");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const bulkTagSelect = document.getElementById("bulkTagSelect");
@@ -22,6 +23,7 @@ const detailRoot = document.getElementById("carerDetail");
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
   name: detailRoot?.querySelector('[data-field="name"]'),
+  status: detailRoot?.querySelector('[data-field="status"]'),
   area: detailRoot?.querySelector('[data-field="area"]'),
   careComp: detailRoot?.querySelector('[data-field="careComp"]'),
   contractedHours: detailRoot?.querySelector('[data-field="contractedHours"]'),
@@ -75,6 +77,19 @@ function setBulkTagStatus(message, isError = false) {
 
 function getAreaLabel(carer) {
   return normalizeValue(carer.area) || "Unassigned";
+}
+
+function getStatusLabel(carer) {
+  const normalized = normalizeValue(carer.status);
+  if (!normalized) {
+    return "Unknown";
+  }
+
+  return normalized
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function getCareCompLabel(carer) {
@@ -137,6 +152,7 @@ function setDetail(carer) {
   if (!carer) {
     detailFields.id.textContent = "-";
     detailFields.name.textContent = "Select a carer";
+    detailFields.status.textContent = "-";
     detailFields.area.textContent = "-";
     detailFields.careComp.textContent = "-";
     detailFields.contractedHours.textContent = "-";
@@ -149,6 +165,7 @@ function setDetail(carer) {
 
   detailFields.id.textContent = normalizeValue(carer.id) || "-";
   detailFields.name.textContent = normalizeValue(carer.name) || "-";
+  detailFields.status.textContent = getStatusLabel(carer);
   detailFields.area.textContent = getAreaLabel(carer);
   detailFields.careComp.textContent = getCareCompLabel(carer);
   detailFields.contractedHours.textContent = formatHours(carer.contractedHours);
@@ -161,9 +178,11 @@ function setDetail(carer) {
 function renderFilterOptions() {
   const areaOptions = Array.from(new Set(allCarers.map(getAreaLabel))).sort((a, b) => a.localeCompare(b));
   const careCompOptions = Array.from(new Set(allCarers.map(getCareCompLabel))).sort((a, b) => a.localeCompare(b));
+  const statusOptions = Array.from(new Set(allCarers.map(getStatusLabel))).sort((a, b) => a.localeCompare(b));
 
   const currentArea = String(areaFilterSelect.value || "all");
   const currentCare = String(careCompFilterSelect.value || "all");
+  const currentStatus = String(statusFilterSelect?.value || "all");
 
   areaFilterSelect.innerHTML = '<option value="all">All areas</option>';
   for (const area of areaOptions) {
@@ -181,6 +200,17 @@ function renderFilterOptions() {
     careCompFilterSelect.appendChild(option);
   }
 
+  if (statusFilterSelect) {
+    statusFilterSelect.innerHTML = '<option value="all">All statuses</option>';
+    for (const status of statusOptions) {
+      const option = document.createElement("option");
+      option.value = status;
+      option.textContent = status;
+      statusFilterSelect.appendChild(option);
+    }
+    statusFilterSelect.value = statusOptions.includes(currentStatus) ? currentStatus : "all";
+  }
+
   areaFilterSelect.value = areaOptions.includes(currentArea) ? currentArea : "all";
   careCompFilterSelect.value = careCompOptions.includes(currentCare) ? currentCare : "all";
 }
@@ -189,12 +219,16 @@ function getFilteredCarers() {
   const query = normalizeText(searchInput.value);
   const selectedArea = String(areaFilterSelect.value || "all");
   const selectedCareComp = String(careCompFilterSelect.value || "all");
+  const selectedStatus = String(statusFilterSelect?.value || "all");
 
   return allCarers.filter((carer) => {
     if (selectedArea !== "all" && getAreaLabel(carer) !== selectedArea) {
       return false;
     }
     if (selectedCareComp !== "all" && getCareCompLabel(carer) !== selectedCareComp) {
+      return false;
+    }
+    if (selectedStatus !== "all" && getStatusLabel(carer) !== selectedStatus) {
       return false;
     }
 
@@ -206,6 +240,7 @@ function getFilteredCarers() {
       normalizeText(carer.id).includes(query) ||
       normalizeText(carer.name).includes(query) ||
       normalizeText(carer.postcode).includes(query) ||
+      normalizeText(getStatusLabel(carer)).includes(query) ||
       normalizeText(getAreaLabel(carer)).includes(query) ||
       normalizeText(getCareCompLabel(carer)).includes(query) ||
       normalizeText(getOtherTagsLabel(carer)).includes(query)
@@ -236,6 +271,7 @@ function renderCarers() {
       <td class="selection-cell"></td>
       <td>${escapeHtml(carer.id)}</td>
       <td>${escapeHtml(carer.name)}</td>
+      <td>${escapeHtml(getStatusLabel(carer))}</td>
       <td>${escapeHtml(getAreaLabel(carer))}</td>
       <td>${escapeHtml(getCareCompLabel(carer))}</td>
       <td>${escapeHtml(formatHours(carer.contractedHours))}</td>
@@ -321,6 +357,7 @@ async function init() {
 searchInput?.addEventListener("input", renderCarers);
 areaFilterSelect?.addEventListener("change", renderCarers);
 careCompFilterSelect?.addEventListener("change", renderCarers);
+statusFilterSelect?.addEventListener("change", renderCarers);
 bulkTagSelect?.addEventListener("change", updateBulkTagControls);
 
 selectVisibleBtn?.addEventListener("click", () => {

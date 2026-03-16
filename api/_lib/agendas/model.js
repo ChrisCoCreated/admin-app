@@ -164,6 +164,9 @@ function sanitizeAgendaInput(input, ownerEmail, mode = "create") {
     participantNames: nameList,
     agendaType: normalizeAgendaType(input.agendaType),
     isPrivate: parseBoolean(input.isPrivate),
+    ...(Object.prototype.hasOwnProperty.call(input, "sortOrder")
+      ? { sortOrder: parseNumber(input.sortOrder, 0) }
+      : {}),
   };
 }
 
@@ -230,6 +233,7 @@ function mapAgendaRow(row, members = [], items = []) {
     id: String(row?.id || "").trim(),
     title: String(row?.title || "").trim(),
     agendaType: normalizeAgendaType(row?.agenda_type),
+    sortOrder: parseNumber(row?.sort_order, 0),
     ownerEmail,
     isPrivate: row?.is_private === true,
     participantEmails: participantRows.map((member) => normalizeEmail(member.user_email)).filter(Boolean),

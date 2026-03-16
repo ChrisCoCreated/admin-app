@@ -44,6 +44,12 @@
           <input id="searchInput" type="search" placeholder="Search by name, id, area or postcode" autocomplete="off" />
         </label>
         <div class="mapping-form-grid">
+          <label class="field" for="statusFilterSelect">
+            Status
+            <select id="statusFilterSelect">
+              <option value="all">All statuses</option>
+            </select>
+          </label>
           <label class="field" for="areaFilterSelect">
             Area
             <select id="areaFilterSelect">
@@ -88,6 +94,7 @@
                   <th>Select</th>
                   <th>ID</th>
                   <th>Name</th>
+                  <th>Status</th>
                   <th>Area</th>
                   <th>Care / Companionship</th>
                   <th>Contracted Hours</th>
@@ -109,6 +116,10 @@
             <div>
               <dt>Name</dt>
               <dd data-field="name">Select a carer</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd data-field="status">-</dd>
             </div>
             <div>
               <dt>Area</dt>

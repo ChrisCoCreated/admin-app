@@ -2894,6 +2894,18 @@ body.lightbox-open {
   align-content: start;
 }
 
+.agenda-list-drop-zone {
+  height: 12px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.agenda-list-drop-zone.is-active {
+  background: rgba(26, 123, 150, 0.18);
+  box-shadow: inset 0 0 0 2px rgba(26, 123, 150, 0.35);
+}
+
 .agenda-list-card {
   display: grid;
   width: 100%;
@@ -2902,6 +2914,11 @@ body.lightbox-open {
   border-radius: 16px;
   background: #fff;
   text-align: left;
+  cursor: grab;
+}
+
+.agenda-list-card.is-dragging {
+  opacity: 0.55;
 }
 
 .agenda-list-card-top {
@@ -2960,7 +2977,8 @@ body.lightbox-open {
 }
 
 .agenda-card-copy-btn,
-.agenda-card-edit-btn {
+.agenda-card-edit-btn,
+.agenda-card-delete-btn {
   margin-top: 0.05rem;
   width: 2.25rem;
   min-width: 2.25rem;
@@ -3598,7 +3616,8 @@ body.lightbox-open {
   }
 
   .agenda-card-copy-btn,
-  .agenda-card-edit-btn {
+  .agenda-card-edit-btn,
+  .agenda-card-delete-btn {
     justify-self: start;
   }
 

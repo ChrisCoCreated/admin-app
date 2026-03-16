@@ -183,6 +183,16 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async deleteAgenda(payload = {}) {
+      const response = await authFetch(buildUrl("/api/agendas", payload), {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        await parseError(response, "Agenda delete failed");
+      }
+      return response.json();
+    },
+
     async createAgendaItem(payload = {}) {
       const response = await authFetch(endpoint("/api/agendas/items"), {
         method: "POST",

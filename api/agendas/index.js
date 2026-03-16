@@ -1,6 +1,7 @@
 const { requireApiAuth } = require("../_lib/require-api-auth");
 const {
   createAgendaForUser,
+  deleteAgendaForUser,
   listAgendasForUser,
   listAgendaSummariesForUser,
   mapAgendaError,
@@ -32,6 +33,13 @@ module.exports = async (req, res) => {
 
     if (req.method === "PATCH") {
       const payload = await updateAgendaForUser(req.authUser?.email || "", req.body || {});
+      res.setHeader("Cache-Control", "no-store");
+      res.status(200).json(payload);
+      return;
+    }
+
+    if (req.method === "DELETE") {
+      const payload = await deleteAgendaForUser(req.authUser?.email || "", req.body?.agendaId || req.query?.agendaId || "");
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json(payload);
       return;

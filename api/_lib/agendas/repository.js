@@ -38,7 +38,7 @@ async function listAgendasByIds(ids) {
     query: {
       select: "*",
       id: filter,
-      order: "updated_at.desc,title.asc",
+      order: "sort_order.asc,updated_at.desc,title.asc",
     },
   });
   return Array.isArray(rows) ? rows : [];
@@ -101,6 +101,37 @@ async function updateAgendaRow(agendaId, patch) {
     body: patch,
   });
   return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function deleteAgendaRow(agendaId) {
+  const normalizedAgendaId = ensureUuid(agendaId, "Agenda");
+  await supabaseRestFetch("agenda_items", {
+    method: "DELETE",
+    query: {
+      agenda_id: `eq.${normalizedAgendaId}`,
+    },
+    headers: {
+      Prefer: "return=minimal",
+    },
+  });
+  await supabaseRestFetch("agenda_members", {
+    method: "DELETE",
+    query: {
+      agenda_id: `eq.${normalizedAgendaId}`,
+    },
+    headers: {
+      Prefer: "return=minimal",
+    },
+  });
+  await supabaseRestFetch("agendas", {
+    method: "DELETE",
+    query: {
+      id: `eq.${normalizedAgendaId}`,
+    },
+    headers: {
+      Prefer: "return=minimal",
+    },
+  });
 }
 
 async function replaceAgendaMembers(agendaId, members) {
@@ -183,6 +214,7 @@ module.exports = {
   createAgendaMembers,
   createAgendaItemRow,
   createAgendaRow,
+  deleteAgendaRow,
   ensureUuid,
   listAgendaItemsByAgendaIds,
   listAgendaMembersByAgendaIds,

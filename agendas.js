@@ -417,6 +417,21 @@ function classifyAgendaItems(agenda) {
   };
 }
 
+function sortAgendasLocally(list) {
+  return [...(Array.isArray(list) ? list : [])].sort((a, b) => {
+    const orderDelta = Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0);
+    if (orderDelta !== 0) {
+      return orderDelta;
+    }
+    const aUpdated = Date.parse(a?.updatedAt || "") || 0;
+    const bUpdated = Date.parse(b?.updatedAt || "") || 0;
+    if (aUpdated !== bUpdated) {
+      return bUpdated - aUpdated;
+    }
+    return String(a?.title || "").localeCompare(String(b?.title || ""), undefined, { sensitivity: "base" });
+  });
+}
+
 function sortAgendaItemsLocally(items) {
   return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
     const orderDelta = Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0);
@@ -427,6 +442,10 @@ function sortAgendaItemsLocally(items) {
     const bUpdated = Date.parse(b?.updatedAt || "") || 0;
     return bUpdated - aUpdated;
   });
+}
+
+function applyLocalAgendas(nextAgendas) {
+  agendas = sortAgendasLocally(nextAgendas);
 }
 
 function applyLocalAgendaItems(agendaId, items) {
@@ -442,7 +461,7 @@ function applyLocalAgendaItems(agendaId, items) {
       items: nextItems,
     });
   }
-  agendas = agendas.map((agenda) => {
+  applyLocalAgendas(agendas.map((agenda) => {
     if (agenda.id !== normalizedAgendaId) {
       return agenda;
     }
@@ -450,7 +469,7 @@ function applyLocalAgendaItems(agendaId, items) {
       ...agenda,
       items: nextItems,
     };
-  });
+  }));
 }
 
 function patchAgendaItemLocally(agendaId, itemId, patch) {
@@ -698,10 +717,55 @@ function renderAgendaList() {
   agendaList.innerHTML = "";
   agendaListEmpty.hidden = list.length > 0;
 
-  list.forEach((agenda) => {
+  function buildAgendaDropZone(insertIndex) {
+    const zone = document.createElement("div");
+    zone.className = "agenda-list-drop-zone";
+    zone.setAttribute("aria-hidden", "true");
+    zone.addEventListener("dragover", (event) => {
+      const currentDrag = resolveDragState(event);
+      if (!currentDrag || currentDrag.type !== "agenda") {
+        return;
+      }
+      event.preventDefault();
+      zone.classList.add("is-active");
+    });
+    zone.addEventListener("dragleave", () => {
+      zone.classList.remove("is-active");
+    });
+    zone.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      zone.classList.remove("is-active");
+      const currentDrag = resolveDragState(event);
+      if (!currentDrag || currentDrag.type !== "agenda") {
+        return;
+      }
+      dragState = null;
+      await reorderAgendaToIndex(currentDrag.agendaId, insertIndex);
+    });
+    return zone;
+  }
+
+  if (list.length) {
+    agendaList.appendChild(buildAgendaDropZone(0));
+  }
+
+  list.forEach((agenda, index) => {
     const isOwner = normalizeEmail(agenda.ownerEmail) === normalizeEmail(currentUser?.email);
     const card = document.createElement("article");
     card.className = "agenda-list-card";
+    card.draggable = true;
+    card.addEventListener("dragstart", (event) => {
+      dragState = {
+        type: "agenda",
+        agendaId: agenda.id,
+      };
+      setNativeDragData(event, dragState);
+      card.classList.add("is-dragging");
+    });
+    card.addEventListener("dragend", () => {
+      dragState = null;
+      card.classList.remove("is-dragging");
+    });
     if (agenda.id === selectedAgendaId) {
       card.classList.add("is-selected");
     }
@@ -774,6 +838,24 @@ function renderAgendaList() {
         void openAgenda(agenda.id, { editSettings: true });
       });
       cardActions.appendChild(editButton);
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "ghost subtle icon-only agenda-card-delete-btn";
+      deleteButton.setAttribute("aria-label", "Delete agenda");
+      const deleteIcon = document.createElement("span");
+      deleteIcon.setAttribute("aria-hidden", "true");
+      deleteIcon.textContent = "×";
+      deleteButton.appendChild(deleteIcon);
+      deleteButton.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const confirmed = window.confirm(`Delete "${title}"? This will remove its agenda items too.`);
+        if (!confirmed) {
+          return;
+        }
+        await deleteAgenda(agenda);
+      });
+      cardActions.appendChild(deleteButton);
     }
 
     if (cardActions.childElementCount > 0) {
@@ -785,6 +867,7 @@ function renderAgendaList() {
       void openAgenda(agenda.id);
     });
     agendaList.appendChild(card);
+    agendaList.appendChild(buildAgendaDropZone(index + 1));
   });
 }
 
@@ -1532,7 +1615,7 @@ function mergeAgendaSummaryWithDetail(agenda) {
 }
 
 function applyAgendaSummaries(nextAgendas) {
-  agendas = (Array.isArray(nextAgendas) ? nextAgendas : []).map((agenda) => mergeAgendaSummaryWithDetail(agenda));
+  applyLocalAgendas((Array.isArray(nextAgendas) ? nextAgendas : []).map((agenda) => mergeAgendaSummaryWithDetail(agenda)));
   if (!selectedAgendaId && agendas.length) {
     selectedAgendaId = agendas[0].id;
   }
@@ -1567,7 +1650,7 @@ async function loadAgendaDetail(agendaId, options = {}) {
     });
     if (agenda?.id) {
       agendaDetailsById.set(agenda.id, agenda);
-      agendas = agendas.map((entry) => {
+      applyLocalAgendas(agendas.map((entry) => {
         if (entry.id !== agenda.id) {
           return entry;
         }
@@ -1576,7 +1659,7 @@ async function loadAgendaDetail(agendaId, options = {}) {
           ...agenda,
           title: String(agenda.title || entry.title || "").trim(),
         };
-      });
+      }));
       writeCachedAgendaSummaries();
       renderAgendaList();
       if (agenda.id === selectedAgendaId) {
@@ -1648,6 +1731,79 @@ async function refreshAgendas(status = "", options = {}) {
 function editorCommand(command, value = null) {
   itemDetailEditor.focus();
   document.execCommand(command, false, value);
+}
+
+async function reorderAgendaToIndex(sourceAgendaId, insertIndex) {
+  const visibleAgendas = filteredAgendas();
+  const sourceIndex = visibleAgendas.findIndex((agenda) => agenda.id === sourceAgendaId);
+  if (sourceIndex === -1) {
+    return;
+  }
+  const remainingVisible = visibleAgendas.filter((agenda) => agenda.id !== sourceAgendaId);
+  const normalizedInsertIndex = Math.max(0, Math.min(insertIndex, remainingVisible.length));
+  if (normalizedInsertIndex === sourceIndex || normalizedInsertIndex === sourceIndex + 1) {
+    return;
+  }
+
+  const sortOrder = computeInsertedSortOrder(remainingVisible, normalizedInsertIndex);
+  const previousAgendas = agendas.map((agenda) => ({ ...agenda }));
+  const nextAgendas = agendas.map((agenda) => {
+    if (agenda.id !== sourceAgendaId) {
+      return agenda;
+    }
+    return {
+      ...agenda,
+      sortOrder,
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  try {
+    applyLocalAgendas(nextAgendas);
+    renderAgendaList();
+    setStatus("");
+    await directoryApi.updateAgenda({ agendaId: sourceAgendaId, sortOrder });
+    await refreshAgendas("Agenda order updated.", { selectedAgendaId });
+  } catch (error) {
+    applyLocalAgendas(previousAgendas);
+    renderAgendaList();
+    console.error(error);
+    setStatus(error?.message || "Could not reorder agenda.", true);
+  }
+}
+
+async function deleteAgenda(agenda) {
+  const agendaId = String(agenda?.id || "").trim();
+  if (!agendaId) {
+    return;
+  }
+  const previousAgendas = agendas.map((entry) => ({ ...entry }));
+  const previousDetails = new Map(agendaDetailsById);
+  const nextAgendas = agendas.filter((entry) => entry.id !== agendaId);
+
+  try {
+    applyLocalAgendas(nextAgendas);
+    agendaDetailsById.delete(agendaId);
+    if (selectedAgendaId === agendaId) {
+      selectedAgendaId = nextAgendas[0]?.id || "";
+      selectedItemId = "";
+    }
+    renderAgendaList();
+    renderAgendaDetail();
+    setStatus("Deleting agenda...");
+    await directoryApi.deleteAgenda({ agendaId });
+    await refreshAgendas("Agenda deleted.", { selectedAgendaId });
+  } catch (error) {
+    applyLocalAgendas(previousAgendas);
+    agendaDetailsById = previousDetails;
+    if (!selectedAgendaId && agendaId) {
+      selectedAgendaId = agendaId;
+    }
+    renderAgendaList();
+    renderAgendaDetail();
+    console.error(error);
+    setStatus(error?.message || "Could not delete agenda.", true);
+  }
 }
 
 async function reorderItemToIndex(agenda, sourceItemId, insertIndex) {
