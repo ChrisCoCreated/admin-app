@@ -2186,6 +2186,66 @@ body.lightbox-open {
   cursor: crosshair;
 }
 
+.people-overlay-marker {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.people-overlay-marker::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 2px solid #24314a;
+  background: #d8e0f2;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.people-overlay-marker.is-dot::before {
+  border-radius: 999px;
+  transform: none;
+}
+
+.people-overlay-marker.is-diamond::before {
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+
+.people-overlay-marker.is-client.is-active::before {
+  background: #31b7c8;
+  border-color: #1f3c88;
+}
+
+.people-overlay-marker.is-client.is-pending::before {
+  background: #9ddfeb;
+  border-color: #f29f3d;
+  border-style: dashed;
+}
+
+.people-overlay-marker.is-client.is-archived::before {
+  background: #d7dfef;
+  border-color: #7f8ba3;
+}
+
+.people-overlay-marker.is-companion.is-active::before {
+  background: #c9439b;
+  border-color: #8b2f6e;
+}
+
+.people-overlay-marker.is-companion.is-pending::before {
+  background: #f2b9db;
+  border-color: #f29f3d;
+  border-style: dashed;
+}
+
+.people-overlay-marker.is-companion.is-archived::before {
+  background: #ddd3de;
+  border-color: #8a7886;
+}
+
 .drive-time-search-list {
   list-style: none;
   margin: 12px 0 0;

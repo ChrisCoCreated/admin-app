@@ -680,11 +680,13 @@ function renderOverlayStatusFilters() {
   }
   const options = deriveOverlayStatusOptions(peopleOverlayData);
   if (!overlayStatusSet.size) {
-    overlayStatusSet = new Set(options);
+    const defaultOptions = options.filter((status) => status !== "archived");
+    overlayStatusSet = new Set(defaultOptions.length ? defaultOptions : options);
   } else {
     overlayStatusSet = new Set(Array.from(overlayStatusSet).filter((status) => options.includes(status)));
     if (!overlayStatusSet.size) {
-      overlayStatusSet = new Set(options);
+      const defaultOptions = options.filter((status) => status !== "archived");
+      overlayStatusSet = new Set(defaultOptions.length ? defaultOptions : options);
     }
   }
 
@@ -807,16 +809,17 @@ function ensureOverlayLayer(item) {
   if (existing) {
     return existing;
   }
-  const style =
-    item.type === "client"
-      ? { color: "#1f3c88", fillColor: "#31b7c8" }
-      : { color: "#8b2f6e", fillColor: "#c9439b" };
-  const marker = window.L.circleMarker([item.lat, item.lng], {
-    radius: 5,
-    color: style.color,
-    weight: 2,
-    fillColor: style.fillColor,
-    fillOpacity: 0.85,
+  const normalizedArea = normalizeLocation(item.areaLabel || item.locationLabel || "");
+  const isCentralArea = normalizedArea.toLowerCase().includes("central");
+  const marker = window.L.marker([item.lat, item.lng], {
+    icon: window.L.divIcon({
+      className: `people-overlay-marker ${item.type === "client" ? "is-client" : "is-companion"} is-${normalizeStatus(
+        item.status
+      )}${isCentralArea ? " is-diamond" : " is-dot"}`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      popupAnchor: [0, -8],
+    }),
     pane: MAP_PANES.people,
   });
   marker.bindPopup(
