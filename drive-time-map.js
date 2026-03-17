@@ -704,16 +704,22 @@ function normalizeClientAreaLabel(value) {
   }
 
   const compact = normalized.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  if (compact === "central") {
+  if (compact === "central" || compact.includes("central")) {
     return "Central";
   }
-  if (compact === "east kent" || compact === "eastkent") {
+  if (compact === "east kent" || compact === "eastkent" || compact.includes("east kent")) {
     return "East Kent";
   }
-  if (compact === "london plus" || compact === "londonplus") {
+  if (compact === "london plus" || compact === "londonplus" || compact.includes("london plus")) {
     return "London Plus";
   }
-  if (compact === "wellbeing assurance" || compact === "wellbeingassurance" || compact === "well being assurance") {
+  if (
+    compact === "wellbeing assurance" ||
+    compact === "wellbeingassurance" ||
+    compact === "well being assurance" ||
+    compact.includes("wellbeing assurance") ||
+    compact.includes("well being assurance")
+  ) {
     return "Wellbeing Assurance";
   }
 
@@ -936,6 +942,9 @@ function getFilteredOverlayPeople() {
 
     const normalizedArea = item.type === "client" ? normalizeClientAreaLabel(item.areaLabel) : normalizeLocation(item.areaLabel);
     if (item.type === "client") {
+      if (!normalizedArea) {
+        return true;
+      }
       return !overlayClientAreaSet.size || overlayClientAreaSet.has(normalizedArea);
     }
 
