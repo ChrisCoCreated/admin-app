@@ -33,16 +33,6 @@ const COMPANY_ASSETS = [
     fileName: "toucan-full.svg",
   },
   {
-    id: `${COMPANY_ASSET_PREFIX}_thrive_mark`,
-    title: "Thrive Toucan Mark",
-    client: "Company Assets",
-    imageUrl: "./assets/toucan-mark.svg",
-    mediaUrl: "./assets/toucan-mark.svg",
-    attachmentUrl: "./assets/toucan-mark.svg",
-    mediaType: "image",
-    fileName: "toucan-mark.svg",
-  },
-  {
     id: `${COMPANY_ASSET_PREFIX}_thrive_app_icon`,
     title: "Thrive App Icon",
     client: "Company Assets",
@@ -296,6 +286,8 @@ const composeStatus = document.getElementById("composeStatus");
 const layoutStage = document.getElementById("layoutStage");
 const localImageDropZone = document.getElementById("localImageDropZone");
 const localImageInput = document.getElementById("localImageInput");
+const logoOverlaySection = document.getElementById("logoOverlaySection");
+const logoOverlayPicker = document.getElementById("logoOverlayPicker");
 const selectedImagesList = document.getElementById("selectedImagesList");
 const adjustStatus = document.getElementById("adjustStatus");
 const adjustControls = document.getElementById("adjustControls");
@@ -335,6 +327,7 @@ let showAllLayouts = false;
 let dragState = null;
 let latestOutputBlob = null;
 let latestOutputUrl = "";
+let activeLogoOverlayId = "";
 const layoutStyle = {
   backgroundColor: "#ffffff",
   gapEnabled: true,
@@ -514,6 +507,21 @@ function getClientPhotos() {
   return clientPhotoPool;
 }
 
+function canUseCompanyAssets() {
+  return currentRole === "admin" || currentRole === "marketing";
+}
+
+function getLogoOverlayAssets() {
+  return COMPANY_ASSETS.filter((asset) => {
+    const fileName = String(asset?.fileName || "").toLowerCase();
+    return !fileName.includes("app-icon");
+  });
+}
+
+function getActiveLogoOverlay() {
+  return getLogoOverlayAssets().find((asset) => asset.id === activeLogoOverlayId) || null;
+}
+
 function updateClientOptions() {
   const current = selectedClient;
   const clients = cachedClients.slice().sort((a, b) => a.localeCompare(b));
@@ -600,7 +608,7 @@ function toggleImageSelection(photo) {
 }
 
 function syncCompanyAssetsVisibility() {
-  const canShowCompanyAssets = currentRole === "admin" || currentRole === "marketing";
+  const canShowCompanyAssets = canUseCompanyAssets();
   if (showCompanyAssetsRow) {
     showCompanyAssetsRow.hidden = !canShowCompanyAssets;
   }
@@ -610,6 +618,80 @@ function syncCompanyAssetsVisibility() {
   if (showCompanyAssetsInput) {
     showCompanyAssetsInput.checked = showCompanyAssets;
   }
+}
+
+function renderLogoOverlayPicker() {
+  const canShowLogoOverlay = canUseCompanyAssets();
+  if (logoOverlaySection) {
+    logoOverlaySection.hidden = !canShowLogoOverlay;
+  }
+  if (!canShowLogoOverlay || !logoOverlayPicker) {
+    return;
+  }
+
+  const overlayAssets = getLogoOverlayAssets();
+  if (!overlayAssets.some((asset) => asset.id === activeLogoOverlayId)) {
+    activeLogoOverlayId = "";
+  }
+
+  logoOverlayPicker.innerHTML = "";
+
+  const noneBtn = document.createElement("button");
+  noneBtn.type = "button";
+  noneBtn.className = `layout-overlay-option${!activeLogoOverlayId ? " active" : ""}`;
+  noneBtn.textContent = "No overlay";
+  noneBtn.setAttribute("aria-pressed", !activeLogoOverlayId ? "true" : "false");
+  noneBtn.addEventListener("click", () => {
+    activeLogoOverlayId = "";
+    invalidateOutput();
+    renderStage();
+    renderLogoOverlayPicker();
+  });
+  logoOverlayPicker.append(noneBtn);
+
+  for (const asset of overlayAssets) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `layout-overlay-option${asset.id === activeLogoOverlayId ? " active" : ""}`;
+    btn.setAttribute("aria-pressed", asset.id === activeLogoOverlayId ? "true" : "false");
+
+    const img = document.createElement("img");
+    img.className = "layout-overlay-thumb";
+    img.src = asset.imageUrl;
+    img.alt = asset.title;
+
+    const label = document.createElement("span");
+    label.className = "layout-overlay-label";
+    label.textContent = asset.title;
+
+    btn.append(img, label);
+    btn.addEventListener("click", () => {
+      activeLogoOverlayId = asset.id;
+      invalidateOutput();
+      renderStage();
+      renderLogoOverlayPicker();
+    });
+    logoOverlayPicker.append(btn);
+  }
+}
+
+function computeLogoOverlayRect(width, height, gapPx, image) {
+  const safeWidth = Math.max(1, Number(width) || 1);
+  const safeHeight = Math.max(1, Number(height) || 1);
+  const imageWidth = Math.max(1, Number(image?.width) || 1);
+  const imageHeight = Math.max(1, Number(image?.height) || 1);
+  const margin = Math.max(16, Number(gapPx) || 0);
+  const maxWidth = safeWidth * 0.26;
+  const maxHeight = safeHeight * 0.18;
+  const scale = Math.min(maxWidth / imageWidth, maxHeight / imageHeight);
+  const drawW = Math.max(40, imageWidth * scale);
+  const drawH = Math.max(24, imageHeight * scale);
+  return {
+    x: safeWidth - margin - drawW,
+    y: safeHeight - margin - drawH,
+    w: drawW,
+    h: drawH,
+  };
 }
 
 function addLocalImages(files = []) {
@@ -1203,6 +1285,26 @@ function renderStage() {
     layoutStage.append(slotEl);
   });
 
+  const activeLogoOverlay = getActiveLogoOverlay();
+  if (activeLogoOverlay) {
+    void loadExportImage([activeLogoOverlay.imageUrl])
+      .then((overlayImage) => {
+        const overlayRect = computeLogoOverlayRect(stageWidth, stageHeight, previewGapPx, overlayImage);
+        const overlayEl = document.createElement("img");
+        overlayEl.className = "layout-logo-overlay";
+        overlayEl.src = activeLogoOverlay.imageUrl;
+        overlayEl.alt = activeLogoOverlay.title;
+        overlayEl.style.left = `${overlayRect.x}px`;
+        overlayEl.style.top = `${overlayRect.y}px`;
+        overlayEl.style.width = `${overlayRect.w}px`;
+        overlayEl.style.height = `${overlayRect.h}px`;
+        layoutStage.append(overlayEl);
+      })
+      .catch((error) => {
+        console.error("[Photo Layout Debug] Could not render logo overlay preview.", error);
+      });
+  }
+
   const usedCount = Math.min(layout.slots.length, selectedImages.length);
   setComposeStatus(
     `${layout.name} layout: using ${usedCount} of ${selectedImages.length} selected image${
@@ -1282,6 +1384,11 @@ function drawImageIntoSlot(ctx, img, slot, transform, cornerRadiusPx = 0) {
     placement.drawH
   );
   ctx.restore();
+}
+
+function drawLogoOverlayIntoCanvas(ctx, img, canvasWidth, canvasHeight, gapPx) {
+  const overlayRect = computeLogoOverlayRect(canvasWidth, canvasHeight, gapPx, img);
+  ctx.drawImage(img, overlayRect.x, overlayRect.y, overlayRect.w, overlayRect.h);
 }
 
 function decodeBase64ToBlob(base64, mimeType) {
@@ -1401,6 +1508,12 @@ async function buildOutputCanvas() {
     );
   }
 
+  const activeLogoOverlay = getActiveLogoOverlay();
+  if (activeLogoOverlay) {
+    const overlayImage = await loadExportImage([activeLogoOverlay.imageUrl]);
+    drawLogoOverlayIntoCanvas(ctx, overlayImage, canvas.width, canvas.height, gapPx);
+  }
+
   return canvas;
 }
 
@@ -1508,6 +1621,7 @@ async function saveOutput() {
 
 function renderAll() {
   syncCompanyAssetsVisibility();
+  renderLogoOverlayPicker();
   renderImagesGrid();
   renderLayoutPicker();
   renderSelectedImagesList();

@@ -1457,6 +1457,51 @@ body.lightbox-open {
   gap: 10px;
 }
 
+.layout-overlay-picker {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.layout-overlay-option {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #d5deef;
+  border-radius: 12px;
+  background: #f8fbff;
+  color: #23324d;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.layout-overlay-option.active {
+  border-color: #2e67c5;
+  background: #eaf2ff;
+  box-shadow: 0 0 0 1px rgba(46, 103, 197, 0.16);
+}
+
+.layout-overlay-thumb {
+  width: 64px;
+  height: 40px;
+  object-fit: contain;
+  display: block;
+}
+
+.layout-overlay-label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.layout-logo-overlay {
+  position: absolute;
+  z-index: 4;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .layout-output-preview-wrap {
   margin-top: 14px;
 }
@@ -2270,6 +2315,13 @@ body.lightbox-open {
   grid-template-columns: auto auto auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
+}
+
+.drive-time-visibility-toggle {
+  min-width: 62px;
+  justify-content: center;
+  padding: 6px 10px;
+  font-size: 0.78rem;
 }
 
 .drive-time-color-dot {

@@ -1712,15 +1712,18 @@ function renderSavedSearches() {
       });
     }
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = search.visible;
-    checkbox.disabled = search.archived;
-    checkbox.addEventListener("change", () => {
-      search.visible = checkbox.checked;
+    const visibilityBtn = document.createElement("button");
+    visibilityBtn.type = "button";
+    visibilityBtn.className = `area-filter-btn drive-time-visibility-toggle${search.visible ? " active" : ""}`;
+    visibilityBtn.textContent = search.visible ? "Hide" : "Show";
+    visibilityBtn.disabled = search.archived;
+    visibilityBtn.setAttribute("aria-pressed", String(search.visible));
+    visibilityBtn.addEventListener("click", () => {
+      search.visible = !search.visible;
       persistSavedSearches();
       syncSearchLayer(search);
       setStatus(`${search.name} ${search.visible ? "shown" : "hidden"} on map.`);
+      renderSavedSearches();
     });
 
     const colorDot = document.createElement("span");
@@ -1743,7 +1746,7 @@ function renderSavedSearches() {
     if (selectCheckbox) {
       visibilityLabel.append(selectCheckbox);
     }
-    visibilityLabel.append(checkbox, colorDot, titleWrap);
+    visibilityLabel.append(visibilityBtn, colorDot, titleWrap);
 
     li.append(visibilityLabel);
 
@@ -2073,17 +2076,18 @@ function setAllSearchVisibility(isVisible) {
 }
 
 function exportSavedSearches() {
-  if (!savedSearches.length) {
-    setStatus("No saved searches to export.", true);
+  const visibleSearches = savedSearches.filter((search) => search.visible && !search.archived);
+  if (!visibleSearches.length) {
+    setStatus("No visible searches to export.", true);
     return;
   }
   const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
   downloadJson(`drive-time-searches-${stamp}.json`, {
     version: 2,
     exportedAt: new Date().toISOString(),
-    searches: savedSearches,
+    searches: visibleSearches,
   });
-  setStatus(`Exported ${savedSearches.length} saved search(es).`);
+  setStatus(`Exported ${visibleSearches.length} visible search(es).`);
 }
 
 function importSavedSearchesFromText(rawText) {
