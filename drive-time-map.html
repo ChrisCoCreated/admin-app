@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Thrive Admin - Drive-Time Map</title>
+    <title>Thrive Admin - Our Geography</title>
     <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
     <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
     <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
@@ -40,11 +40,11 @@
 
     <main class="container drive-time-main">
       <section class="hero compact">
-        <h1>Drive-Time Catchment</h1>
-        <p>Office-centric mode: click towns/villages to test and grow the catchment.</p>
+        <h1>Our Geography</h1>
+        <p>Saved catchments and people coverage across our service areas.</p>
       </section>
 
-      <section class="panel">
+      <section id="geographyBuilderPanel" class="panel">
         <div class="drive-time-controls office-catchment-controls">
           <label class="field" for="locationInput">
             Office location
@@ -98,7 +98,7 @@
         <p id="driveTimeMeta" class="muted"></p>
       </section>
 
-      <section class="panel">
+      <section id="acceptedPlacesPanel" class="panel">
         <div class="row">
           <h2>Accepted Places</h2>
           <button id="clearAcceptedPlacesBtn" class="secondary" type="button" disabled>Clear all</button>

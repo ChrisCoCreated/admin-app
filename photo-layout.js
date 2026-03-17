@@ -11,6 +11,7 @@ const DEFAULT_RADIUS_PX = 36;
 const CLIENT_LIST_CACHE_KEY = "photoLayoutClientListV1";
 const CLIENT_LIST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const ALL_CLIENTS_VALUE = "__all_clients__";
+const COMPANY_ASSET_PREFIX = "__company_asset__";
 const LAYOUT_BACKGROUND_COLORS = new Set([
   "#ffffff",
   "#000000",
@@ -20,6 +21,68 @@ const LAYOUT_BACKGROUND_COLORS = new Set([
   "#3aceac",
   "#ffd23f",
 ]);
+const COMPANY_ASSETS = [
+  {
+    id: `${COMPANY_ASSET_PREFIX}_thrive_full`,
+    title: "Thrive Full Logo",
+    client: "Company Assets",
+    imageUrl: "./assets/toucan-full.svg",
+    mediaUrl: "./assets/toucan-full.svg",
+    attachmentUrl: "./assets/toucan-full.svg",
+    mediaType: "image",
+    fileName: "toucan-full.svg",
+  },
+  {
+    id: `${COMPANY_ASSET_PREFIX}_thrive_mark`,
+    title: "Thrive Toucan Mark",
+    client: "Company Assets",
+    imageUrl: "./assets/toucan-mark.svg",
+    mediaUrl: "./assets/toucan-mark.svg",
+    attachmentUrl: "./assets/toucan-mark.svg",
+    mediaType: "image",
+    fileName: "toucan-mark.svg",
+  },
+  {
+    id: `${COMPANY_ASSET_PREFIX}_thrive_app_icon`,
+    title: "Thrive App Icon",
+    client: "Company Assets",
+    imageUrl: "./assets/app-icon.svg",
+    mediaUrl: "./assets/app-icon.svg",
+    attachmentUrl: "./assets/app-icon.svg",
+    mediaType: "image",
+    fileName: "app-icon.svg",
+  },
+  {
+    id: `${COMPANY_ASSET_PREFIX}_thrive_mascot`,
+    title: "Thrive Mascot",
+    client: "Company Assets",
+    imageUrl: "./assets/thrive-mascot-RGB.svg",
+    mediaUrl: "./assets/thrive-mascot-RGB.svg",
+    attachmentUrl: "./assets/thrive-mascot-RGB.svg",
+    mediaType: "image",
+    fileName: "thrive-mascot-RGB.svg",
+  },
+  {
+    id: `${COMPANY_ASSET_PREFIX}_pwc_colour_logo`,
+    title: "Plan with Care Colour Logo",
+    client: "Company Assets",
+    imageUrl: "./assets/PwC Colour Logo.png",
+    mediaUrl: "./assets/PwC Colour Logo.png",
+    attachmentUrl: "./assets/PwC Colour Logo.png",
+    mediaType: "image",
+    fileName: "PwC Colour Logo.png",
+  },
+  {
+    id: `${COMPANY_ASSET_PREFIX}_pwc_white_logo`,
+    title: "Plan with Care White Logo",
+    client: "Company Assets",
+    imageUrl: "./assets/PwC White Logo.png",
+    mediaUrl: "./assets/PwC White Logo.png",
+    attachmentUrl: "./assets/PwC White Logo.png",
+    mediaType: "image",
+    fileName: "PwC White Logo.png",
+  },
+];
 
 const LAYOUTS = [
   {
@@ -221,6 +284,8 @@ const LAYOUTS = [
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientSelect = document.getElementById("clientSelect");
+const showCompanyAssetsRow = document.getElementById("showCompanyAssetsRow");
+const showCompanyAssetsInput = document.getElementById("showCompanyAssets");
 const imagesStatus = document.getElementById("imagesStatus");
 const imagesGrid = document.getElementById("imagesGrid");
 const layoutPicker = document.getElementById("layoutPicker");
@@ -264,6 +329,8 @@ let selectedClient = "";
 let selectedImages = [];
 let selectedSlotIndex = -1;
 let activeLayoutId = LAYOUTS[0].id;
+let currentRole = "";
+let showCompanyAssets = false;
 let showAllLayouts = false;
 let dragState = null;
 let latestOutputBlob = null;
@@ -441,6 +508,9 @@ function getImageAspectRatioMode() {
 }
 
 function getClientPhotos() {
+  if (showCompanyAssets) {
+    return [...COMPANY_ASSETS, ...clientPhotoPool];
+  }
   return clientPhotoPool;
 }
 
@@ -527,6 +597,19 @@ function toggleImageSelection(photo) {
   }
   invalidateOutput();
   renderAll();
+}
+
+function syncCompanyAssetsVisibility() {
+  const canShowCompanyAssets = currentRole === "admin" || currentRole === "marketing";
+  if (showCompanyAssetsRow) {
+    showCompanyAssetsRow.hidden = !canShowCompanyAssets;
+  }
+  if (!canShowCompanyAssets) {
+    showCompanyAssets = false;
+  }
+  if (showCompanyAssetsInput) {
+    showCompanyAssetsInput.checked = showCompanyAssets;
+  }
 }
 
 function addLocalImages(files = []) {
@@ -1233,7 +1316,7 @@ async function loadExportImage(sourceCandidates = []) {
       return exportImageCache.get(candidate);
     }
     try {
-      if (/^(blob:|data:)/i.test(candidate)) {
+      if (/^(blob:|data:|\.\/assets\/|\/assets\/)/i.test(candidate)) {
         const localImage = await loadImageElement(candidate);
         exportImageCache.set(candidate, localImage);
         return localImage;
@@ -1424,6 +1507,7 @@ async function saveOutput() {
 }
 
 function renderAll() {
+  syncCompanyAssetsVisibility();
   renderImagesGrid();
   renderLayoutPicker();
   renderSelectedImagesList();
@@ -1517,6 +1601,7 @@ async function init() {
 
     const profile = await directoryApi.getCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
+    currentRole = role;
     if (!canAccessPage(role, "photolayout")) {
       redirectToUnauthorized("photolayout");
       return;
@@ -1543,6 +1628,11 @@ async function init() {
 clientSelect?.addEventListener("change", () => {
   selectedClient = String(clientSelect.value || "").trim();
   void loadPhotosForClient(selectedClient);
+});
+
+showCompanyAssetsInput?.addEventListener("change", () => {
+  showCompanyAssets = Boolean(showCompanyAssetsInput.checked);
+  renderImagesGrid();
 });
 
 showAllLayoutsInput?.addEventListener("change", () => {

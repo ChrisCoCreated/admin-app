@@ -75,7 +75,7 @@ const PAGE_META = {
   simpletasks: { href: "./simple-tasks.html", label: "Tasks (Simple)" },
   tasks: { href: "./tasks.html", label: "Tasks (Advanced)" },
   mapping: { href: "./mapping.html", label: "Time Mapping" },
-  drivetime: { href: "./drive-time-map.html", label: "Drive-Time Map" },
+  drivetime: { href: "./drive-time-map.html", label: "Our Geography" },
   reports: { href: "./reports.html", label: "Reports" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates" },
   consultant: { href: "./consultant.html", label: "Consultant" },
@@ -97,7 +97,13 @@ function normalizePath(pathname) {
 export function getAccessiblePages(role) {
   const normalizedRole = normalizeRole(role);
   const pages = ROLE_PAGES[normalizedRole];
-  return Array.isArray(pages) ? pages : [];
+  if (!Array.isArray(pages)) {
+    return [];
+  }
+  if (pages.includes("drivetime")) {
+    return pages;
+  }
+  return [...pages, "drivetime"];
 }
 
 export function canAccessPage(role, pageKey) {

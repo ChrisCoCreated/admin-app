@@ -4,6 +4,8 @@ import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260311";
 
 const signOutBtn = document.getElementById("signOutBtn");
+const geographyBuilderPanel = document.getElementById("geographyBuilderPanel");
+const acceptedPlacesPanel = document.getElementById("acceptedPlacesPanel");
 const locationInput = document.getElementById("locationInput");
 const setOfficeBtn = document.getElementById("setOfficeBtn");
 const clientOfficeSelect = document.getElementById("clientOfficeSelect");
@@ -103,6 +105,7 @@ let savedSearchFilter = "active";
 let clientOfficeOptions = [];
 let editAddPlacesMode = false;
 let selectedSavedSearchIds = new Set();
+let currentUserRole = "";
 
 const MAP_PANES = {
   searchArea: "search-area-pane",
@@ -118,6 +121,10 @@ const authController = createAuthController({
   clientId: FRONTEND_CONFIG.spaClientId,
 });
 const directoryApi = createDirectoryApi(authController);
+
+function isAdminUser() {
+  return currentUserRole === "admin";
+}
 
 function createEmptyCatchment() {
   return {
@@ -416,6 +423,7 @@ function sanitizeSavedSearch(raw, fallbackIndex = 0) {
     savedAt: String(raw?.savedAt || raw?.createdAt || new Date().toISOString()),
     visible: raw?.visible !== false,
     archived: raw?.archived === true,
+    defaultOnLoad: raw?.defaultOnLoad === true,
     colorIndex: Number.isInteger(colorIndex) && colorIndex >= 0 ? colorIndex : fallbackIndex,
   };
 
@@ -514,13 +522,24 @@ function getSelectedSavedSearches() {
   return savedSearches.filter((search) => selectedSavedSearchIds.has(search.id));
 }
 
+function applyDefaultSearchVisibility() {
+  const defaults = savedSearches.filter((search) => search.defaultOnLoad === true && !search.archived);
+  if (!defaults.length) {
+    return;
+  }
+  const defaultIds = new Set(defaults.map((search) => search.id));
+  for (const search of savedSearches) {
+    search.visible = defaultIds.has(search.id);
+  }
+}
+
 function updateSavedSearchSelectionActions() {
   const selectedCount = getSelectedSavedSearches().length;
   if (duplicateSelectedSearchesBtn) {
-    duplicateSelectedSearchesBtn.disabled = selectedCount < 1;
+    duplicateSelectedSearchesBtn.disabled = !isAdminUser() || selectedCount < 1;
   }
   if (mergeSelectedSearchesBtn) {
-    mergeSelectedSearchesBtn.disabled = selectedCount < 2;
+    mergeSelectedSearchesBtn.disabled = !isAdminUser() || selectedCount < 2;
   }
 }
 
@@ -529,6 +548,26 @@ function getEditingSearch() {
     return null;
   }
   return savedSearches.find((search) => search.id === editingSearchId) || null;
+}
+
+function applyRoleVisibility() {
+  const adminOnly = isAdminUser();
+  geographyBuilderPanel?.toggleAttribute("hidden", !adminOnly);
+  acceptedPlacesPanel?.toggleAttribute("hidden", !adminOnly);
+  duplicateSelectedSearchesBtn?.toggleAttribute("hidden", !adminOnly);
+  mergeSelectedSearchesBtn?.toggleAttribute("hidden", !adminOnly);
+  showAllSearchesBtn?.toggleAttribute("hidden", !adminOnly);
+  hideAllSearchesBtn?.toggleAttribute("hidden", !adminOnly);
+  exportSearchesBtn?.toggleAttribute("hidden", !adminOnly);
+  importSearchesBtn?.toggleAttribute("hidden", !adminOnly);
+  importSearchesFileInput?.toggleAttribute("hidden", !adminOnly);
+  savedSearchFilterSelect?.closest(".field")?.toggleAttribute("hidden", !adminOnly);
+
+  if (!adminOnly) {
+    selectedSavedSearchIds.clear();
+    resetCurrentCatchment();
+  }
+  updateSavedSearchSelectionActions();
 }
 
 function persistEditingSearchChanges(statusMessage = "") {
@@ -1657,18 +1696,21 @@ function renderSavedSearches() {
     const visibilityLabel = document.createElement("label");
     visibilityLabel.className = "drive-time-search-visibility";
 
-    const selectCheckbox = document.createElement("input");
-    selectCheckbox.type = "checkbox";
-    selectCheckbox.checked = selectedSavedSearchIds.has(search.id);
-    selectCheckbox.setAttribute("aria-label", `Select ${search.name}`);
-    selectCheckbox.addEventListener("change", () => {
-      if (selectCheckbox.checked) {
-        selectedSavedSearchIds.add(search.id);
-      } else {
-        selectedSavedSearchIds.delete(search.id);
-      }
-      updateSavedSearchSelectionActions();
-    });
+    let selectCheckbox = null;
+    if (isAdminUser()) {
+      selectCheckbox = document.createElement("input");
+      selectCheckbox.type = "checkbox";
+      selectCheckbox.checked = selectedSavedSearchIds.has(search.id);
+      selectCheckbox.setAttribute("aria-label", `Select ${search.name}`);
+      selectCheckbox.addEventListener("change", () => {
+        if (selectCheckbox.checked) {
+          selectedSavedSearchIds.add(search.id);
+        } else {
+          selectedSavedSearchIds.delete(search.id);
+        }
+        updateSavedSearchSelectionActions();
+      });
+    }
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -1695,90 +1737,117 @@ function renderSavedSearches() {
     subtitle.className = "drive-time-search-subtitle";
     subtitle.textContent = `${search.office.name} | ${search.thresholdMinutes} mins | ${search.acceptedPlaces.length} places${
       search.archived ? " | Archived" : ""
-    }`;
+    }${search.defaultOnLoad ? " | Default on load" : ""}`;
     titleWrap.append(title, subtitle);
 
-    visibilityLabel.append(selectCheckbox, checkbox, colorDot, titleWrap);
-
-    const actions = document.createElement("div");
-    actions.className = "drive-time-search-actions";
-
-    const colourSelect = document.createElement("select");
-    colourSelect.className = "drive-time-color-select";
-    colourSelect.setAttribute("aria-label", `Colour for ${search.name}`);
-    for (let i = 0; i < AREA_COLORS.length; i += 1) {
-      const option = document.createElement("option");
-      option.value = String(i);
-      option.textContent = getColorLabel(i);
-      colourSelect.appendChild(option);
+    if (selectCheckbox) {
+      visibilityLabel.append(selectCheckbox);
     }
-    colourSelect.value = String(Math.max(0, Number(search.colorIndex || 0) % AREA_COLORS.length));
-    colourSelect.addEventListener("change", () => {
-      search.colorIndex = Number(colourSelect.value);
-      persistSavedSearches();
-      syncSearchLayer(search);
-      renderSavedSearches();
-      setStatus(`Updated colour for '${search.name}'.`);
-    });
+    visibilityLabel.append(checkbox, colorDot, titleWrap);
 
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "secondary";
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => {
-      beginEditingSavedSearch(search);
-    });
+    li.append(visibilityLabel);
 
-    const focusBtn = document.createElement("button");
-    focusBtn.type = "button";
-    focusBtn.className = "secondary";
-    focusBtn.textContent = "Focus";
-    focusBtn.addEventListener("click", () => {
-      if (!search.visible) {
-        search.visible = true;
+    if (isAdminUser()) {
+      const actions = document.createElement("div");
+      actions.className = "drive-time-search-actions";
+
+      const colourSelect = document.createElement("select");
+      colourSelect.className = "drive-time-color-select";
+      colourSelect.setAttribute("aria-label", `Colour for ${search.name}`);
+      for (let i = 0; i < AREA_COLORS.length; i += 1) {
+        const option = document.createElement("option");
+        option.value = String(i);
+        option.textContent = getColorLabel(i);
+        colourSelect.appendChild(option);
+      }
+      colourSelect.value = String(Math.max(0, Number(search.colorIndex || 0) % AREA_COLORS.length));
+      colourSelect.addEventListener("change", () => {
+        search.colorIndex = Number(colourSelect.value);
         persistSavedSearches();
         syncSearchLayer(search);
         renderSavedSearches();
-      }
-      fitToSearch(search);
-    });
+        setStatus(`Updated colour for '${search.name}'.`);
+      });
 
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "secondary";
-    removeBtn.textContent = "Remove";
-    removeBtn.addEventListener("click", () => {
-      const wasEditing = editingSearchId === search.id;
-      removeAreaLayers(search.id);
-      savedSearches = savedSearches.filter((item) => item.id !== search.id);
-      persistSavedSearches();
-      renderSavedSearches();
-      if (wasEditing) {
-        resetCurrentCatchment();
-      }
-      setStatus(`Removed '${search.name}'.`);
-    });
+      const defaultToggle = document.createElement("label");
+      defaultToggle.className = "drive-time-default-toggle";
 
-    const archiveBtn = document.createElement("button");
-    archiveBtn.type = "button";
-    archiveBtn.className = "secondary";
-    archiveBtn.textContent = search.archived ? "Restore" : "Archive";
-    archiveBtn.addEventListener("click", () => {
-      search.archived = !search.archived;
-      if (search.archived) {
-        search.visible = false;
-        if (editingSearchId === search.id) {
+      const defaultCheckbox = document.createElement("input");
+      defaultCheckbox.type = "checkbox";
+      defaultCheckbox.checked = search.defaultOnLoad === true;
+      defaultCheckbox.setAttribute("aria-label", `Default on load for ${search.name}`);
+      defaultCheckbox.addEventListener("change", () => {
+        search.defaultOnLoad = defaultCheckbox.checked;
+        persistSavedSearches();
+        renderSavedSearches();
+        setStatus(search.defaultOnLoad ? `Set '${search.name}' as default on load.` : `Removed '${search.name}' from defaults.`);
+      });
+
+      const defaultText = document.createElement("span");
+      defaultText.textContent = "Default";
+
+      defaultToggle.append(defaultCheckbox, defaultText);
+
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "secondary";
+      editBtn.textContent = "Edit";
+      editBtn.addEventListener("click", () => {
+        beginEditingSavedSearch(search);
+      });
+
+      const focusBtn = document.createElement("button");
+      focusBtn.type = "button";
+      focusBtn.className = "secondary";
+      focusBtn.textContent = "Focus";
+      focusBtn.addEventListener("click", () => {
+        if (!search.visible) {
+          search.visible = true;
+          persistSavedSearches();
+          syncSearchLayer(search);
+          renderSavedSearches();
+        }
+        fitToSearch(search);
+      });
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "secondary";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => {
+        const wasEditing = editingSearchId === search.id;
+        removeAreaLayers(search.id);
+        savedSearches = savedSearches.filter((item) => item.id !== search.id);
+        selectedSavedSearchIds.delete(search.id);
+        persistSavedSearches();
+        renderSavedSearches();
+        if (wasEditing) {
           resetCurrentCatchment();
         }
-      }
-      persistSavedSearches();
-      syncSearchLayer(search);
-      renderSavedSearches();
-      setStatus(search.archived ? `Archived '${search.name}'.` : `Restored '${search.name}'.`);
-    });
+        setStatus(`Removed '${search.name}'.`);
+      });
 
-    actions.append(colourSelect, editBtn, focusBtn, archiveBtn, removeBtn);
-    li.append(visibilityLabel, actions);
+      const archiveBtn = document.createElement("button");
+      archiveBtn.type = "button";
+      archiveBtn.className = "secondary";
+      archiveBtn.textContent = search.archived ? "Restore" : "Archive";
+      archiveBtn.addEventListener("click", () => {
+        search.archived = !search.archived;
+        if (search.archived) {
+          search.visible = false;
+          if (editingSearchId === search.id) {
+            resetCurrentCatchment();
+          }
+        }
+        persistSavedSearches();
+        syncSearchLayer(search);
+        renderSavedSearches();
+        setStatus(search.archived ? `Archived '${search.name}'.` : `Restored '${search.name}'.`);
+      });
+
+      actions.append(colourSelect, editBtn, focusBtn, archiveBtn, removeBtn, defaultToggle);
+      li.append(actions);
+    }
     savedSearchesList.appendChild(li);
   }
 
@@ -1814,6 +1883,9 @@ function resetCurrentCatchment() {
 }
 
 function duplicateSelectedSearches() {
+  if (!isAdminUser()) {
+    return;
+  }
   const selected = getSelectedSavedSearches();
   if (!selected.length) {
     setStatus("Select at least one search to duplicate.", true);
@@ -1828,6 +1900,7 @@ function duplicateSelectedSearches() {
         name: `${search.name} (Copy)`,
         savedAt: new Date().toISOString(),
         visible: false,
+        defaultOnLoad: false,
       },
       savedSearches.length + index
     )
@@ -1846,6 +1919,9 @@ function duplicateSelectedSearches() {
 }
 
 function mergeSelectedSearches() {
+  if (!isAdminUser()) {
+    return;
+  }
   const selected = getSelectedSavedSearches();
   if (selected.length < 2) {
     setStatus("Select at least two searches to merge.", true);
@@ -1890,6 +1966,7 @@ function mergeSelectedSearches() {
       savedAt: new Date().toISOString(),
       visible: true,
       archived: false,
+      defaultOnLoad: false,
       colorIndex: savedSearches.length,
       formattedAddress: primary.formattedAddress || primary.office?.name || "Merged search",
       query: primary.query || primary.office?.name || "Merged search",
@@ -1946,6 +2023,7 @@ function saveCurrentSearch() {
       savedAt: new Date().toISOString(),
       visible: true,
       archived: editingTarget?.archived === true,
+      defaultOnLoad: editingTarget?.defaultOnLoad === true,
       colorIndex: editingTarget?.colorIndex ?? savedSearches.length,
       formattedAddress: currentCatchment.office.name,
       query: currentCatchment.office.name,
@@ -2060,7 +2138,7 @@ function formatReasonMessage(reason, threshold) {
 }
 
 async function handleMapClickForCatchment(latlng) {
-  if (!map || !USE_OFFICE_CATCHMENT_MODE) {
+  if (!map || !USE_OFFICE_CATCHMENT_MODE || !isAdminUser()) {
     return;
   }
   if (!currentCatchment.office) {
@@ -2296,6 +2374,7 @@ async function init() {
 
     const profile = await directoryApi.getCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
+    currentUserRole = role;
     if (!canAccessPage(role, "drivetime")) {
       redirectToUnauthorized("drivetime");
       return;
@@ -2313,7 +2392,11 @@ async function init() {
 
     loadGeocodeCache();
     loadSavedSearches();
-    await loadClientOfficeOptions();
+    applyDefaultSearchVisibility();
+    applyRoleVisibility();
+    if (isAdminUser()) {
+      await loadClientOfficeOptions();
+    }
     if (savedSearchFilterSelect) {
       savedSearchFilterSelect.value = savedSearchFilter;
     }
@@ -2336,8 +2419,8 @@ async function init() {
     updateEditAddPlacesButtonState();
     updateClearAcceptedButtonState();
     setPeopleOverlayStatus("Overlay not loaded.");
-    setStatus("Set an office location to start building a catchment.");
-    document.body.classList.toggle("office-click-mode", USE_OFFICE_CATCHMENT_MODE);
+    setStatus(isAdminUser() ? "Set an office location to start building a catchment." : "Toggle saved searches to view our geography.");
+    document.body.classList.toggle("office-click-mode", USE_OFFICE_CATCHMENT_MODE && isAdminUser());
     if (!USE_OFFICE_CATCHMENT_MODE) {
       setStatus("Office catchment mode is disabled in config.", true);
     }

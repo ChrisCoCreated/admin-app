@@ -2313,6 +2313,18 @@ body.lightbox-open {
   font-size: 0.82rem;
 }
 
+.drive-time-default-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 4px;
+  color: #24314a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .drive-time-color-select {
   min-height: 30px;
   border-radius: 8px;
