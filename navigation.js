@@ -1,3 +1,9 @@
+import {
+  getStoredActualRole,
+  isLoggedInUserPreviewEnabled,
+  setLoggedInUserPreviewEnabled,
+} from "./role-preview.js?v=20260317";
+
 const ROLE_PAGES = {
   admin: [
     "clients",
@@ -60,6 +66,7 @@ const ROLE_PAGES = {
   time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
   time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
   time_hr_clients: ["clients", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
+  logged_in: [],
 };
 
 const PAGE_META = {
@@ -100,6 +107,9 @@ export function getAccessiblePages(role) {
   if (!Array.isArray(pages)) {
     return [];
   }
+  if (!pages.length) {
+    return [];
+  }
   if (pages.includes("drivetime")) {
     return pages;
   }
@@ -134,9 +144,11 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
 
   const pages = getAccessiblePages(role);
   const currentPath = normalizePath(currentPathname);
+  const actualRole = getStoredActualRole();
+  const canPreviewAsLoggedInUser = actualRole === "admin";
   nav.innerHTML = "";
 
-  if (!pages.length) {
+  if (!pages.length && !canPreviewAsLoggedInUser) {
     return;
   }
 
@@ -149,6 +161,38 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
 
   const panel = document.createElement("div");
   panel.className = "topnav-panel";
+
+  if (canPreviewAsLoggedInUser) {
+    const previewControl = document.createElement("label");
+    previewControl.className = "topnav-preview-toggle";
+
+    const previewInput = document.createElement("input");
+    previewInput.type = "checkbox";
+    previewInput.checked = isLoggedInUserPreviewEnabled();
+
+    const previewCopy = document.createElement("span");
+    previewCopy.className = "topnav-preview-copy";
+    previewCopy.innerHTML =
+      '<strong>View as logged-in user</strong><span>Hide admin-only permissions and pages until you switch this off.</span>';
+
+    previewInput.addEventListener("change", () => {
+      setLoggedInUserPreviewEnabled(previewInput.checked);
+      const nextRole = previewInput.checked ? "logged_in" : actualRole;
+      const currentPageKey = Object.entries(PAGE_META).find(([, page]) => normalizePath(page.href) === currentPath)?.[0] || "";
+      menu.open = false;
+
+      if (currentPageKey && !canAccessPage(nextRole, currentPageKey)) {
+        window.location.href = "./index.html";
+        return;
+      }
+
+      window.location.reload();
+    });
+
+    previewControl.appendChild(previewInput);
+    previewControl.appendChild(previewCopy);
+    panel.appendChild(previewControl);
+  }
 
   for (const pageKey of pages) {
     const page = PAGE_META[pageKey];

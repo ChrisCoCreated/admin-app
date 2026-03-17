@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { getAccessiblePages, getHomePageTiles, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260314";
+import { getAccessiblePages, getHomePageTiles, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260317";
 
 const signInBtn = document.getElementById("signInBtn");
 const authState = document.getElementById("authState");
@@ -67,6 +67,7 @@ function setSignedInUi() {
 
 function renderUserSummary(profile) {
   const role = String(profile?.role || "").trim().toLowerCase();
+  const actualRole = String(profile?.actualRole || role).trim().toLowerCase();
   const email = String(profile?.email || "").trim();
   const pageLabels = getAccessiblePages(role)
     .map((pageKey) => getPageMeta(pageKey)?.label)
@@ -78,8 +79,18 @@ function renderUserSummary(profile) {
   }
   if (homeUserPermissions) {
     const permissions = pageLabels.length ? pageLabels.join(", ") : "None";
-    homeUserPermissions.textContent = `Permissions: ${permissions}`;
+    homeUserPermissions.textContent = profile?.previewingLoggedInUser
+      ? `Permissions: ${permissions} (previewing as a signed-in user without admin permissions).`
+      : `Permissions: ${permissions}`;
     homeUserPermissions.hidden = false;
+  }
+  if (heroSignInMessage) {
+    heroSignInMessage.hidden = true;
+  }
+  if (profile?.previewingLoggedInUser && actualRole === "admin" && homeUserPermissions) {
+    homeUserPermissions.classList.add("status-preview");
+  } else if (homeUserPermissions) {
+    homeUserPermissions.classList.remove("status-preview");
   }
 }
 
@@ -142,7 +153,7 @@ async function renderRoleMenu() {
   const profile = await fetchCurrentUser();
   const role = String(profile?.role || "").trim().toLowerCase();
   const pages = getAccessiblePages(role);
-  if (!pages.length) {
+  if (!pages.length && !profile?.previewingLoggedInUser) {
     window.location.href = "./unauthorized.html";
     return;
   }

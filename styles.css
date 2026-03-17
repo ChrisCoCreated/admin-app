@@ -129,6 +129,39 @@ body {
   background: #e8eefb;
 }
 
+.topnav-preview-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  margin-bottom: 4px;
+  border: 1px solid #d6dfef;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(49, 183, 200, 0.1), rgba(255, 255, 255, 0.98));
+  cursor: pointer;
+}
+
+.topnav-preview-toggle input {
+  margin-top: 2px;
+}
+
+.topnav-preview-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.topnav-preview-copy strong {
+  color: #1d2a42;
+  font-size: 0.96rem;
+}
+
+.topnav-preview-copy span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -237,6 +270,15 @@ body.auth-pending .auth-card {
     #edf3ff;
   transform: translateY(-1px);
   box-shadow: 0 14px 30px rgba(17, 20, 26, 0.12);
+}
+
+.status-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(49, 183, 200, 0.28);
+  border-radius: 12px;
+  background: rgba(49, 183, 200, 0.08);
+  color: #17424d;
 }
 
 .row {

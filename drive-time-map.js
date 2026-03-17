@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260311";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260317";
 import { OUR_GEOGRAPHY_DEFAULT_SEARCHES } from "./our-geography-default-searches.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
@@ -39,7 +39,6 @@ const importSearchesFileInput = document.getElementById("importSearchesFileInput
 const loadPeopleOverlayBtn = document.getElementById("loadPeopleOverlayBtn");
 const showPeopleOverlayInput = document.getElementById("showPeopleOverlayInput");
 const overlayTypeSelect = document.getElementById("overlayTypeSelect");
-const overlayLocationSelect = document.getElementById("overlayLocationSelect");
 const overlayClientAreaFilters = document.getElementById("overlayClientAreaFilters");
 const overlayCompanionAreaFilters = document.getElementById("overlayCompanionAreaFilters");
 const overlayCompanionCareCompSelect = document.getElementById("overlayCompanionCareCompSelect");
@@ -78,6 +77,7 @@ const AREA_COLORS = [
   { stroke: "#2f6b2a", fill: "#89c46b" },
 ];
 const AREA_COLOR_LABELS = ["Brand Cyan", "Brand Pink", "Brand Mint", "Warm Sand", "Soft Indigo", "Leaf Green"];
+const CLIENT_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
 
 const OFFICE = {
   name: String(FRONTEND_CONFIG.mapOffice?.name || "Canterbury Office"),
@@ -689,11 +689,44 @@ function buildCarerQuery(carer) {
 
 function buildClientLocationLabel(client) {
   return (
-    normalizeLocation(client?.area) ||
     normalizeLocation(client?.location) ||
     normalizeLocation(client?.town) ||
     normalizeLocation(client?.postcode) ||
+    normalizeLocation(client?.area) ||
     "Unassigned"
+  );
+}
+
+function normalizeClientAreaLabel(value) {
+  const normalized = normalizeLocation(value);
+  if (!normalized) {
+    return "";
+  }
+
+  const compact = normalized.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (compact === "central") {
+    return "Central";
+  }
+  if (compact === "east kent" || compact === "eastkent") {
+    return "East Kent";
+  }
+  if (compact === "london plus" || compact === "londonplus") {
+    return "London Plus";
+  }
+  if (compact === "wellbeing assurance" || compact === "wellbeingassurance" || compact === "well being assurance") {
+    return "Wellbeing Assurance";
+  }
+
+  return "";
+}
+
+function buildClientAreaLabel(client) {
+  return (
+    normalizeClientAreaLabel(client?.area) ||
+    normalizeClientAreaLabel(client?.clientArea) ||
+    normalizeClientAreaLabel(client?.serviceArea) ||
+    normalizeClientAreaLabel(client?.branchArea) ||
+    ""
   );
 }
 
@@ -721,15 +754,6 @@ function deriveOverlayStatusOptions(items) {
   return [...ordered, ...extra];
 }
 
-function deriveOverlayLocationOptions(items) {
-  const unique = new Set(
-    items
-      .map((item) => normalizeLocation(item.locationLabel))
-      .filter(Boolean)
-  );
-  return Array.from(unique).sort((a, b) => a.localeCompare(b));
-}
-
 function deriveCompanionAreaOptions(items) {
   const values = new Set(
     items
@@ -741,13 +765,7 @@ function deriveCompanionAreaOptions(items) {
 }
 
 function deriveClientAreaOptions(items) {
-  const values = new Set(
-    items
-      .filter((item) => item.type === "client")
-      .map((item) => normalizeLocation(item.areaLabel))
-      .filter(Boolean)
-  );
-  return Array.from(values).sort((a, b) => a.localeCompare(b));
+  return [...CLIENT_AREA_OPTIONS];
 }
 
 function deriveCompanionCareCompOptions(items) {
@@ -812,26 +830,6 @@ function renderOverlayStatusFilters() {
     applyPeopleOverlayFilters();
   });
   overlayStatusFilters.appendChild(allBtn);
-}
-
-function renderOverlayLocationOptions() {
-  if (!overlayLocationSelect) {
-    return;
-  }
-  const current = String(overlayLocationSelect.value || "all");
-  const options = deriveOverlayLocationOptions(peopleOverlayData);
-  overlayLocationSelect.innerHTML = "";
-  const all = document.createElement("option");
-  all.value = "all";
-  all.textContent = "All locations";
-  overlayLocationSelect.appendChild(all);
-  for (const location of options) {
-    const option = document.createElement("option");
-    option.value = location;
-    option.textContent = location;
-    overlayLocationSelect.appendChild(option);
-  }
-  overlayLocationSelect.value = options.includes(current) ? current : "all";
 }
 
 function renderAreaFilterButtons(root, options, selectedSet, onChange, emptyLabel) {
@@ -928,17 +926,15 @@ function renderCompanionOverlayOptions() {
 
 function getFilteredOverlayPeople() {
   const typeFilter = String(overlayTypeSelect?.value || "all");
-  const locationFilter = String(overlayLocationSelect?.value || "all");
   const companionCareCompFilter = String(overlayCompanionCareCompSelect?.value || "all");
   return peopleOverlayData.filter((item) => {
     const matchesType = typeFilter === "all" || item.type === typeFilter;
     const matchesStatus = overlayStatusSet.has(normalizeStatus(item.status));
-    const matchesLocation = locationFilter === "all" || normalizeLocation(item.locationLabel) === locationFilter;
-    if (!(matchesType && matchesStatus && matchesLocation)) {
+    if (!(matchesType && matchesStatus)) {
       return false;
     }
 
-    const normalizedArea = normalizeLocation(item.areaLabel);
+    const normalizedArea = item.type === "client" ? normalizeClientAreaLabel(item.areaLabel) : normalizeLocation(item.areaLabel);
     if (item.type === "client") {
       return !overlayClientAreaSet.size || overlayClientAreaSet.has(normalizedArea);
     }
@@ -1032,7 +1028,7 @@ function buildOverlayItems(clientsPayload, carersPayload) {
       name: normalizeLocation(client.name || "Unnamed client"),
       status: normalizeStatus(client.status),
       locationLabel: buildClientLocationLabel(client),
-      areaLabel: normalizeLocation(client.area || client.location || client.town || ""),
+      areaLabel: buildClientAreaLabel(client),
       geocodeQuery: query,
     });
     index += 1;
@@ -1140,7 +1136,6 @@ async function loadPeopleOverlay() {
       peopleOverlayData = [];
       overlayLoaded = true;
       renderOverlayStatusFilters();
-      renderOverlayLocationOptions();
       renderCompanionOverlayOptions();
       applyPeopleOverlayFilters();
       setPeopleOverlayStatus("No mappable people records found.");
@@ -1151,7 +1146,6 @@ async function loadPeopleOverlay() {
     peopleOverlayData = resolvedItems;
     overlayLoaded = true;
     renderOverlayStatusFilters();
-    renderOverlayLocationOptions();
     renderCompanionOverlayOptions();
     applyPeopleOverlayFilters();
     setPeopleOverlayStatus(`Loaded ${resolvedItems.length} mapped people.`);
@@ -2607,10 +2601,6 @@ showPeopleOverlayInput?.addEventListener("change", () => {
 });
 
 overlayTypeSelect?.addEventListener("change", () => {
-  applyPeopleOverlayFilters();
-});
-
-overlayLocationSelect?.addEventListener("change", () => {
   applyPeopleOverlayFilters();
 });
 

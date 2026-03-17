@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260311";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260317";
 
 const refreshBtn = document.getElementById("refreshBtn");
 const addTaskBtn = document.getElementById("addTaskBtn");

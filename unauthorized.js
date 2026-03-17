@@ -1,5 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { createDirectoryApi } from "./directory-api.js";
+import { renderTopNavigation } from "./navigation.js?v=20260317";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const deniedMessage = document.getElementById("deniedMessage");
@@ -8,6 +10,7 @@ const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
 });
+const directoryApi = createDirectoryApi(authController);
 
 const PAGE_LABELS = {
   clients: "Clients",
@@ -32,6 +35,22 @@ function setDeniedMessage() {
   deniedMessage.textContent = `You do not have permission to view ${getPageLabel(page)}.`;
 }
 
+async function init() {
+  try {
+    const account = await authController.restoreSession();
+    if (!account) {
+      return;
+    }
+
+    const profile = await directoryApi.getCurrentUser();
+    renderTopNavigation({ role: profile?.role, currentPathname: window.location.pathname });
+  } catch (error) {
+    console.error(error);
+  } finally {
+    document.body.classList.remove("auth-pending");
+  }
+}
+
 signOutBtn?.addEventListener("click", async () => {
   try {
     signOutBtn.disabled = true;
@@ -42,3 +61,4 @@ signOutBtn?.addEventListener("click", async () => {
 });
 
 setDeniedMessage();
+void init();

@@ -1,4 +1,5 @@
 import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { applyRolePreview } from "./role-preview.js?v=20260317";
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 
@@ -78,7 +79,8 @@ export function createDirectoryApi(authController) {
       if (!response.ok) {
         await parseError(response, "Profile request failed");
       }
-      return response.json();
+      const profile = await response.json();
+      return applyRolePreview(profile);
     },
 
     async getPerformanceScorecard(query = {}) {
