@@ -66,7 +66,7 @@ const ROLE_PAGES = {
   time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
   time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
   time_hr_clients: ["clients", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
-  logged_in: [],
+  logged_in: ["drivetime"],
 };
 
 const PAGE_META = {
@@ -105,9 +105,6 @@ export function getAccessiblePages(role) {
   const normalizedRole = normalizeRole(role);
   const pages = ROLE_PAGES[normalizedRole];
   if (!Array.isArray(pages)) {
-    return [];
-  }
-  if (!pages.length) {
     return [];
   }
   if (pages.includes("drivetime")) {
