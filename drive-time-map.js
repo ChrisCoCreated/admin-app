@@ -6,6 +6,9 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260311";
 const signOutBtn = document.getElementById("signOutBtn");
 const geographyBuilderPanel = document.getElementById("geographyBuilderPanel");
 const acceptedPlacesPanel = document.getElementById("acceptedPlacesPanel");
+const mapSearchInput = document.getElementById("mapSearchInput");
+const mapSearchBtn = document.getElementById("mapSearchBtn");
+const clearMapSearchBtn = document.getElementById("clearMapSearchBtn");
 const locationInput = document.getElementById("locationInput");
 const setOfficeBtn = document.getElementById("setOfficeBtn");
 const clientOfficeSelect = document.getElementById("clientOfficeSelect");
@@ -85,6 +88,7 @@ let activeOffice = null;
 
 let map = null;
 let officeMarker = null;
+let lookupMarker = null;
 let previewPolygon = null;
 let previewVertexMarkers = [];
 let currentAcceptedMarkers = [];
@@ -167,6 +171,9 @@ function showClickFeedback(message, tone = "info") {
 }
 
 function setBusy(isBusy) {
+  if (mapSearchBtn) {
+    mapSearchBtn.disabled = isBusy;
+  }
   if (setOfficeBtn) {
     setOfficeBtn.disabled = isBusy;
   }
@@ -175,6 +182,12 @@ function setBusy(isBusy) {
   }
   if (saveSearchBtn) {
     saveSearchBtn.disabled = isBusy || !canSaveCurrentCatchment();
+  }
+}
+
+function updateLookupPinControls() {
+  if (clearMapSearchBtn) {
+    clearMapSearchBtn.disabled = !lookupMarker;
   }
 }
 
@@ -2289,6 +2302,79 @@ function updateOfficeMarker() {
   );
 }
 
+function clearLookupPin() {
+  if (lookupMarker) {
+    lookupMarker.remove();
+    lookupMarker = null;
+  }
+  updateLookupPinControls();
+}
+
+function setLookupPin(point) {
+  if (!map || !window.L || !Number.isFinite(Number(point?.lat)) || !Number.isFinite(Number(point?.lng))) {
+    return;
+  }
+  const lat = Number(point.lat);
+  const lng = Number(point.lng);
+  const formattedAddress = normalizeSearchName(point.formattedAddress || "Pinned location");
+
+  if (!lookupMarker) {
+    lookupMarker = window.L.marker([lat, lng], {
+      keyboard: false,
+      pane: MAP_PANES.activeOffice,
+    }).addTo(map);
+  } else {
+    lookupMarker.setLatLng([lat, lng]);
+  }
+
+  lookupMarker.bindPopup(`<strong>${escapeHtml(formattedAddress)}</strong>`);
+  lookupMarker.openPopup();
+  map.setView([lat, lng], Math.max(map.getZoom(), 13));
+  updateLookupPinControls();
+}
+
+async function findAndPinLocation() {
+  const query = normalizeSearchName(mapSearchInput?.value || "");
+  if (!query) {
+    setStatus("Enter a location or address to drop a pin.", true);
+    return;
+  }
+
+  setBusy(true);
+  setStatus("Finding location...");
+  try {
+    const response = await authedFetch(GEOCODE_BATCH_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        queries: [{ id: "lookup", query }],
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data?.error || "Could not find that location.");
+    }
+
+    const point = Array.isArray(data?.points) ? data.points[0] : null;
+    if (!point) {
+      throw new Error("Could not find that location.");
+    }
+
+    setLookupPin(point);
+    if (mapSearchInput) {
+      mapSearchInput.value = normalizeSearchName(point.formattedAddress || query);
+    }
+    setStatus(`Pinned ${normalizeSearchName(point.formattedAddress || query)}.`);
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not find that location.", true);
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function setOfficeFromQuery(queryValue, sourceLabel = "") {
   const query = normalizeSearchName(queryValue || "");
   if (!query) {
@@ -2422,6 +2508,7 @@ async function init() {
     updateSaveButtonState();
     updateEditAddPlacesButtonState();
     updateClearAcceptedButtonState();
+    updateLookupPinControls();
     setPeopleOverlayStatus("Overlay not loaded.");
     setStatus(isAdminUser() ? "Set an office location to start building a catchment." : "Toggle saved searches to view our geography.");
     document.body.classList.toggle("office-click-mode", USE_OFFICE_CATCHMENT_MODE && isAdminUser());
@@ -2442,6 +2529,15 @@ async function init() {
 
 saveSearchBtn?.addEventListener("click", () => {
   saveCurrentSearch();
+});
+
+mapSearchBtn?.addEventListener("click", () => {
+  void findAndPinLocation();
+});
+
+clearMapSearchBtn?.addEventListener("click", () => {
+  clearLookupPin();
+  setStatus("Pinned location cleared.");
 });
 
 duplicateSelectedSearchesBtn?.addEventListener("click", () => {
@@ -2556,6 +2652,14 @@ locationInput?.addEventListener("keydown", (event) => {
   }
   event.preventDefault();
   void setOfficeFromInput();
+});
+
+mapSearchInput?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+  event.preventDefault();
+  void findAndPinLocation();
 });
 
 customDepartureBtn?.addEventListener("click", () => {
