@@ -2,6 +2,7 @@ import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260311";
+import { OUR_GEOGRAPHY_DEFAULT_SEARCHES } from "./our-geography-default-searches.js";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const geographyBuilderPanel = document.getElementById("geographyBuilderPanel");
@@ -511,6 +512,14 @@ function loadSavedSearches() {
   } catch {
     savedSearches = [];
   }
+}
+
+function loadReadOnlyDefaultSearches() {
+  const searches = Array.isArray(OUR_GEOGRAPHY_DEFAULT_SEARCHES?.searches) ? OUR_GEOGRAPHY_DEFAULT_SEARCHES.searches : [];
+  savedSearches = searches
+    .map((entry, index) => sanitizeSavedSearch(entry, index))
+    .filter(Boolean)
+    .slice(0, 100);
 }
 
 function persistSavedSearches() {
@@ -2481,8 +2490,12 @@ async function init() {
     }
 
     loadGeocodeCache();
-    loadSavedSearches();
-    applyDefaultSearchVisibility();
+    if (isAdminUser()) {
+      loadSavedSearches();
+      applyDefaultSearchVisibility();
+    } else {
+      loadReadOnlyDefaultSearches();
+    }
     applyRoleVisibility();
     if (isAdminUser()) {
       await loadClientOfficeOptions();
