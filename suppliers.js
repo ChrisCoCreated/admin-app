@@ -16,6 +16,7 @@ const supplierTypeSelect = document.getElementById("supplierTypeSelect");
 const supplierCountySelect = document.getElementById("supplierCountySelect");
 const supplierTownSelect = document.getElementById("supplierTownSelect");
 const supplierRatingSelect = document.getElementById("supplierRatingSelect");
+const supplierTagSelect = document.getElementById("supplierTagSelect");
 const supplierWebsiteOnly = document.getElementById("supplierWebsiteOnly");
 const supplierQuickFilters = document.getElementById("supplierQuickFilters");
 const supplierStatsGrid = document.getElementById("supplierStatsGrid");
@@ -35,12 +36,16 @@ const entryTownInput = document.getElementById("entryTownInput");
 const entryCountyInput = document.getElementById("entryCountyInput");
 const entryWebsiteInput = document.getElementById("entryWebsiteInput");
 const entryRatingInput = document.getElementById("entryRatingInput");
+const entryTagInput = document.getElementById("entryTagInput");
 const entryContactInput = document.getElementById("entryContactInput");
 const entryNotesInput = document.getElementById("entryNotesInput");
 const copyEntrySummaryBtn = document.getElementById("copyEntrySummaryBtn");
 const copyEntryCsvBtn = document.getElementById("copyEntryCsvBtn");
 const resetEntryBtn = document.getElementById("resetEntryBtn");
 const supplierTypeSuggestions = document.getElementById("supplierTypeSuggestions");
+const supplierTagSuggestions = document.getElementById("supplierTagSuggestions");
+
+const DEFAULT_TAG_OPTIONS = ["sport", "travel", "fashion", "identity", "fun", "play", "music", "religion"];
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -48,7 +53,7 @@ const authController = createAuthController({
 });
 const directoryApi = createDirectoryApi(authController);
 
-let currentMode = "standard";
+let currentMode = "ee";
 let activeCategoryFilter = "";
 
 function redirectToUnauthorized(pageKey) {
@@ -94,6 +99,35 @@ function formatRating(rating) {
   return "Unrated";
 }
 
+function normalizeTagList(value) {
+  if (Array.isArray(value)) {
+    return Array.from(
+      new Set(
+        value
+          .map((tag) => normalizeValue(tag))
+          .filter(Boolean)
+      )
+    );
+  }
+  const normalized = normalizeValue(value);
+  if (!normalized) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      normalized
+        .split(/[;,]/)
+        .map((tag) => normalizeValue(tag))
+        .filter(Boolean)
+    )
+  );
+}
+
+function formatTagLabel(value) {
+  const normalized = normalizeValue(value);
+  return normalized || "No tag";
+}
+
 function optionValues(items, fieldName) {
   return Array.from(
     new Set(
@@ -102,6 +136,16 @@ function optionValues(items, fieldName) {
         .filter(Boolean)
     )
   ).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+}
+
+function getAllTagOptions(items = SUPPLIERS_DATA) {
+  const tags = new Set(DEFAULT_TAG_OPTIONS);
+  for (const item of items) {
+    for (const tag of normalizeTagList(item.tags)) {
+      tags.add(tag);
+    }
+  }
+  return Array.from(tags).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
 }
 
 function categoryCounts(items) {
@@ -146,6 +190,7 @@ function updateFilterOptions() {
   populateSelect(supplierTypeSelect, optionValues(modeItems, "supplierType"), "categories");
   populateSelect(supplierCountySelect, optionValues(modeItems, "county"), "counties");
   populateSelect(supplierTownSelect, optionValues(modeItems, "town"), "towns");
+  populateSelect(supplierTagSelect, getAllTagOptions(modeItems), "tags");
 
   const availableCategories = new Set(optionValues(modeItems, "supplierType"));
   if (activeCategoryFilter && !availableCategories.has(activeCategoryFilter)) {
@@ -158,6 +203,13 @@ function updateFilterOptions() {
     option.value = category;
     supplierTypeSuggestions.appendChild(option);
   }
+
+  supplierTagSuggestions.innerHTML = "";
+  for (const tag of getAllTagOptions(modeItems)) {
+    const option = document.createElement("option");
+    option.value = tag;
+    supplierTagSuggestions.appendChild(option);
+  }
 }
 
 function matchesFilters(item) {
@@ -166,6 +218,7 @@ function matchesFilters(item) {
   const countyValue = normalizeValue(supplierCountySelect?.value);
   const townValue = normalizeValue(supplierTownSelect?.value);
   const ratingValue = normalizeValue(supplierRatingSelect?.value);
+  const tagValue = normalizeValue(supplierTagSelect?.value);
   const websiteOnly = Boolean(supplierWebsiteOnly?.checked);
   const categoryValue = activeCategoryFilter || typeValue;
 
@@ -184,6 +237,9 @@ function matchesFilters(item) {
   if (ratingValue && ratingValue !== "unrated" && normalizeValue(item.rating) !== ratingValue) {
     return false;
   }
+  if (tagValue && !normalizeTagList(item.tags).includes(tagValue)) {
+    return false;
+  }
   if (websiteOnly && !normalizeValue(item.website)) {
     return false;
   }
@@ -199,6 +255,7 @@ function matchesFilters(item) {
     item.notes,
     item.contactDetails,
     item.website,
+    normalizeTagList(item.tags).join("\n"),
   ]
     .map((value) => normalizeKey(value))
     .join("\n");
@@ -231,12 +288,14 @@ function renderStats(items) {
   const recommendedCount = items.filter((item) => item.rating === "👍").length;
   const websiteCount = items.filter((item) => normalizeValue(item.website)).length;
   const topCategory = categoryCounts(modeItems)[0];
+  const taggedCount = items.filter((item) => normalizeTagList(item.tags).length > 0).length;
 
   supplierStatsGrid.innerHTML = "";
   supplierStatsGrid.append(
     buildStatCard("In this mode", modeItems.length, currentMode === "ee" ? "is-ee" : ""),
     buildStatCard("Matching filters", items.length),
     buildStatCard("With websites", websiteCount),
+    buildStatCard("Tagged", taggedCount),
     buildStatCard("Recommended", recommendedCount, "is-positive"),
     buildStatCard("Top category", topCategory ? `${topCategory[0]} (${topCategory[1]})` : "None")
   );
@@ -360,6 +419,14 @@ function supplierCard(item) {
   modeChip.textContent = item.isEe ? "Enhance & Exceed" : "Standard";
   chips.appendChild(modeChip);
 
+  const tags = normalizeTagList(item.tags);
+  for (const tag of tags) {
+    const tagChip = document.createElement("span");
+    tagChip.className = "supplier-chip supplier-tag-chip";
+    tagChip.textContent = `#${tag}`;
+    chips.appendChild(tagChip);
+  }
+
   const notes = document.createElement("p");
   notes.className = "supplier-copy";
   notes.textContent = excerpt(item.notes);
@@ -427,6 +494,7 @@ function quickEntryPayload() {
     county: normalizeValue(entryCountyInput.value),
     website: normalizeValue(entryWebsiteInput.value),
     rating: normalizeValue(entryRatingInput.value),
+    tag: normalizeValue(entryTagInput.value),
     contactDetails: normalizeValue(entryContactInput.value),
     notes: normalizeValue(entryNotesInput.value),
     isEe: currentMode === "ee",
@@ -438,6 +506,7 @@ function buildQuickEntryPreviewText() {
   return [
     `Name: ${payload.title || "-"}`,
     `Category: ${payload.supplierType || "-"}`,
+    `Tag: ${formatTagLabel(payload.tag)}`,
     `Town: ${payload.town || "-"}`,
     `County: ${payload.county || "-"}`,
     `Website: ${payload.website || "-"}`,
@@ -466,6 +535,7 @@ function buildQuickEntryCsv() {
     escapeCsvValue(payload.contactDetails),
     escapeCsvValue(payload.rating),
     escapeCsvValue(payload.isEe ? "True" : "False"),
+    escapeCsvValue(payload.tag),
   ].join(",");
 }
 
@@ -507,6 +577,7 @@ function setMode(mode) {
   supplierCountySelect.value = "";
   supplierTownSelect.value = "";
   supplierRatingSelect.value = "";
+  supplierTagSelect.value = "";
   supplierWebsiteOnly.checked = false;
   renderPage();
 }
@@ -583,6 +654,10 @@ supplierTownSelect?.addEventListener("change", () => {
 });
 
 supplierRatingSelect?.addEventListener("change", () => {
+  renderPage();
+});
+
+supplierTagSelect?.addEventListener("change", () => {
   renderPage();
 });
 

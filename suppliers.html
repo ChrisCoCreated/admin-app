@@ -45,8 +45,8 @@
         <div class="suppliers-mode-shell" aria-label="Supplier mode">
           <span class="suppliers-mode-label">Mode</span>
           <div class="suppliers-mode-toggle">
-            <button id="standardModeBtn" class="secondary active" type="button">Standard suppliers</button>
-            <button id="eeModeBtn" class="secondary" type="button">EE experiences</button>
+            <button id="standardModeBtn" class="secondary" type="button">Standard suppliers</button>
+            <button id="eeModeBtn" class="secondary active" type="button">EE experiences</button>
           </div>
         </div>
       </section>
@@ -102,6 +102,12 @@
               <option value="👉">Worth exploring</option>
               <option value="👎">Avoid</option>
               <option value="unrated">Unrated</option>
+            </select>
+          </label>
+          <label class="field" for="supplierTagSelect">
+            Tag
+            <select id="supplierTagSelect">
+              <option value="">All tags</option>
             </select>
           </label>
           <label class="field suppliers-checkbox-field" for="supplierWebsiteOnly">
@@ -169,6 +175,16 @@
                 <option value="👎">Avoid</option>
               </select>
             </label>
+            <label class="field" for="entryTagInput">
+              Tag
+              <input
+                id="entryTagInput"
+                type="text"
+                list="supplierTagSuggestions"
+                placeholder="music, sport, travel or your own tag"
+              />
+            </label>
+            <datalist id="supplierTagSuggestions"></datalist>
             <label class="field" for="entryContactInput">
               Contact details
               <textarea id="entryContactInput" placeholder="Phone, email, named contact"></textarea>
@@ -193,6 +209,7 @@
             </div>
             <pre id="quickEntryPreview" class="suppliers-preview-output">Name: -
 Category: -
+Tag: -
 Town: -
 County: -
 Website: -

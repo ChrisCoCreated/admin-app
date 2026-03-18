@@ -2608,10 +2608,18 @@ body.lightbox-open {
   margin-top: 18px;
   display: grid;
   gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
 }
 
 .drive-time-overlay-status {
   margin: 0;
+  justify-self: end;
+  align-self: end;
+  color: #7a869c;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .drive-time-map {
@@ -3219,6 +3227,15 @@ body.lightbox-open {
   .drive-time-overlay-grid {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .drive-time-overlay-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .drive-time-overlay-status {
+    justify-self: start;
+    text-align: left;
   }
 
   .task-toolbar {
