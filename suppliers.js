@@ -2,15 +2,27 @@ import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260317";
-import { SUPPLIERS_DATA } from "./data/suppliers-data.js";
+import {
+  buildFieldMaps,
+  createSharePointApi,
+  fieldByTitle as sharedFieldByTitle,
+  fieldByTitleWritable as sharedFieldByTitleWritable,
+} from "./sharepoint-list-utils.js";
 
-const SHAREPOINT_LIST_URL =
-  "https://planwithcare.sharepoint.com/sites/Wellbeing/Lists/Suppliers%20Database?env=WebViewList";
+const FIXED_TENANT_ID = FRONTEND_CONFIG.tenantId;
+const FIXED_CLIENT_ID = FRONTEND_CONFIG.spaClientId;
+const FIXED_SITE_URL =
+  FRONTEND_CONFIG.sharePoint?.wellbeingSiteUrl || "https://planwithcare.sharepoint.com/sites/Wellbeing";
+const SUPPLIERS_LIST_PATH =
+  FRONTEND_CONFIG.sharePoint?.suppliersListPath || "/sites/Wellbeing/Lists/Suppliers Database";
+const SHAREPOINT_LIST_URL = `${FIXED_SITE_URL}/Lists/Suppliers%20Database?env=WebViewList`;
+const DEFAULT_TAG_OPTIONS = ["sport", "travel", "fashion", "identity", "fun", "play", "music", "religion"];
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const standardModeBtn = document.getElementById("standardModeBtn");
 const eeModeBtn = document.getElementById("eeModeBtn");
+const refreshSuppliersBtn = document.getElementById("refreshSuppliersBtn");
 const supplierSearchInput = document.getElementById("supplierSearchInput");
 const supplierTypeSelect = document.getElementById("supplierTypeSelect");
 const supplierCountySelect = document.getElementById("supplierCountySelect");
@@ -39,22 +51,40 @@ const entryRatingInput = document.getElementById("entryRatingInput");
 const entryTagInput = document.getElementById("entryTagInput");
 const entryContactInput = document.getElementById("entryContactInput");
 const entryNotesInput = document.getElementById("entryNotesInput");
+const saveEntryBtn = document.getElementById("saveEntryBtn");
 const copyEntrySummaryBtn = document.getElementById("copyEntrySummaryBtn");
 const copyEntryCsvBtn = document.getElementById("copyEntryCsvBtn");
 const resetEntryBtn = document.getElementById("resetEntryBtn");
 const supplierTypeSuggestions = document.getElementById("supplierTypeSuggestions");
 const supplierTagSuggestions = document.getElementById("supplierTagSuggestions");
 
-const DEFAULT_TAG_OPTIONS = ["sport", "travel", "fashion", "identity", "fun", "play", "music", "religion"];
-
 const authController = createAuthController({
-  tenantId: FRONTEND_CONFIG.tenantId,
-  clientId: FRONTEND_CONFIG.spaClientId,
+  tenantId: FIXED_TENANT_ID,
+  clientId: FIXED_CLIENT_ID,
+  onSignedOut: () => {
+    spApi?.clearCaches();
+    spApi = null;
+    listInfo = null;
+    fieldMap = null;
+    allSuppliers = [];
+  },
 });
 const directoryApi = createDirectoryApi(authController);
 
+let spApi = null;
+let listInfo = null;
+let fieldMap = null;
 let currentMode = "ee";
 let activeCategoryFilter = "";
+let allSuppliers = [];
+let currentRole = "";
+let listChoices = {
+  supplierTypes: [],
+  tags: [...DEFAULT_TAG_OPTIONS],
+};
+let suppliersLoaded = false;
+let loadingSuppliers = false;
+let savingSupplier = false;
 
 function redirectToUnauthorized(pageKey) {
   const page = encodeURIComponent(String(pageKey || "suppliers").trim().toLowerCase());
@@ -66,12 +96,54 @@ function setStatus(message, isError = false) {
   statusMessage.classList.toggle("error", isError);
 }
 
-function getModeLabel(mode = currentMode) {
-  return mode === "ee" ? "EE experiences" : "standard suppliers";
+function getConfig() {
+  const siteUrl = new URL(FIXED_SITE_URL);
+  return {
+    siteUrl: siteUrl.origin + siteUrl.pathname.replace(/\/$/, ""),
+    siteHost: siteUrl.origin,
+  };
 }
 
-function getModeItems(mode = currentMode) {
-  return SUPPLIERS_DATA.filter((item) => Boolean(item.isEe) === (mode === "ee"));
+async function getSharePointToken(config) {
+  return authController.acquireSharePointToken(config.siteHost);
+}
+
+function getSpApi(config) {
+  if (!spApi) {
+    spApi = createSharePointApi({
+      siteUrl: config.siteUrl,
+      getToken: () => getSharePointToken(config),
+    });
+  }
+  return spApi;
+}
+
+function fieldByTitle(candidates) {
+  return sharedFieldByTitle(fieldMap, candidates);
+}
+
+function fieldByTitleWritable(candidates) {
+  return sharedFieldByTitleWritable(fieldMap, candidates);
+}
+
+function fieldInternalName(candidates, options = {}) {
+  const field = options.writable ? fieldByTitleWritable(candidates) : fieldByTitle(candidates);
+  return field?.InternalName || null;
+}
+
+function resolveFieldAliases() {
+  return {
+    title: fieldInternalName(["Title"], { writable: true }) || "Title",
+    supplierType: fieldInternalName(["Supplier Type"], { writable: true }),
+    notes: fieldInternalName(["Notes"], { writable: true }),
+    website: fieldInternalName(["Website"], { writable: true }),
+    town: fieldInternalName(["Town"], { writable: true }),
+    county: fieldInternalName(["County"], { writable: true }),
+    contactDetails: fieldInternalName(["Contact Details"], { writable: true }),
+    rating: fieldInternalName(["Rating"], { writable: true }),
+    ee: fieldInternalName(["EE"], { writable: true }),
+    tags: fieldInternalName(["Tags"], { writable: true }),
+  };
 }
 
 function normalizeValue(value) {
@@ -80,23 +152,6 @@ function normalizeValue(value) {
 
 function normalizeKey(value) {
   return normalizeValue(value).toLowerCase();
-}
-
-function formatLabel(value, fallback = "Unspecified") {
-  return normalizeValue(value) || fallback;
-}
-
-function formatRating(rating) {
-  if (rating === "👍") {
-    return "Recommended";
-  }
-  if (rating === "👉") {
-    return "Worth exploring";
-  }
-  if (rating === "👎") {
-    return "Avoid";
-  }
-  return "Unrated";
 }
 
 function normalizeTagList(value) {
@@ -109,10 +164,16 @@ function normalizeTagList(value) {
       )
     );
   }
+
+  if (value && typeof value === "object" && Array.isArray(value.results)) {
+    return normalizeTagList(value.results);
+  }
+
   const normalized = normalizeValue(value);
   if (!normalized) {
     return [];
   }
+
   return Array.from(
     new Set(
       normalized
@@ -123,9 +184,12 @@ function normalizeTagList(value) {
   );
 }
 
+function formatLabel(value, fallback = "Unspecified") {
+  return normalizeValue(value) || fallback;
+}
+
 function formatTagLabel(value) {
-  const normalized = normalizeValue(value);
-  return normalized || "No tag";
+  return normalizeValue(value) || "No tag";
 }
 
 function optionValues(items, fieldName) {
@@ -138,14 +202,22 @@ function optionValues(items, fieldName) {
   ).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
 }
 
-function getAllTagOptions(items = SUPPLIERS_DATA) {
-  const tags = new Set(DEFAULT_TAG_OPTIONS);
+function getAllTagOptions(items = allSuppliers) {
+  const tags = new Set(listChoices.tags || DEFAULT_TAG_OPTIONS);
   for (const item of items) {
     for (const tag of normalizeTagList(item.tags)) {
       tags.add(tag);
     }
   }
   return Array.from(tags).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+}
+
+function getModeLabel(mode = currentMode) {
+  return mode === "ee" ? "EE experiences" : "standard suppliers";
+}
+
+function getModeItems(mode = currentMode) {
+  return allSuppliers.filter((item) => Boolean(item.isEe) === (mode === "ee"));
 }
 
 function categoryCounts(items) {
@@ -166,6 +238,7 @@ function populateSelect(select, values, label) {
   if (!select) {
     return;
   }
+
   const previousValue = select.value;
   select.innerHTML = "";
   const allOption = document.createElement("option");
@@ -187,18 +260,22 @@ function populateSelect(select, values, label) {
 
 function updateFilterOptions() {
   const modeItems = getModeItems();
-  populateSelect(supplierTypeSelect, optionValues(modeItems, "supplierType"), "categories");
+  const supplierTypes = Array.from(
+    new Set([...(listChoices.supplierTypes || []), ...optionValues(modeItems, "supplierType")])
+  ).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+
+  populateSelect(supplierTypeSelect, supplierTypes, "categories");
   populateSelect(supplierCountySelect, optionValues(modeItems, "county"), "counties");
   populateSelect(supplierTownSelect, optionValues(modeItems, "town"), "towns");
   populateSelect(supplierTagSelect, getAllTagOptions(modeItems), "tags");
 
-  const availableCategories = new Set(optionValues(modeItems, "supplierType"));
+  const availableCategories = new Set(supplierTypes);
   if (activeCategoryFilter && !availableCategories.has(activeCategoryFilter)) {
     activeCategoryFilter = "";
   }
 
   supplierTypeSuggestions.innerHTML = "";
-  for (const category of optionValues(modeItems, "supplierType")) {
+  for (const category of supplierTypes) {
     const option = document.createElement("option");
     option.value = category;
     supplierTypeSuggestions.appendChild(option);
@@ -210,6 +287,44 @@ function updateFilterOptions() {
     option.value = tag;
     supplierTagSuggestions.appendChild(option);
   }
+}
+
+function normalizeWebsiteValue(value) {
+  if (!value) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return normalizeValue(value);
+  }
+  if (typeof value === "object") {
+    return normalizeValue(value.Url || value.url || value.Description || value.description);
+  }
+  return "";
+}
+
+function normalizeBooleanValue(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = normalizeValue(value).toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+}
+
+function normalizeSupplierItem(item, aliases) {
+  return {
+    id: Number(item?.Id || 0),
+    title: normalizeValue(item?.[aliases.title]),
+    supplierType: normalizeValue(item?.[aliases.supplierType]),
+    notes: normalizeValue(item?.[aliases.notes]),
+    website: normalizeWebsiteValue(item?.[aliases.website]),
+    town: normalizeValue(item?.[aliases.town]),
+    county: normalizeValue(item?.[aliases.county]),
+    contactDetails: normalizeValue(item?.[aliases.contactDetails]),
+    rating: normalizeValue(item?.[aliases.rating]),
+    isEe: normalizeBooleanValue(item?.[aliases.ee]),
+    tags: normalizeTagList(item?.[aliases.tags]),
+    modified: normalizeValue(item?.Modified),
+  };
 }
 
 function matchesFilters(item) {
@@ -360,6 +475,14 @@ function excerpt(value, fallback = "No notes added yet.") {
   return `${trimmed.slice(0, 177).trimEnd()}...`;
 }
 
+function getSupplierEditUrl(itemId) {
+  if (!Number.isFinite(Number(itemId)) || Number(itemId) <= 0) {
+    return SHAREPOINT_LIST_URL;
+  }
+  const relative = `${SUPPLIERS_LIST_PATH}/EditForm.aspx?ID=${encodeURIComponent(String(itemId))}`;
+  return new URL(relative, FIXED_SITE_URL).toString();
+}
+
 async function copyText(text, successMessage) {
   if (!text) {
     setStatus("Nothing to copy yet.", true);
@@ -409,6 +532,7 @@ function supplierCard(item) {
 
   const chips = document.createElement("div");
   chips.className = "supplier-chip-row";
+
   const typeChip = document.createElement("span");
   typeChip.className = "supplier-chip";
   typeChip.textContent = formatLabel(item.supplierType);
@@ -419,8 +543,7 @@ function supplierCard(item) {
   modeChip.textContent = item.isEe ? "Enhance & Exceed" : "Standard";
   chips.appendChild(modeChip);
 
-  const tags = normalizeTagList(item.tags);
-  for (const tag of tags) {
+  for (const tag of normalizeTagList(item.tags)) {
     const tagChip = document.createElement("span");
     tagChip.className = "supplier-chip supplier-tag-chip";
     tagChip.textContent = `#${tag}`;
@@ -462,7 +585,7 @@ function supplierCard(item) {
 
   const sharepointLink = document.createElement("a");
   sharepointLink.className = "secondary supplier-inline-link";
-  sharepointLink.href = SHAREPOINT_LIST_URL;
+  sharepointLink.href = getSupplierEditUrl(item.id);
   sharepointLink.target = "_blank";
   sharepointLink.rel = "noopener noreferrer";
   sharepointLink.textContent = "Edit in SharePoint";
@@ -483,7 +606,11 @@ function renderResults(items) {
 function renderHeading(items) {
   const label = getModeLabel();
   resultsHeading.textContent = currentMode === "ee" ? "EE Directory" : "Supplier Directory";
-  resultsSummary.textContent = `${items.length} ${label} shown from ${getModeItems().length} records.`;
+  if (!suppliersLoaded) {
+    resultsSummary.textContent = "Loading live SharePoint records...";
+    return;
+  }
+  resultsSummary.textContent = `${items.length} ${label} shown from ${getModeItems().length} live SharePoint records.`;
 }
 
 function quickEntryPayload() {
@@ -545,11 +672,15 @@ function renderQuickEntryPreview() {
   quickEntryModeBadge.textContent = isEeMode ? "Enhance & Exceed" : "Standard supplier";
   quickEntryModeBadge.className = `supplier-chip ${isEeMode ? "ee-flag" : "standard-flag"}`;
   quickEntryIntro.textContent = isEeMode
-    ? "Draft a new EE experience or resource here, then paste it into SharePoint."
-    : "Draft a new standard supplier entry here, then paste it into SharePoint.";
+    ? "Create a new EE experience or resource in SharePoint from here."
+    : "Create a new standard supplier entry in SharePoint from here.";
   quickEntryStatus.textContent = isEeMode
-    ? "This entry will be copied with EE set to True."
-    : "This entry will be copied with EE set to False.";
+    ? savingSupplier
+      ? "Saving this EE entry to SharePoint..."
+      : "This entry will be saved with EE set to True."
+    : savingSupplier
+      ? "Saving this standard supplier to SharePoint..."
+      : "This entry will be saved with EE set to False.";
   quickEntryPreview.textContent = buildQuickEntryPreviewText();
 }
 
@@ -570,6 +701,15 @@ function renderPage() {
   renderResults(items);
 }
 
+function setBusyState() {
+  if (refreshSuppliersBtn) {
+    refreshSuppliersBtn.disabled = loadingSuppliers || savingSupplier;
+  }
+  if (saveEntryBtn) {
+    saveEntryBtn.disabled = savingSupplier || loadingSuppliers;
+  }
+}
+
 function setMode(mode) {
   currentMode = mode === "ee" ? "ee" : "standard";
   activeCategoryFilter = "";
@@ -588,6 +728,7 @@ function resetFilters() {
   supplierCountySelect.value = "";
   supplierTownSelect.value = "";
   supplierRatingSelect.value = "";
+  supplierTagSelect.value = "";
   supplierWebsiteOnly.checked = false;
   activeCategoryFilter = "";
   renderPage();
@@ -595,6 +736,174 @@ function resetFilters() {
 
 async function fetchCurrentUser() {
   return directoryApi.getCurrentUser();
+}
+
+async function loadListInfo() {
+  const config = getConfig();
+  const api = getSpApi(config);
+  listInfo = await api.resolveListByPath(SUPPLIERS_LIST_PATH);
+  const fields = await api.getListFields(listInfo.Id);
+  fieldMap = buildFieldMaps(fields);
+
+  const supplierTypeField = fieldByTitle(["Supplier Type"]);
+  const tagsField = fieldByTitle(["Tags"]);
+  listChoices = {
+    supplierTypes: Array.isArray(supplierTypeField?.Choices?.results)
+      ? supplierTypeField.Choices.results.map((entry) => normalizeValue(entry)).filter(Boolean)
+      : [],
+    tags: Array.from(
+      new Set([
+        ...DEFAULT_TAG_OPTIONS,
+        ...(Array.isArray(tagsField?.Choices?.results)
+          ? tagsField.Choices.results.map((entry) => normalizeValue(entry)).filter(Boolean)
+          : []),
+      ])
+    ).sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" })),
+  };
+}
+
+async function loadSuppliers() {
+  loadingSuppliers = true;
+  setBusyState();
+  setStatus("Loading live suppliers from SharePoint...");
+
+  try {
+    if (!listInfo || !fieldMap) {
+      await loadListInfo();
+    }
+
+    const config = getConfig();
+    const api = getSpApi(config);
+    const aliases = resolveFieldAliases();
+    const selectFields = [
+      "Id",
+      "Modified",
+      aliases.title,
+      aliases.supplierType,
+      aliases.notes,
+      aliases.website,
+      aliases.town,
+      aliases.county,
+      aliases.contactDetails,
+      aliases.rating,
+      aliases.ee,
+      aliases.tags,
+    ].filter(Boolean);
+
+    const query = Array.from(new Set(selectFields)).join(",");
+    const data = await api.request(
+      `/_api/web/lists(guid'${listInfo.Id}')/items?$top=5000&$orderby=Modified desc&$select=${encodeURIComponent(query)}`
+    );
+
+    allSuppliers = Array.isArray(data?.d?.results)
+      ? data.d.results
+          .map((item) => normalizeSupplierItem(item, aliases))
+          .filter((item) => item.title)
+      : [];
+
+    suppliersLoaded = true;
+    setStatus(`Loaded ${allSuppliers.length} supplier records from SharePoint.`);
+    renderPage();
+  } catch (error) {
+    console.error(error);
+    suppliersLoaded = false;
+    allSuppliers = [];
+    renderPage();
+    setStatus(error?.message || "Could not load suppliers from SharePoint.", true);
+  } finally {
+    loadingSuppliers = false;
+    setBusyState();
+  }
+}
+
+function buildWebsitePayload(url, title) {
+  const normalizedUrl = normalizeValue(url);
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  return {
+    __metadata: { type: "SP.FieldUrlValue" },
+    Url: normalizedUrl,
+    Description: normalizeValue(title) || normalizedUrl,
+  };
+}
+
+async function createSupplierInSharePoint() {
+  const payload = quickEntryPayload();
+  if (!payload.title) {
+    entryTitleInput.focus();
+    throw new Error("Name is required before saving.");
+  }
+
+  if (!listInfo || !fieldMap) {
+    await loadListInfo();
+  }
+
+  const aliases = resolveFieldAliases();
+  const requestBody = {
+    __metadata: { type: listInfo.ListItemEntityTypeFullName },
+  };
+
+  requestBody[aliases.title] = payload.title;
+  if (aliases.supplierType && payload.supplierType) {
+    requestBody[aliases.supplierType] = payload.supplierType;
+  }
+  if (aliases.notes && payload.notes) {
+    requestBody[aliases.notes] = payload.notes;
+  }
+  if (aliases.website && payload.website) {
+    requestBody[aliases.website] = buildWebsitePayload(payload.website, payload.title);
+  }
+  if (aliases.town && payload.town) {
+    requestBody[aliases.town] = payload.town;
+  }
+  if (aliases.county && payload.county) {
+    requestBody[aliases.county] = payload.county;
+  }
+  if (aliases.contactDetails && payload.contactDetails) {
+    requestBody[aliases.contactDetails] = payload.contactDetails;
+  }
+  if (aliases.rating && payload.rating) {
+    requestBody[aliases.rating] = payload.rating;
+  }
+  if (aliases.ee) {
+    requestBody[aliases.ee] = Boolean(payload.isEe);
+  }
+  if (aliases.tags && payload.tag) {
+    requestBody[aliases.tags] = payload.tag;
+  }
+
+  const config = getConfig();
+  const api = getSpApi(config);
+  const result = await api.createListItem(listInfo.Id, requestBody);
+  return Number(result?.d?.Id || 0);
+}
+
+function resetQuickEntry() {
+  quickEntryForm.reset();
+  renderQuickEntryPreview();
+}
+
+async function handleSaveSupplier() {
+  savingSupplier = true;
+  setBusyState();
+  renderQuickEntryPreview();
+
+  try {
+    setStatus("Saving supplier to SharePoint...");
+    const itemId = await createSupplierInSharePoint();
+    await loadSuppliers();
+    resetQuickEntry();
+    setStatus(itemId ? `Saved to SharePoint as item #${itemId}.` : "Saved to SharePoint.");
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not save supplier to SharePoint.", true);
+  } finally {
+    savingSupplier = false;
+    setBusyState();
+    renderQuickEntryPreview();
+  }
 }
 
 async function init() {
@@ -606,16 +915,17 @@ async function init() {
     }
 
     const profile = await fetchCurrentUser();
-    const role = String(profile?.role || "").trim().toLowerCase();
-    if (!canAccessPage(role, "suppliers")) {
+    currentRole = String(profile?.role || "").trim().toLowerCase();
+    if (!canAccessPage(currentRole, "suppliers")) {
       redirectToUnauthorized("suppliers");
       return;
     }
 
-    renderTopNavigation({ role });
+    renderTopNavigation({ role: currentRole });
     const email = String(profile?.email || "").trim();
-    setStatus(email ? `Signed in as ${email}` : "Signed in");
+    setStatus(email ? `Signed in as ${email}. Loading live suppliers...` : "Signed in. Loading live suppliers...");
     renderPage();
+    await loadSuppliers();
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("suppliers");
@@ -634,6 +944,10 @@ standardModeBtn?.addEventListener("click", () => {
 
 eeModeBtn?.addEventListener("click", () => {
   setMode("ee");
+});
+
+refreshSuppliersBtn?.addEventListener("click", () => {
+  void loadSuppliers();
 });
 
 supplierSearchInput?.addEventListener("input", () => {
@@ -673,6 +987,10 @@ quickEntryForm?.addEventListener("input", () => {
   renderQuickEntryPreview();
 });
 
+saveEntryBtn?.addEventListener("click", () => {
+  void handleSaveSupplier();
+});
+
 copyEntrySummaryBtn?.addEventListener("click", () => {
   void copyText(buildQuickEntryPreviewText(), "Copied quick entry summary.");
 });
@@ -682,8 +1000,7 @@ copyEntryCsvBtn?.addEventListener("click", () => {
 });
 
 resetEntryBtn?.addEventListener("click", () => {
-  quickEntryForm.reset();
-  renderQuickEntryPreview();
+  resetQuickEntry();
 });
 
 signOutBtn?.addEventListener("click", async () => {

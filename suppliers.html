@@ -38,8 +38,7 @@
           <p class="suppliers-kicker">Suppliers Database</p>
           <h1>Suppliers & Experiences</h1>
           <p id="statusMessage" class="muted">
-            Browse the local directory, switch between standard suppliers and EE experiences, and use quick entry to
-            prep new items before opening SharePoint.
+            Loading the live SharePoint directory, with EE and standard modes split for faster browsing.
           </p>
         </div>
         <div class="suppliers-mode-shell" aria-label="Supplier mode">
@@ -55,15 +54,18 @@
         <div class="panel-head">
           <div>
             <h2>Find Records</h2>
-            <p class="muted">Filter the current mode, then jump out to SharePoint when you want to add or edit.</p>
+            <p class="muted">This view loads directly from the Wellbeing SharePoint list.</p>
           </div>
-          <a
-            class="button-link"
-            href="https://planwithcare.sharepoint.com/sites/Wellbeing/Lists/Suppliers%20Database?env=WebViewList"
-            target="_blank"
-            rel="noopener noreferrer"
-            >Open SharePoint list</a
-          >
+          <div class="supplier-actions">
+            <button id="refreshSuppliersBtn" class="secondary" type="button">Refresh</button>
+            <a
+              class="button-link"
+              href="https://planwithcare.sharepoint.com/sites/Wellbeing/Lists/Suppliers%20Database?env=WebViewList"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Open SharePoint list</a
+            >
+          </div>
         </div>
 
         <div class="suppliers-filter-grid">
@@ -139,7 +141,7 @@
         <aside class="panel suppliers-entry-panel">
           <h2>Quick Entry</h2>
           <p id="quickEntryIntro" class="muted">
-            Draft a new standard supplier entry here, then paste it into SharePoint.
+            Create a new standard supplier entry in SharePoint from here.
           </p>
 
           <form id="quickEntryForm" class="suppliers-entry-form">
@@ -196,11 +198,12 @@
           </form>
 
           <div class="suppliers-entry-actions">
+            <button id="saveEntryBtn" type="button">Save to SharePoint</button>
             <button id="copyEntrySummaryBtn" type="button">Copy entry summary</button>
             <button id="copyEntryCsvBtn" class="secondary" type="button">Copy CSV row</button>
             <button id="resetEntryBtn" class="secondary" type="button">Reset</button>
           </div>
-          <p id="quickEntryStatus" class="muted">Current mode decides whether the entry is marked as EE.</p>
+          <p id="quickEntryStatus" class="muted">Current mode decides whether the entry is saved with EE turned on.</p>
 
           <div class="suppliers-preview-card">
             <div class="suppliers-preview-head">

@@ -10,10 +10,12 @@ export const FRONTEND_CONFIG = {
   sharePoint: {
     supportTeamSiteUrl: "https://planwithcare.sharepoint.com/sites/SupportTeam",
     thriveCallsSiteUrl: "https://planwithcare.sharepoint.com/sites/ThriveCalls",
+    wellbeingSiteUrl: "https://planwithcare.sharepoint.com/sites/Wellbeing",
     photosListPath: "/sites/SupportTeam/Lists/Photos and Lists",
     clientsListPath: "/sites/SupportTeam/Lists/Clients  One Touch",
     expensesListPath: "/sites/SupportTeam/Lists/Expenses",
     ppeListPath: "/sites/SupportTeam/Lists/PPE FirstAid Check",
+    suppliersListPath: "/sites/Wellbeing/Lists/Suppliers Database",
     enquiriesListTitle: "Enquiries Log",
   },
   mapOffice: {

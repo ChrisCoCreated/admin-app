@@ -1203,7 +1203,7 @@ dd {
   margin-top: 14px;
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .suppliers-preview-card {
@@ -1313,6 +1313,12 @@ dd {
   border-color: #bee0db;
   background: #edf9f6;
   color: #1f6f60;
+}
+
+.supplier-tag-chip {
+  border-color: #d7d0ef;
+  background: #f2eeff;
+  color: #57419c;
 }
 
 .supplier-copy,
