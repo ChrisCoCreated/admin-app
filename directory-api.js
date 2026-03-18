@@ -223,10 +223,10 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
-    async listClients(query = {}) {
-      const response = await authFetch(buildUrl("/api/clients", query));
+    async listSharePointClients(query = {}) {
+      const response = await authFetch(buildUrl("/api/sharepoint/clients", query));
       if (!response.ok) {
-        await parseError(response, "Clients request failed");
+        await parseError(response, "SharePoint clients request failed");
       }
       return response.json();
     },

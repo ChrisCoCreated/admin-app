@@ -697,43 +697,8 @@ function buildClientLocationLabel(client) {
   );
 }
 
-function normalizeClientAreaLabel(value) {
-  const normalized = normalizeLocation(value);
-  if (!normalized) {
-    return "";
-  }
-
-  const compact = normalized.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  if (compact === "central" || compact.includes("central")) {
-    return "Central";
-  }
-  if (compact === "east kent" || compact === "eastkent" || compact.includes("east kent")) {
-    return "East Kent";
-  }
-  if (compact === "london plus" || compact === "londonplus" || compact.includes("london plus")) {
-    return "London Plus";
-  }
-  if (
-    compact === "wellbeing assurance" ||
-    compact === "wellbeingassurance" ||
-    compact === "well being assurance" ||
-    compact.includes("wellbeing assurance") ||
-    compact.includes("well being assurance")
-  ) {
-    return "Wellbeing Assurance";
-  }
-
-  return "";
-}
-
-function buildClientAreaLabel(client) {
-  return (
-    normalizeClientAreaLabel(client?.area) ||
-    normalizeClientAreaLabel(client?.clientArea) ||
-    normalizeClientAreaLabel(client?.serviceArea) ||
-    normalizeClientAreaLabel(client?.branchArea) ||
-    ""
-  );
+function normalizeAreaKey(value) {
+  return normalizeLocation(value).toLowerCase();
 }
 
 function buildCarerLocationLabel(carer) {
@@ -940,12 +905,10 @@ function getFilteredOverlayPeople() {
       return false;
     }
 
-    const normalizedArea = item.type === "client" ? normalizeClientAreaLabel(item.areaLabel) : normalizeLocation(item.areaLabel);
+    const normalizedArea = item.type === "client" ? normalizeAreaKey(item.areaLabel) : normalizeLocation(item.areaLabel);
     if (item.type === "client") {
-      if (!normalizedArea) {
-        return true;
-      }
-      return !overlayClientAreaSet.size || overlayClientAreaSet.has(normalizedArea);
+      const selectedAreas = new Set(Array.from(overlayClientAreaSet).map((value) => normalizeAreaKey(value)));
+      return !selectedAreas.size || selectedAreas.has(normalizedArea);
     }
 
     if (item.type !== "companion") {
@@ -1037,7 +1000,7 @@ function buildOverlayItems(clientsPayload, carersPayload) {
       name: normalizeLocation(client.name || "Unnamed client"),
       status: normalizeStatus(client.status),
       locationLabel: buildClientLocationLabel(client),
-      areaLabel: buildClientAreaLabel(client),
+      areaLabel: normalizeLocation(client.area || ""),
       geocodeQuery: query,
     });
     index += 1;

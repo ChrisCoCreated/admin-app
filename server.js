@@ -4,8 +4,8 @@ const http = require("http");
 const path = require("path");
 const { URL } = require("url");
 
-const clientsIndexHandler = require("./api/clients/index");
-const clientsByIdHandler = require("./api/clients/[id]");
+const sharePointClientsIndexHandler = require("./api/clients/index");
+const sharePointClientsByIdHandler = require("./api/clients/[id]");
 const clientsReconcilePreviewHandler = require("./api/clients/reconcile/preview");
 const clientsReconcileApplyHandler = require("./api/clients/reconcile/apply");
 const clientsTagsBulkHandler = require("./api/clients/tags/bulk");
@@ -201,8 +201,8 @@ async function handleApi(req, res, reqUrl) {
   };
   const apiRes = createApiResponseAdapter(res);
 
-  if (reqUrl.pathname === "/api/clients") {
-    await clientsIndexHandler(apiReq, apiRes);
+  if (reqUrl.pathname === "/api/sharepoint/clients") {
+    await sharePointClientsIndexHandler(apiReq, apiRes);
     return true;
   }
 
@@ -405,10 +405,10 @@ async function handleApi(req, res, reqUrl) {
     return true;
   }
 
-  const byIdMatch = /^\/api\/clients\/([^/]+)$/.exec(reqUrl.pathname);
+  const byIdMatch = /^\/api\/sharepoint\/clients\/([^/]+)$/.exec(reqUrl.pathname);
   if (byIdMatch) {
     apiReq.query.id = decodeURIComponent(byIdMatch[1]);
-    await clientsByIdHandler(apiReq, apiRes);
+    await sharePointClientsByIdHandler(apiReq, apiRes);
     return true;
   }
 

@@ -15,8 +15,8 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Authenticated Drive-Time Map page (`drive-time-map.html`) for 20-minute drive-time polygons
 - Authenticated Consultant page (`consultant.html`) for anonymisation and DOCX report export
 - Secure backend APIs:
-  - `GET /api/clients` (original SharePoint/local clients list)
-  - `GET /api/clients/:id`
+  - `GET /api/sharepoint/clients` (original SharePoint/local clients list)
+  - `GET /api/sharepoint/clients/:id`
   - `GET /api/onetouch/clients` (OneTouch clients list enriched with SharePoint Xero/consent fields; no carers/visits relationship lookup)
   - `GET /api/clients/reconcile/preview` (admin + care_manager; OneTouch-to-SharePoint reconciliation preview)
   - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)

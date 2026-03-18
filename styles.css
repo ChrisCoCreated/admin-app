@@ -60,8 +60,52 @@ body {
 .topbar-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 12px;
   min-width: 0;
+}
+
+.topbar-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.topbar-shortcut {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #c8d3e6;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #1d2a42;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(17, 20, 26, 0.06);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.topbar-shortcut:hover {
+  transform: translateY(-1px);
+  border-color: rgba(49, 183, 200, 0.45);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 22px rgba(17, 20, 26, 0.1);
+}
+
+.topbar-shortcut.active {
+  border-color: rgba(49, 183, 200, 0.65);
+  background: linear-gradient(135deg, rgba(49, 183, 200, 0.2), rgba(255, 255, 255, 0.96));
 }
 
 .topnav {
@@ -608,6 +652,31 @@ tbody tr.selected {
 .detail-list dd[data-field]:focus-visible {
   border-radius: 6px;
   box-shadow: 0 0 0 2px #7aa7ff;
+}
+
+.detail-json-block {
+  margin-top: 20px;
+  border-top: 1px solid #dbe1ec;
+  padding-top: 16px;
+}
+
+.detail-json-block h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+}
+
+.detail-json-output {
+  margin: 0;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #dbe1ec;
+  background: #0f172a;
+  color: #e5eefc;
+  font: 0.84rem/1.5 "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  max-height: 420px;
 }
 
 .subheading {
@@ -2879,6 +2948,12 @@ body.lightbox-open {
   .topbar-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .topbar-shortcuts {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .topbar-inner {

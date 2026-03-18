@@ -140,13 +140,43 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
   }
 
   const pages = getAccessiblePages(role);
+  const shortcutPages = getHomePageTiles(role);
   const currentPath = normalizePath(currentPathname);
   const actualRole = getStoredActualRole();
   const canPreviewAsLoggedInUser = actualRole === "admin";
+  const actions = nav.parentElement;
+  const existingShortcuts = actions?.querySelector(".topbar-shortcuts");
+  existingShortcuts?.remove();
   nav.innerHTML = "";
 
   if (!pages.length && !canPreviewAsLoggedInUser) {
     return;
+  }
+
+  if (actions && shortcutPages.length) {
+    const shortcuts = document.createElement("div");
+    shortcuts.className = "topbar-shortcuts";
+    shortcuts.setAttribute("aria-label", "Quick links");
+
+    for (const pageKey of shortcutPages) {
+      const page = PAGE_META[pageKey];
+      if (!page) {
+        continue;
+      }
+      const link = document.createElement("a");
+      link.className = "topbar-shortcut";
+      link.href = page.href;
+      link.textContent = page.label;
+      if (normalizePath(page.href) === currentPath) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      }
+      shortcuts.appendChild(link);
+    }
+
+    if (shortcuts.children.length) {
+      actions.insertBefore(shortcuts, nav);
+    }
   }
 
   const menu = document.createElement("details");

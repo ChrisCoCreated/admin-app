@@ -17,6 +17,7 @@ const clientsTableBody = document.getElementById("clientsTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
 const detailRoot = document.getElementById("clientDetail");
+const clientRawJson = document.getElementById("clientRawJson");
 const detailPanel = document.querySelector(".detail-panel");
 const reconcilePanel = document.getElementById("reconcilePanel");
 const reconcileHeader = document.getElementById("reconcileHeader");
@@ -169,7 +170,25 @@ function setupDetailCopy() {
   });
 }
 
+function formatClientJson(client) {
+  try {
+    return JSON.stringify(client ?? null, null, 2);
+  } catch (error) {
+    return JSON.stringify(
+      {
+        error: error?.message || "Could not serialize client object.",
+      },
+      null,
+      2
+    );
+  }
+}
+
 function setDetail(client) {
+  if (clientRawJson) {
+    clientRawJson.textContent = formatClientJson(client);
+  }
+
   if (!client) {
     detailFields.id.textContent = "-";
     detailFields.name.textContent = "Select a client";
