@@ -38,10 +38,10 @@ const importSearchesBtn = document.getElementById("importSearchesBtn");
 const importSearchesFileInput = document.getElementById("importSearchesFileInput");
 const loadPeopleOverlayBtn = document.getElementById("loadPeopleOverlayBtn");
 const showPeopleOverlayInput = document.getElementById("showPeopleOverlayInput");
-const overlayTypeSelect = document.getElementById("overlayTypeSelect");
+const overlayTypeFilters = document.getElementById("overlayTypeFilters");
 const overlayClientAreaFilters = document.getElementById("overlayClientAreaFilters");
 const overlayCompanionAreaFilters = document.getElementById("overlayCompanionAreaFilters");
-const overlayCompanionCareCompSelect = document.getElementById("overlayCompanionCareCompSelect");
+const overlayAssociateCareCompFilters = document.getElementById("overlayAssociateCareCompFilters");
 const overlayStatusFilters = document.getElementById("overlayStatusFilters");
 const peopleOverlayStatus = document.getElementById("peopleOverlayStatus");
 const savedSearchesList = document.getElementById("savedSearchesList");
@@ -101,6 +101,8 @@ const peopleOverlayLayers = new Map();
 let overlayStatusSet = new Set();
 let overlayClientAreaSet = new Set();
 let overlayCompanionAreaSet = new Set();
+let overlayTypeValue = "all";
+let overlayAssociateCareCompValue = "all";
 let overlayLoaded = false;
 let geocodeCache = {};
 let useCustomDepartureTime = false;
@@ -706,7 +708,17 @@ function buildCarerLocationLabel(carer) {
 }
 
 function getOverlayTypeLabel(type) {
-  return type === "companion" ? "Companion" : "Client";
+  return type === "companion" ? "Associate" : "Client";
+}
+
+function getOverlayTypeFilterLabel(type) {
+  if (type === "client") {
+    return "clients";
+  }
+  if (type === "companion") {
+    return "associates";
+  }
+  return "all";
 }
 
 function clearPeopleOverlayLayers() {
@@ -852,15 +864,54 @@ function renderAreaFilterButtons(root, options, selectedSet, onChange, emptyLabe
   }
 }
 
-function renderCompanionOverlayOptions() {
-  if (!overlayCompanionCareCompSelect) {
+function renderSingleSelectButtons(root, options, selectedValue, onChange, emptyLabel) {
+  if (!root) {
     return;
   }
 
-  const currentCareComp = String(overlayCompanionCareCompSelect.value || "all");
+  root.innerHTML = "";
+  if (!options.length) {
+    const empty = document.createElement("span");
+    empty.className = "muted";
+    empty.textContent = emptyLabel;
+    root.appendChild(empty);
+    return;
+  }
+
+  for (const option of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `area-filter-btn${selectedValue === option.value ? " active" : ""}`;
+    btn.textContent = option.label;
+    btn.addEventListener("click", () => {
+      onChange(option.value);
+    });
+    root.appendChild(btn);
+  }
+}
+
+function renderCompanionOverlayOptions() {
+  if (!overlayAssociateCareCompFilters) {
+    return;
+  }
+
   const clientAreaOptions = deriveClientAreaOptions(peopleOverlayData);
   const companionAreaOptions = deriveCompanionAreaOptions(peopleOverlayData);
   const careCompOptions = deriveCompanionCareCompOptions(peopleOverlayData);
+  const typeOptions = [
+    { value: "all", label: "All" },
+    { value: "client", label: "Clients" },
+    { value: "companion", label: "Associates" },
+  ];
+  const careCompButtonOptions = [{ value: "all", label: "All tags" }].concat(
+    careCompOptions.map((tag) => ({ value: tag, label: tag }))
+  );
+
+  renderSingleSelectButtons(overlayTypeFilters, typeOptions, overlayTypeValue, (value) => {
+    overlayTypeValue = value;
+    renderCompanionOverlayOptions();
+    applyPeopleOverlayFilters();
+  }, "No types");
 
   renderAreaFilterButtons(
     overlayClientAreaFilters,
@@ -881,23 +932,28 @@ function renderCompanionOverlayOptions() {
       renderCompanionOverlayOptions();
       applyPeopleOverlayFilters();
     },
-    "No companion areas"
+    "No associate areas"
   );
 
-  overlayCompanionCareCompSelect.innerHTML = '<option value="all">All tags</option>';
-  for (const tag of careCompOptions) {
-    const option = document.createElement("option");
-    option.value = tag;
-    option.textContent = tag;
-    overlayCompanionCareCompSelect.appendChild(option);
+  if (!careCompOptions.includes(overlayAssociateCareCompValue)) {
+    overlayAssociateCareCompValue = "all";
   }
-
-  overlayCompanionCareCompSelect.value = careCompOptions.includes(currentCareComp) ? currentCareComp : "all";
+  renderSingleSelectButtons(
+    overlayAssociateCareCompFilters,
+    careCompButtonOptions,
+    overlayAssociateCareCompValue,
+    (value) => {
+      overlayAssociateCareCompValue = value;
+      renderCompanionOverlayOptions();
+      applyPeopleOverlayFilters();
+    },
+    "No tags"
+  );
 }
 
 function getFilteredOverlayPeople() {
-  const typeFilter = String(overlayTypeSelect?.value || "all");
-  const companionCareCompFilter = String(overlayCompanionCareCompSelect?.value || "all");
+  const typeFilter = String(overlayTypeValue || "all");
+  const companionCareCompFilter = String(overlayAssociateCareCompValue || "all");
   return peopleOverlayData.filter((item) => {
     const matchesType = typeFilter === "all" || item.type === typeFilter;
     const matchesStatus = overlayStatusSet.has(normalizeStatus(item.status));
@@ -908,6 +964,9 @@ function getFilteredOverlayPeople() {
     const normalizedArea = item.type === "client" ? normalizeAreaKey(item.areaLabel) : normalizeLocation(item.areaLabel);
     if (item.type === "client") {
       const selectedAreas = new Set(Array.from(overlayClientAreaSet).map((value) => normalizeAreaKey(value)));
+      if (selectedAreas.size >= CLIENT_AREA_OPTIONS.length) {
+        return true;
+      }
       return !selectedAreas.size || selectedAreas.has(normalizedArea);
     }
 
@@ -975,7 +1034,7 @@ function applyPeopleOverlayFilters() {
   }
 
   const total = peopleOverlayData.length;
-  const typeLabel = String(overlayTypeSelect?.value || "all");
+  const typeLabel = getOverlayTypeFilterLabel(String(overlayTypeValue || "all"));
   setPeopleOverlayStatus(
     overlayLoaded
       ? `Showing ${shouldShow ? filtered.length : 0} of ${total} people (${typeLabel}, ${showPeopleOverlayInput?.checked ? "visible" : "hidden"}).`
@@ -1097,7 +1156,7 @@ async function loadPeopleOverlay() {
       loadPeopleOverlayBtn.disabled = true;
     }
     clearPeopleOverlayLayers();
-    setPeopleOverlayStatus("Loading clients and companions...");
+    setPeopleOverlayStatus("Loading clients and associates...");
 
     const [clientsPayload, carersPayload] = await Promise.all([
       directoryApi.listOneTouchClients({ limit: 500 }),
@@ -2569,14 +2628,6 @@ loadPeopleOverlayBtn?.addEventListener("click", () => {
 });
 
 showPeopleOverlayInput?.addEventListener("change", () => {
-  applyPeopleOverlayFilters();
-});
-
-overlayTypeSelect?.addEventListener("change", () => {
-  applyPeopleOverlayFilters();
-});
-
-overlayCompanionCareCompSelect?.addEventListener("change", () => {
   applyPeopleOverlayFilters();
 });
 
