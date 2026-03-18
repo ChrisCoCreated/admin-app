@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Suppliers & Experiences</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260318" />
+  </head>
+  <body class="auth-pending suppliers-page">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container suppliers-main">
+      <section class="hero compact suppliers-hero">
+        <div class="suppliers-hero-copy">
+          <p class="suppliers-kicker">Suppliers Database</p>
+          <h1>Suppliers & Experiences</h1>
+          <p id="statusMessage" class="muted">
+            Browse the local directory, switch between standard suppliers and EE experiences, and use quick entry to
+            prep new items before opening SharePoint.
+          </p>
+        </div>
+        <div class="suppliers-mode-shell" aria-label="Supplier mode">
+          <span class="suppliers-mode-label">Mode</span>
+          <div class="suppliers-mode-toggle">
+            <button id="standardModeBtn" class="secondary active" type="button">Standard suppliers</button>
+            <button id="eeModeBtn" class="secondary" type="button">EE experiences</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Find Records</h2>
+            <p class="muted">Filter the current mode, then jump out to SharePoint when you want to add or edit.</p>
+          </div>
+          <a
+            class="button-link"
+            href="https://planwithcare.sharepoint.com/sites/Wellbeing/Lists/Suppliers%20Database?env=WebViewList"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Open SharePoint list</a
+          >
+        </div>
+
+        <div class="suppliers-filter-grid">
+          <label class="field" for="supplierSearchInput">
+            Search
+            <input
+              id="supplierSearchInput"
+              type="search"
+              placeholder="Search by title, type, town, county, notes or contact"
+              autocomplete="off"
+            />
+          </label>
+          <label class="field" for="supplierTypeSelect">
+            Category
+            <select id="supplierTypeSelect">
+              <option value="">All categories</option>
+            </select>
+          </label>
+          <label class="field" for="supplierCountySelect">
+            County
+            <select id="supplierCountySelect">
+              <option value="">All counties</option>
+            </select>
+          </label>
+          <label class="field" for="supplierTownSelect">
+            Town
+            <select id="supplierTownSelect">
+              <option value="">All towns</option>
+            </select>
+          </label>
+          <label class="field" for="supplierRatingSelect">
+            Rating
+            <select id="supplierRatingSelect">
+              <option value="">Any rating</option>
+              <option value="👍">Recommended</option>
+              <option value="👉">Worth exploring</option>
+              <option value="👎">Avoid</option>
+              <option value="unrated">Unrated</option>
+            </select>
+          </label>
+          <label class="field suppliers-checkbox-field" for="supplierWebsiteOnly">
+            Quick filter
+            <span class="suppliers-checkbox-wrap">
+              <input id="supplierWebsiteOnly" type="checkbox" />
+              <span>Only show entries with a website</span>
+            </span>
+          </label>
+        </div>
+
+        <div id="supplierQuickFilters" class="status-filter-row" aria-label="Popular categories"></div>
+        <div id="supplierStatsGrid" class="suppliers-stats-grid" aria-label="Mode summary"></div>
+      </section>
+
+      <section class="suppliers-layout">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 id="resultsHeading">Supplier Directory</h2>
+              <p id="resultsSummary" class="muted">Loading records...</p>
+            </div>
+            <button id="clearFiltersBtn" class="secondary" type="button">Clear filters</button>
+          </div>
+          <div id="suppliersResultsGrid" class="suppliers-results-grid"></div>
+          <p id="emptyState" class="muted" hidden>No results match the current filters.</p>
+        </article>
+
+        <aside class="panel suppliers-entry-panel">
+          <h2>Quick Entry</h2>
+          <p id="quickEntryIntro" class="muted">
+            Draft a new standard supplier entry here, then paste it into SharePoint.
+          </p>
+
+          <form id="quickEntryForm" class="suppliers-entry-form">
+            <label class="field" for="entryTitleInput">
+              Name
+              <input id="entryTitleInput" type="text" placeholder="Supplier or experience name" />
+            </label>
+            <label class="field" for="entryTypeInput">
+              Category
+              <input id="entryTypeInput" type="text" list="supplierTypeSuggestions" placeholder="Plumber, Dementia Resource..." />
+            </label>
+            <datalist id="supplierTypeSuggestions"></datalist>
+            <div class="suppliers-entry-split">
+              <label class="field" for="entryTownInput">
+                Town
+                <input id="entryTownInput" type="text" placeholder="Town" />
+              </label>
+              <label class="field" for="entryCountyInput">
+                County
+                <input id="entryCountyInput" type="text" placeholder="County" />
+              </label>
+            </div>
+            <label class="field" for="entryWebsiteInput">
+              Website
+              <input id="entryWebsiteInput" type="text" placeholder="https://example.com" />
+            </label>
+            <label class="field" for="entryRatingInput">
+              Rating
+              <select id="entryRatingInput">
+                <option value="">No rating yet</option>
+                <option value="👍">Recommended</option>
+                <option value="👉">Worth exploring</option>
+                <option value="👎">Avoid</option>
+              </select>
+            </label>
+            <label class="field" for="entryContactInput">
+              Contact details
+              <textarea id="entryContactInput" placeholder="Phone, email, named contact"></textarea>
+            </label>
+            <label class="field" for="entryNotesInput">
+              Notes
+              <textarea id="entryNotesInput" placeholder="Useful detail, timings, recommendation notes"></textarea>
+            </label>
+          </form>
+
+          <div class="suppliers-entry-actions">
+            <button id="copyEntrySummaryBtn" type="button">Copy entry summary</button>
+            <button id="copyEntryCsvBtn" class="secondary" type="button">Copy CSV row</button>
+            <button id="resetEntryBtn" class="secondary" type="button">Reset</button>
+          </div>
+          <p id="quickEntryStatus" class="muted">Current mode decides whether the entry is marked as EE.</p>
+
+          <div class="suppliers-preview-card">
+            <div class="suppliers-preview-head">
+              <strong>Preview</strong>
+              <span id="quickEntryModeBadge" class="supplier-chip ee-flag">EE</span>
+            </div>
+            <pre id="quickEntryPreview" class="suppliers-preview-output">Name: -
+Category: -
+Town: -
+County: -
+Website: -
+Rating: -
+Contact Details:
+-
+Notes:
+-</pre>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="./suppliers.js"></script>
+  </body>
+</html>

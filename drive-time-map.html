@@ -44,19 +44,6 @@
         <p>Saved catchments and people coverage across our service areas.</p>
       </section>
 
-      <section class="panel">
-        <div class="drive-time-controls office-catchment-controls office-catchment-client-controls">
-          <label class="field" for="mapSearchInput">
-            Find a location
-            <input id="mapSearchInput" type="text" placeholder="Enter an address or place" autocomplete="street-address" />
-          </label>
-          <div class="drive-time-action-group">
-            <button id="mapSearchBtn" class="secondary drive-time-small-btn" type="button">Drop pin</button>
-            <button id="clearMapSearchBtn" class="secondary drive-time-small-btn" type="button" disabled>Clear pin</button>
-          </div>
-        </div>
-      </section>
-
       <section id="geographyBuilderPanel" class="panel">
         <div class="drive-time-controls office-catchment-controls">
           <label class="field" for="locationInput">
@@ -152,7 +139,7 @@
 
       <section class="panel">
         <h2>People Overlay</h2>
-        <div class="row">
+        <div class="row drive-time-overlay-toolbar">
           <button id="loadPeopleOverlayBtn" class="secondary" type="button">Load clients & associates</button>
           <label class="checkbox-row" for="showPeopleOverlayInput">
             <input id="showPeopleOverlayInput" type="checkbox" checked />
@@ -160,25 +147,43 @@
           </label>
         </div>
         <div class="drive-time-overlay-grid">
-          <div class="field">
-            Type
+          <div class="field drive-time-overlay-group">
+            <div class="drive-time-overlay-label">Type</div>
             <div id="overlayTypeFilters" class="area-filter-row"></div>
           </div>
-          <div class="field">
-            Associate care/companionship
+          <div class="field drive-time-overlay-group">
+            <div class="drive-time-overlay-label">Associate care/companionship</div>
             <div id="overlayAssociateCareCompFilters" class="area-filter-row"></div>
           </div>
+          <div class="drive-time-overlay-group">
+            <div class="drive-time-overlay-label">Client areas</div>
+            <div id="overlayClientAreaFilters" class="area-filter-row"></div>
+          </div>
+          <div class="drive-time-overlay-group">
+            <div class="drive-time-overlay-label">Associate areas</div>
+            <div id="overlayCompanionAreaFilters" class="area-filter-row"></div>
+          </div>
         </div>
-        <div>
-          <div class="muted">Client areas</div>
-          <div id="overlayClientAreaFilters" class="area-filter-row"></div>
+        <div class="drive-time-overlay-footer">
+          <div class="drive-time-overlay-group">
+            <div class="drive-time-overlay-label">Status</div>
+            <div id="overlayStatusFilters" class="status-filter-row"></div>
+          </div>
+          <p id="peopleOverlayStatus" class="muted drive-time-overlay-status">Overlay not loaded.</p>
         </div>
-        <div>
-          <div class="muted">Associate areas</div>
-          <div id="overlayCompanionAreaFilters" class="area-filter-row"></div>
+      </section>
+
+      <section class="panel">
+        <div class="drive-time-controls office-catchment-controls office-catchment-client-controls">
+          <label class="field" for="mapSearchInput">
+            Find a location
+            <input id="mapSearchInput" type="text" placeholder="Enter an address or place" autocomplete="street-address" />
+          </label>
+          <div class="drive-time-action-group">
+            <button id="mapSearchBtn" class="secondary drive-time-small-btn" type="button">Drop pin</button>
+            <button id="clearMapSearchBtn" class="secondary drive-time-small-btn" type="button" disabled>Clear pin</button>
+          </div>
         </div>
-        <div id="overlayStatusFilters" class="status-filter-row"></div>
-        <p id="peopleOverlayStatus" class="muted">Overlay not loaded.</p>
       </section>
 
       <section class="panel">

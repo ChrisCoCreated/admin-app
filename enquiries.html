@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Enquiries | Thrive Admin</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260318" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <a class="topbar-shortcut" href="./index.html">Home</a>
+          <button id="signOutBtn" class="secondary" type="button" hidden>Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <h1>Enquiries</h1>
+        <p class="muted">Use Quick Entry for first-call details, then switch to Update Mode to move status and record key dates.</p>
+        <p class="muted alt-link">
+          Open SharePoint list:
+          <a href="https://planwithcare.sharepoint.com/sites/ThriveCalls/Lists/Enquiries%20Log/Mine.aspx" target="_blank" rel="noopener noreferrer">Enquiries Log (Mine)</a>
+        </p>
+      </section>
+
+      <section class="panel auth-card">
+        <div>
+          <h2>Sign in</h2>
+          <p class="muted">Use your work account to access the SharePoint enquiries log.</p>
+        </div>
+        <div class="auth-actions">
+          <button id="signInBtn" type="button">Sign in</button>
+          <span id="authState" class="muted">Please sign in</span>
+        </div>
+      </section>
+
+      <section id="dataQualityCard" class="panel" hidden>
+        <div class="card-header-row">
+          <h2>
+            <button id="dataQualityToggleBtn" class="section-toggle-btn" type="button" aria-expanded="true" aria-controls="dataQualityContent">
+              Missing Required Info
+            </button>
+          </h2>
+          <span id="dataQualityCount" class="muted"></span>
+        </div>
+        <div id="dataQualityContent">
+          <p class="muted">Complete missing fields for lost enquiries and older enquiries with incomplete referral details.</p>
+          <div id="dataQualityList" class="data-quality-list"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="card-header-row">
+          <h2>
+            <button id="quickEntryToggleBtn" class="section-toggle-btn" type="button" aria-expanded="true" aria-controls="quickEntryContent">
+              Quick Entry Mode
+            </button>
+          </h2>
+          <span class="muted">New initial enquiry</span>
+        </div>
+        <div id="quickEntryContent">
+          <div class="grid-two">
+            <label class="field">Name of Person making enquiry
+              <input id="qCallerName" type="text" placeholder="e.g. Alice Smith" />
+            </label>
+            <label class="field">Relationship to proposed Client
+              <select id="qRelationship">
+                <option value="">Select relationship</option>
+                <option>Self</option>
+                <option>Spouse</option>
+                <option>Sibling</option>
+                <option>Child</option>
+                <option>Grandchild</option>
+                <option>Friend</option>
+                <option>Unknown</option>
+                <option>Proffesional</option>
+                <option>Other</option>
+              </select>
+            </label>
+            <label class="field">Client full name
+              <div class="input-with-action">
+                <input id="qClientName" class="short-input" type="text" placeholder="e.g. Bob Smith" />
+                <button id="qClientTbcBtn" class="mini-btn" type="button">TBC</button>
+              </div>
+            </label>
+            <label class="field">Phone number
+              <input id="qPhone" type="text" placeholder="e.g. 07971 5640123" />
+            </label>
+            <label class="field">Email
+              <input id="qEmail" type="email" placeholder="name@example.com" />
+            </label>
+            <label class="field">Referral source
+              <select id="qSource">
+                <option value="">Select source</option>
+                <option>Family/Friend</option>
+                <option>Professional</option>
+                <option>Legal Representative</option>
+                <option>Autumna</option>
+                <option>Lottie</option>
+                <option>Team Member</option>
+                <option>carehome.co.uk</option>
+                <option>Google</option>
+                <option>Event</option>
+                <option>BNI</option>
+                <option>Saw Article</option>
+                <option>Community Partner</option>
+              </select>
+            </label>
+            <label class="field">Location
+              <select id="qLocationSelect">
+                <option value="">Select location</option>
+                <option>Ashford</option>
+                <option>Canterbury</option>
+                <option>Deal</option>
+                <option>Folkestone</option>
+                <option>Maidstone</option>
+                <option>London</option>
+                <option>West Kent</option>
+                <option value="__other__">Other (type below)</option>
+              </select>
+            </label>
+            <label id="qLocationCustomWrap" class="field" hidden>Location (other)
+              <input id="qLocationCustom" type="text" placeholder="Enter location" />
+            </label>
+            <label id="qReferralFromWrap" class="field" hidden>Referral from
+              <input id="qReferralFrom" type="text" placeholder="Who referred this enquiry?" />
+            </label>
+            <label id="qBusDevNotesWrap" class="field" hidden>Business development notes
+              <textarea id="qBusDevNotes" placeholder="Where referral came from, what is working/not working in marketing, and reason for loss or win."></textarea>
+            </label>
+            <label class="field">Status
+              <select id="qStatus">
+                <option>7. Initial Enquiry</option>
+                <option>6. Awaiting Call Back</option>
+                <option>5. Arranging Assessment</option>
+                <option>Hasn't Enquired Yet</option>
+              </select>
+            </label>
+            <label class="field">Callback arranged for
+              <input id="qCallbackDate" type="date" />
+            </label>
+            <label class="field">Assessment booked for
+              <input id="qAssessmentDate" type="date" />
+            </label>
+          </div>
+          <label class="field">Initial notes
+            <textarea id="qNotes" placeholder="Capture the initial enquiry details and context."></textarea>
+          </label>
+          <button id="createEnquiryBtn" type="button" disabled>Create enquiry</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="card-header-row">
+          <h2>Update Mode</h2>
+          <span class="muted">Find and update existing enquiries</span>
+        </div>
+
+        <div class="search-filter-row">
+          <label class="field search-field">Search
+            <input id="searchInput" type="text" placeholder="Search by name, status, caller" disabled />
+          </label>
+          <button id="toggleFiltersBtn" type="button" class="mini-btn" disabled>Show filters</button>
+        </div>
+
+        <div id="filterPanel" class="grid-two" hidden>
+          <label class="field">Whose enquiries
+            <select id="ownerFilter" disabled>
+              <option value="mine" selected>My enquiries</option>
+              <option value="all">All enquiries</option>
+            </select>
+          </label>
+          <label class="field">What to show
+            <select id="scopeFilter" disabled>
+              <option value="active" selected>Active enquiries</option>
+              <option value="all">All enquiries</option>
+            </select>
+          </label>
+          <label class="field">Order by
+            <select id="sortFilter" disabled>
+              <option value="status" selected>Status</option>
+              <option value="updated">Last updated</option>
+              <option value="created">Last created</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="filterSummaryLine" class="filter-divider" aria-hidden="true"></div>
+
+        <div id="listWrap" class="list-wrap" aria-live="polite">
+          <p class="muted">Sign in to load enquiries.</p>
+        </div>
+
+        <div id="updatePanel" class="update-panel" hidden>
+          <h3 id="selectedTitle">Selected enquiry</h3>
+          <p id="selectedMeta" class="muted"></p>
+          <p>
+            <a id="selectedEnquiryLink" class="selected-enquiry-link" href="#" target="_blank" rel="noopener noreferrer" hidden>
+              Open selected enquiry in SharePoint
+            </a>
+          </p>
+
+          <div class="grid-two">
+            <label class="field">Status
+              <select id="uStatus">
+                <option>7. Initial Enquiry</option>
+                <option>6. Awaiting Call Back</option>
+                <option>5. Arranging Assessment</option>
+                <option>Hasn't Enquired Yet</option>
+                <option>Lost - Pre Assessment</option>
+                <option>Won</option>
+              </select>
+            </label>
+            <label class="field">Callback arranged for
+              <input id="uCallbackDate" type="date" />
+            </label>
+            <label class="field">Assessment booked for
+              <input id="uAssessmentDate" type="date" />
+            </label>
+          </div>
+
+          <label class="field">Updates (latest at top)
+            <textarea id="uUpdates" placeholder="Add latest update at the top."></textarea>
+          </label>
+
+          <button id="showBusinessInfoBtn" class="inline-toggle-btn" type="button" aria-pressed="false" disabled>
+            Show business development info
+          </button>
+
+          <div id="businessFields" class="business-fields" hidden>
+            <h4>Business Development Info</h4>
+            <div class="grid-two">
+              <label class="field">Current status
+                <select id="uCurrentStatus">
+                  <option value="">Use main status</option>
+                  <option>7. Initial Enquiry</option>
+                  <option>6. Awaiting Call Back</option>
+                  <option>5. Arranging Assessment</option>
+                  <option>Hasn't Enquired Yet</option>
+                  <option>Lost - Pre Assessment</option>
+                  <option>Won</option>
+                </select>
+              </label>
+              <label class="field">Follow up
+                <input id="uFollowUp" type="text" placeholder="Next action" />
+              </label>
+              <label class="field">Likelihood (%)
+                <input id="uLikelihood" type="number" min="0" max="100" step="1" placeholder="e.g. 70" />
+              </label>
+              <label class="field">Hourly rate
+                <input id="uRateHourly" type="number" min="0" step="0.01" placeholder="e.g. 35" />
+              </label>
+              <label class="field">Source of enquiry
+                <select id="uSource">
+                  <option value="">Select source</option>
+                  <option>Family/Friend</option>
+                  <option>Professional</option>
+                  <option>Legal Representative</option>
+                  <option>Autumna</option>
+                  <option>Lottie</option>
+                  <option>Team Member</option>
+                  <option>carehome.co.uk</option>
+                  <option>Google</option>
+                  <option>Event</option>
+                  <option>BNI</option>
+                  <option>Saw Article</option>
+                  <option>Community Partner</option>
+                </select>
+              </label>
+              <label class="field">Referral From
+                <input id="uReferralFrom" type="text" placeholder="Who referred this enquiry?" />
+              </label>
+              <label class="field grid-span-2">Location
+                <select id="uLocationSelect">
+                  <option value="">Select location</option>
+                  <option>Ashford</option>
+                  <option>Canterbury</option>
+                  <option>Deal</option>
+                  <option>Folkestone</option>
+                  <option>Maidstone</option>
+                  <option>London</option>
+                  <option>West Kent</option>
+                  <option value="__other__">Other (type below)</option>
+                </select>
+              </label>
+              <label id="uLocationCustomWrap" class="field grid-span-2" hidden>Location (other)
+                <input id="uLocationCustom" type="text" placeholder="Enter location" />
+              </label>
+            </div>
+            <label class="field">Business development notes
+              <textarea id="uBusDevNotes" placeholder="Where referral came from, what is working/not working in marketing, and reason for loss or win."></textarea>
+            </label>
+          </div>
+
+          <div class="status-chips" role="group" aria-label="Quick status set">
+            <button type="button" class="chip-btn" data-status="6. Awaiting Call Back">Awaiting callback</button>
+            <button type="button" class="chip-btn" data-status="5. Arranging Assessment">Arranging assessment</button>
+            <button type="button" class="chip-btn" data-status="Lost - Pre Assessment">Mark lost</button>
+          </div>
+
+          <div id="lostFields" class="lost-fields" hidden>
+            <h4>Lost Details</h4>
+            <div class="grid-two">
+              <label class="field">Reason for loss
+                <select id="uReasonForLoss">
+                  <option value="">Select reason</option>
+                  <option>Cost – Too Expensive</option>
+                  <option>Timing – Not Ready Yet</option>
+                  <option>Timing – Urgent Need, We Had No Availability</option>
+                  <option>Location – Outside Service Area</option>
+                  <option>Needs – Required Support Beyond Our Offer</option>
+                  <option>Changed Circumstances – Care No Longer Needed</option>
+                  <option>Changed Circumstances – Client Passed Away</option>
+                  <option>Communication – Couldn’t Reach Client / No Response</option>
+                  <option>Internal – Duplicate Enquiry or Admin Error</option>
+                  <option>Competition - Went with another provider</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <button id="saveUpdateBtn" type="button" disabled>Save update</button>
+        </div>
+      </section>
+
+      <p id="statusMessage" class="status-message" aria-live="polite"></p>
+      <p id="statusDetail" class="status-detail" aria-live="polite"></p>
+    </main>
+
+    <script type="module" src="./enquiries.js"></script>
+  </body>
+</html>

@@ -48,6 +48,23 @@ export function createAuthController(options) {
   let account = null;
   let signOutWrap = null;
 
+  function getErrorCode(error) {
+    return String(error?.errorCode || error?.code || "").toLowerCase();
+  }
+
+  function shouldFallbackToRedirectOnInteractiveError(error) {
+    const code = getErrorCode(error);
+    return (
+      shouldPreferRedirectAuth() ||
+      code.includes("popup") ||
+      code.includes("monitor_window_timeout") ||
+      code.includes("block") ||
+      code.includes("interaction_required") ||
+      code.includes("login_required") ||
+      code.includes("consent_required")
+    );
+  }
+
   function shouldPreferRedirectAuth() {
     const ua = navigator.userAgent || "";
     const isAndroid = /Android/i.test(ua);
@@ -143,13 +160,7 @@ export function createAuthController(options) {
         account = loginResult.account;
         msalInstance.setActiveAccount(account);
       } catch (error) {
-        const code = String(error?.errorCode || error?.code || "");
-        const shouldFallbackToRedirect =
-          code.includes("popup") ||
-          code.includes("monitor_window_timeout") ||
-          code.includes("block");
-
-        if (!shouldFallbackToRedirect) {
+        if (!shouldFallbackToRedirectOnInteractiveError(error)) {
           throw error;
         }
 
@@ -192,10 +203,23 @@ export function createAuthController(options) {
     try {
       const tokenResponse = await msalInstance.acquireTokenSilent(request);
       return tokenResponse.accessToken;
-    } catch {
-      const tokenResponse = await msalInstance.acquireTokenPopup(request);
-      return tokenResponse.accessToken;
+    } catch (silentError) {
+      try {
+        const tokenResponse = await msalInstance.acquireTokenPopup(request);
+        return tokenResponse.accessToken;
+      } catch (interactiveError) {
+        if (!shouldFallbackToRedirectOnInteractiveError(interactiveError)) {
+          throw interactiveError;
+        }
+
+        await msalInstance.acquireTokenRedirect(request);
+        throw silentError;
+      }
     }
+  }
+
+  async function acquireSharePointToken(siteHost) {
+    return acquireToken([`${siteHost}/AllSites.Write`]);
   }
 
   async function signOut() {
@@ -231,6 +255,7 @@ export function createAuthController(options) {
     signIn,
     restoreSession,
     acquireToken,
+    acquireSharePointToken,
     signOut,
     getAccount: () => account,
     setAuthUi,
