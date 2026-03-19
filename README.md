@@ -28,6 +28,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `POST /api/maps/geocode-batch`
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)
   - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
+  - `POST /api/tasks/assign` (API auth + Graph app token; create To Do tasks for arbitrary users or from SharePoint Task Sets)
   - `POST /api/consultant/report-docx` (admin + consultant; DOCX export from template)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
@@ -69,9 +70,12 @@ Set values in `frontend-config.js`:
 - `AZURE_TENANT_ID`
 - `AZURE_API_AUDIENCE` or `AZURE_API_CLIENT_ID`
 - `AZURE_REQUIRED_SCOPE` (default `client.read`)
+- `AZURE_API_CLIENT_SECRET` for app-only Graph calls
 - At least one app access env var such as `ACCESS_FULL_EMAILS` or `ACCESS_DIRECTOR_EMAILS`
 - `SHAREPOINT_SITE_URL`
 - `SHAREPOINT_TASK_OVERLAY_LIST_NAME` (optional; default `TaskOverlay`)
+- `SHAREPOINT_TASK_SETS_SITE_URL` (optional; defaults to `SHAREPOINT_SITE_URL`)
+- `SHAREPOINT_TASK_SETS_LIST_NAME` (optional; default `Actions for Task Sets`)
 - `GRAPH_TOKEN_AUDIENCE` (optional override; defaults include Graph audiences)
 - `ONETOUCH_USERNAME`
 - `ONETOUCH_PASSWORD`
@@ -85,6 +89,8 @@ Optional fallback toggles:
 - `USE_LOCAL_CLIENTS_FALLBACK=1`
 - `ALLOW_LOCAL_CLIENTS_ON_GRAPH_ERROR=1`
 - `CLIENTS_DATA_FILE=./data/clients.json`
+
+For `/api/tasks/assign`, the Entra app also needs Graph application permissions that can create To Do tasks for users and read the SharePoint Task Set list. In practice this means `Tasks.ReadWrite.All` plus site read access such as `Sites.Read.All`.
 
 Google Maps Platform vars (for Time Mapping):
 

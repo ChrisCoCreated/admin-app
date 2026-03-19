@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Tasks Test</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260311" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container tasks-main">
+      <section class="hero compact">
+        <h1>Task Creation Test</h1>
+        <p>Admin-only page for exercising the new arbitrary-user task creation endpoint against the SharePoint Task Set test row.</p>
+      </section>
+
+      <section class="panel">
+        <p id="statusMessage" class="muted">Loading test page...</p>
+        <p id="userMessage" class="muted"></p>
+      </section>
+
+      <section class="clients-grid">
+        <article class="panel detail-panel">
+          <h2>Test Source</h2>
+          <dl class="detail-list">
+            <div>
+              <dt>Task Set</dt>
+              <dd>Test</dd>
+            </div>
+            <div>
+              <dt>Task</dt>
+              <dd>Test Task</dd>
+            </div>
+            <div>
+              <dt>Description</dt>
+              <dd>xyz egrg e</dd>
+            </div>
+            <div>
+              <dt>Responsible Person</dt>
+              <dd>chris@planwithcare.co.uk</dd>
+            </div>
+            <div>
+              <dt>Due Date Delay</dt>
+              <dd>-1 (no due date)</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="panel detail-panel">
+          <h2>Request Builder</h2>
+          <form id="taskAssignForm" class="overlay-form">
+            <label class="field" for="targetUserInput">
+              Target user override
+              <input id="targetUserInput" type="email" placeholder="Defaults to chris@planwithcare.co.uk" autocomplete="off" />
+            </label>
+            <label class="field" for="anchorDateInput">
+              Anchor date
+              <input id="anchorDateInput" type="date" />
+            </label>
+            <label class="field" for="areaInput">
+              Area filter
+              <input id="areaInput" type="text" value="Colleague" autocomplete="off" />
+            </label>
+            <label class="field" for="taskSetInput">
+              Task set
+              <input id="taskSetInput" type="text" value="Test" autocomplete="off" />
+            </label>
+            <div class="row wrap-row">
+              <button id="dryRunBtn" class="secondary" type="button">Dry run</button>
+              <button id="createBtn" type="submit">Create task</button>
+            </div>
+          </form>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2>Payload</h2>
+        <pre id="payloadOutput" class="task-test-output"></pre>
+      </section>
+
+      <section class="panel">
+        <h2>Response</h2>
+        <pre id="responseOutput" class="task-test-output">No request yet.</pre>
+      </section>
+    </main>
+
+    <script type="module" src="./tasks-test.js"></script>
+  </body>
+</html>

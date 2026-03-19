@@ -479,6 +479,20 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async assignTasks(payload = {}) {
+      const response = await authFetch(endpoint("/api/tasks/assign"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Task assign failed");
+      }
+      return response.json();
+    },
+
     async updateTask(payload = {}) {
       const response = await authFetch(endpoint("/api/tasks/update"), {
         method: "POST",

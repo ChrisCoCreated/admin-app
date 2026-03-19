@@ -39,7 +39,10 @@ function inferSource(body) {
 function toIsoAtUtcNoon(rawValue) {
   const raw = normalizeText(rawValue);
   if (!raw) {
-    return new Date().toISOString();
+    const now = new Date();
+    return new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12, 0, 0, 0)
+    ).toISOString();
   }
 
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
