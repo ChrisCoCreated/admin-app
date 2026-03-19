@@ -2343,6 +2343,27 @@ body.lightbox-open {
   line-height: 1.5;
 }
 
+.task-test-live-root {
+  display: grid;
+  gap: 12px;
+}
+
+.task-test-live-card {
+  border: 1px solid #dbe2f0;
+  border-radius: 16px;
+  background: #f8fbff;
+  padding: 14px 16px;
+}
+
+.task-test-live-card h3 {
+  margin: 0 0 8px;
+}
+
+.task-test-live-card p {
+  margin: 0 0 12px;
+  color: #4c5d79;
+}
+
 .task-pill-list {
   display: grid;
   gap: 10px;

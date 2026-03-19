@@ -493,6 +493,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listTaskSetTemplates(query = {}) {
+      const response = await authFetch(buildUrl("/api/tasks/task-sets", query));
+      if (!response.ok) {
+        await parseError(response, "Task set list failed");
+      }
+      return response.json();
+    },
+
     async updateTask(payload = {}) {
       const response = await authFetch(endpoint("/api/tasks/update"), {
         method: "POST",

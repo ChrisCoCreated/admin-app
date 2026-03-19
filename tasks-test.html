@@ -45,55 +45,19 @@
 
       <section class="clients-grid">
         <article class="panel detail-panel">
-          <h2>Test Source</h2>
-          <dl class="detail-list">
-            <div>
-              <dt>Task Set</dt>
-              <dd>Test</dd>
-            </div>
-            <div>
-              <dt>Task</dt>
-              <dd>Test Task</dd>
-            </div>
-            <div>
-              <dt>Description</dt>
-              <dd>xyz egrg e</dd>
-            </div>
-            <div>
-              <dt>Responsible Person</dt>
-              <dd>chris@planwithcare.co.uk</dd>
-            </div>
-            <div>
-              <dt>Due Date Delay</dt>
-              <dd>-1 (no due date)</dd>
-            </div>
-          </dl>
+          <h2>Live Task Set Row</h2>
+          <p class="muted">Loaded live from the SharePoint list for Task Set <strong>Test</strong> and Area <strong>Colleague</strong>.</p>
+          <div id="liveTaskSetRoot" class="task-test-live-root">Loading live task set content...</div>
         </article>
 
         <article class="panel detail-panel">
-          <h2>Request Builder</h2>
-          <form id="taskAssignForm" class="overlay-form">
-            <label class="field" for="targetUserInput">
-              Target user override
-              <input id="targetUserInput" type="email" placeholder="Defaults to chris@planwithcare.co.uk" autocomplete="off" />
-            </label>
-            <label class="field" for="anchorDateInput">
-              Anchor date
-              <input id="anchorDateInput" type="date" />
-            </label>
-            <label class="field" for="areaInput">
-              Area filter
-              <input id="areaInput" type="text" value="Colleague" autocomplete="off" />
-            </label>
-            <label class="field" for="taskSetInput">
-              Task set
-              <input id="taskSetInput" type="text" value="Test" autocomplete="off" />
-            </label>
-            <div class="row wrap-row">
-              <button id="dryRunBtn" class="secondary" type="button">Dry run</button>
-              <button id="createBtn" type="submit">Create task</button>
-            </div>
-          </form>
+          <h2>Actions</h2>
+          <p class="muted">Click a button to run the backend against the live SharePoint row and show the response below.</p>
+          <div class="row wrap-row">
+            <button id="reloadBtn" class="secondary" type="button">Reload live row</button>
+            <button id="dryRunBtn" class="secondary" type="button">Dry run</button>
+            <button id="createBtn" type="button">Create task</button>
+          </div>
         </article>
       </section>
 

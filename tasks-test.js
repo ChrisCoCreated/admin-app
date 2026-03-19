@@ -6,19 +6,16 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260317";
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const userMessage = document.getElementById("userMessage");
-const taskAssignForm = document.getElementById("taskAssignForm");
-const targetUserInput = document.getElementById("targetUserInput");
-const anchorDateInput = document.getElementById("anchorDateInput");
-const areaInput = document.getElementById("areaInput");
-const taskSetInput = document.getElementById("taskSetInput");
+const liveTaskSetRoot = document.getElementById("liveTaskSetRoot");
+const reloadBtn = document.getElementById("reloadBtn");
 const dryRunBtn = document.getElementById("dryRunBtn");
 const createBtn = document.getElementById("createBtn");
 const payloadOutput = document.getElementById("payloadOutput");
 const responseOutput = document.getElementById("responseOutput");
 
-const DEFAULT_TARGET_USER = "chris@planwithcare.co.uk";
 const DEFAULT_TASK_SET = "Test";
 const DEFAULT_AREA = "Colleague";
+const DEFAULT_TARGET_USER = "chris@planwithcare.co.uk";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -33,46 +30,83 @@ function setStatus(message, isError = false) {
 }
 
 function setBusy(value) {
+  reloadBtn.disabled = value;
   dryRunBtn.disabled = value;
   createBtn.disabled = value;
-  targetUserInput.disabled = value;
-  anchorDateInput.disabled = value;
-  areaInput.disabled = value;
-  taskSetInput.disabled = value;
 }
 
 function pretty(value) {
   return JSON.stringify(value, null, 2);
 }
 
-function todayDateValue() {
-  const now = new Date();
-  const year = String(now.getUTCFullYear()).padStart(4, "0");
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(now.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function buildPayload({ dryRun }) {
-  const targetUser = String(targetUserInput?.value || "").trim().toLowerCase();
-  const taskSet = String(taskSetInput?.value || DEFAULT_TASK_SET).trim();
-  const anchorDate = String(anchorDateInput?.value || "").trim();
-  const area = String(areaInput?.value || DEFAULT_AREA).trim();
-
   const payload = {
-    taskSet,
-    area,
+    taskSet: DEFAULT_TASK_SET,
+    area: DEFAULT_AREA,
     dryRun,
+    targetUser: DEFAULT_TARGET_USER,
   };
 
-  if (targetUser) {
-    payload.targetUser = targetUser;
-  }
-  if (anchorDate) {
-    payload.anchorDate = anchorDate;
+  payloadOutput.textContent = pretty(payload);
+  return payload;
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderLiveTemplates(templates = []) {
+  if (!liveTaskSetRoot) {
+    return;
   }
 
-  payloadOutput.textContent = pretty(payload);
+  if (!Array.isArray(templates) || !templates.length) {
+    liveTaskSetRoot.innerHTML = '<p class="muted">No matching live rows found.</p>';
+    return;
+  }
+
+  liveTaskSetRoot.innerHTML = templates
+    .map((template) => {
+      return `
+        <article class="task-test-live-card">
+          <h3>${escapeHtml(template.title || "Untitled task")}</h3>
+          <p>${escapeHtml(template.description || "-")}</p>
+          <dl class="detail-list">
+            <div>
+              <dt>Responsible Person</dt>
+              <dd>${escapeHtml(template.responsiblePerson || "-")}</dd>
+            </div>
+            <div>
+              <dt>Due Date Delay</dt>
+              <dd>${escapeHtml(template.dueDateDelay ?? "-")}</dd>
+            </div>
+            <div>
+              <dt>Item ID</dt>
+              <dd>${escapeHtml(template.itemId || "-")}</dd>
+            </div>
+          </dl>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+async function loadLiveTemplates() {
+  if (liveTaskSetRoot) {
+    liveTaskSetRoot.textContent = "Loading live task set content...";
+  }
+
+  const payload = await directoryApi.listTaskSetTemplates({
+    taskSet: DEFAULT_TASK_SET,
+    area: DEFAULT_AREA,
+  });
+
+  renderLiveTemplates(payload?.templates || []);
   return payload;
 }
 
@@ -121,21 +155,9 @@ async function init() {
     document.body.classList.remove("auth-pending");
     userMessage.textContent = `Signed in as ${profile?.email || "unknown"} (${role || "unknown role"}).`;
 
-    if (anchorDateInput && !anchorDateInput.value) {
-      anchorDateInput.value = todayDateValue();
-    }
-    if (taskSetInput && !taskSetInput.value) {
-      taskSetInput.value = DEFAULT_TASK_SET;
-    }
-    if (areaInput && !areaInput.value) {
-      areaInput.value = DEFAULT_AREA;
-    }
-    if (targetUserInput) {
-      targetUserInput.placeholder = `Defaults to ${DEFAULT_TARGET_USER}`;
-    }
-
     buildPayload({ dryRun: true });
-    setStatus("Ready to test /api/tasks/assign.");
+    await loadLiveTemplates();
+    setStatus("Live task set row loaded. Click a button to run the backend.");
   } catch (error) {
     console.error("[tasks-test] Init failed", error);
     setStatus(error?.message || "Could not initialise test page.", true);
@@ -144,20 +166,32 @@ async function init() {
   }
 }
 
-taskAssignForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await submitRequest(false);
+reloadBtn?.addEventListener("click", async () => {
+  setBusy(true);
+  setStatus("Reloading live task set row...");
+  try {
+    const payload = await loadLiveTemplates();
+    responseOutput.textContent = pretty(payload);
+    setStatus("Live task set row reloaded.");
+  } catch (error) {
+    responseOutput.textContent = pretty({
+      error: {
+        message: error?.message || String(error),
+      },
+    });
+    setStatus(error?.message || "Could not reload live task set row.", true);
+  } finally {
+    setBusy(false);
+  }
 });
 
 dryRunBtn?.addEventListener("click", async () => {
   await submitRequest(true);
 });
 
-targetUserInput?.addEventListener("input", () => buildPayload({ dryRun: true }));
-anchorDateInput?.addEventListener("input", () => buildPayload({ dryRun: true }));
-areaInput?.addEventListener("input", () => buildPayload({ dryRun: true }));
-taskSetInput?.addEventListener("input", () => buildPayload({ dryRun: true }));
-
+createBtn?.addEventListener("click", async () => {
+  await submitRequest(false);
+});
 signOutBtn?.addEventListener("click", async () => {
   await authController.signOut();
 });
