@@ -29,6 +29,7 @@ const tasksOverlayHandler = require("./api/tasks/overlay");
 const tasksWhiteboardHandler = require("./api/tasks/whiteboard");
 const tasksWhiteboardSyncHandler = require("./api/tasks/whiteboard-sync");
 const tasksCreateHandler = require("./api/tasks/create");
+const tasksAssignHandler = require("./api/tasks/assign");
 const mapsDriveTimeHandler = require("./api/maps/drive-time");
 const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
@@ -370,6 +371,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await tasksCreateHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/tasks/assign") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await tasksAssignHandler(apiReq, apiRes);
     return true;
   }
 

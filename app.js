@@ -23,16 +23,21 @@ const ADMIN_HOME_EXTERNAL_LINKS = [
     href: "https://www.thrivehomecare.co.uk/prices",
     label: "Prices",
     description: "Thrive HomeCare",
+    iconText: "£",
   },
   {
     href: "https://care2.onetouchhealth.net/cm/in/menuNewV.php",
     label: "OneTouch",
     description: "Care Management",
+    iconSrc: "https://care2.onetouchhealth.net/cm/favicon.ico",
+    iconAlt: "OneTouch favicon",
   },
   {
     href: "https://www.atlas-hub.co.uk/o/57aba442-b45f-4f13-9af8-e99c345a8786/",
     label: "Atlas",
     description: "Team hub",
+    iconSrc: "https://www.atlas-hub.co.uk/favicon.ico",
+    iconAlt: "Atlas favicon",
   },
 ];
 if (authCard) {
@@ -175,15 +180,36 @@ function renderAdminHomeLinks(role) {
     link.target = "_blank";
     link.rel = "noreferrer";
 
+    const titleRow = document.createElement("span");
+    titleRow.className = "home-menu-link-title-row";
+
     const title = document.createElement("span");
     title.className = "home-menu-link-title";
     title.textContent = linkMeta.label;
+
+    if (linkMeta.iconText) {
+      const icon = document.createElement("span");
+      icon.className = "home-menu-link-icon home-menu-link-icon-text";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = linkMeta.iconText;
+      titleRow.appendChild(icon);
+    } else if (linkMeta.iconSrc) {
+      const icon = document.createElement("img");
+      icon.className = "home-menu-link-icon home-menu-link-icon-image";
+      icon.src = linkMeta.iconSrc;
+      icon.alt = linkMeta.iconAlt || "";
+      icon.width = 20;
+      icon.height = 20;
+      titleRow.appendChild(icon);
+    }
+
+    titleRow.appendChild(title);
 
     const description = document.createElement("span");
     description.className = "home-menu-link-meta";
     description.textContent = linkMeta.description;
 
-    link.appendChild(title);
+    link.appendChild(titleRow);
     link.appendChild(description);
     homeAdminLinksGrid.appendChild(link);
   }
