@@ -91,7 +91,7 @@ const PAGE_META = {
   tasks: { href: "./tasks.html", label: "Tasks (Advanced)" },
   taskstest: { href: "./tasks-test.html", label: "Tasks Test" },
   mapping: { href: "./mapping.html", label: "Time Mapping" },
-  drivetime: { href: "./drive-time-map.html", label: "Our Geography" },
+  drivetime: { href: "./drive-time-map.html", label: "Our Geography", shortcutLabel: "Map" },
   reports: { href: "./reports.html", label: "Reports" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates" },
   suppliers: { href: "./suppliers.html", label: "Suppliers & Experiences" },
@@ -100,7 +100,7 @@ const PAGE_META = {
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
 };
 
-const ADMIN_HOME_PAGES = ["reports", "agendas", "recruitment", "emailtemplates"];
+const ADMIN_HOME_PAGES = ["reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
@@ -176,7 +176,7 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
       const link = document.createElement("a");
       link.className = "topbar-shortcut";
       link.href = page.href;
-      link.textContent = page.label;
+      link.textContent = page.shortcutLabel || page.label;
       if (normalizePath(page.href) === currentPath) {
         link.classList.add("active");
         link.setAttribute("aria-current", "page");
