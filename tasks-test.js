@@ -15,6 +15,7 @@ const responseOutput = document.getElementById("responseOutput");
 
 const DEFAULT_TASK_SET = "Test";
 const DEFAULT_AREA = "Colleague";
+const DEFAULT_PROVIDER = "planner";
 let liveTemplates = [];
 
 const authController = createAuthController({
@@ -71,6 +72,7 @@ function buildPayload({ dryRun }) {
   });
 
   const payload = { dryRun, tasks };
+  payload.provider = DEFAULT_PROVIDER;
 
   payloadOutput.textContent = pretty(payload);
   return payload;
@@ -154,9 +156,9 @@ async function submitRequest(dryRun) {
   responseOutput.textContent = "Waiting for response...";
 
   try {
-    const response = await directoryApi.assignTasks(payload);
+    const response = await directoryApi.createTaskBatch(payload);
     responseOutput.textContent = pretty(response);
-    setStatus(dryRun ? "Dry run complete." : "Task creation request complete.");
+    setStatus(dryRun ? "Dry run complete." : "Planner task creation request complete.");
   } catch (error) {
     responseOutput.textContent = pretty({
       error: {
@@ -167,7 +169,7 @@ async function submitRequest(dryRun) {
         correlationId: error?.correlationId || "",
       },
     });
-    setStatus(error?.message || "Task request failed.", true);
+    setStatus(error?.message || "Planner task request failed.", true);
   } finally {
     setBusy(false);
   }
@@ -195,7 +197,7 @@ async function init() {
     setBusy(true);
     buildPayload({ dryRun: true });
     await loadLiveTemplates();
-    setStatus("Live task set row loaded. Use Dry Run Request or Create Task Now.");
+    setStatus("Live task set rows loaded. Use Dry Run Request or Create Planner Tasks.");
   } catch (error) {
     console.error("[tasks-test] Init failed", error);
     setStatus(error?.message || "Could not initialise test page.", true);
@@ -211,14 +213,14 @@ reloadBtn?.addEventListener("click", async () => {
   try {
     const payload = await loadLiveTemplates();
     responseOutput.textContent = pretty(payload);
-    setStatus("Live task set row reloaded.");
+    setStatus("Live task set rows reloaded.");
   } catch (error) {
     responseOutput.textContent = pretty({
       error: {
         message: error?.message || String(error),
       },
     });
-    setStatus(error?.message || "Could not reload live task set row.", true);
+    setStatus(error?.message || "Could not reload live task set rows.", true);
   } finally {
     setBusy(false);
   }

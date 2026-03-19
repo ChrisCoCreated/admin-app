@@ -34,8 +34,8 @@
 
     <main class="container tasks-main">
       <section class="hero compact">
-        <h1>Task Creation Test</h1>
-        <p>Admin-only page for exercising the new arbitrary-user task creation endpoint against the SharePoint Task Set test row.</p>
+        <h1>Planner Task Creation Test</h1>
+        <p>Admin-only page for exercising live Planner task creation from the SharePoint Task Set test rows.</p>
       </section>
 
       <section class="panel">
@@ -45,18 +45,18 @@
 
       <section class="panel task-test-action-panel">
         <h2>Run Test</h2>
-        <p class="muted">Once the live row has loaded, use one of the buttons below to call the backend and inspect the response.</p>
+        <p class="muted">Once the live rows have loaded, use one of the buttons below to call the Planner batch backend and inspect the response.</p>
         <div class="row wrap-row task-test-action-row">
           <button id="reloadBtn" class="secondary" type="button">Reload Live Row</button>
           <button id="dryRunBtn" class="secondary" type="button">Dry Run Request</button>
-          <button id="createBtn" type="button">Create Task Now</button>
+          <button id="createBtn" type="button">Create Planner Tasks</button>
         </div>
       </section>
 
       <section class="clients-grid">
         <article class="panel detail-panel">
-          <h2>Live Task Set Row</h2>
-          <p class="muted">Loaded live from the SharePoint list for Task Set <strong>Test</strong> and Area <strong>Colleague</strong>.</p>
+          <h2>Live Task Set Rows</h2>
+          <p class="muted">Loaded live from the SharePoint list for Task Set <strong>Test</strong> and Area <strong>Colleague</strong>. Each valid row becomes one Planner task for its <strong>Responsible Person</strong>.</p>
           <div id="liveTaskSetRoot" class="task-test-live-root">Loading live task set content...</div>
         </article>
       </section>

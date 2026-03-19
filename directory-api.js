@@ -501,6 +501,20 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async createTaskBatch(payload = {}) {
+      const response = await authFetch(endpoint("/api/tasks/create-batch"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Task batch create failed");
+      }
+      return response.json();
+    },
+
     async updateTask(payload = {}) {
       const response = await authFetch(endpoint("/api/tasks/update"), {
         method: "POST",

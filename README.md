@@ -29,6 +29,8 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `GET /api/tasks/unified` (delegated Microsoft Graph token)
   - `POST /api/tasks/overlay` (delegated Microsoft Graph token)
   - `POST /api/tasks/assign` (API auth + Graph app token; create To Do tasks for arbitrary users or from SharePoint Task Sets)
+  - `POST /api/tasks/create-batch` (API auth + Graph app token; Planner test batch creation from direct payloads or SharePoint Task Sets)
+  - `GET /api/tasks/task-sets` (API auth; live SharePoint Task Set rows for preview/testing)
   - `POST /api/consultant/report-docx` (admin + consultant; DOCX export from template)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
@@ -76,6 +78,8 @@ Set values in `frontend-config.js`:
 - `SHAREPOINT_TASK_OVERLAY_LIST_NAME` (optional; default `TaskOverlay`)
 - `SHAREPOINT_TASK_SETS_SITE_URL` (optional; defaults to `SHAREPOINT_SITE_URL`)
 - `SHAREPOINT_TASK_SETS_LIST_NAME` (optional; default `Actions for Task Sets`)
+- `PLANNER_TEST_PLAN_ID` (used by the Planner test batch creator)
+- `PLANNER_TEST_BUCKET_NAME` (used by the Planner test batch creator)
 - `GRAPH_TOKEN_AUDIENCE` (optional override; defaults include Graph audiences)
 - `ONETOUCH_USERNAME`
 - `ONETOUCH_PASSWORD`
@@ -90,7 +94,7 @@ Optional fallback toggles:
 - `ALLOW_LOCAL_CLIENTS_ON_GRAPH_ERROR=1`
 - `CLIENTS_DATA_FILE=./data/clients.json`
 
-For `/api/tasks/assign`, the Entra app also needs Graph application permissions that can create To Do tasks for users and read the SharePoint Task Set list. In practice this means `Tasks.ReadWrite.All` plus site read access such as `Sites.Read.All`.
+For `/api/tasks/create-batch`, the Entra app needs Graph application permissions that can create Planner tasks and read the SharePoint Task Set list. In practice this means `Tasks.ReadWrite.All`, site read access such as `Sites.Read.All`, and enough directory/user read access to resolve assignee identities.
 
 Google Maps Platform vars (for Time Mapping):
 
