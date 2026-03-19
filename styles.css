@@ -290,7 +290,9 @@ body.auth-pending .auth-card {
 
 .home-menu-link {
   display: flex;
+  flex-direction: column;
   align-items: flex-end;
+  justify-content: flex-end;
   min-height: 120px;
   border: 1px solid #c8d3e6;
   border-radius: 16px;
@@ -314,6 +316,18 @@ body.auth-pending .auth-card {
     #edf3ff;
   transform: translateY(-1px);
   box-shadow: 0 14px 30px rgba(17, 20, 26, 0.12);
+}
+
+.home-menu-link-title,
+.home-menu-link-meta {
+  width: 100%;
+}
+
+.home-menu-link-meta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
 .status-preview {

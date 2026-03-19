@@ -15,6 +15,26 @@ const homeUserPermissions = document.getElementById("homeUserPermissions");
 const homeQuickLinks = document.getElementById("homeQuickLinks");
 const homeQuickLinksMessage = document.getElementById("homeQuickLinksMessage");
 const homeMenuGrid = document.getElementById("homeMenuGrid");
+const homeAdminLinks = document.getElementById("homeAdminLinks");
+const homeAdminLinksGrid = document.getElementById("homeAdminLinksGrid");
+
+const ADMIN_HOME_EXTERNAL_LINKS = [
+  {
+    href: "https://www.thrivehomecare.co.uk/prices",
+    label: "Prices",
+    description: "Thrive HomeCare",
+  },
+  {
+    href: "https://care2.onetouchhealth.net/cm/in/menuNewV.php",
+    label: "OneTouch",
+    description: "Care Management",
+  },
+  {
+    href: "https://www.atlas-hub.co.uk/o/57aba442-b45f-4f13-9af8-e99c345a8786/",
+    label: "Atlas",
+    description: "Team hub",
+  },
+];
 if (authCard) {
   authCard.hidden = true;
 }
@@ -44,6 +64,12 @@ function setSignedOutUi() {
   }
   if (homeMenuGrid) {
     homeMenuGrid.innerHTML = "";
+  }
+  if (homeAdminLinks) {
+    homeAdminLinks.hidden = true;
+  }
+  if (homeAdminLinksGrid) {
+    homeAdminLinksGrid.innerHTML = "";
   }
   if (topbarActions) {
     topbarActions.hidden = true;
@@ -129,6 +155,42 @@ function renderHomeQuickLinks(role) {
   homeQuickLinks.hidden = !homeMenuGrid.children.length;
 }
 
+function renderAdminHomeLinks(role) {
+  if (!homeAdminLinks || !homeAdminLinksGrid) {
+    return;
+  }
+
+  const isAdmin = String(role || "").trim().toLowerCase() === "admin";
+  homeAdminLinksGrid.innerHTML = "";
+
+  if (!isAdmin) {
+    homeAdminLinks.hidden = true;
+    return;
+  }
+
+  for (const linkMeta of ADMIN_HOME_EXTERNAL_LINKS) {
+    const link = document.createElement("a");
+    link.className = "home-menu-link home-menu-link-external";
+    link.href = linkMeta.href;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+
+    const title = document.createElement("span");
+    title.className = "home-menu-link-title";
+    title.textContent = linkMeta.label;
+
+    const description = document.createElement("span");
+    description.className = "home-menu-link-meta";
+    description.textContent = linkMeta.description;
+
+    link.appendChild(title);
+    link.appendChild(description);
+    homeAdminLinksGrid.appendChild(link);
+  }
+
+  homeAdminLinks.hidden = !homeAdminLinksGrid.children.length;
+}
+
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
@@ -160,6 +222,7 @@ async function renderRoleMenu() {
   setSignedInUi();
   renderUserSummary(profile);
   renderHomeQuickLinks(role);
+  renderAdminHomeLinks(role);
   renderTopNavigation({ role, currentPathname: "./index.html" });
 }
 
