@@ -815,6 +815,16 @@ dd {
     background-color 120ms ease;
 }
 
+.button-link-one-touch::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: 4px;
+  background: #fff url("https://care2.onetouchhealth.net/cm/favicon.ico") center/10px 10px no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(17, 38, 84, 0.16);
+}
+
 .button-link-one-touch::after {
   content: "↗";
   font-size: 0.9em;
