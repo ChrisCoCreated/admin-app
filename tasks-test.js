@@ -15,7 +15,7 @@ const responseOutput = document.getElementById("responseOutput");
 
 const DEFAULT_TASK_SET = "Test";
 const DEFAULT_AREA = "Colleague";
-const DEFAULT_TARGET_USER = "chris@planwithcare.co.uk";
+let liveTemplates = [];
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -39,13 +39,38 @@ function pretty(value) {
   return JSON.stringify(value, null, 2);
 }
 
+function normalizedUtcNoonToday() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12, 0, 0, 0)).toISOString();
+}
+
+function addDays(isoValue, days) {
+  const parsed = new Date(isoValue);
+  parsed.setUTCDate(parsed.getUTCDate() + days);
+  return parsed.toISOString();
+}
+
 function buildPayload({ dryRun }) {
-  const payload = {
-    taskSet: DEFAULT_TASK_SET,
-    area: DEFAULT_AREA,
-    dryRun,
-    targetUser: DEFAULT_TARGET_USER,
-  };
+  const anchorDateTimeUtc = normalizedUtcNoonToday();
+  const tasks = liveTemplates.map((template) => {
+    const dueDateDelay = Number(template?.dueDateDelay);
+    const dueDateTimeUtc =
+      Number.isFinite(dueDateDelay) && dueDateDelay >= 0 ? addDays(anchorDateTimeUtc, dueDateDelay) : null;
+
+    return {
+      title: String(template?.title || "").trim(),
+      description: String(template?.description || "").trim(),
+      targetUser: String(template?.responsiblePerson || "").trim().toLowerCase(),
+      dueDateTimeUtc,
+      sourceTaskSet: String(template?.taskSet || "").trim(),
+      sourceItemId: String(template?.itemId || "").trim(),
+      sourceResponsiblePerson: String(template?.responsiblePerson || "").trim(),
+      area: String(template?.area || "").trim(),
+      dueDateDelay: Number.isFinite(dueDateDelay) ? dueDateDelay : null,
+    };
+  });
+
+  const payload = { dryRun, tasks };
 
   payloadOutput.textContent = pretty(payload);
   return payload;
@@ -106,12 +131,24 @@ async function loadLiveTemplates() {
     area: DEFAULT_AREA,
   });
 
-  renderLiveTemplates(payload?.templates || []);
+  liveTemplates = Array.isArray(payload?.templates) ? payload.templates : [];
+  renderLiveTemplates(liveTemplates);
+  buildPayload({ dryRun: true });
   return payload;
 }
 
 async function submitRequest(dryRun) {
   const payload = buildPayload({ dryRun });
+  if (!Array.isArray(payload.tasks) || !payload.tasks.length) {
+    setStatus("No live task rows are loaded yet.", true);
+    responseOutput.textContent = pretty({
+      error: {
+        message: "No live task rows are loaded yet.",
+      },
+    });
+    return;
+  }
+
   setBusy(true);
   setStatus(dryRun ? "Running dry run..." : "Creating task...");
   responseOutput.textContent = "Waiting for response...";
@@ -155,13 +192,15 @@ async function init() {
     document.body.classList.remove("auth-pending");
     userMessage.textContent = `Signed in as ${profile?.email || "unknown"} (${role || "unknown role"}).`;
 
+    setBusy(true);
     buildPayload({ dryRun: true });
     await loadLiveTemplates();
-    setStatus("Live task set row loaded. Click a button to run the backend.");
+    setStatus("Live task set row loaded. Use Dry Run Request or Create Task Now.");
   } catch (error) {
     console.error("[tasks-test] Init failed", error);
     setStatus(error?.message || "Could not initialise test page.", true);
   } finally {
+    setBusy(false);
     document.body.classList.remove("auth-pending");
   }
 }

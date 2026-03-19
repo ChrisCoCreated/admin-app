@@ -43,21 +43,21 @@
         <p id="userMessage" class="muted"></p>
       </section>
 
+      <section class="panel task-test-action-panel">
+        <h2>Run Test</h2>
+        <p class="muted">Once the live row has loaded, use one of the buttons below to call the backend and inspect the response.</p>
+        <div class="row wrap-row task-test-action-row">
+          <button id="reloadBtn" class="secondary" type="button">Reload Live Row</button>
+          <button id="dryRunBtn" class="secondary" type="button">Dry Run Request</button>
+          <button id="createBtn" type="button">Create Task Now</button>
+        </div>
+      </section>
+
       <section class="clients-grid">
         <article class="panel detail-panel">
           <h2>Live Task Set Row</h2>
           <p class="muted">Loaded live from the SharePoint list for Task Set <strong>Test</strong> and Area <strong>Colleague</strong>.</p>
           <div id="liveTaskSetRoot" class="task-test-live-root">Loading live task set content...</div>
-        </article>
-
-        <article class="panel detail-panel">
-          <h2>Actions</h2>
-          <p class="muted">Click a button to run the backend against the live SharePoint row and show the response below.</p>
-          <div class="row wrap-row">
-            <button id="reloadBtn" class="secondary" type="button">Reload live row</button>
-            <button id="dryRunBtn" class="secondary" type="button">Dry run</button>
-            <button id="createBtn" type="button">Create task</button>
-          </div>
         </article>
       </section>
 

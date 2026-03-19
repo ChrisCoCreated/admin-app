@@ -2343,6 +2343,14 @@ body.lightbox-open {
   line-height: 1.5;
 }
 
+.task-test-action-panel {
+  margin-bottom: 14px;
+}
+
+.task-test-action-row {
+  align-items: center;
+}
+
 .task-test-live-root {
   display: grid;
   gap: 12px;
