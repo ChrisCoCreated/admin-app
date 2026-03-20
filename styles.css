@@ -1173,6 +1173,68 @@ dd {
   margin: 0;
 }
 
+.score-chip-group {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.score-chip {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #173045;
+  background: #eef3f8;
+  box-shadow: none;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    border-color 120ms ease,
+    filter 120ms ease;
+}
+
+.score-chip:hover {
+  transform: translateY(-1px);
+}
+
+.score-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(49, 183, 200, 0.2);
+}
+
+.score-chip.score-green {
+  background: #e7f7ef;
+  color: #0f6a3b;
+}
+
+.score-chip.score-amber {
+  background: #fff4df;
+  color: #8a5a00;
+}
+
+.score-chip.score-red {
+  background: #fde7e7;
+  color: #a22a2a;
+}
+
+.score-chip.is-active {
+  border-color: rgba(23, 48, 69, 0.2);
+  box-shadow: 0 8px 18px rgba(17, 20, 26, 0.12);
+  transform: translateY(-1px);
+}
+
+.score-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  box-shadow: none;
+}
+
 .screen-question-card textarea,
 .initial-screen-form textarea {
   min-height: 120px;

@@ -71,15 +71,15 @@
             <article class="screen-question-card">
               <div class="screen-question-top">
                 <h3>1. What sort of availability do you currently have for work? Are you looking for full-time, part-time, or flexible hours?</h3>
-                <label class="field compact-field" for="q1Score">
-                  Score
-                  <select id="q1Score">
-                    <option value="">Select</option>
-                    <option value="Green">Green</option>
-                    <option value="Amber">Amber</option>
-                    <option value="Red">Red</option>
-                  </select>
-                </label>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q1Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q1Score" type="hidden" value="" />
+                </div>
               </div>
               <label class="field" for="q1NotesAvailability">
                 Notes
@@ -90,15 +90,15 @@
             <article class="screen-question-card">
               <div class="screen-question-top">
                 <h3>2. Are you open to covering short-notice or emergency shifts, including evenings or weekends on occasion?</h3>
-                <label class="field compact-field" for="q2Score">
-                  Score
-                  <select id="q2Score">
-                    <option value="">Select</option>
-                    <option value="Green">Green</option>
-                    <option value="Amber">Amber</option>
-                    <option value="Red">Red</option>
-                  </select>
-                </label>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q2Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q2Score" type="hidden" value="" />
+                </div>
               </div>
               <label class="field" for="q2NotesShortNotice">
                 Notes
@@ -109,15 +109,15 @@
             <article class="screen-question-card">
               <div class="screen-question-top">
                 <h3>3. Are you happy to travel for placements or cover, and do you drive or use public transport?</h3>
-                <label class="field compact-field" for="q3Score">
-                  Score
-                  <select id="q3Score">
-                    <option value="">Select</option>
-                    <option value="Green">Green</option>
-                    <option value="Amber">Amber</option>
-                    <option value="Red">Red</option>
-                  </select>
-                </label>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q3Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q3Score" type="hidden" value="" />
+                </div>
               </div>
               <label class="field" for="q3NotesTravel">
                 Notes
@@ -135,15 +135,15 @@
             <article class="screen-question-card">
               <div class="screen-question-top">
                 <h3>4. Thrive’s values are creative, connected, empowering and impactful. Which of those stand out to you, and why?</h3>
-                <label class="field compact-field" for="q4Score">
-                  Score
-                  <select id="q4Score">
-                    <option value="">Select</option>
-                    <option value="Green">Green</option>
-                    <option value="Amber">Amber</option>
-                    <option value="Red">Red</option>
-                  </select>
-                </label>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q4Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q4Score" type="hidden" value="" />
+                </div>
               </div>
               <label class="field" for="q4NotesValuesFit">
                 Notes
@@ -154,15 +154,15 @@
             <article class="screen-question-card">
               <div class="screen-question-top">
                 <h3>5. In your view, what does good care feel like, not just what is done, but how it is done?</h3>
-                <label class="field compact-field" for="q5Score">
-                  Score
-                  <select id="q5Score">
-                    <option value="">Select</option>
-                    <option value="Green">Green</option>
-                    <option value="Amber">Amber</option>
-                    <option value="Red">Red</option>
-                  </select>
-                </label>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q5Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q5Score" type="hidden" value="" />
+                </div>
               </div>
               <label class="field" for="q5NotesGoodCare">
                 Notes
@@ -173,15 +173,15 @@
             <article class="screen-question-card">
               <div class="screen-question-top">
                 <h3>6. Thrive is still building systems and routines, so we often try things, learn, and adapt. Have you worked like that before, and how do you feel about that flexibility?</h3>
-                <label class="field compact-field" for="q6Score">
-                  Score
-                  <select id="q6Score">
-                    <option value="">Select</option>
-                    <option value="Green">Green</option>
-                    <option value="Amber">Amber</option>
-                    <option value="Red">Red</option>
-                  </select>
-                </label>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q6Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q6Score" type="hidden" value="" />
+                </div>
               </div>
               <label class="field" for="q6NotesFlexibility">
                 Notes
@@ -192,15 +192,15 @@
             <article class="screen-question-card">
               <div class="screen-question-top">
                 <h3>7. How do you support a client’s emotional or social wellbeing, and how do you look after yourself in this role?</h3>
-                <label class="field compact-field" for="q7Score">
-                  Score
-                  <select id="q7Score">
-                    <option value="">Select</option>
-                    <option value="Green">Green</option>
-                    <option value="Amber">Amber</option>
-                    <option value="Red">Red</option>
-                  </select>
-                </label>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q7Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q7Score" type="hidden" value="" />
+                </div>
               </div>
               <label class="field" for="q7NotesWellbeing">
                 Notes

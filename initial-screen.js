@@ -10,6 +10,7 @@ const screenCandidateMeta = document.getElementById("screenCandidateMeta");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
 const initialScreenForm = document.getElementById("initialScreenForm");
 const saveInitialScreenBtn = document.getElementById("saveInitialScreenBtn");
+const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
 const fieldRefs = {
   q1NotesAvailability: document.getElementById("q1NotesAvailability"),
@@ -71,6 +72,24 @@ function setFormEnabled(enabled) {
     }
     field.disabled = !enabled || saveBusy;
   }
+  for (const group of scoreChipGroups) {
+    for (const button of group.querySelectorAll(".score-chip")) {
+      button.disabled = !enabled || saveBusy;
+    }
+  }
+}
+
+function syncScoreChipGroup(fieldId, value) {
+  const group = document.querySelector(`.score-chip-group[data-score-field="${fieldId}"]`);
+  if (!group) {
+    return;
+  }
+  const selectedValue = cleanText(value);
+  for (const button of group.querySelectorAll(".score-chip")) {
+    const isActive = cleanText(button.getAttribute("data-score-value")) === selectedValue;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
 }
 
 function fillForm(responses = {}) {
@@ -90,6 +109,13 @@ function fillForm(responses = {}) {
   fieldRefs.q7Score.value = cleanText(responses.q7Score);
   fieldRefs.initialCallSummary.value = cleanText(responses.initialCallSummary);
   fieldRefs.fullTimeRequired.checked = responses.fullTimeRequired === true;
+  syncScoreChipGroup("q1Score", fieldRefs.q1Score.value);
+  syncScoreChipGroup("q2Score", fieldRefs.q2Score.value);
+  syncScoreChipGroup("q3Score", fieldRefs.q3Score.value);
+  syncScoreChipGroup("q4Score", fieldRefs.q4Score.value);
+  syncScoreChipGroup("q5Score", fieldRefs.q5Score.value);
+  syncScoreChipGroup("q6Score", fieldRefs.q6Score.value);
+  syncScoreChipGroup("q7Score", fieldRefs.q7Score.value);
 }
 
 function readForm() {
@@ -198,6 +224,23 @@ async function init() {
 }
 
 initialScreenForm?.addEventListener("submit", saveInitialScreen);
+
+for (const group of scoreChipGroups) {
+  const fieldId = cleanText(group.getAttribute("data-score-field"));
+  const input = fieldId ? document.getElementById(fieldId) : null;
+  if (!(input instanceof HTMLInputElement)) {
+    continue;
+  }
+  for (const button of group.querySelectorAll(".score-chip")) {
+    button.addEventListener("click", () => {
+      if (button.disabled) {
+        return;
+      }
+      input.value = cleanText(button.getAttribute("data-score-value"));
+      syncScoreChipGroup(fieldId, input.value);
+    });
+  }
+}
 
 signOutBtn?.addEventListener("click", async () => {
   try {
