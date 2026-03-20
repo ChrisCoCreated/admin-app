@@ -38,65 +38,84 @@
         <p>Active candidates from SharePoint recruitment list.</p>
       </section>
 
-      <section class="panel">
-        <label class="field" for="searchInput">
-          Search
-          <input id="searchInput" type="search" placeholder="Search candidate, status, source, notes or phone" autocomplete="off" />
-        </label>
-        <div class="mapping-form-grid">
-          <label class="field" for="locationFilterSelect">
-            Location
-            <select id="locationFilterSelect">
-              <option value="all">All locations</option>
-            </select>
-          </label>
-          <label class="field" for="statusFilterSelect">
-            Status
-            <select id="statusFilterSelect">
-              <option value="all">All statuses</option>
-            </select>
-          </label>
-          <label class="field" for="sourceFilterSelect">
-            Source
-            <select id="sourceFilterSelect">
-              <option value="all">All sources</option>
-            </select>
-          </label>
+      <section class="panel recruitment-toolbar-panel">
+        <div class="card-header-row recruitment-toolbar-header">
+          <div>
+            <h2>Search & Import</h2>
+            <span class="muted">Open filters, search, and CSV tools when you need them.</span>
+          </div>
+          <button
+            id="toggleRecruitmentToolbarBtn"
+            type="button"
+            class="mini-btn recruitment-toolbar-toggle"
+            aria-expanded="false"
+            aria-controls="recruitmentToolbarContent"
+            aria-label="Show search and import tools"
+            title="Show search and import tools"
+          >
+            <span aria-hidden="true">⌕</span>
+          </button>
         </div>
-        <p id="statusMessage" class="muted">Loading active candidates...</p>
-        <div class="recruitment-import-wrap">
-          <h3>Import CSV</h3>
-          <div id="importDropZone" class="recruitment-dropzone" tabindex="0" role="button" aria-label="Upload recruitment CSV">
-            <p>Drag and drop CSV here, or click to choose file.</p>
-            <input id="importFileInput" type="file" accept=".csv,text/csv" hidden />
+        <div id="recruitmentToolbarContent" hidden>
+          <label class="field" for="searchInput">
+            Search
+            <input id="searchInput" type="search" placeholder="Search candidate, status, source, notes or phone" autocomplete="off" />
+          </label>
+          <div class="mapping-form-grid">
+            <label class="field" for="locationFilterSelect">
+              Location
+              <select id="locationFilterSelect">
+                <option value="all">All locations</option>
+              </select>
+            </label>
+            <label class="field" for="statusFilterSelect">
+              Status
+              <select id="statusFilterSelect">
+                <option value="all">All statuses</option>
+              </select>
+            </label>
+            <label class="field" for="sourceFilterSelect">
+              Source
+              <select id="sourceFilterSelect">
+                <option value="all">All sources</option>
+              </select>
+            </label>
           </div>
-          <p id="importFileName" class="muted">No file selected.</p>
-          <p id="importSummary" class="muted">Upload a CSV to preview import results.</p>
-          <div id="importPreviewWrap" class="import-preview-wrap" hidden>
-            <h4 id="importPreviewTitle">Preview (all rows)</h4>
-            <p class="muted">Click a row (or Edit) to change it before importing.</p>
-            <div class="table-wrap">
-              <table class="import-preview-table">
-                <thead>
-                  <tr>
-                    <th>Candidate</th>
-                    <th>Email</th>
-                    <th>Phone</th>
-                    <th>Candidate Location</th>
-                    <th>Job Location</th>
-                    <th>Status</th>
-                    <th>Interest</th>
-                    <th>Source</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="importPreviewBody"></tbody>
-              </table>
+          <p id="statusMessage" class="muted">Loading active candidates...</p>
+          <div class="recruitment-import-wrap">
+            <h3>Import CSV</h3>
+            <div id="importDropZone" class="recruitment-dropzone" tabindex="0" role="button" aria-label="Upload recruitment CSV">
+              <p>Drag and drop CSV here, or click to choose file.</p>
+              <input id="importFileInput" type="file" accept=".csv,text/csv" hidden />
             </div>
-          </div>
-          <p id="importErrors" class="muted error" hidden></p>
-          <div class="row">
-            <button id="runImportBtn" type="button" disabled>Import CSV</button>
+            <p id="importFileName" class="muted">No file selected.</p>
+            <p id="importSummary" class="muted">Upload a CSV to preview import results.</p>
+            <div id="importPreviewWrap" class="import-preview-wrap" hidden>
+              <h4 id="importPreviewTitle">Preview (all rows)</h4>
+              <p class="muted">Click a row (or Edit) to change it before importing.</p>
+              <div class="table-wrap">
+                <table class="import-preview-table">
+                  <thead>
+                    <tr>
+                      <th>Candidate</th>
+                      <th>Email</th>
+                      <th>Phone</th>
+                      <th>Candidate Location</th>
+                      <th>Job Location</th>
+                      <th>Status</th>
+                      <th>Interest</th>
+                      <th>Source</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="importPreviewBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <p id="importErrors" class="muted error" hidden></p>
+            <div class="row">
+              <button id="runImportBtn" type="button" disabled>Import CSV</button>
+            </div>
           </div>
         </div>
       </section>
@@ -136,6 +155,10 @@
             <div>
               <dt>Status</dt>
               <dd data-field="status">-</dd>
+            </div>
+            <div>
+              <dt>Active</dt>
+              <dd data-field="active">-</dd>
             </div>
             <div>
               <dt>Source</dt>

@@ -25,6 +25,8 @@ const runImportBtn = document.getElementById("runImportBtn");
 const importPreviewWrap = document.getElementById("importPreviewWrap");
 const importPreviewTitle = document.getElementById("importPreviewTitle");
 const importPreviewBody = document.getElementById("importPreviewBody");
+const toggleRecruitmentToolbarBtn = document.getElementById("toggleRecruitmentToolbarBtn");
+const recruitmentToolbarContent = document.getElementById("recruitmentToolbarContent");
 const oneTouchPickerModal = document.getElementById("oneTouchPickerModal");
 const oneTouchPickerCandidate = document.getElementById("oneTouchPickerCandidate");
 const oneTouchAreaSelect = document.getElementById("oneTouchAreaSelect");
@@ -41,6 +43,7 @@ const detailFields = {
   candidateName: detailRoot?.querySelector('[data-field="candidateName"]'),
   location: detailRoot?.querySelector('[data-field="location"]'),
   status: detailRoot?.querySelector('[data-field="status"]'),
+  active: detailRoot?.querySelector('[data-field="active"]'),
   source: detailRoot?.querySelector('[data-field="source"]'),
   phoneNumber: detailRoot?.querySelector('[data-field="phoneNumber"]'),
   interviewBooked: detailRoot?.querySelector('[data-field="interviewBooked"]'),
@@ -75,6 +78,7 @@ let statusQuickMenuCandidateId = "";
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
+const STATUS_FILTER_DEFAULT = "__default__";
 const RECRUITMENT_STATUS_OPTIONS = [
   "Rejected",
   "RED FLAG (Rejected)",
@@ -114,6 +118,23 @@ function setStatus(message, isError = false) {
   }
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
+}
+
+function setRecruitmentToolbarVisible(visible) {
+  if (!recruitmentToolbarContent || !toggleRecruitmentToolbarBtn) {
+    return;
+  }
+  recruitmentToolbarContent.hidden = !visible;
+  toggleRecruitmentToolbarBtn.setAttribute("aria-expanded", visible ? "true" : "false");
+  toggleRecruitmentToolbarBtn.setAttribute(
+    "aria-label",
+    visible ? "Hide search and import tools" : "Show search and import tools"
+  );
+  toggleRecruitmentToolbarBtn.setAttribute(
+    "title",
+    visible ? "Hide search and import tools" : "Show search and import tools"
+  );
+  toggleRecruitmentToolbarBtn.classList.toggle("is-open", visible);
 }
 
 function hasOneTouchLink(candidate) {
@@ -725,6 +746,7 @@ function setDetail(candidate) {
     detailFields.candidateName.textContent = "Select a candidate";
     detailFields.location.textContent = "-";
     detailFields.status.textContent = "-";
+    detailFields.active.textContent = "-";
     detailFields.source.textContent = "-";
     detailFields.phoneNumber.textContent = "-";
     detailFields.interviewBooked.textContent = "-";
@@ -750,6 +772,7 @@ function setDetail(candidate) {
   detailFields.candidateName.textContent = cleanText(candidate.candidateName) || "-";
   detailFields.location.textContent = cleanText(candidate.location) || "-";
   detailFields.status.textContent = cleanText(candidate.status) || "-";
+  detailFields.active.textContent = formatBoolean(candidate.active);
   detailFields.source.textContent = cleanText(candidate.source) || "-";
   detailFields.phoneNumber.textContent = cleanText(candidate.phoneNumber) || "-";
   detailFields.interviewBooked.textContent = formatBoolean(candidate.interviewBooked);
@@ -784,11 +807,12 @@ function renderFilterOptions() {
   ).sort((a, b) => a.localeCompare(b));
 
   const selectedLocation = cleanText(locationFilterSelect.value || "all");
-  const selectedStatus = cleanText(statusFilterSelect.value || "all");
+  const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
 
   locationFilterSelect.innerHTML = '<option value="all">All locations</option>';
-  statusFilterSelect.innerHTML = '<option value="all">All statuses</option>';
+  statusFilterSelect.innerHTML =
+    `<option value="${STATUS_FILTER_DEFAULT}">All except rejected</option><option value="all">All statuses</option>`;
   sourceFilterSelect.innerHTML = '<option value="all">All sources</option>';
 
   for (const location of locationOptions) {
@@ -811,21 +835,29 @@ function renderFilterOptions() {
   }
 
   locationFilterSelect.value = locationOptions.includes(selectedLocation) ? selectedLocation : "all";
-  statusFilterSelect.value = statusOptions.includes(selectedStatus) ? selectedStatus : "all";
+  statusFilterSelect.value =
+    selectedStatus === STATUS_FILTER_DEFAULT || statusOptions.includes(selectedStatus) ? selectedStatus : STATUS_FILTER_DEFAULT;
   sourceFilterSelect.value = sourceOptions.includes(selectedSource) ? selectedSource : "all";
 }
 
 function getFilteredCandidates() {
   const query = normalizeText(searchInput.value);
   const selectedLocation = cleanText(locationFilterSelect.value || "all");
-  const selectedStatus = cleanText(statusFilterSelect.value || "all");
+  const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
 
   return allCandidates.filter((candidate) => {
     if (selectedLocation !== "all" && cleanText(candidate.location) !== selectedLocation) {
       return false;
     }
-    if (selectedStatus !== "all" && cleanText(candidate.status) !== selectedStatus) {
+    if (selectedStatus === STATUS_FILTER_DEFAULT && normalizeText(candidate.status) === "rejected") {
+      return false;
+    }
+    if (
+      selectedStatus !== "all" &&
+      selectedStatus !== STATUS_FILTER_DEFAULT &&
+      cleanText(candidate.status) !== selectedStatus
+    ) {
       return false;
     }
     if (selectedSource !== "all" && cleanText(candidate.source) !== selectedSource) {
@@ -1202,7 +1234,7 @@ function redirectToUnauthorized(pageKey) {
 
 async function loadRecruitmentCandidates() {
   const payload = await directoryApi.listRecruitment();
-  allCandidates = Array.isArray(payload?.items) ? payload.items : [];
+  allCandidates = Array.isArray(payload?.items) ? payload.items.filter((item) => item?.active === true) : [];
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
   }
@@ -1247,6 +1279,9 @@ searchInput?.addEventListener("input", renderCandidates);
 locationFilterSelect?.addEventListener("change", renderCandidates);
 statusFilterSelect?.addEventListener("change", renderCandidates);
 sourceFilterSelect?.addEventListener("change", renderCandidates);
+toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
+  setRecruitmentToolbarVisible(recruitmentToolbarContent?.hidden);
+});
 
 importDropZone?.addEventListener("click", () => {
   if (importBusy) {
@@ -1349,12 +1384,17 @@ document.addEventListener("click", (event) => {
   closeStatusQuickMenu();
 });
 
-window.addEventListener(
+document.addEventListener(
   "scroll",
-  () => {
-    if (!statusQuickMenu?.hidden) {
-      closeStatusQuickMenu();
+  (event) => {
+    if (statusQuickMenu?.hidden) {
+      return;
     }
+    const target = event.target;
+    if (target instanceof Node && statusQuickMenu?.contains(target)) {
+      return;
+    }
+    closeStatusQuickMenu();
   },
   true
 );
