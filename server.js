@@ -16,6 +16,7 @@ const oneTouchTagsHandler = require("./api/onetouch/tags");
 const recruitmentHandler = require("./api/recruitment");
 const recruitmentImportHandler = require("./api/recruitment/import");
 const recruitmentOneTouchOptionsHandler = require("./api/recruitment/onetouch-options");
+const recruitmentInitialScreenHandler = require("./api/recruitment/initial-screen");
 const recruitmentStatusHandler = require("./api/recruitment/status");
 const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
@@ -271,6 +272,14 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/recruitment/onetouch-options") {
     await recruitmentOneTouchOptionsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/recruitment/initial-screen") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await recruitmentInitialScreenHandler(apiReq, apiRes);
     return true;
   }
 

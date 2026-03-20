@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Initial Screen</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260320" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container clients-main">
+      <section class="hero compact">
+        <div class="screen-hero-row">
+          <div>
+            <p class="eyebrow">Recruitment</p>
+            <h1 id="screenCandidateName">Initial 10-Minute Call</h1>
+            <p id="screenCandidateMeta">Loading candidate details...</p>
+          </div>
+          <a class="secondary button-like" href="./recruitment.html">Back to Recruitment</a>
+        </div>
+      </section>
+
+      <section class="panel initial-screen-panel">
+        <div class="screen-intro-card">
+          <p class="screen-script-label">Warm introduction</p>
+          <p>
+            Hi <span id="screenCandidateFirstName">there</span>, thank you for taking the time to chat with me today.
+            This is a short introductory call, around 10 minutes, to get a sense of availability, travel flexibility,
+            and whether Thrive feels like the right values fit.
+          </p>
+          <p>
+            Thrive is still a young and growing organisation, so we are looking for people who are open to adapting,
+            helping shape how we work, and growing with us.
+          </p>
+          <p class="muted">Use this form to capture the call notes and score each answer.</p>
+        </div>
+
+        <p id="screenStatusMessage" class="muted">Loading screening form...</p>
+
+        <form id="initialScreenForm" class="initial-screen-form" hidden>
+          <section class="screen-section">
+            <div class="screen-section-heading">
+              <p class="eyebrow">Availability & Travel</p>
+              <h2>Availability, short notice and travel</h2>
+            </div>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>1. What sort of availability do you currently have for work? Are you looking for full-time, part-time, or flexible hours?</h3>
+                <label class="field compact-field" for="q1Score">
+                  Score
+                  <select id="q1Score">
+                    <option value="">Select</option>
+                    <option value="Green">Green</option>
+                    <option value="Amber">Amber</option>
+                    <option value="Red">Red</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field" for="q1NotesAvailability">
+                Notes
+                <textarea id="q1NotesAvailability" placeholder="Capture availability, preferred hours, weekends, and anything important for scheduling."></textarea>
+              </label>
+            </article>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>2. Are you open to covering short-notice or emergency shifts, including evenings or weekends on occasion?</h3>
+                <label class="field compact-field" for="q2Score">
+                  Score
+                  <select id="q2Score">
+                    <option value="">Select</option>
+                    <option value="Green">Green</option>
+                    <option value="Amber">Amber</option>
+                    <option value="Red">Red</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field" for="q2NotesShortNotice">
+                Notes
+                <textarea id="q2NotesShortNotice" placeholder="Capture flexibility for short notice, evenings, weekends, and any limits."></textarea>
+              </label>
+            </article>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>3. Are you happy to travel for placements or cover, and do you drive or use public transport?</h3>
+                <label class="field compact-field" for="q3Score">
+                  Score
+                  <select id="q3Score">
+                    <option value="">Select</option>
+                    <option value="Green">Green</option>
+                    <option value="Amber">Amber</option>
+                    <option value="Red">Red</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field" for="q3NotesTravel">
+                Notes
+                <textarea id="q3NotesTravel" placeholder="Capture travel range, preferred towns, transport method, and any constraints."></textarea>
+              </label>
+            </article>
+          </section>
+
+          <section class="screen-section">
+            <div class="screen-section-heading">
+              <p class="eyebrow">Values & Fit</p>
+              <h2>Values, standards and cultural fit</h2>
+            </div>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>4. Thrive’s values are creative, connected, empowering and impactful. Which of those stand out to you, and why?</h3>
+                <label class="field compact-field" for="q4Score">
+                  Score
+                  <select id="q4Score">
+                    <option value="">Select</option>
+                    <option value="Green">Green</option>
+                    <option value="Amber">Amber</option>
+                    <option value="Red">Red</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field" for="q4NotesValuesFit">
+                Notes
+                <textarea id="q4NotesValuesFit" placeholder="Capture what they connect with and any examples that show values fit."></textarea>
+              </label>
+            </article>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>5. In your view, what does good care feel like, not just what is done, but how it is done?</h3>
+                <label class="field compact-field" for="q5Score">
+                  Score
+                  <select id="q5Score">
+                    <option value="">Select</option>
+                    <option value="Green">Green</option>
+                    <option value="Amber">Amber</option>
+                    <option value="Red">Red</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field" for="q5NotesGoodCare">
+                Notes
+                <textarea id="q5NotesGoodCare" placeholder="Capture how they talk about dignity, choice, independence, warmth, and standards."></textarea>
+              </label>
+            </article>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>6. Thrive is still building systems and routines, so we often try things, learn, and adapt. Have you worked like that before, and how do you feel about that flexibility?</h3>
+                <label class="field compact-field" for="q6Score">
+                  Score
+                  <select id="q6Score">
+                    <option value="">Select</option>
+                    <option value="Green">Green</option>
+                    <option value="Amber">Amber</option>
+                    <option value="Red">Red</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field" for="q6NotesFlexibility">
+                Notes
+                <textarea id="q6NotesFlexibility" placeholder="Capture examples of adaptability, pace of change, and comfort with ambiguity."></textarea>
+              </label>
+            </article>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>7. How do you support a client’s emotional or social wellbeing, and how do you look after yourself in this role?</h3>
+                <label class="field compact-field" for="q7Score">
+                  Score
+                  <select id="q7Score">
+                    <option value="">Select</option>
+                    <option value="Green">Green</option>
+                    <option value="Amber">Amber</option>
+                    <option value="Red">Red</option>
+                  </select>
+                </label>
+              </div>
+              <label class="field" for="q7NotesWellbeing">
+                Notes
+                <textarea id="q7NotesWellbeing" placeholder="Capture how they support wellbeing, reduce loneliness, and maintain their own resilience."></textarea>
+              </label>
+            </article>
+          </section>
+
+          <section class="screen-section">
+            <div class="screen-section-heading">
+              <p class="eyebrow">Close</p>
+              <h2>Summary and next steps</h2>
+            </div>
+
+            <label class="field" for="initialCallSummary">
+              Initial Call Summary
+              <textarea id="initialCallSummary" placeholder="Summarise the overall call, strengths, concerns, and anything to carry into the next stage."></textarea>
+            </label>
+
+            <label class="checkbox-field" for="fullTimeRequired">
+              <input id="fullTimeRequired" type="checkbox" />
+              <span>Candidate said full-time hours are required</span>
+            </label>
+          </section>
+
+          <div class="screen-actions">
+            <button id="saveInitialScreenBtn" type="submit">Save Initial Screen</button>
+            <a class="secondary button-like" href="./recruitment.html">Back to Recruitment</a>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script type="module" src="./initial-screen.js"></script>
+  </body>
+</html>

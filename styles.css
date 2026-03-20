@@ -869,6 +869,30 @@ dd {
   font-size: 0.82rem;
 }
 
+.recruitment-action-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.recruitment-screen-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 1px solid #d4dceb;
+  border-radius: 10px;
+  background: #eef2f8;
+  color: #1c2433;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.recruitment-screen-link:hover {
+  background: #e5ebf5;
+}
+
 .status-pill-trigger {
   display: inline-flex;
   align-items: center;
@@ -1051,6 +1075,141 @@ dd {
 
 #recruitmentToolbarContent {
   margin-top: 14px;
+}
+
+.button-like {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid #d4dceb;
+  border-radius: 11px;
+  background: #eef2f8;
+  color: #1c2433;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.button-like:hover {
+  background: #e5ebf5;
+}
+
+.screen-hero-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.screen-script-label {
+  margin: 0 0 8px;
+  color: #1b5467;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.initial-screen-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.screen-intro-card {
+  padding: 18px 20px;
+  border: 1px solid #d7e1ef;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(49, 183, 200, 0.12), rgba(255, 255, 255, 0.98)),
+    #ffffff;
+}
+
+.screen-intro-card p {
+  margin: 0 0 10px;
+}
+
+.initial-screen-form {
+  display: grid;
+  gap: 18px;
+}
+
+.screen-section {
+  display: grid;
+  gap: 14px;
+}
+
+.screen-section-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.screen-section-heading h2 {
+  margin: 0;
+}
+
+.screen-question-card {
+  padding: 18px;
+  border: 1px solid #d9e2ef;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(17, 20, 26, 0.05);
+}
+
+.screen-question-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  gap: 16px;
+  align-items: start;
+}
+
+.screen-question-top h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.compact-field {
+  margin: 0;
+}
+
+.screen-question-card textarea,
+.initial-screen-form textarea {
+  min-height: 120px;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #d7e1ef;
+  border-radius: 14px;
+  background: #f8fbff;
+  font-weight: 700;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.screen-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .screen-hero-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .screen-question-top {
+    grid-template-columns: 1fr;
+  }
 }
 
 .recruitment-import-wrap h3 {

@@ -377,6 +377,31 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getRecruitmentInitialScreen(query = {}) {
+      const response = await authFetch(buildUrl("/api/recruitment/initial-screen", query), {
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment initial screen request failed");
+      }
+      return response.json();
+    },
+
+    async saveRecruitmentInitialScreen(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment/initial-screen"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment initial screen save failed");
+      }
+      return response.json();
+    },
+
     async previewRecruitmentImport(payload = {}) {
       const response = await authFetch(endpoint("/api/recruitment/import"), {
         method: "POST",

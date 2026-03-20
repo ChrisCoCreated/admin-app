@@ -141,6 +141,12 @@ function hasOneTouchLink(candidate) {
   return Boolean(cleanText(candidate?.oneTouchLink));
 }
 
+function getInitialScreenUrl(candidateId) {
+  const url = new URL("./initial-screen.html", window.location.href);
+  url.searchParams.set("itemId", cleanText(candidateId));
+  return url.toString();
+}
+
 function setAddButtonsBusy(disabled) {
   addToOneTouchBusy = disabled;
   if (oneTouchPickerConfirmBtn) {
@@ -905,17 +911,20 @@ function renderCandidates() {
       <td>${escapeHtml(cleanText(candidate.source) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.phoneNumber) || "-")}</td>
       <td>
-        ${
-          hasOneTouchLink(candidate)
-            ? `<a
-                class="button-link-one-touch recruitment-open-link"
-                href="${escapeHtml(cleanText(candidate.oneTouchLink))}"
-                target="_blank"
-                rel="noopener noreferrer"
-                >Open in OneTouch</a
-              >`
-            : `<button type="button" class="secondary recruitment-add-btn"${addToOneTouchBusy ? " disabled" : ""}>Add to OneTouch</button>`
-        }
+        <div class="recruitment-action-stack">
+          <a class="secondary recruitment-screen-link" href="${escapeHtml(getInitialScreenUrl(candidate.id))}">Initial Screen</a>
+          ${
+            hasOneTouchLink(candidate)
+              ? `<a
+                  class="button-link-one-touch recruitment-open-link"
+                  href="${escapeHtml(cleanText(candidate.oneTouchLink))}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Open in OneTouch</a
+                >`
+              : `<button type="button" class="secondary recruitment-add-btn"${addToOneTouchBusy ? " disabled" : ""}>Add to OneTouch</button>`
+          }
+        </div>
       </td>
     `;
 
