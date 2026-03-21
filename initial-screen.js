@@ -28,7 +28,6 @@ const fieldRefs = {
   q7NotesWellbeing: document.getElementById("q7NotesWellbeing"),
   q7Score: document.getElementById("q7Score"),
   initialCallSummary: document.getElementById("initialCallSummary"),
-  fullTimeRequired: document.getElementById("fullTimeRequired"),
 };
 
 const authController = createAuthController({
@@ -85,6 +84,7 @@ function syncScoreChipGroup(fieldId, value) {
     return;
   }
   const selectedValue = cleanText(value);
+  group.classList.toggle("has-selection", Boolean(selectedValue));
   for (const button of group.querySelectorAll(".score-chip")) {
     const isActive = cleanText(button.getAttribute("data-score-value")) === selectedValue;
     button.classList.toggle("is-active", isActive);
@@ -108,7 +108,6 @@ function fillForm(responses = {}) {
   fieldRefs.q7NotesWellbeing.value = cleanText(responses.q7NotesWellbeing);
   fieldRefs.q7Score.value = cleanText(responses.q7Score);
   fieldRefs.initialCallSummary.value = cleanText(responses.initialCallSummary);
-  fieldRefs.fullTimeRequired.checked = responses.fullTimeRequired === true;
   syncScoreChipGroup("q1Score", fieldRefs.q1Score.value);
   syncScoreChipGroup("q2Score", fieldRefs.q2Score.value);
   syncScoreChipGroup("q3Score", fieldRefs.q3Score.value);
@@ -135,7 +134,6 @@ function readForm() {
     q7NotesWellbeing: fieldRefs.q7NotesWellbeing.value,
     q7Score: fieldRefs.q7Score.value,
     initialCallSummary: fieldRefs.initialCallSummary.value,
-    fullTimeRequired: fieldRefs.fullTimeRequired.checked,
   };
 }
 
