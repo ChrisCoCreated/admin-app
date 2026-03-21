@@ -35,7 +35,6 @@ const SCREEN_FIELDS = [
   "Q7_Notes_Wellbeing",
   "Q7_Score",
   "InitialCallSummary",
-  "FullTimeRequired",
 ];
 
 function normalizeText(value) {
@@ -138,7 +137,6 @@ function mapInitialScreenItem(item) {
       q7NotesWellbeing: normalizeText(fields.Q7_Notes_Wellbeing),
       q7Score: normalizeScore(fields.Q7_Score),
       initialCallSummary: normalizeText(fields.InitialCallSummary),
-      fullTimeRequired: toBoolean(fields.FullTimeRequired),
     },
   };
 }
@@ -160,7 +158,6 @@ function buildPatchBody(input = {}) {
     Q7_Notes_Wellbeing: normalizeText(input.q7NotesWellbeing),
     Q7_Score: normalizeScore(input.q7Score),
     InitialCallSummary: normalizeText(input.initialCallSummary),
-    FullTimeRequired: input.fullTimeRequired === true,
   };
 }
 

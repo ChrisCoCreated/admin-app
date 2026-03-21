@@ -43,6 +43,55 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+function getDraftStorageKey(itemId) {
+  return `recruitment-initial-screen-draft:${cleanText(itemId)}`;
+}
+
+function loadLocalDraft(itemId) {
+  const key = getDraftStorageKey(itemId);
+  if (!key) {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalDraft() {
+  if (!currentItemId) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      getDraftStorageKey(currentItemId),
+      JSON.stringify({
+        updatedAt: new Date().toISOString(),
+        responses: readForm(),
+      })
+    );
+  } catch {
+    // Ignore storage failures and keep the screening flow usable.
+  }
+}
+
+function clearLocalDraft(itemId) {
+  if (!itemId) {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(getDraftStorageKey(itemId));
+  } catch {
+    // Ignore storage failures and keep the screening flow usable.
+  }
+}
+
 function setStatus(message, isError = false) {
   if (!screenStatusMessage) {
     return;
@@ -161,9 +210,13 @@ async function loadInitialScreen() {
 
   renderCandidateHeader(item);
   fillForm(item.responses || {});
+  const localDraft = loadLocalDraft(currentItemId);
+  if (localDraft?.responses && typeof localDraft.responses === "object") {
+    fillForm(localDraft.responses);
+  }
   initialScreenForm.hidden = false;
   setFormEnabled(true);
-  setStatus("Initial screening form loaded.");
+  setStatus(localDraft ? "Initial screening form loaded. Restored local draft." : "Initial screening form loaded.");
 }
 
 async function saveInitialScreen(event) {
@@ -182,6 +235,7 @@ async function saveInitialScreen(event) {
       responses: readForm(),
     });
     fillForm(result?.item?.responses || {});
+    clearLocalDraft(currentItemId);
     setStatus("Initial screening notes saved.");
   } catch (error) {
     console.error(error);
@@ -236,8 +290,18 @@ for (const group of scoreChipGroups) {
       }
       input.value = cleanText(button.getAttribute("data-score-value"));
       syncScoreChipGroup(fieldId, input.value);
+      saveLocalDraft();
     });
   }
+}
+
+for (const field of Object.values(fieldRefs)) {
+  if (!(field instanceof HTMLTextAreaElement)) {
+    continue;
+  }
+  field.addEventListener("input", () => {
+    saveLocalDraft();
+  });
 }
 
 signOutBtn?.addEventListener("click", async () => {
