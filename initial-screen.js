@@ -33,6 +33,8 @@ const fieldRefs = {
   q7NotesWellbeing: document.getElementById("q7NotesWellbeing"),
   q7Score: document.getElementById("q7Score"),
   initialCallSummary: document.getElementById("initialCallSummary"),
+  screenOutcome: document.getElementById("screenOutcome"),
+  screenNextSteps: document.getElementById("screenNextSteps"),
 };
 
 const authController = createAuthController({
@@ -43,10 +45,20 @@ const directoryApi = createDirectoryApi(authController);
 
 let currentItemId = "";
 let saveBusy = false;
+let copyFeedbackTimer = 0;
 const SCORE_FIELD_KEYS = ["q1Score", "q2Score", "q3Score", "q4Score", "q5Score", "q6Score", "q7Score"];
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function getDraftStorageKey(itemId) {
@@ -166,6 +178,8 @@ function fillForm(responses = {}) {
   fieldRefs.q7NotesWellbeing.value = cleanText(responses.q7NotesWellbeing);
   fieldRefs.q7Score.value = cleanText(responses.q7Score);
   fieldRefs.initialCallSummary.value = cleanText(responses.initialCallSummary);
+  fieldRefs.screenOutcome.value = cleanText(responses.screenOutcome);
+  fieldRefs.screenNextSteps.value = cleanText(responses.screenNextSteps);
   syncScoreChipGroup("q1Score", fieldRefs.q1Score.value);
   syncScoreChipGroup("q2Score", fieldRefs.q2Score.value);
   syncScoreChipGroup("q3Score", fieldRefs.q3Score.value);
@@ -193,6 +207,8 @@ function readForm() {
     q7NotesWellbeing: fieldRefs.q7NotesWellbeing.value,
     q7Score: fieldRefs.q7Score.value,
     initialCallSummary: fieldRefs.initialCallSummary.value,
+    screenOutcome: fieldRefs.screenOutcome.value,
+    screenNextSteps: fieldRefs.screenNextSteps.value,
   };
 }
 
@@ -237,19 +253,108 @@ function buildCopySummaryText() {
     `Initial Screen Summary: ${cleanText(screenCandidateName?.textContent) || "Candidate"}`,
     cleanText(screenCandidateMeta?.textContent) ? `Details: ${cleanText(screenCandidateMeta.textContent)}` : "",
     `Scores: Green ${counts.Green} | Amber ${counts.Amber} | Red ${counts.Red} | Unscored ${counts.Unscored}`,
+    form.screenOutcome ? `Outcome: ${cleanText(form.screenOutcome)}` : "",
+    form.screenNextSteps ? `Next steps: ${cleanText(form.screenNextSteps)}` : "",
     form.initialCallSummary ? `Call summary: ${cleanText(form.initialCallSummary)}` : "",
     `Link: ${window.location.href}`,
   ];
   return lines.filter(Boolean).join("\n");
 }
 
+function buildCopySummaryHtml() {
+  const form = readForm();
+  const counts = getScoreCounts();
+  const candidateName = cleanText(screenCandidateName?.textContent) || "Candidate";
+  const candidateMeta = cleanText(screenCandidateMeta?.textContent);
+  const summaryText = cleanText(form.initialCallSummary);
+  const screenOutcome = cleanText(form.screenOutcome);
+  const screenNextSteps = cleanText(form.screenNextSteps);
+  const pageUrl = window.location.href;
+
+  return `
+    <div style="font-family: Manrope, Segoe UI, Arial, sans-serif; color: #1c2433; line-height: 1.45;">
+      <h2 style="margin: 0 0 8px; font-size: 20px;">Initial Screen Summary: ${escapeHtml(candidateName)}</h2>
+      ${candidateMeta ? `<p style="margin: 0 0 12px; color: #5b6576;">${escapeHtml(candidateMeta)}</p>` : ""}
+      <table style="border-collapse: collapse; margin: 0 0 14px;">
+        <tr>
+          <td style="padding: 6px 10px; border-radius: 999px; background: #ecfaf2; color: #0f6a3b; font-weight: 700;">Green: ${counts.Green}</td>
+          <td style="width: 8px;"></td>
+          <td style="padding: 6px 10px; border-radius: 999px; background: #fff6e5; color: #8a5a00; font-weight: 700;">Amber: ${counts.Amber}</td>
+          <td style="width: 8px;"></td>
+          <td style="padding: 6px 10px; border-radius: 999px; background: #fdecec; color: #a22a2a; font-weight: 700;">Red: ${counts.Red}</td>
+          <td style="width: 8px;"></td>
+          <td style="padding: 6px 10px; border-radius: 999px; background: #f5f7fa; color: #5c6676; font-weight: 700;">Unscored: ${counts.Unscored}</td>
+        </tr>
+      </table>
+      ${
+        screenOutcome
+          ? `<p style="margin: 0 0 10px;"><strong>Outcome:</strong> ${escapeHtml(screenOutcome)}</p>`
+          : ""
+      }
+      ${
+        screenNextSteps
+          ? `<div style="margin: 0 0 14px;">
+              <div style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #1b5467; font-weight: 800;">Next Steps</div>
+              <div style="padding: 12px 14px; border: 1px solid #d8e1ed; border-radius: 12px; background: #fbfdff; white-space: pre-wrap;">${escapeHtml(screenNextSteps)}</div>
+            </div>`
+          : ""
+      }
+      ${
+        summaryText
+          ? `<div style="margin: 0 0 14px;">
+              <div style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #1b5467; font-weight: 800;">Call Summary</div>
+              <div style="padding: 12px 14px; border: 1px solid #d8e1ed; border-radius: 12px; background: #fbfdff; white-space: pre-wrap;">${escapeHtml(summaryText)}</div>
+            </div>`
+          : ""
+      }
+      <p style="margin: 0;"><a href="${escapeHtml(pageUrl)}" style="color: #1f3f89; font-weight: 700;">Open Initial Screen</a></p>
+    </div>
+  `.trim();
+}
+
+function setCopyButtonState(state) {
+  if (!copyScreenSummaryBtn) {
+    return;
+  }
+  window.clearTimeout(copyFeedbackTimer);
+  copyScreenSummaryBtn.classList.remove("is-success", "is-error");
+  copyScreenSummaryBtn.textContent = "Copy Summary";
+  if (state === "success") {
+    copyScreenSummaryBtn.classList.add("is-success");
+    copyScreenSummaryBtn.textContent = "Copied";
+    copyFeedbackTimer = window.setTimeout(() => {
+      copyScreenSummaryBtn.classList.remove("is-success");
+      copyScreenSummaryBtn.textContent = "Copy Summary";
+    }, 1800);
+  } else if (state === "error") {
+    copyScreenSummaryBtn.classList.add("is-error");
+    copyScreenSummaryBtn.textContent = "Copy Failed";
+    copyFeedbackTimer = window.setTimeout(() => {
+      copyScreenSummaryBtn.classList.remove("is-error");
+      copyScreenSummaryBtn.textContent = "Copy Summary";
+    }, 1800);
+  }
+}
+
 async function copyScreenSummary() {
   const text = buildCopySummaryText();
+  const html = buildCopySummaryHtml();
   try {
-    await navigator.clipboard.writeText(text);
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/plain": new Blob([text], { type: "text/plain" }),
+          "text/html": new Blob([html], { type: "text/html" }),
+        }),
+      ]);
+    } else {
+      await navigator.clipboard.writeText(text);
+    }
+    setCopyButtonState("success");
     setStatus("Summary copied to clipboard.");
   } catch (error) {
     console.error(error);
+    setCopyButtonState("error");
     setStatus("Could not copy summary to clipboard.", true);
   }
 }
@@ -365,10 +470,14 @@ for (const group of scoreChipGroups) {
 }
 
 for (const field of Object.values(fieldRefs)) {
-  if (!(field instanceof HTMLTextAreaElement)) {
+  if (!(field instanceof HTMLTextAreaElement) && !(field instanceof HTMLSelectElement)) {
     continue;
   }
   field.addEventListener("input", () => {
+    renderScoreSummary();
+    saveLocalDraft();
+  });
+  field.addEventListener("change", () => {
     renderScoreSummary();
     saveLocalDraft();
   });

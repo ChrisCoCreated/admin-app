@@ -1295,6 +1295,27 @@ dd {
   margin: 0;
 }
 
+#copyScreenSummaryBtn {
+  min-width: 124px;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+#copyScreenSummaryBtn.is-success {
+  background: #dff6e8;
+  color: #0f6a3b;
+  box-shadow: 0 8px 18px rgba(15, 106, 59, 0.16);
+}
+
+#copyScreenSummaryBtn.is-error {
+  background: #fde1e1;
+  color: #a22a2a;
+  box-shadow: 0 8px 18px rgba(162, 42, 42, 0.14);
+}
+
 .screen-score-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

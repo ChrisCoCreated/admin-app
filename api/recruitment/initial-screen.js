@@ -35,6 +35,8 @@ const SCREEN_FIELDS = [
   "Q7_Notes_Wellbeing",
   "Q7_Score",
   "InitialCallSummary",
+  "ScreenOutcome",
+  "ScreenNextSteps",
 ];
 
 function normalizeText(value) {
@@ -137,6 +139,8 @@ function mapInitialScreenItem(item) {
       q7NotesWellbeing: normalizeText(fields.Q7_Notes_Wellbeing),
       q7Score: normalizeScore(fields.Q7_Score),
       initialCallSummary: normalizeText(fields.InitialCallSummary),
+      screenOutcome: normalizeText(fields.ScreenOutcome),
+      screenNextSteps: normalizeText(fields.ScreenNextSteps),
     },
   };
 }
@@ -158,6 +162,8 @@ function buildPatchBody(input = {}) {
     Q7_Notes_Wellbeing: normalizeText(input.q7NotesWellbeing),
     Q7_Score: normalizeScore(input.q7Score),
     InitialCallSummary: normalizeText(input.initialCallSummary),
+    ScreenOutcome: normalizeText(input.screenOutcome),
+    ScreenNextSteps: normalizeText(input.screenNextSteps),
   };
 }
 
