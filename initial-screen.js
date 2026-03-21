@@ -10,6 +10,11 @@ const screenCandidateMeta = document.getElementById("screenCandidateMeta");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
 const initialScreenForm = document.getElementById("initialScreenForm");
 const saveInitialScreenBtn = document.getElementById("saveInitialScreenBtn");
+const copyScreenSummaryBtn = document.getElementById("copyScreenSummaryBtn");
+const scoreCountGreen = document.getElementById("scoreCountGreen");
+const scoreCountAmber = document.getElementById("scoreCountAmber");
+const scoreCountRed = document.getElementById("scoreCountRed");
+const scoreCountUnscored = document.getElementById("scoreCountUnscored");
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
 const fieldRefs = {
@@ -38,6 +43,7 @@ const directoryApi = createDirectoryApi(authController);
 
 let currentItemId = "";
 let saveBusy = false;
+const SCORE_FIELD_KEYS = ["q1Score", "q2Score", "q3Score", "q4Score", "q5Score", "q6Score", "q7Score"];
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -114,6 +120,9 @@ function setFormEnabled(enabled) {
   if (saveInitialScreenBtn) {
     saveInitialScreenBtn.disabled = !enabled || saveBusy;
   }
+  if (copyScreenSummaryBtn) {
+    copyScreenSummaryBtn.disabled = !enabled || saveBusy;
+  }
   for (const field of Object.values(fieldRefs)) {
     if (!field) {
       continue;
@@ -164,6 +173,7 @@ function fillForm(responses = {}) {
   syncScoreChipGroup("q5Score", fieldRefs.q5Score.value);
   syncScoreChipGroup("q6Score", fieldRefs.q6Score.value);
   syncScoreChipGroup("q7Score", fieldRefs.q7Score.value);
+  renderScoreSummary();
 }
 
 function readForm() {
@@ -184,6 +194,64 @@ function readForm() {
     q7Score: fieldRefs.q7Score.value,
     initialCallSummary: fieldRefs.initialCallSummary.value,
   };
+}
+
+function getScoreCounts() {
+  const counts = {
+    Green: 0,
+    Amber: 0,
+    Red: 0,
+    Unscored: 0,
+  };
+  for (const key of SCORE_FIELD_KEYS) {
+    const value = cleanText(fieldRefs[key]?.value);
+    if (value === "Green" || value === "Amber" || value === "Red") {
+      counts[value] += 1;
+    } else {
+      counts.Unscored += 1;
+    }
+  }
+  return counts;
+}
+
+function renderScoreSummary() {
+  const counts = getScoreCounts();
+  if (scoreCountGreen) {
+    scoreCountGreen.textContent = String(counts.Green);
+  }
+  if (scoreCountAmber) {
+    scoreCountAmber.textContent = String(counts.Amber);
+  }
+  if (scoreCountRed) {
+    scoreCountRed.textContent = String(counts.Red);
+  }
+  if (scoreCountUnscored) {
+    scoreCountUnscored.textContent = String(counts.Unscored);
+  }
+}
+
+function buildCopySummaryText() {
+  const form = readForm();
+  const counts = getScoreCounts();
+  const lines = [
+    `Initial Screen Summary: ${cleanText(screenCandidateName?.textContent) || "Candidate"}`,
+    cleanText(screenCandidateMeta?.textContent) ? `Details: ${cleanText(screenCandidateMeta.textContent)}` : "",
+    `Scores: Green ${counts.Green} | Amber ${counts.Amber} | Red ${counts.Red} | Unscored ${counts.Unscored}`,
+    form.initialCallSummary ? `Call summary: ${cleanText(form.initialCallSummary)}` : "",
+    `Link: ${window.location.href}`,
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
+async function copyScreenSummary() {
+  const text = buildCopySummaryText();
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus("Summary copied to clipboard.");
+  } catch (error) {
+    console.error(error);
+    setStatus("Could not copy summary to clipboard.", true);
+  }
 }
 
 function renderCandidateHeader(item) {
@@ -290,6 +358,7 @@ for (const group of scoreChipGroups) {
       }
       input.value = cleanText(button.getAttribute("data-score-value"));
       syncScoreChipGroup(fieldId, input.value);
+      renderScoreSummary();
       saveLocalDraft();
     });
   }
@@ -300,9 +369,17 @@ for (const field of Object.values(fieldRefs)) {
     continue;
   }
   field.addEventListener("input", () => {
+    renderScoreSummary();
     saveLocalDraft();
   });
 }
+
+copyScreenSummaryBtn?.addEventListener("click", async () => {
+  if (copyScreenSummaryBtn.disabled) {
+    return;
+  }
+  await copyScreenSummary();
+});
 
 signOutBtn?.addEventListener("click", async () => {
   try {
