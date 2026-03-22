@@ -85,6 +85,8 @@ let listChoices = {
 let suppliersLoaded = false;
 let loadingSuppliers = false;
 let savingSupplier = false;
+let saveFeedbackState = "idle";
+let saveFeedbackResetTimer = null;
 
 function redirectToUnauthorized(pageKey) {
   const page = encodeURIComponent(String(pageKey || "suppliers").trim().toLowerCase());
@@ -143,6 +145,21 @@ function resolveFieldAliases() {
     rating: fieldInternalName(["Rating"], { writable: true }),
     ee: fieldInternalName(["EE"], { writable: true }),
     tags: fieldInternalName(["Tags"], { writable: true }),
+  };
+}
+
+function resolveWritableFields() {
+  return {
+    title: fieldByTitleWritable(["Title"]),
+    supplierType: fieldByTitleWritable(["Supplier Type"]),
+    notes: fieldByTitleWritable(["Notes"]),
+    website: fieldByTitleWritable(["Website"]),
+    town: fieldByTitleWritable(["Town"]),
+    county: fieldByTitleWritable(["County"]),
+    contactDetails: fieldByTitleWritable(["Contact Details"]),
+    rating: fieldByTitleWritable(["Rating"]),
+    ee: fieldByTitleWritable(["EE"]),
+    tags: fieldByTitleWritable(["Tags"]),
   };
 }
 
@@ -674,13 +691,13 @@ function renderQuickEntryPreview() {
   quickEntryIntro.textContent = isEeMode
     ? "Create a new EE experience or resource in SharePoint from here."
     : "Create a new standard supplier entry in SharePoint from here.";
-  quickEntryStatus.textContent = isEeMode
-    ? savingSupplier
-      ? "Saving this EE entry to SharePoint..."
-      : "This entry will be saved with EE set to True."
-    : savingSupplier
-      ? "Saving this standard supplier to SharePoint..."
-      : "This entry will be saved with EE set to False.";
+  if (quickEntryStatus) {
+    quickEntryStatus.hidden = saveFeedbackState !== "error";
+    if (saveFeedbackState !== "error") {
+      quickEntryStatus.textContent = "";
+      quickEntryStatus.classList.remove("error");
+    }
+  }
   quickEntryPreview.textContent = buildQuickEntryPreviewText();
 }
 
@@ -707,6 +724,42 @@ function setBusyState() {
   }
   if (saveEntryBtn) {
     saveEntryBtn.disabled = savingSupplier || loadingSuppliers;
+    saveEntryBtn.classList.toggle("is-generating", savingSupplier);
+    saveEntryBtn.classList.toggle("is-success", saveFeedbackState === "success");
+    saveEntryBtn.classList.toggle("is-error", saveFeedbackState === "error");
+    saveEntryBtn.textContent = savingSupplier
+      ? "Saving..."
+      : saveFeedbackState === "success"
+        ? "Saved"
+        : saveFeedbackState === "error"
+          ? "Try again"
+          : "Save to SharePoint";
+  }
+}
+
+function setSaveFeedbackState(state, errorMessage = "") {
+  saveFeedbackState = state;
+  if (saveFeedbackResetTimer) {
+    clearTimeout(saveFeedbackResetTimer);
+    saveFeedbackResetTimer = null;
+  }
+
+  if (quickEntryStatus) {
+    quickEntryStatus.hidden = state !== "error";
+    quickEntryStatus.textContent = state === "error" ? errorMessage : "";
+    quickEntryStatus.classList.toggle("error", state === "error");
+  }
+
+  setBusyState();
+  renderQuickEntryPreview();
+
+  if (state === "success") {
+    saveFeedbackResetTimer = setTimeout(() => {
+      saveFeedbackState = "idle";
+      saveFeedbackResetTimer = null;
+      setBusyState();
+      renderQuickEntryPreview();
+    }, 1800);
   }
 }
 
@@ -829,6 +882,45 @@ function buildWebsitePayload(url, title) {
   };
 }
 
+function setSharePointFieldValue(requestBody, field, value, options = {}) {
+  if (!field?.InternalName || field.ReadOnlyField) {
+    return;
+  }
+
+  if (value == null) {
+    return;
+  }
+
+  const type = normalizeValue(field.TypeAsString);
+  if (type === "URL") {
+    const websitePayload = buildWebsitePayload(value, options.title || "");
+    if (websitePayload) {
+      requestBody[field.InternalName] = websitePayload;
+    }
+    return;
+  }
+
+  if (type === "MultiChoice" || field.AllowMultipleValues) {
+    const results = normalizeTagList(value);
+    if (results.length) {
+      requestBody[field.InternalName] = { results };
+    }
+    return;
+  }
+
+  if (type === "Boolean") {
+    requestBody[field.InternalName] = Boolean(value);
+    return;
+  }
+
+  const normalized = typeof value === "string" ? normalizeValue(value) : value;
+  if (normalized === "") {
+    return;
+  }
+
+  requestBody[field.InternalName] = normalized;
+}
+
 async function createSupplierInSharePoint() {
   const payload = quickEntryPayload();
   if (!payload.title) {
@@ -840,39 +932,21 @@ async function createSupplierInSharePoint() {
     await loadListInfo();
   }
 
-  const aliases = resolveFieldAliases();
+  const fields = resolveWritableFields();
   const requestBody = {
     __metadata: { type: listInfo.ListItemEntityTypeFullName },
   };
 
-  requestBody[aliases.title] = payload.title;
-  if (aliases.supplierType && payload.supplierType) {
-    requestBody[aliases.supplierType] = payload.supplierType;
-  }
-  if (aliases.notes && payload.notes) {
-    requestBody[aliases.notes] = payload.notes;
-  }
-  if (aliases.website && payload.website) {
-    requestBody[aliases.website] = buildWebsitePayload(payload.website, payload.title);
-  }
-  if (aliases.town && payload.town) {
-    requestBody[aliases.town] = payload.town;
-  }
-  if (aliases.county && payload.county) {
-    requestBody[aliases.county] = payload.county;
-  }
-  if (aliases.contactDetails && payload.contactDetails) {
-    requestBody[aliases.contactDetails] = payload.contactDetails;
-  }
-  if (aliases.rating && payload.rating) {
-    requestBody[aliases.rating] = payload.rating;
-  }
-  if (aliases.ee) {
-    requestBody[aliases.ee] = Boolean(payload.isEe);
-  }
-  if (aliases.tags && payload.tag) {
-    requestBody[aliases.tags] = payload.tag;
-  }
+  setSharePointFieldValue(requestBody, fields.title, payload.title);
+  setSharePointFieldValue(requestBody, fields.supplierType, payload.supplierType);
+  setSharePointFieldValue(requestBody, fields.notes, payload.notes);
+  setSharePointFieldValue(requestBody, fields.website, payload.website, { title: payload.title });
+  setSharePointFieldValue(requestBody, fields.town, payload.town);
+  setSharePointFieldValue(requestBody, fields.county, payload.county);
+  setSharePointFieldValue(requestBody, fields.contactDetails, payload.contactDetails);
+  setSharePointFieldValue(requestBody, fields.rating, payload.rating);
+  setSharePointFieldValue(requestBody, fields.ee, payload.isEe);
+  setSharePointFieldValue(requestBody, fields.tags, payload.tag);
 
   const config = getConfig();
   const api = getSpApi(config);
@@ -882,27 +956,29 @@ async function createSupplierInSharePoint() {
 
 function resetQuickEntry() {
   quickEntryForm.reset();
+  setSaveFeedbackState("idle");
   renderQuickEntryPreview();
 }
 
 async function handleSaveSupplier() {
   savingSupplier = true;
+  setSaveFeedbackState("idle");
   setBusyState();
-  renderQuickEntryPreview();
 
   try {
     setStatus("Saving supplier to SharePoint...");
     const itemId = await createSupplierInSharePoint();
     await loadSuppliers();
     resetQuickEntry();
+    setSaveFeedbackState("success");
     setStatus(itemId ? `Saved to SharePoint as item #${itemId}.` : "Saved to SharePoint.");
   } catch (error) {
     console.error(error);
+    setSaveFeedbackState("error", error?.message || "Could not save supplier to SharePoint.");
     setStatus(error?.message || "Could not save supplier to SharePoint.", true);
   } finally {
     savingSupplier = false;
     setBusyState();
-    renderQuickEntryPreview();
   }
 }
 
