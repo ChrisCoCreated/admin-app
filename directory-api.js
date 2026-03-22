@@ -223,6 +223,42 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listProblemsToSolve(query = {}) {
+      const response = await authFetch(buildUrl("/api/problems", query));
+      if (!response.ok) {
+        await parseError(response, "Problems request failed");
+      }
+      return response.json();
+    },
+
+    async createProblemToSolve(payload = {}) {
+      const response = await authFetch(endpoint("/api/problems"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Problem create failed");
+      }
+      return response.json();
+    },
+
+    async updateProblemToSolve(payload = {}) {
+      const response = await authFetch(endpoint("/api/problems"), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Problem save failed");
+      }
+      return response.json();
+    },
+
     async listSharePointClients(query = {}) {
       const response = await authFetch(buildUrl("/api/sharepoint/clients", query));
       if (!response.ok) {

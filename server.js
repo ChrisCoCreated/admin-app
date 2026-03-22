@@ -25,6 +25,7 @@ const marketingMediaHandler = require("./api/marketing/media");
 const agendasHandler = require("./api/agendas");
 const agendaByIdHandler = require("./api/agendas/[id]");
 const agendaItemsHandler = require("./api/agendas/items");
+const problemsHandler = require("./api/problems");
 const tasksUnifiedHandler = require("./api/tasks/unified");
 const tasksOverlayHandler = require("./api/tasks/overlay");
 const tasksWhiteboardHandler = require("./api/tasks/whiteboard");
@@ -314,6 +315,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await agendaItemsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/problems") {
+    if (req.method === "POST" || req.method === "PATCH") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await problemsHandler(apiReq, apiRes);
     return true;
   }
 

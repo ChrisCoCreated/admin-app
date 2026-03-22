@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Problems to Solve</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260322" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container problems-main">
+      <section class="hero compact">
+        <h1>Problems to Solve</h1>
+        <p>Capture the messy version first, then tighten it just enough to set a next step and move.</p>
+      </section>
+
+      <section class="panel problems-composer-panel">
+        <form id="problemComposerForm" class="problems-composer" autocomplete="off">
+          <label class="sr-only" for="problemInput">What&rsquo;s bothering you or needs improving?</label>
+          <div class="problems-input-shell">
+            <input
+              id="problemInput"
+              class="problems-input"
+              type="text"
+              placeholder="What’s bothering you or needs improving?"
+              maxlength="280"
+            />
+            <div class="problems-composer-actions">
+              <button id="voiceInputBtn" class="ghost" type="button" hidden>Voice</button>
+              <button id="captureProblemBtn" type="submit">Capture</button>
+            </div>
+          </div>
+        </form>
+        <div class="problems-composer-foot">
+          <p class="muted">Press Enter to add. Everything below saves automatically.</p>
+          <p id="pageStatus" class="muted">Loading problems...</p>
+        </div>
+      </section>
+
+      <section class="panel problems-list-panel">
+        <div id="problemsList" class="problems-list" aria-live="polite"></div>
+        <div id="problemsEmptyState" class="problem-empty" hidden>
+          <h2>No problems captured yet</h2>
+          <p class="muted">Drop in the messy version above and the page will shape the first draft for you.</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./problems.js"></script>
+  </body>
+</html>
