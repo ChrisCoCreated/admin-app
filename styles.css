@@ -893,6 +893,37 @@ dd {
   background: #e5ebf5;
 }
 
+.recruitment-quick-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 1px solid #d8e0eb;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.recruitment-whatsapp-link {
+  background: #e9f9ef;
+  color: #167a44;
+}
+
+.recruitment-whatsapp-link:hover {
+  background: #dff4e7;
+}
+
+.recruitment-teams-link {
+  background: #edf1ff;
+  color: #364aa8;
+}
+
+.recruitment-teams-link:hover {
+  background: #e1e7ff;
+}
+
 .status-pill-trigger {
   display: inline-flex;
   align-items: center;

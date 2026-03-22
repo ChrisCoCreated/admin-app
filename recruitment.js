@@ -147,6 +147,44 @@ function getInitialScreenUrl(candidateId) {
   return url.toString();
 }
 
+function normalizePhoneForActions(phoneNumber) {
+  const raw = cleanText(phoneNumber);
+  if (!raw) {
+    return "";
+  }
+  let digits = raw.replace(/[^\d+]/g, "");
+  if (digits.startsWith("00")) {
+    digits = `+${digits.slice(2)}`;
+  }
+  if (!digits.startsWith("+")) {
+    const numeric = digits.replace(/\D/g, "");
+    if (numeric.startsWith("0")) {
+      digits = `+44${numeric.slice(1)}`;
+    } else if (numeric.startsWith("44")) {
+      digits = `+${numeric}`;
+    } else {
+      digits = `+${numeric}`;
+    }
+  }
+  return digits.replace(/(?!^\+)\D/g, "");
+}
+
+function getWhatsAppUrl(phoneNumber) {
+  const normalized = normalizePhoneForActions(phoneNumber).replace(/\D/g, "");
+  if (!normalized) {
+    return "";
+  }
+  return `https://wa.me/${encodeURIComponent(normalized)}`;
+}
+
+function getTeamsCallUrl(phoneNumber) {
+  const normalized = normalizePhoneForActions(phoneNumber);
+  if (!normalized) {
+    return "";
+  }
+  return `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(normalized)}`;
+}
+
 function setAddButtonsBusy(disabled) {
   addToOneTouchBusy = disabled;
   if (oneTouchPickerConfirmBtn) {
@@ -902,17 +940,28 @@ function renderCandidates() {
   for (const candidate of filtered) {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", candidate.id === selectedCandidateId);
+    const whatsappUrl = getWhatsAppUrl(candidate.phoneNumber);
+    const teamsCallUrl = getTeamsCallUrl(candidate.phoneNumber);
     tr.innerHTML = `
       <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
       <td>
         <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
       </td>
-      <td>${escapeHtml(cleanText(candidate.source) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.phoneNumber) || "-")}</td>
       <td>
         <div class="recruitment-action-stack">
           <a class="secondary recruitment-screen-link" href="${escapeHtml(getInitialScreenUrl(candidate.id))}">Initial Screen</a>
+          ${
+            whatsappUrl
+              ? `<a class="recruitment-quick-link recruitment-whatsapp-link" href="${escapeHtml(whatsappUrl)}" target="_blank" rel="noopener noreferrer">Text in WhatsApp</a>`
+              : ""
+          }
+          ${
+            teamsCallUrl
+              ? `<a class="recruitment-quick-link recruitment-teams-link" href="${escapeHtml(teamsCallUrl)}" target="_blank" rel="noopener noreferrer">Call in Teams</a>`
+              : ""
+          }
           ${
             hasOneTouchLink(candidate)
               ? `<a
