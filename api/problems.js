@@ -1,8 +1,10 @@
 const { requireApiAuth } = require("./_lib/require-api-auth");
 const { createProblemForUser, listProblemsForUser, mapProblemError, updateProblemForUser } = require("./_lib/problems/service");
 
+const ALLOWED_ROLES = ["admin"];
+
 module.exports = async (req, res) => {
-  if (!(await requireApiAuth(req, res))) {
+  if (!(await requireApiAuth(req, res, { allowedRoles: ALLOWED_ROLES }))) {
     return;
   }
 
