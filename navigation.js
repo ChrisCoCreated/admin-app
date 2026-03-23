@@ -70,6 +70,7 @@ const ROLE_PAGES = {
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
   hr_only: ["carers", "timesheets", "recruitment", "agendas"],
   clients_only: ["clients", "agendas"],
+  enquiries_only: ["enquiries", "agendas"],
   hr_clients: ["clients", "carers", "timesheets", "recruitment", "agendas"],
   time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
   time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],

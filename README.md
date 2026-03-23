@@ -121,6 +121,7 @@ Set comma-separated email lists with these env vars:
 - `ACCESS_TIME_EMAILS` for time-mapping roles
 - `ACCESS_HR_EMAILS` for HR roles
 - `ACCESS_CLIENTS_EMAILS` for client roles
+- `ACCESS_ENQUIRIES_EMAILS` for enquiries-only access
 - `ACCESS_CONSULTANT_EMAILS` for `consultant`
 
 ## Redirect URI notes
