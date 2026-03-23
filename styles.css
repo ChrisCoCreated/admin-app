@@ -924,6 +924,55 @@ dd {
   background: #e1e7ff;
 }
 
+.recruitment-active-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  background: transparent;
+  color: #687283;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.recruitment-active-toggle-track {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: #dbe2ec;
+  transition: background-color 140ms ease;
+}
+
+.recruitment-active-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(17, 20, 26, 0.16);
+  transition: transform 140ms ease;
+}
+
+.recruitment-active-toggle.is-active {
+  color: #0f6a3b;
+}
+
+.recruitment-active-toggle.is-active .recruitment-active-toggle-track {
+  background: #86d2a5;
+}
+
+.recruitment-active-toggle.is-active .recruitment-active-toggle-thumb {
+  transform: translateX(16px);
+}
+
+.recruitment-active-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .status-pill-trigger {
   display: inline-flex;
   align-items: center;
@@ -1140,6 +1189,13 @@ dd {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.screen-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .initial-screen-panel {

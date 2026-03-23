@@ -14,6 +14,7 @@ const carersTagsBulkHandler = require("./api/carers/tags/bulk");
 const oneTouchClientsHandler = require("./api/onetouch/clients");
 const oneTouchTagsHandler = require("./api/onetouch/tags");
 const recruitmentHandler = require("./api/recruitment");
+const recruitmentActiveHandler = require("./api/recruitment/active");
 const recruitmentImportHandler = require("./api/recruitment/import");
 const recruitmentOneTouchOptionsHandler = require("./api/recruitment/onetouch-options");
 const recruitmentInitialScreenHandler = require("./api/recruitment/initial-screen");
@@ -260,6 +261,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await recruitmentHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/recruitment/active") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await recruitmentActiveHandler(apiReq, apiRes);
     return true;
   }
 

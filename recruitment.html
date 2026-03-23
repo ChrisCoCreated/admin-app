@@ -80,6 +80,14 @@
                 <option value="all">All sources</option>
               </select>
             </label>
+            <label class="field" for="activeFilterSelect">
+              Active
+              <select id="activeFilterSelect">
+                <option value="active">Active only</option>
+                <option value="inactive">Inactive only</option>
+                <option value="all">All</option>
+              </select>
+            </label>
           </div>
           <p id="statusMessage" class="muted">Loading active candidates...</p>
           <div class="recruitment-import-wrap">
@@ -131,6 +139,7 @@
                   <th>Location</th>
                   <th>Status</th>
                   <th>Phone</th>
+                  <th>Active</th>
                   <th>Action</th>
                 </tr>
               </thead>

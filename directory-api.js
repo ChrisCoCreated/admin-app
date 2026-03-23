@@ -388,6 +388,21 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async updateRecruitmentActive(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment/active"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment active update request failed");
+      }
+      return response.json();
+    },
+
     async updateRecruitmentStatus(payload = {}) {
       const response = await authFetch(endpoint("/api/recruitment/status"), {
         method: "POST",

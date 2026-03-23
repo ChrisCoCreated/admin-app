@@ -626,16 +626,32 @@ function buildProblemCard(problem) {
   syncProblemSummary(problem, view);
   applyReframesToInputs(problem, view);
 
-  toggleBtn.addEventListener("click", () => {
-    const expanded = expandedIds.has(problem.id);
-    if (expanded) {
-      expandedIds.delete(problem.id);
-    } else {
+  function setExpanded(nextExpanded) {
+    if (nextExpanded) {
       expandedIds.add(problem.id);
+    } else {
+      expandedIds.delete(problem.id);
     }
-    body.hidden = expanded;
-    toggleBtn.textContent = expanded ? "Expand" : "Collapse";
+    body.hidden = !nextExpanded;
+    toggleBtn.textContent = nextExpanded ? "Collapse" : "Expand";
+    article.classList.toggle("problem-card-expanded", nextExpanded);
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    setExpanded(!expandedIds.has(problem.id));
   });
+
+  article.addEventListener("click", (event) => {
+    const interactiveTarget = event.target.closest("button, input, textarea, select, label, a");
+    if (interactiveTarget) {
+      return;
+    }
+    if (!expandedIds.has(problem.id)) {
+      setExpanded(true);
+    }
+  });
+
+  setExpanded(expandedIds.has(problem.id));
 
   originalInput.addEventListener("input", () => {
     const current = getProblemById(problem.id);

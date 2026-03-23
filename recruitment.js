@@ -7,6 +7,7 @@ const searchInput = document.getElementById("searchInput");
 const locationFilterSelect = document.getElementById("locationFilterSelect");
 const statusFilterSelect = document.getElementById("statusFilterSelect");
 const sourceFilterSelect = document.getElementById("sourceFilterSelect");
+const activeFilterSelect = document.getElementById("activeFilterSelect");
 const recruitmentTableBody = document.getElementById("recruitmentTableBody");
 const emptyState = document.getElementById("emptyState");
 const statusMessage = document.getElementById("statusMessage");
@@ -74,6 +75,7 @@ let importEditingDraft = null;
 let oneTouchOptionsCache = null;
 let oneTouchPickerCandidateId = "";
 let statusUpdateBusy = false;
+let activeUpdateBusy = false;
 let statusQuickMenuCandidateId = "";
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
@@ -853,6 +855,7 @@ function renderFilterOptions() {
   const selectedLocation = cleanText(locationFilterSelect.value || "all");
   const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
+  const selectedActive = cleanText(activeFilterSelect?.value || "active");
 
   locationFilterSelect.innerHTML = '<option value="all">All locations</option>';
   statusFilterSelect.innerHTML =
@@ -882,6 +885,9 @@ function renderFilterOptions() {
   statusFilterSelect.value =
     selectedStatus === STATUS_FILTER_DEFAULT || statusOptions.includes(selectedStatus) ? selectedStatus : STATUS_FILTER_DEFAULT;
   sourceFilterSelect.value = sourceOptions.includes(selectedSource) ? selectedSource : "all";
+  if (activeFilterSelect) {
+    activeFilterSelect.value = ["active", "inactive", "all"].includes(selectedActive) ? selectedActive : "active";
+  }
 }
 
 function getFilteredCandidates() {
@@ -889,8 +895,15 @@ function getFilteredCandidates() {
   const selectedLocation = cleanText(locationFilterSelect.value || "all");
   const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
+  const selectedActive = cleanText(activeFilterSelect?.value || "active");
 
   return allCandidates.filter((candidate) => {
+    if (selectedActive === "active" && candidate.active !== true) {
+      return false;
+    }
+    if (selectedActive === "inactive" && candidate.active !== false) {
+      return false;
+    }
     if (selectedLocation !== "all" && cleanText(candidate.location) !== selectedLocation) {
       return false;
     }
@@ -950,6 +963,19 @@ function renderCandidates() {
       </td>
       <td>${escapeHtml(cleanText(candidate.phoneNumber) || "-")}</td>
       <td>
+        <button
+          type="button"
+          class="recruitment-active-toggle${candidate.active ? " is-active" : ""}"
+          aria-pressed="${candidate.active ? "true" : "false"}"
+          ${activeUpdateBusy ? " disabled" : ""}
+        >
+          <span class="recruitment-active-toggle-track">
+            <span class="recruitment-active-toggle-thumb"></span>
+          </span>
+          <span class="recruitment-active-toggle-label">${candidate.active ? "Active" : "Inactive"}</span>
+        </button>
+      </td>
+      <td>
         <div class="recruitment-action-stack">
           <a class="secondary recruitment-screen-link" href="${escapeHtml(getInitialScreenUrl(candidate.id))}">Initial Screen</a>
           ${
@@ -1000,6 +1026,23 @@ function renderCandidates() {
         return;
       }
       openStatusQuickMenu(candidate, statusTrigger);
+    });
+    const activeToggle = tr.querySelector(".recruitment-active-toggle");
+    activeToggle?.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (activeUpdateBusy) {
+        return;
+      }
+      activeUpdateBusy = true;
+      try {
+        await updateCandidateActiveById(candidate.id, candidate.active !== true);
+      } catch (error) {
+        console.error(error);
+        setStatus(error?.message || "Could not update active status.", true);
+      } finally {
+        activeUpdateBusy = false;
+        renderCandidates();
+      }
     });
 
     recruitmentTableBody.appendChild(tr);
@@ -1252,6 +1295,29 @@ async function updateCandidateStatusById(candidateId, selectedStatus) {
   return true;
 }
 
+async function updateCandidateActiveById(candidateId, nextActive) {
+  const targetId = cleanText(candidateId);
+  if (!targetId || typeof nextActive !== "boolean") {
+    setStatus("Could not update active status.", true);
+    return false;
+  }
+
+  await directoryApi.updateRecruitmentActive({
+    itemId: targetId,
+    active: nextActive,
+  });
+
+  const candidate = allCandidates.find((item) => item.id === targetId);
+  if (candidate) {
+    candidate.active = nextActive;
+  }
+
+  renderFilterOptions();
+  renderCandidates();
+  setStatus(`Candidate marked ${nextActive ? "active" : "inactive"}.`);
+  return true;
+}
+
 async function saveCandidateStatus() {
   if (statusUpdateBusy || !statusUpdateSelect) {
     return;
@@ -1292,7 +1358,7 @@ function redirectToUnauthorized(pageKey) {
 
 async function loadRecruitmentCandidates() {
   const payload = await directoryApi.listRecruitment();
-  allCandidates = Array.isArray(payload?.items) ? payload.items.filter((item) => item?.active === true) : [];
+  allCandidates = Array.isArray(payload?.items) ? payload.items : [];
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
   }
@@ -1337,6 +1403,7 @@ searchInput?.addEventListener("input", renderCandidates);
 locationFilterSelect?.addEventListener("change", renderCandidates);
 statusFilterSelect?.addEventListener("change", renderCandidates);
 sourceFilterSelect?.addEventListener("change", renderCandidates);
+activeFilterSelect?.addEventListener("change", renderCandidates);
 toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
   setRecruitmentToolbarVisible(recruitmentToolbarContent?.hidden);
 });

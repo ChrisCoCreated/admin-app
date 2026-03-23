@@ -11,7 +11,7 @@ import {
 const $ = (id) => document.getElementById(id);
 
 const FIXED_TENANT_ID = FRONTEND_CONFIG.tenantId;
-const FIXED_CLIENT_ID = FRONTEND_CONFIG.sharePointSpaClientId || FRONTEND_CONFIG.spaClientId;
+const FIXED_CLIENT_ID = FRONTEND_CONFIG.spaClientId;
 const FIXED_SITE_URL =
   FRONTEND_CONFIG.sharePoint?.thriveCallsSiteUrl || "https://planwithcare.sharepoint.com/sites/ThriveCalls";
 const ENQUIRIES_LIST_TITLE = FRONTEND_CONFIG.sharePoint?.enquiriesListTitle || "Enquiries Log";
@@ -648,7 +648,11 @@ function formatAuthError(error) {
     return "Sign-in was cancelled.";
   }
 
-  if (message.includes("redirect_uri")) {
+  if (
+    message.includes("redirect_uri") ||
+    message.includes("redirect uri") ||
+    message.includes("aadsts50011")
+  ) {
     return `Redirect URI mismatch. Register ${window.location.origin} in the Azure app as an SPA redirect URI.`;
   }
 

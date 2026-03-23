@@ -228,7 +228,7 @@ async function fetchRecruitmentItems(graphClient, siteId, listId) {
 
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
   const items = await graphClient.fetchAllPages(url);
-  return items.map(normalizeRecruitmentItem).filter((item) => item.active);
+  return items.map(normalizeRecruitmentItem);
 }
 
 async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {

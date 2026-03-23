@@ -7,6 +7,9 @@ const signOutBtn = document.getElementById("signOutBtn");
 const screenCandidateName = document.getElementById("screenCandidateName");
 const screenCandidateFirstName = document.getElementById("screenCandidateFirstName");
 const screenCandidateMeta = document.getElementById("screenCandidateMeta");
+const screenContactActions = document.getElementById("screenContactActions");
+const screenWhatsAppLink = document.getElementById("screenWhatsAppLink");
+const screenTeamsCallLink = document.getElementById("screenTeamsCallLink");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
 const initialScreenForm = document.getElementById("initialScreenForm");
 const saveInitialScreenBtn = document.getElementById("saveInitialScreenBtn");
@@ -59,6 +62,44 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function normalizePhoneForActions(phoneNumber) {
+  const raw = cleanText(phoneNumber);
+  if (!raw) {
+    return "";
+  }
+  let digits = raw.replace(/[^\d+]/g, "");
+  if (digits.startsWith("00")) {
+    digits = `+${digits.slice(2)}`;
+  }
+  if (!digits.startsWith("+")) {
+    const numeric = digits.replace(/\D/g, "");
+    if (numeric.startsWith("0")) {
+      digits = `+44${numeric.slice(1)}`;
+    } else if (numeric.startsWith("44")) {
+      digits = `+${numeric}`;
+    } else {
+      digits = `+${numeric}`;
+    }
+  }
+  return digits.replace(/(?!^\+)\D/g, "");
+}
+
+function getWhatsAppUrl(phoneNumber) {
+  const normalized = normalizePhoneForActions(phoneNumber).replace(/\D/g, "");
+  if (!normalized) {
+    return "";
+  }
+  return `https://wa.me/${encodeURIComponent(normalized)}`;
+}
+
+function getTeamsCallUrl(phoneNumber) {
+  const normalized = normalizePhoneForActions(phoneNumber);
+  if (!normalized) {
+    return "";
+  }
+  return `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(normalized)}`;
 }
 
 function getDraftStorageKey(itemId) {
@@ -362,9 +403,22 @@ async function copyScreenSummary() {
 function renderCandidateHeader(item) {
   const candidateName = cleanText(item?.candidateName) || "Initial 10-Minute Call";
   const parts = [cleanText(item?.status), cleanText(item?.location), cleanText(item?.phoneNumber)].filter(Boolean);
+  const whatsappUrl = getWhatsAppUrl(item?.phoneNumber);
+  const teamsCallUrl = getTeamsCallUrl(item?.phoneNumber);
   screenCandidateName.textContent = candidateName;
   screenCandidateFirstName.textContent = candidateName.split(/\s+/)[0] || "there";
   screenCandidateMeta.textContent = parts.length ? parts.join(" • ") : "Recruitment screening";
+  if (screenContactActions) {
+    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl;
+  }
+  if (screenWhatsAppLink) {
+    screenWhatsAppLink.href = whatsappUrl || "#";
+    screenWhatsAppLink.hidden = !whatsappUrl;
+  }
+  if (screenTeamsCallLink) {
+    screenTeamsCallLink.href = teamsCallUrl || "#";
+    screenTeamsCallLink.hidden = !teamsCallUrl;
+  }
 }
 
 async function loadInitialScreen() {
