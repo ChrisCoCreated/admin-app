@@ -171,14 +171,19 @@ function normalizePhoneForActions(phoneNumber) {
   return digits.replace(/(?!^\+)\D/g, "");
 }
 
-function getWhatsAppUrl(phoneNumber) {
+function getWhatsAppMessage(candidateName) {
+  const firstName = cleanText(candidateName).split(/\s+/)[0] || "there";
+  return `Hi ${firstName}, thanks for applying to Thrive Homecare. Are you available for a quick initial chat? Chris`;
+}
+
+function getWhatsAppUrl(phoneNumber, candidateName) {
   const normalized = normalizePhoneForActions(phoneNumber).replace(/\D/g, "");
   if (!normalized) {
     return "";
   }
   const url = new URL("https://web.whatsapp.com/send");
   url.searchParams.set("phone", normalized);
-  url.searchParams.set("text", "Recruitment: ");
+  url.searchParams.set("text", getWhatsAppMessage(candidateName));
   return url.toString();
 }
 
@@ -956,7 +961,7 @@ function renderCandidates() {
   for (const candidate of filtered) {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", candidate.id === selectedCandidateId);
-    const whatsappUrl = getWhatsAppUrl(candidate.phoneNumber);
+    const whatsappUrl = getWhatsAppUrl(candidate.phoneNumber, candidate.candidateName);
     const teamsCallUrl = getTeamsCallUrl(candidate.phoneNumber);
     tr.innerHTML = `
       <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
