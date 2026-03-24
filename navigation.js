@@ -96,7 +96,7 @@ const PAGE_META = {
   mapping: { href: "./mapping.html", label: "Time Mapping" },
   drivetime: { href: "./drive-time-map.html", label: "Our Geography", shortcutLabel: "Map" },
   reports: { href: "./reports.html", label: "Reports" },
-  emailtemplates: { href: "./email-templates.html", label: "Email Templates" },
+  emailtemplates: { href: "./email-templates.html", label: "Email Templates", shortcutLabel: "Email" },
   suppliers: { href: "./suppliers.html", label: "Suppliers & Experiences" },
   consultant: { href: "./consultant.html", label: "Consultant" },
   marketing: { href: "./marketing.html", label: "Marketing" },
@@ -204,7 +204,8 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
   const actualRole = getStoredActualRole();
   const canPreviewAsLoggedInUser = actualRole === "admin";
   const actions = nav.parentElement;
-  const existingShortcuts = actions?.querySelector(".topbar-shortcuts");
+  const topbarInner = actions?.parentElement;
+  const existingShortcuts = topbarInner?.querySelector(".topbar-shortcuts");
   const signOutBtn = document.getElementById("signOutBtn");
   existingShortcuts?.remove();
   nav.innerHTML = "";
@@ -213,7 +214,7 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
     return;
   }
 
-  if (actions && shortcutPages.length) {
+  if (topbarInner && actions && shortcutPages.length) {
     const shortcuts = document.createElement("div");
     shortcuts.className = "topbar-shortcuts";
     shortcuts.setAttribute("aria-label", "Quick links");
@@ -235,7 +236,7 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
     }
 
     if (shortcuts.children.length) {
-      actions.insertBefore(shortcuts, nav);
+      topbarInner.insertBefore(shortcuts, actions);
     }
   }
 
@@ -248,24 +249,10 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
 
   const panel = document.createElement("div");
   panel.className = "topnav-panel";
-
-  const panelHeader = document.createElement("div");
-  panelHeader.className = "topnav-panel-header";
-
-  const panelTitle = document.createElement("h2");
-  panelTitle.className = "topnav-panel-title";
-  panelTitle.textContent = "Supermenu";
-
-  const panelCopy = document.createElement("p");
-  panelCopy.className = "topnav-panel-copy";
-  panelCopy.textContent = "Everything is grouped here so it stays tidy on desktop and mobile.";
-
-  panelHeader.appendChild(panelTitle);
-  panelHeader.appendChild(panelCopy);
-  panel.appendChild(panelHeader);
+  let previewControl = null;
 
   if (canPreviewAsLoggedInUser) {
-    const previewControl = document.createElement("label");
+    previewControl = document.createElement("label");
     previewControl.className = "topnav-preview-toggle";
 
     const previewInput = document.createElement("input");
@@ -293,7 +280,6 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
 
     previewControl.appendChild(previewInput);
     previewControl.appendChild(previewCopy);
-    panel.appendChild(previewControl);
   }
 
   for (const section of groupedPages) {
@@ -342,8 +328,13 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
 
     const accountActions = document.createElement("div");
     accountActions.className = "topnav-account-actions";
+    if (previewControl) {
+      accountActions.appendChild(previewControl);
+    }
     accountActions.appendChild(signOutBtn);
     panel.appendChild(accountActions);
+  } else if (previewControl) {
+    panel.appendChild(previewControl);
   }
 
   menu.appendChild(panel);

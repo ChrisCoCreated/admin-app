@@ -91,7 +91,10 @@ function getWhatsAppUrl(phoneNumber) {
   if (!normalized) {
     return "";
   }
-  return `https://wa.me/${encodeURIComponent(normalized)}`;
+  const url = new URL("https://web.whatsapp.com/send");
+  url.searchParams.set("phone", normalized);
+  url.searchParams.set("text", "Recruitment: ");
+  return url.toString();
 }
 
 function getTeamsCallUrl(phoneNumber) {

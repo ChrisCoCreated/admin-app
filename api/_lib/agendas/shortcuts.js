@@ -11,8 +11,10 @@ const AGENDA_SHORTCUTS = [
   { label: "R", type: "person", terms: ["rebecca"], userEmail: "rebecca@planwithcare.co.uk", displayName: "Rebecca" },
   { label: "P", type: "person", terms: ["peter"], userEmail: "peter@planwithcare.co.uk", displayName: "Peter" },
   { label: "A", type: "person", terms: ["agota"], userEmail: "agota@planwithcare.co.uk", displayName: "Agota" },
+  { label: "Al", type: "person", terms: ["alise"], userEmail: "alise@planwithcare.co.uk", displayName: "Alise" },
   { label: "M", type: "person", terms: ["miska", "michalina"], userEmail: "michalina@thrivehomecare.co.uk", displayName: "Miska" },
   { label: "C", type: "person", terms: ["claire"], userEmail: "claire@planwithcare.co.uk", displayName: "Claire" },
+  { label: "Pa", type: "person", terms: ["paul"], userEmail: "paul@planwithcare.co.uk", displayName: "Paul" },
 ];
 
 function agendaMembers(agenda) {
@@ -114,26 +116,32 @@ async function getAgendaShortcutPhoto(email) {
     throw error;
   }
 
-  try {
-    const response = await fetchGraphResponse(
-      `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(normalizedEmail)}/photo/$value`,
-      {
+  const candidates = [
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(normalizedEmail)}/photo/$value`,
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(normalizedEmail)}/photos/48x48/$value`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const response = await fetchGraphResponse(url, {
         headers: {
           Accept: "image/*",
         },
+      });
+      const arrayBuffer = await response.arrayBuffer();
+      return {
+        buffer: Buffer.from(arrayBuffer),
+        mimeType: String(response.headers.get("content-type") || "image/jpeg").trim() || "image/jpeg",
+      };
+    } catch (error) {
+      if (Number(error?.status) === 404) {
+        continue;
       }
-    );
-    const arrayBuffer = await response.arrayBuffer();
-    return {
-      buffer: Buffer.from(arrayBuffer),
-      mimeType: String(response.headers.get("content-type") || "image/jpeg").trim() || "image/jpeg",
-    };
-  } catch (error) {
-    if (Number(error?.status) === 404) {
-      return null;
+      throw error;
     }
-    throw error;
   }
+
+  return null;
 }
 
 module.exports = {

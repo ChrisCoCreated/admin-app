@@ -73,14 +73,12 @@ body {
   justify-content: flex-end;
   gap: 8px;
   min-width: 0;
-}
-
-.home-page .topbar-actions .topbar-shortcuts {
-  order: 1;
+  margin-left: auto;
 }
 
 .topbar-shortcut {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   min-height: 38px;
   padding: 8px 12px;
@@ -169,24 +167,6 @@ body {
   box-shadow: 0 20px 48px rgba(17, 20, 26, 0.18);
 }
 
-.topnav-panel-header {
-  display: grid;
-  gap: 4px;
-}
-
-.topnav-panel-title {
-  margin: 0;
-  font-size: 1.1rem;
-  letter-spacing: -0.02em;
-}
-
-.topnav-panel-copy {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.93rem;
-  line-height: 1.4;
-}
-
 .topnav-section {
   display: grid;
   gap: 8px;
@@ -273,6 +253,8 @@ body {
 }
 
 .topnav-account-actions {
+  display: grid;
+  gap: 12px;
   padding-top: 2px;
   border-top: 1px solid #e0e5ef;
 }
@@ -3990,7 +3972,13 @@ body.lightbox-open {
   .topbar-shortcuts {
     order: 3;
     width: 100%;
+    margin-left: 0;
+    flex-wrap: nowrap;
     justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .topbar-inner {
