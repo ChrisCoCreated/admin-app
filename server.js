@@ -26,6 +26,8 @@ const marketingMediaHandler = require("./api/marketing/media");
 const agendasHandler = require("./api/agendas");
 const agendaByIdHandler = require("./api/agendas/[id]");
 const agendaItemsHandler = require("./api/agendas/items");
+const agendaShortcutsHandler = require("./api/agendas/shortcuts");
+const agendaShortcutPhotoHandler = require("./api/agendas/shortcut-photo");
 const problemsHandler = require("./api/problems");
 const tasksUnifiedHandler = require("./api/tasks/unified");
 const tasksOverlayHandler = require("./api/tasks/overlay");
@@ -316,6 +318,16 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/agendas/detail") {
     await agendaByIdHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/agendas/shortcuts") {
+    await agendaShortcutsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/agendas/shortcut-photo") {
+    await agendaShortcutPhotoHandler(apiReq, apiRes);
     return true;
   }
 

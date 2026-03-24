@@ -87,10 +87,36 @@ async function fetchGraphJson(url, options = {}) {
   return payload;
 }
 
+async function fetchGraphResponse(url, options = {}) {
+  const token = await getGraphAppAccessToken();
+  const response = await fetch(url, {
+    method: options.method || "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+    body: options.body,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    const payload = parseJsonSafe(text);
+    const error = new Error(payload?.error?.message || text || `Graph request failed (${response.status}).`);
+    error.status = response.status;
+    error.code = payload?.error?.code || "GRAPH_REQUEST_FAILED";
+    throw error;
+  }
+
+  return response;
+}
+
 function createGraphAppClient() {
   return {
     fetchJson(url, options = {}) {
       return fetchGraphJson(url, options);
+    },
+    fetchResponse(url, options = {}) {
+      return fetchGraphResponse(url, options);
     },
     async fetchAllPages(initialUrl) {
       const rows = [];
@@ -109,5 +135,6 @@ function createGraphAppClient() {
 
 module.exports = {
   createGraphAppClient,
+  fetchGraphResponse,
   getGraphAppAccessToken,
 };

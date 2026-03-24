@@ -157,6 +157,32 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listAgendaShortcuts(query = {}) {
+      const response = await authFetch(buildUrl("/api/agendas/shortcuts", query));
+      if (!response.ok) {
+        await parseError(response, "Agenda shortcuts request failed");
+      }
+      return response.json();
+    },
+
+    async getAgendaShortcutPhoto(query = {}) {
+      const response = await authFetch(buildUrl("/api/agendas/shortcut-photo", query), {
+        headers: {
+          Accept: "image/*",
+        },
+      });
+      if (response.status === 404) {
+        return null;
+      }
+      if (!response.ok) {
+        await parseError(response, "Agenda shortcut photo request failed");
+      }
+      return {
+        blob: await response.blob(),
+        mimeType: String(response.headers.get("Content-Type") || "").trim(),
+      };
+    },
+
     async createAgenda(payload = {}) {
       const response = await authFetch(endpoint("/api/agendas"), {
         method: "POST",

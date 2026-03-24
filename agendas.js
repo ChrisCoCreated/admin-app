@@ -74,24 +74,15 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
 const AGENDA_STAGING_CACHE_PREFIX = "thrive.agendas.staging.v1";
+const AGENDA_SHORTCUT_PHOTO_CACHE_PREFIX = "thrive.agendas.shortcut-photos.v1";
+const AGENDA_SHORTCUT_PHOTO_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const GLOBAL_AGENDA_STAGING_KEY = "__global__";
 const AGENDA_DEBUG = false;
-const ADMIN_AGENDA_SHORTCUTS = [
-  { label: "Huddle", terms: ["huddle"] },
-  { label: "Operations", terms: ["operations"] },
-  { label: "Leadership", terms: ["leadership"] },
-  { label: "£", terms: ["laura"] },
-  { label: "N", terms: ["nathan"] },
-  { label: "R", terms: ["rebecca"] },
-  { label: "P", terms: ["peter"] },
-  { label: "A", terms: ["agota"] },
-  { label: "M", terms: ["miska", "michalina"] },
-  { label: "C", terms: ["claire"] },
-];
 
 let currentUser = null;
 let agendas = [];
 let agendaDetailsById = new Map();
+let agendaShortcuts = [];
 let selectedAgendaId = "";
 let selectedItemId = "";
 let busy = false;
@@ -110,6 +101,7 @@ let completedSectionExpanded = false;
 let agendaStagingExpanded = true;
 const taskDraftsByItemId = new Map();
 const loadingAgendaDetails = new Set();
+const loadingAgendaShortcutPhotos = new Set();
 let stagedAgendaItemsById = new Map();
 
 function logAgendaDebug(message, details) {
@@ -237,6 +229,77 @@ function syncAgendaItemEditorState() {
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function agendaShortcutPhotoCacheKey(email) {
+  return `${AGENDA_SHORTCUT_PHOTO_CACHE_PREFIX}:${normalizeEmail(email)}`;
+}
+
+function readCachedAgendaShortcutPhoto(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(agendaShortcutPhotoCacheKey(normalizedEmail));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    const expiresAt = Date.parse(parsed?.expiresAt || "");
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      window.localStorage.removeItem(agendaShortcutPhotoCacheKey(normalizedEmail));
+      return null;
+    }
+    return {
+      hasPhoto: parsed?.hasPhoto === true,
+      dataUrl: String(parsed?.dataUrl || ""),
+      expiresAt: new Date(expiresAt).toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAgendaShortcutPhoto(email, record) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      agendaShortcutPhotoCacheKey(normalizedEmail),
+      JSON.stringify({
+        hasPhoto: record?.hasPhoto === true,
+        dataUrl: String(record?.dataUrl || ""),
+        expiresAt:
+          String(record?.expiresAt || "").trim() ||
+          new Date(Date.now() + AGENDA_SHORTCUT_PHOTO_TTL_MS).toISOString(),
+      })
+    );
+  } catch {
+    // Ignore local cache write failures.
+  }
+}
+
+function shortcutFallbackText(shortcut) {
+  const label = String(shortcut?.label || "").trim();
+  if (label) {
+    return label.slice(0, 2).toUpperCase();
+  }
+  return String(shortcut?.displayName || "?")
+    .trim()
+    .slice(0, 1)
+    .toUpperCase();
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("Could not read photo blob."));
+    reader.readAsDataURL(blob);
+  });
 }
 
 function agendaStagingCacheKey(email) {
@@ -738,24 +801,6 @@ function agendaDisplayTitle(agenda) {
   return "Untitled agenda";
 }
 
-function normalizedAgendaSearchText(agenda) {
-  const detailedAgenda = agendaDetailsById.get(agenda?.id);
-  const members = Array.isArray(agenda?.members) && agenda.members.length
-    ? agenda.members
-    : Array.isArray(detailedAgenda?.members)
-      ? detailedAgenda.members
-      : [];
-  const people = members.map((member) => member.displayName || displayNameForEmail(member.userEmail)).filter(Boolean);
-  return [
-    String(agendaDisplayTitle(agenda) || ""),
-    ...people,
-    ...(Array.isArray(agenda?.participantNames) ? agenda.participantNames : []),
-    ...(Array.isArray(agenda?.participantEmails) ? agenda.participantEmails : []),
-  ]
-    .join(" ")
-    .toLowerCase();
-}
-
 function renderAgendaShortcuts() {
   if (!agendaShortcutBar || !agendaShortcutList) {
     return;
@@ -767,29 +812,133 @@ function renderAgendaShortcuts() {
   }
 
   agendaShortcutList.innerHTML = "";
-  let count = 0;
+  let visibleCount = 0;
 
-  ADMIN_AGENDA_SHORTCUTS.forEach((shortcut) => {
-    const match = agendas.find((agenda) => shortcut.terms.some((term) => normalizedAgendaSearchText(agenda).includes(term)));
-    if (!match) {
-      return;
-    }
-    count += 1;
+  agendaShortcuts.forEach((shortcut) => {
+    visibleCount += 1;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "agenda-shortcut-chip";
-    button.textContent = shortcut.label;
-    button.title = agendaDisplayTitle(match);
-    if (match.id === selectedAgendaId) {
+    button.title = String(shortcut?.displayName || shortcut?.label || "").trim() || "Agenda shortcut";
+    if (shortcut?.targetAgendaId === selectedAgendaId) {
       button.classList.add("is-selected");
     }
-    button.addEventListener("click", () => {
-      void openAgenda(match.id);
-    });
+
+    if (shortcut?.type === "person") {
+      button.classList.add("is-person");
+      const avatar = document.createElement("span");
+      avatar.className = "agenda-shortcut-avatar";
+      if (shortcut?.photoDataUrl) {
+        const image = document.createElement("img");
+        image.src = shortcut.photoDataUrl;
+        image.alt = "";
+        avatar.appendChild(image);
+      } else {
+        avatar.textContent = shortcutFallbackText(shortcut);
+      }
+      button.appendChild(avatar);
+      button.setAttribute(
+        "aria-label",
+        `${String(shortcut?.displayName || shortcut?.label || "Shortcut").trim()} shortcut`
+      );
+    } else {
+      button.textContent = shortcut.label;
+      button.setAttribute("aria-label", `${shortcut.label} shortcut`);
+    }
+
+    if (shortcut?.targetAgendaId) {
+      button.addEventListener("click", () => {
+        void openAgenda(shortcut.targetAgendaId);
+      });
+    } else {
+      button.disabled = true;
+    }
     agendaShortcutList.appendChild(button);
   });
 
-  agendaShortcutBar.hidden = count === 0;
+  agendaShortcutBar.hidden = visibleCount === 0;
+}
+
+async function loadAgendaShortcutPhoto(shortcut) {
+  const email = normalizeEmail(shortcut?.userEmail);
+  if (!email || loadingAgendaShortcutPhotos.has(email)) {
+    return;
+  }
+  loadingAgendaShortcutPhotos.add(email);
+  try {
+    const photo = await directoryApi.getAgendaShortcutPhoto({ email });
+    if (!photo?.blob) {
+      writeCachedAgendaShortcutPhoto(email, {
+        hasPhoto: false,
+        dataUrl: "",
+      });
+      agendaShortcuts = agendaShortcuts.map((entry) => (
+        normalizeEmail(entry?.userEmail) === email
+          ? { ...entry, photoDataUrl: "", hasPhoto: false }
+          : entry
+      ));
+      renderAgendaShortcuts();
+      return;
+    }
+    const dataUrl = await blobToDataUrl(photo.blob);
+    writeCachedAgendaShortcutPhoto(email, {
+      hasPhoto: true,
+      dataUrl,
+    });
+    agendaShortcuts = agendaShortcuts.map((entry) => (
+      normalizeEmail(entry?.userEmail) === email
+        ? { ...entry, photoDataUrl: dataUrl, hasPhoto: true }
+        : entry
+    ));
+    renderAgendaShortcuts();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    loadingAgendaShortcutPhotos.delete(email);
+  }
+}
+
+function hydrateAgendaShortcutPhotos() {
+  agendaShortcuts = agendaShortcuts.map((shortcut) => {
+    if (shortcut?.type !== "person" || !shortcut?.userEmail) {
+      return shortcut;
+    }
+    const cached = readCachedAgendaShortcutPhoto(shortcut.userEmail);
+    if (cached) {
+      return {
+        ...shortcut,
+        photoDataUrl: cached.hasPhoto ? cached.dataUrl : "",
+        hasPhoto: cached.hasPhoto,
+      };
+    }
+    void loadAgendaShortcutPhoto(shortcut);
+    return {
+      ...shortcut,
+      photoDataUrl: "",
+      hasPhoto: false,
+    };
+  });
+}
+
+async function loadAgendaShortcuts() {
+  if (String(currentUser?.role || "").trim().toLowerCase() !== "admin") {
+    agendaShortcuts = [];
+    renderAgendaShortcuts();
+    return;
+  }
+  try {
+    const payload = await directoryApi.listAgendaShortcuts();
+    agendaShortcuts = (Array.isArray(payload?.shortcuts) ? payload.shortcuts : []).map((shortcut) => ({
+      ...shortcut,
+      photoDataUrl: "",
+    }));
+    hydrateAgendaShortcutPhotos();
+    renderAgendaShortcuts();
+  } catch (error) {
+    console.error(error);
+    agendaShortcuts = [];
+    renderAgendaShortcuts();
+  }
 }
 
 function renderAgendaList() {
@@ -956,6 +1105,7 @@ async function openAgenda(agendaId, options = {}) {
   selectedItemId = "";
   setAgendaSettingsExpanded(options.editSettings === true);
   renderAgendaList();
+  renderAgendaShortcuts();
   renderAgendaDetail();
   await loadAgendaDetail(agendaId);
   if (options.editSettings === true) {
@@ -1773,7 +1923,7 @@ async function loadAgendas(status = "", options = {}) {
   applyAgendaSummaries(nextAgendas);
   writeCachedAgendaSummaries();
   renderAgendaList();
-  renderAgendaShortcuts();
+  await loadAgendaShortcuts();
   renderAgendaDetail();
   if (selectedAgendaId) {
     void loadAgendaDetail(selectedAgendaId, { force: options.forceSelectedDetail === true });
