@@ -48,13 +48,26 @@ function resolveShortcutAgendaId(shortcut, agendas) {
 
   if (shortcut?.type === "person") {
     const expectedEmail = normalizeEmail(shortcut.userEmail);
-    const oneToOneMatch = list.find((agenda) => {
+    const exactEmailMatch = list.find((agenda) => {
       const members = agendaMembers(agenda);
       const hasMatchingEmail = members.some((member) => normalizeEmail(member.userEmail) === expectedEmail);
       return hasMatchingEmail && members.length <= 2;
     });
-    if (oneToOneMatch?.id) {
-      return oneToOneMatch.id;
+    if (exactEmailMatch?.id) {
+      return exactEmailMatch.id;
+    }
+
+    const compactAgendaMatch = list.find((agenda) => {
+      const members = agendaMembers(agenda);
+      if (members.length > 2) {
+        return false;
+      }
+      const title = String(agenda?.title || "").trim().toLowerCase();
+      const haystack = shortcutHaystack(agenda);
+      return normalizedTerms.some((term) => title.includes(term) || haystack.includes(term));
+    });
+    if (compactAgendaMatch?.id) {
+      return compactAgendaMatch.id;
     }
   }
 

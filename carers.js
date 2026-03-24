@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260317";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260324";
 
 const searchInput = document.getElementById("searchInput");
 const areaFilterSelect = document.getElementById("areaFilterSelect");

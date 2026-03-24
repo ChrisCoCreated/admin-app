@@ -104,6 +104,28 @@ const PAGE_META = {
 };
 
 const ADMIN_HOME_PAGES = ["reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
+const MENU_GROUPS = [
+  {
+    title: "People",
+    pages: ["clients", "carers", "recruitment", "enquiries", "suppliers", "consultant"],
+  },
+  {
+    title: "Planning",
+    pages: ["agendas", "whiteboard", "simpletasks", "tasks", "taskstest"],
+  },
+  {
+    title: "Time & Geography",
+    pages: ["timesheets", "mapping", "drivetime"],
+  },
+  {
+    title: "Performance",
+    pages: ["reports", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
+  },
+  {
+    title: "Marketing & Content",
+    pages: ["emailtemplates", "marketing", "photolayout"],
+  },
+];
 
 function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
@@ -146,6 +168,29 @@ export function getHomePageTiles(role) {
   return [];
 }
 
+function getGroupedPages(role) {
+  const accessiblePages = getAccessiblePages(role);
+  const accessibleSet = new Set(accessiblePages);
+  const groupedSections = [];
+  const usedPages = new Set();
+
+  for (const group of MENU_GROUPS) {
+    const pages = group.pages.filter((pageKey) => accessibleSet.has(pageKey));
+    if (!pages.length) {
+      continue;
+    }
+    pages.forEach((pageKey) => usedPages.add(pageKey));
+    groupedSections.push({ title: group.title, pages });
+  }
+
+  const remainingPages = accessiblePages.filter((pageKey) => !usedPages.has(pageKey));
+  if (remainingPages.length) {
+    groupedSections.push({ title: "Other", pages: remainingPages });
+  }
+
+  return groupedSections;
+}
+
 export function renderTopNavigation({ role, currentPathname = window.location.pathname } = {}) {
   const nav = document.getElementById("primaryNav");
   if (!nav) {
@@ -153,12 +198,14 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
   }
 
   const pages = getAccessiblePages(role);
+  const groupedPages = getGroupedPages(role);
   const shortcutPages = getHomePageTiles(role);
   const currentPath = normalizePath(currentPathname);
   const actualRole = getStoredActualRole();
   const canPreviewAsLoggedInUser = actualRole === "admin";
   const actions = nav.parentElement;
   const existingShortcuts = actions?.querySelector(".topbar-shortcuts");
+  const signOutBtn = document.getElementById("signOutBtn");
   existingShortcuts?.remove();
   nav.innerHTML = "";
 
@@ -202,6 +249,21 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
   const panel = document.createElement("div");
   panel.className = "topnav-panel";
 
+  const panelHeader = document.createElement("div");
+  panelHeader.className = "topnav-panel-header";
+
+  const panelTitle = document.createElement("h2");
+  panelTitle.className = "topnav-panel-title";
+  panelTitle.textContent = "Supermenu";
+
+  const panelCopy = document.createElement("p");
+  panelCopy.className = "topnav-panel-copy";
+  panelCopy.textContent = "Everything is grouped here so it stays tidy on desktop and mobile.";
+
+  panelHeader.appendChild(panelTitle);
+  panelHeader.appendChild(panelCopy);
+  panel.appendChild(panelHeader);
+
   if (canPreviewAsLoggedInUser) {
     const previewControl = document.createElement("label");
     previewControl.className = "topnav-preview-toggle";
@@ -234,24 +296,54 @@ export function renderTopNavigation({ role, currentPathname = window.location.pa
     panel.appendChild(previewControl);
   }
 
-  for (const pageKey of pages) {
-    const page = PAGE_META[pageKey];
-    if (!page) {
+  for (const section of groupedPages) {
+    const sectionElement = document.createElement("section");
+    sectionElement.className = "topnav-section";
+
+    const heading = document.createElement("h3");
+    heading.className = "topnav-section-title";
+    heading.textContent = section.title;
+    sectionElement.appendChild(heading);
+
+    const sectionLinks = document.createElement("div");
+    sectionLinks.className = "topnav-section-links";
+
+    for (const pageKey of section.pages) {
+      const page = PAGE_META[pageKey];
+      if (!page) {
+        continue;
+      }
+      const link = document.createElement("a");
+      link.className = "topnav-link";
+      link.href = page.href;
+      link.textContent = page.label;
+      if (normalizePath(page.href) === currentPath) {
+        link.classList.add("active");
+        link.setAttribute("aria-current", "page");
+      }
+      link.addEventListener("click", () => {
+        menu.open = false;
+      });
+      sectionLinks.appendChild(link);
+    }
+
+    if (!sectionLinks.children.length) {
       continue;
     }
-    const link = document.createElement("a");
-    link.className = "topnav-link";
-    link.href = page.href;
-    link.textContent = page.label;
-    if (normalizePath(page.href) === currentPath) {
-      link.classList.add("active");
-      link.setAttribute("aria-current", "page");
-      summary.textContent = `Menu: ${page.label}`;
-    }
-    link.addEventListener("click", () => {
-      menu.open = false;
-    });
-    panel.appendChild(link);
+
+    sectionElement.appendChild(sectionLinks);
+    panel.appendChild(sectionElement);
+  }
+
+  if (signOutBtn) {
+    signOutBtn.hidden = false;
+    signOutBtn.classList.add("topnav-signout");
+    signOutBtn.classList.remove("secondary");
+
+    const accountActions = document.createElement("div");
+    accountActions.className = "topnav-account-actions";
+    accountActions.appendChild(signOutBtn);
+    panel.appendChild(accountActions);
   }
 
   menu.appendChild(panel);

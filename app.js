@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { getAccessiblePages, getHomePageTiles, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260317";
+import { getAccessiblePages, getHomePageTiles, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260324";
 
 const signInBtn = document.getElementById("signInBtn");
 const authState = document.getElementById("authState");
