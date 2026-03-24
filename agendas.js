@@ -200,6 +200,18 @@ function setActionStatus(message, isError = false) {
   actionStatus.classList.toggle("error", isError);
 }
 
+function handleAgendaItemSaveShortcut(event) {
+  if (!event || busy) {
+    return;
+  }
+  const pressedEnter = String(event.key || "").toLowerCase() === "enter";
+  if (!pressedEnter || (!event.metaKey && !event.ctrlKey)) {
+    return;
+  }
+  event.preventDefault();
+  agendaItemForm?.requestSubmit();
+}
+
 function syncAgendaItemEditorState() {
   if (saveAgendaItemBtn) {
     saveAgendaItemBtn.textContent = selectedItemId ? "Save changes" : "Save item";
@@ -2036,9 +2048,13 @@ itemTitleInput?.addEventListener("focus", () => {
   setAgendaItemComposerExpanded(true);
 });
 
+itemTitleInput?.addEventListener("keydown", handleAgendaItemSaveShortcut);
+
 itemDetailEditor?.addEventListener("focus", () => {
   setAgendaItemComposerExpanded(true);
 });
+
+itemDetailEditor?.addEventListener("keydown", handleAgendaItemSaveShortcut);
 
 itemSearchInput?.addEventListener("input", () => {
   renderAgendaDetail();
