@@ -27,6 +27,7 @@ const importPreviewWrap = document.getElementById("importPreviewWrap");
 const importPreviewTitle = document.getElementById("importPreviewTitle");
 const importPreviewBody = document.getElementById("importPreviewBody");
 const toggleRecruitmentToolbarBtn = document.getElementById("toggleRecruitmentToolbarBtn");
+const addRecruitmentItemBtn = document.getElementById("addRecruitmentItemBtn");
 const recruitmentToolbarContent = document.getElementById("recruitmentToolbarContent");
 const oneTouchPickerModal = document.getElementById("oneTouchPickerModal");
 const oneTouchPickerCandidate = document.getElementById("oneTouchPickerCandidate");
@@ -77,6 +78,7 @@ let oneTouchPickerCandidateId = "";
 let statusUpdateBusy = false;
 let activeUpdateBusy = false;
 let statusQuickMenuCandidateId = "";
+let recruitmentListNewItemUrl = "";
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
@@ -139,6 +141,13 @@ function setRecruitmentToolbarVisible(visible) {
   toggleRecruitmentToolbarBtn.classList.toggle("is-open", visible);
 }
 
+function syncAddRecruitmentButton() {
+  if (!addRecruitmentItemBtn) {
+    return;
+  }
+  addRecruitmentItemBtn.disabled = !recruitmentListNewItemUrl;
+}
+
 function hasOneTouchLink(candidate) {
   return Boolean(cleanText(candidate?.oneTouchLink));
 }
@@ -147,6 +156,27 @@ function getInitialScreenUrl(candidateId) {
   const url = new URL("./initial-screen.html", window.location.href);
   url.searchParams.set("itemId", cleanText(candidateId));
   return url.toString();
+}
+
+function getRecruitmentNewItemUrl(listUrl) {
+  const value = cleanText(listUrl);
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const url = new URL(value, window.location.href);
+    const lastSlashIndex = url.pathname.lastIndexOf("/");
+    if (lastSlashIndex <= 0) {
+      return "";
+    }
+    url.pathname = `${url.pathname.slice(0, lastSlashIndex)}/NewForm.aspx`;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
 function normalizePhoneForActions(phoneNumber) {
@@ -1370,6 +1400,8 @@ async function loadRecruitmentCandidates() {
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
   }
+  recruitmentListNewItemUrl = getRecruitmentNewItemUrl(payload?.listUrl);
+  syncAddRecruitmentButton();
   renderFilterOptions();
   renderCandidates();
 }
@@ -1414,6 +1446,13 @@ sourceFilterSelect?.addEventListener("change", renderCandidates);
 activeFilterSelect?.addEventListener("change", renderCandidates);
 toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
   setRecruitmentToolbarVisible(recruitmentToolbarContent?.hidden);
+});
+addRecruitmentItemBtn?.addEventListener("click", () => {
+  if (!recruitmentListNewItemUrl) {
+    setStatus("Could not find the SharePoint add form yet.", true);
+    return;
+  }
+  window.open(recruitmentListNewItemUrl, "_blank", "noopener,noreferrer");
 });
 
 importDropZone?.addEventListener("click", () => {
@@ -1541,4 +1580,5 @@ signOutBtn?.addEventListener("click", async () => {
   }
 });
 
+syncAddRecruitmentButton();
 void init();

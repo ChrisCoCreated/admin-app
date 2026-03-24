@@ -44,17 +44,28 @@
             <h2>Search & Import</h2>
             <span class="muted">Open filters, search, and CSV tools when you need them.</span>
           </div>
-          <button
-            id="toggleRecruitmentToolbarBtn"
-            type="button"
-            class="mini-btn recruitment-toolbar-toggle"
-            aria-expanded="false"
-            aria-controls="recruitmentToolbarContent"
-            aria-label="Show search and import tools"
-            title="Show search and import tools"
-          >
-            <span aria-hidden="true">⌕</span>
-          </button>
+          <div class="recruitment-toolbar-actions">
+            <button
+              id="toggleRecruitmentToolbarBtn"
+              type="button"
+              class="mini-btn recruitment-toolbar-toggle"
+              aria-expanded="false"
+              aria-controls="recruitmentToolbarContent"
+              aria-label="Show search and import tools"
+              title="Show search and import tools"
+            >
+              <span aria-hidden="true">⌕</span>
+            </button>
+            <button
+              id="addRecruitmentItemBtn"
+              type="button"
+              class="mini-btn recruitment-toolbar-toggle recruitment-toolbar-add"
+              aria-label="Add recruitment candidate in SharePoint"
+              title="Add recruitment candidate in SharePoint"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
         </div>
         <div id="recruitmentToolbarContent" hidden>
           <label class="field" for="searchInput">
