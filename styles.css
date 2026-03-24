@@ -919,6 +919,43 @@ dd {
   gap: 8px;
 }
 
+.recruitment-modal-panel {
+  width: min(820px, 100%);
+  max-height: min(88vh, 920px);
+  overflow: auto;
+}
+
+.recruitment-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.recruitment-detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.1rem;
+}
+
+.recruitment-detail-list > div {
+  min-width: 0;
+}
+
+.recruitment-detail-notes {
+  grid-column: 1 / -1;
+}
+
+.recruitment-detail-notes dd {
+  white-space: pre-wrap;
+}
+
+.recruitment-active-field {
+  min-height: 42px;
+  align-self: end;
+}
+
 .recruitment-screen-link {
   display: inline-flex;
   align-items: center;
@@ -936,6 +973,10 @@ dd {
 
 .recruitment-screen-link:hover {
   background: #e5ebf5;
+}
+
+.recruitment-detail-trigger {
+  width: 100%;
 }
 
 .recruitment-quick-link {

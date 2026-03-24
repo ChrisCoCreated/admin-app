@@ -29,6 +29,24 @@ const importPreviewBody = document.getElementById("importPreviewBody");
 const toggleRecruitmentToolbarBtn = document.getElementById("toggleRecruitmentToolbarBtn");
 const addRecruitmentItemBtn = document.getElementById("addRecruitmentItemBtn");
 const recruitmentToolbarContent = document.getElementById("recruitmentToolbarContent");
+const candidateDetailModal = document.getElementById("candidateDetailModal");
+const candidateDetailModalTitle = document.getElementById("candidateDetailModalTitle");
+const candidateDetailCloseBtn = document.getElementById("candidateDetailCloseBtn");
+const addRecruitmentModal = document.getElementById("addRecruitmentModal");
+const addRecruitmentCloseBtn = document.getElementById("addRecruitmentCloseBtn");
+const addRecruitmentForm = document.getElementById("addRecruitmentForm");
+const addRecruitmentError = document.getElementById("addRecruitmentError");
+const addCandidateNameInput = document.getElementById("addCandidateNameInput");
+const addCandidateStatusSelect = document.getElementById("addCandidateStatusSelect");
+const addCandidateEmailInput = document.getElementById("addCandidateEmailInput");
+const addCandidatePhoneInput = document.getElementById("addCandidatePhoneInput");
+const addCandidateLivesInInput = document.getElementById("addCandidateLivesInInput");
+const addCandidateJobLocationInput = document.getElementById("addCandidateJobLocationInput");
+const addCandidateSourceInput = document.getElementById("addCandidateSourceInput");
+const addCandidateActiveInput = document.getElementById("addCandidateActiveInput");
+const addCandidateNotesInput = document.getElementById("addCandidateNotesInput");
+const saveRecruitmentCandidateBtn = document.getElementById("saveRecruitmentCandidateBtn");
+const cancelAddRecruitmentBtn = document.getElementById("cancelAddRecruitmentBtn");
 const oneTouchPickerModal = document.getElementById("oneTouchPickerModal");
 const oneTouchPickerCandidate = document.getElementById("oneTouchPickerCandidate");
 const oneTouchAreaSelect = document.getElementById("oneTouchAreaSelect");
@@ -48,6 +66,7 @@ const detailFields = {
   active: detailRoot?.querySelector('[data-field="active"]'),
   source: detailRoot?.querySelector('[data-field="source"]'),
   phoneNumber: detailRoot?.querySelector('[data-field="phoneNumber"]'),
+  email: detailRoot?.querySelector('[data-field="email"]'),
   interviewBooked: detailRoot?.querySelector('[data-field="interviewBooked"]'),
   interviewWith: detailRoot?.querySelector('[data-field="interviewWith"]'),
   keepInMind: detailRoot?.querySelector('[data-field="keepInMind"]'),
@@ -78,7 +97,7 @@ let oneTouchPickerCandidateId = "";
 let statusUpdateBusy = false;
 let activeUpdateBusy = false;
 let statusQuickMenuCandidateId = "";
-let recruitmentListNewItemUrl = "";
+let createCandidateBusy = false;
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
@@ -145,7 +164,7 @@ function syncAddRecruitmentButton() {
   if (!addRecruitmentItemBtn) {
     return;
   }
-  addRecruitmentItemBtn.disabled = !recruitmentListNewItemUrl;
+  addRecruitmentItemBtn.disabled = createCandidateBusy;
 }
 
 function hasOneTouchLink(candidate) {
@@ -158,24 +177,81 @@ function getInitialScreenUrl(candidateId) {
   return url.toString();
 }
 
-function getRecruitmentNewItemUrl(listUrl) {
-  const value = cleanText(listUrl);
-  if (!value) {
-    return "";
+function setAddRecruitmentError(message = "") {
+  if (!addRecruitmentError) {
+    return;
   }
+  const text = cleanText(message);
+  addRecruitmentError.hidden = !text;
+  addRecruitmentError.textContent = text;
+}
 
-  try {
-    const url = new URL(value, window.location.href);
-    const lastSlashIndex = url.pathname.lastIndexOf("/");
-    if (lastSlashIndex <= 0) {
-      return "";
+function resetAddRecruitmentForm() {
+  addRecruitmentForm?.reset();
+  if (addCandidateStatusSelect) {
+    addCandidateStatusSelect.value = "Initial Call";
+  }
+  if (addCandidateActiveInput) {
+    addCandidateActiveInput.checked = true;
+  }
+  setAddRecruitmentError("");
+}
+
+function setCreateCandidateBusy(disabled) {
+  createCandidateBusy = disabled;
+  syncAddRecruitmentButton();
+  if (saveRecruitmentCandidateBtn) {
+    saveRecruitmentCandidateBtn.disabled = disabled;
+  }
+  if (cancelAddRecruitmentBtn) {
+    cancelAddRecruitmentBtn.disabled = disabled;
+  }
+  for (const field of [
+    addCandidateNameInput,
+    addCandidateStatusSelect,
+    addCandidateEmailInput,
+    addCandidatePhoneInput,
+    addCandidateLivesInInput,
+    addCandidateJobLocationInput,
+    addCandidateSourceInput,
+    addCandidateActiveInput,
+    addCandidateNotesInput,
+  ]) {
+    if (field) {
+      field.disabled = disabled;
     }
-    url.pathname = `${url.pathname.slice(0, lastSlashIndex)}/NewForm.aspx`;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  } catch {
-    return "";
+  }
+}
+
+function openAddRecruitmentModal() {
+  resetAddRecruitmentForm();
+  if (addRecruitmentModal) {
+    addRecruitmentModal.hidden = false;
+  }
+  addCandidateNameInput?.focus();
+}
+
+function closeAddRecruitmentModal(options = {}) {
+  if (createCandidateBusy && options.force !== true) {
+    return;
+  }
+  if (addRecruitmentModal) {
+    addRecruitmentModal.hidden = true;
+  }
+  setAddRecruitmentError("");
+}
+
+function openCandidateDetail(candidate) {
+  if (!candidate?.id || !candidateDetailModal) {
+    return;
+  }
+  setDetail(candidate);
+  candidateDetailModal.hidden = false;
+}
+
+function closeCandidateDetail() {
+  if (candidateDetailModal) {
+    candidateDetailModal.hidden = true;
   }
 }
 
@@ -827,12 +903,16 @@ function openStatusQuickMenu(candidate, anchorEl) {
 
 function setDetail(candidate) {
   if (!candidate) {
+    if (candidateDetailModalTitle) {
+      candidateDetailModalTitle.textContent = "Candidate Detail";
+    }
     detailFields.candidateName.textContent = "Select a candidate";
     detailFields.location.textContent = "-";
     detailFields.status.textContent = "-";
     detailFields.active.textContent = "-";
     detailFields.source.textContent = "-";
     detailFields.phoneNumber.textContent = "-";
+    detailFields.email.textContent = "-";
     detailFields.interviewBooked.textContent = "-";
     detailFields.interviewWith.textContent = "-";
     detailFields.keepInMind.textContent = "-";
@@ -853,12 +933,16 @@ function setDetail(candidate) {
     return;
   }
 
+  if (candidateDetailModalTitle) {
+    candidateDetailModalTitle.textContent = cleanText(candidate.candidateName) || "Candidate Detail";
+  }
   detailFields.candidateName.textContent = cleanText(candidate.candidateName) || "-";
   detailFields.location.textContent = cleanText(candidate.location) || "-";
   detailFields.status.textContent = cleanText(candidate.status) || "-";
   detailFields.active.textContent = formatBoolean(candidate.active);
   detailFields.source.textContent = cleanText(candidate.source) || "-";
   detailFields.phoneNumber.textContent = cleanText(candidate.phoneNumber) || "-";
+  detailFields.email.textContent = cleanText(candidate.email) || "-";
   detailFields.interviewBooked.textContent = formatBoolean(candidate.interviewBooked);
   detailFields.interviewWith.textContent = cleanText(candidate.interviewWith) || "-";
   detailFields.keepInMind.textContent = formatBoolean(candidate.keepInMind);
@@ -1015,6 +1099,7 @@ function renderCandidates() {
       </td>
       <td>
         <div class="recruitment-action-stack">
+          <button type="button" class="secondary recruitment-screen-link recruitment-detail-trigger">View details</button>
           <a class="secondary recruitment-screen-link" href="${escapeHtml(getInitialScreenUrl(candidate.id))}">Initial Screen</a>
           ${
             whatsappUrl
@@ -1045,8 +1130,17 @@ function renderCandidates() {
       selectedCandidateId = candidate.id;
       setDetail(candidate);
       renderCandidates();
+      openCandidateDetail(candidate);
     });
 
+    const detailBtn = tr.querySelector(".recruitment-detail-trigger");
+    detailBtn?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selectedCandidateId = candidate.id;
+      setDetail(candidate);
+      renderCandidates();
+      openCandidateDetail(candidate);
+    });
     const addBtn = tr.querySelector(".recruitment-add-btn");
     addBtn?.addEventListener("click", async (event) => {
       event.stopPropagation();
@@ -1400,10 +1494,49 @@ async function loadRecruitmentCandidates() {
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
   }
-  recruitmentListNewItemUrl = getRecruitmentNewItemUrl(payload?.listUrl);
   syncAddRecruitmentButton();
   renderFilterOptions();
   renderCandidates();
+}
+
+async function createRecruitmentCandidate() {
+  const candidateName = cleanText(addCandidateNameInput?.value);
+  if (!candidateName) {
+    setAddRecruitmentError("Candidate name is required.");
+    addCandidateNameInput?.focus();
+    return;
+  }
+
+  setCreateCandidateBusy(true);
+  setAddRecruitmentError("");
+  try {
+    const result = await directoryApi.createRecruitmentCandidate({
+      candidateName,
+      status: cleanText(addCandidateStatusSelect?.value) || "Initial Call",
+      email: cleanText(addCandidateEmailInput?.value),
+      phoneNumber: cleanText(addCandidatePhoneInput?.value),
+      livesIn: cleanText(addCandidateLivesInInput?.value),
+      location: cleanText(addCandidateJobLocationInput?.value),
+      source: cleanText(addCandidateSourceInput?.value),
+      active: addCandidateActiveInput?.checked !== false,
+      notes: cleanText(addCandidateNotesInput?.value),
+    });
+    await loadRecruitmentCandidates();
+    const createdId = cleanText(result?.item?.id);
+    const createdCandidate = allCandidates.find((candidate) => cleanText(candidate.id) === createdId) || result?.item || null;
+    if (createdCandidate?.id) {
+      selectedCandidateId = cleanText(createdCandidate.id);
+      setDetail(createdCandidate);
+      openCandidateDetail(createdCandidate);
+    }
+    closeAddRecruitmentModal({ force: true });
+    setStatus(`Candidate added: ${candidateName}.`);
+  } catch (error) {
+    console.error(error);
+    setAddRecruitmentError(error?.message || "Could not add candidate.");
+  } finally {
+    setCreateCandidateBusy(false);
+  }
 }
 
 async function init() {
@@ -1448,12 +1581,15 @@ toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
   setRecruitmentToolbarVisible(recruitmentToolbarContent?.hidden);
 });
 addRecruitmentItemBtn?.addEventListener("click", () => {
-  if (!recruitmentListNewItemUrl) {
-    setStatus("Could not find the SharePoint add form yet.", true);
-    return;
-  }
-  window.open(recruitmentListNewItemUrl, "_blank", "noopener,noreferrer");
+  openAddRecruitmentModal();
 });
+addRecruitmentForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await createRecruitmentCandidate();
+});
+addRecruitmentCloseBtn?.addEventListener("click", closeAddRecruitmentModal);
+cancelAddRecruitmentBtn?.addEventListener("click", closeAddRecruitmentModal);
+candidateDetailCloseBtn?.addEventListener("click", closeCandidateDetail);
 
 importDropZone?.addEventListener("click", () => {
   if (importBusy) {
@@ -1531,14 +1667,30 @@ oneTouchPickerModal?.addEventListener("click", (event) => {
   }
   closeOneTouchPicker();
 });
+candidateDetailModal?.addEventListener("click", (event) => {
+  if (event.target !== candidateDetailModal) {
+    return;
+  }
+  closeCandidateDetail();
+});
+addRecruitmentModal?.addEventListener("click", (event) => {
+  if (event.target !== addRecruitmentModal || createCandidateBusy) {
+    return;
+  }
+  closeAddRecruitmentModal();
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || addToOneTouchBusy) {
     return;
   }
   closeStatusQuickMenu();
+  closeCandidateDetail();
   if (!oneTouchPickerModal?.hidden) {
     closeOneTouchPicker();
+  }
+  if (!addRecruitmentModal?.hidden && !createCandidateBusy) {
+    closeAddRecruitmentModal();
   }
 });
 

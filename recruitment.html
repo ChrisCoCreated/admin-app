@@ -159,95 +159,6 @@
           </div>
           <p id="emptyState" class="muted" hidden>No active candidates found.</p>
         </article>
-
-        <article class="panel detail-panel">
-          <h2>Candidate Detail</h2>
-          <dl id="candidateDetail" class="detail-list">
-            <div>
-              <dt>Candidate</dt>
-              <dd data-field="candidateName">Select a candidate</dd>
-            </div>
-            <div>
-              <dt>Location</dt>
-              <dd data-field="location">-</dd>
-            </div>
-            <div>
-              <dt>Status</dt>
-              <dd data-field="status">-</dd>
-            </div>
-            <div>
-              <dt>Active</dt>
-              <dd data-field="active">-</dd>
-            </div>
-            <div>
-              <dt>Source</dt>
-              <dd data-field="source">-</dd>
-            </div>
-            <div>
-              <dt>Phone Number</dt>
-              <dd data-field="phoneNumber">-</dd>
-            </div>
-            <div>
-              <dt>Interview Booked</dt>
-              <dd data-field="interviewBooked">-</dd>
-            </div>
-            <div>
-              <dt>Interview With</dt>
-              <dd data-field="interviewWith">-</dd>
-            </div>
-            <div>
-              <dt>Keep in Mind</dt>
-              <dd data-field="keepInMind">-</dd>
-            </div>
-            <div>
-              <dt>Lives In</dt>
-              <dd data-field="livesIn">-</dd>
-            </div>
-            <div>
-              <dt>1st Interview Date</dt>
-              <dd data-field="firstInterviewDate">-</dd>
-            </div>
-            <div>
-              <dt>Earmarked For</dt>
-              <dd data-field="earmarkedFor">-</dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd data-field="created">-</dd>
-            </div>
-            <div>
-              <dt>OneTouch Link</dt>
-              <dd data-field="oneTouchLink">-</dd>
-            </div>
-            <div>
-              <dt>Notes</dt>
-              <dd data-field="notes">-</dd>
-            </div>
-          </dl>
-          <div class="row wrap-row">
-            <label class="field" for="statusUpdateSelect">
-              Change Status
-              <select id="statusUpdateSelect">
-                <option value="">Select status</option>
-              </select>
-            </label>
-            <button id="saveStatusBtn" type="button">Save Status</button>
-          </div>
-          <p class="row">
-            <a
-              id="openOneTouchBtn"
-              class="button-link-one-touch"
-              href="#"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-disabled="true"
-              >Open in OneTouch</a
-            >
-          </p>
-          <p class="row">
-            <a id="sharePointListLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer">Open SharePoint List</a>
-          </p>
-        </article>
       </section>
     </main>
 
@@ -290,6 +201,171 @@
           <button id="oneTouchPickerConfirmBtn" type="button">Add to OneTouch</button>
           <button id="oneTouchPickerCancelBtn" type="button" class="secondary">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <div id="candidateDetailModal" class="modal-backdrop" hidden>
+      <div class="modal-panel recruitment-modal-panel">
+        <div class="recruitment-modal-header">
+          <div>
+            <p class="eyebrow">Current Candidate</p>
+            <h3 id="candidateDetailModalTitle">Candidate Detail</h3>
+          </div>
+          <button id="candidateDetailCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+        <dl id="candidateDetail" class="detail-list recruitment-detail-list">
+          <div>
+            <dt>Candidate</dt>
+            <dd data-field="candidateName">Select a candidate</dd>
+          </div>
+          <div>
+            <dt>Location</dt>
+            <dd data-field="location">-</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd data-field="status">-</dd>
+          </div>
+          <div>
+            <dt>Active</dt>
+            <dd data-field="active">-</dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd data-field="source">-</dd>
+          </div>
+          <div>
+            <dt>Phone Number</dt>
+            <dd data-field="phoneNumber">-</dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd data-field="email">-</dd>
+          </div>
+          <div>
+            <dt>Interview Booked</dt>
+            <dd data-field="interviewBooked">-</dd>
+          </div>
+          <div>
+            <dt>Interview With</dt>
+            <dd data-field="interviewWith">-</dd>
+          </div>
+          <div>
+            <dt>Keep in Mind</dt>
+            <dd data-field="keepInMind">-</dd>
+          </div>
+          <div>
+            <dt>Lives In</dt>
+            <dd data-field="livesIn">-</dd>
+          </div>
+          <div>
+            <dt>1st Interview Date</dt>
+            <dd data-field="firstInterviewDate">-</dd>
+          </div>
+          <div>
+            <dt>Earmarked For</dt>
+            <dd data-field="earmarkedFor">-</dd>
+          </div>
+          <div>
+            <dt>Created</dt>
+            <dd data-field="created">-</dd>
+          </div>
+          <div>
+            <dt>OneTouch Link</dt>
+            <dd data-field="oneTouchLink">-</dd>
+          </div>
+          <div class="recruitment-detail-notes">
+            <dt>Notes</dt>
+            <dd data-field="notes">-</dd>
+          </div>
+        </dl>
+        <div class="row wrap-row">
+          <label class="field" for="statusUpdateSelect">
+            Change Status
+            <select id="statusUpdateSelect">
+              <option value="">Select status</option>
+            </select>
+          </label>
+          <button id="saveStatusBtn" type="button">Save Status</button>
+        </div>
+        <div class="row wrap-row">
+          <a
+            id="openOneTouchBtn"
+            class="button-link-one-touch"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-disabled="true"
+            >Open in OneTouch</a
+          >
+          <a id="sharePointListLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer">Open SharePoint List</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="addRecruitmentModal" class="modal-backdrop" hidden>
+      <div class="modal-panel recruitment-modal-panel">
+        <div class="recruitment-modal-header">
+          <div>
+            <p class="eyebrow">Recruitment</p>
+            <h3>Add Candidate</h3>
+          </div>
+          <button id="addRecruitmentCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+        <p id="addRecruitmentError" class="muted error" hidden></p>
+        <form id="addRecruitmentForm" class="modal-form">
+          <div class="mapping-form-grid">
+            <label class="field" for="addCandidateNameInput">
+              Candidate Name
+              <input id="addCandidateNameInput" type="text" autocomplete="name" required />
+            </label>
+            <label class="field" for="addCandidateStatusSelect">
+              Status
+              <select id="addCandidateStatusSelect">
+                <option value="Initial Call">Initial Call</option>
+                <option value="Keep in Mind">Keep in Mind</option>
+                <option value="1st Interview">1st Interview</option>
+                <option value="2nd Interview">2nd Interview</option>
+                <option value="Offered">Offered</option>
+                <option value="Accepted">Accepted</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Lost">Lost</option>
+              </select>
+            </label>
+            <label class="field" for="addCandidateEmailInput">
+              Email
+              <input id="addCandidateEmailInput" type="email" autocomplete="email" />
+            </label>
+            <label class="field" for="addCandidatePhoneInput">
+              Phone Number
+              <input id="addCandidatePhoneInput" type="text" autocomplete="tel" />
+            </label>
+            <label class="field" for="addCandidateLivesInInput">
+              Candidate Location
+              <input id="addCandidateLivesInInput" type="text" />
+            </label>
+            <label class="field" for="addCandidateJobLocationInput">
+              Job Location
+              <input id="addCandidateJobLocationInput" type="text" />
+            </label>
+            <label class="field" for="addCandidateSourceInput">
+              Source
+              <input id="addCandidateSourceInput" type="text" />
+            </label>
+            <label class="checkbox-row recruitment-active-field" for="addCandidateActiveInput">
+              <input id="addCandidateActiveInput" type="checkbox" checked />
+              Active candidate
+            </label>
+          </div>
+          <label class="field" for="addCandidateNotesInput">
+            Notes
+            <textarea id="addCandidateNotesInput" placeholder="Capture any relevant context, availability or follow-up notes."></textarea>
+          </label>
+          <div class="modal-actions">
+            <button id="saveRecruitmentCandidateBtn" type="submit">Save Candidate</button>
+            <button id="cancelAddRecruitmentBtn" type="button" class="secondary">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
 
