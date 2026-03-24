@@ -4000,6 +4000,39 @@ body.lightbox-open {
   gap: 1rem;
 }
 
+.agenda-shortcut-bar {
+  display: grid;
+}
+
+.agenda-shortcut-list {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: thin;
+}
+
+.agenda-shortcut-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.35rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(16, 33, 57, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(16, 33, 57, 0.78);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.agenda-shortcut-chip.is-selected {
+  border-color: rgba(26, 123, 150, 0.35);
+  background: rgba(49, 183, 200, 0.12);
+  color: rgba(16, 33, 57, 0.9);
+}
+
 .agenda-list-panel,
 .agenda-detail-panel {
   display: grid;
@@ -5331,6 +5364,14 @@ body.lightbox-open {
   .agendas-layout {
     grid-template-columns: 1fr;
     gap: 0.85rem;
+  }
+
+  .agenda-shortcut-list {
+    gap: 0.45rem;
+  }
+
+  .agenda-shortcut-chip {
+    padding: 0.42rem 0.72rem;
   }
 
   .agenda-detail-panel {

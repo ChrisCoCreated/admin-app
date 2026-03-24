@@ -17,6 +17,8 @@ const ORG_PEOPLE = [
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const actionStatus = document.getElementById("actionStatus");
+const agendaShortcutBar = document.getElementById("agendaShortcutBar");
+const agendaShortcutList = document.getElementById("agendaShortcutList");
 const toggleAgendaSearchBtn = document.getElementById("toggleAgendaSearchBtn");
 const toggleCreatePanelBtn = document.getElementById("toggleCreatePanelBtn");
 const agendaCreatePanel = document.getElementById("agendaCreatePanel");
@@ -74,6 +76,18 @@ const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
 const AGENDA_STAGING_CACHE_PREFIX = "thrive.agendas.staging.v1";
 const GLOBAL_AGENDA_STAGING_KEY = "__global__";
 const AGENDA_DEBUG = false;
+const ADMIN_AGENDA_SHORTCUTS = [
+  { label: "Huddle", terms: ["huddle"] },
+  { label: "Operations", terms: ["operations"] },
+  { label: "Leadership", terms: ["leadership"] },
+  { label: "£", terms: ["laura"] },
+  { label: "N", terms: ["nathan"] },
+  { label: "R", terms: ["rebecca"] },
+  { label: "P", terms: ["peter"] },
+  { label: "A", terms: ["agota"] },
+  { label: "M", terms: ["miska", "michalina"] },
+  { label: "C", terms: ["claire"] },
+];
 
 let currentUser = null;
 let agendas = [];
@@ -722,6 +736,60 @@ function agendaDisplayTitle(agenda) {
     detailedAgenda,
   });
   return "Untitled agenda";
+}
+
+function normalizedAgendaSearchText(agenda) {
+  const detailedAgenda = agendaDetailsById.get(agenda?.id);
+  const members = Array.isArray(agenda?.members) && agenda.members.length
+    ? agenda.members
+    : Array.isArray(detailedAgenda?.members)
+      ? detailedAgenda.members
+      : [];
+  const people = members.map((member) => member.displayName || displayNameForEmail(member.userEmail)).filter(Boolean);
+  return [
+    String(agendaDisplayTitle(agenda) || ""),
+    ...people,
+    ...(Array.isArray(agenda?.participantNames) ? agenda.participantNames : []),
+    ...(Array.isArray(agenda?.participantEmails) ? agenda.participantEmails : []),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function renderAgendaShortcuts() {
+  if (!agendaShortcutBar || !agendaShortcutList) {
+    return;
+  }
+  if (String(currentUser?.role || "").trim().toLowerCase() !== "admin") {
+    agendaShortcutBar.hidden = true;
+    agendaShortcutList.innerHTML = "";
+    return;
+  }
+
+  agendaShortcutList.innerHTML = "";
+  let count = 0;
+
+  ADMIN_AGENDA_SHORTCUTS.forEach((shortcut) => {
+    const match = agendas.find((agenda) => shortcut.terms.some((term) => normalizedAgendaSearchText(agenda).includes(term)));
+    if (!match) {
+      return;
+    }
+    count += 1;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "agenda-shortcut-chip";
+    button.textContent = shortcut.label;
+    button.title = agendaDisplayTitle(match);
+    if (match.id === selectedAgendaId) {
+      button.classList.add("is-selected");
+    }
+    button.addEventListener("click", () => {
+      void openAgenda(match.id);
+    });
+    agendaShortcutList.appendChild(button);
+  });
+
+  agendaShortcutBar.hidden = count === 0;
 }
 
 function renderAgendaList() {
@@ -1674,6 +1742,7 @@ async function loadAgendaDetail(agendaId, options = {}) {
       }));
       writeCachedAgendaSummaries();
       renderAgendaList();
+      renderAgendaShortcuts();
       if (agenda.id === selectedAgendaId) {
         renderAgendaDetail();
       }
@@ -1704,6 +1773,7 @@ async function loadAgendas(status = "", options = {}) {
   applyAgendaSummaries(nextAgendas);
   writeCachedAgendaSummaries();
   renderAgendaList();
+  renderAgendaShortcuts();
   renderAgendaDetail();
   if (selectedAgendaId) {
     void loadAgendaDetail(selectedAgendaId, { force: options.forceSelectedDetail === true });
@@ -1723,6 +1793,7 @@ function hydrateAgendasFromCache() {
   }
   applyAgendaSummaries(cachedAgendas);
   renderAgendaList();
+  renderAgendaShortcuts();
   renderAgendaDetail();
   setStatus(`Loaded ${cachedAgendas.length} cached agenda${cachedAgendas.length === 1 ? "" : "s"}. Refreshing...`);
   agendas.forEach((agenda) => {
