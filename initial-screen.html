@@ -56,28 +56,15 @@
       </section>
 
       <section class="panel initial-screen-panel">
-        <div class="screen-intro-card">
-          <p class="screen-script-label">Warm introduction</p>
-          <p>
-            Hi <span id="screenCandidateFirstName">there</span>, thank you for taking the time to chat with me today.
-            This is a short introductory call, around 10 minutes, to get a sense of availability, travel flexibility,
-            and whether Thrive feels like the right values fit.
-          </p>
-          <p>
-            Thrive is still a young and growing organisation, so we are looking for people who are open to adapting,
-            helping shape how we work, and growing with us.
-          </p>
-          <p class="muted">Use this form to capture the call notes and score each answer.</p>
-        </div>
-
         <p id="screenStatusMessage" class="muted">Loading screening form...</p>
 
         <form id="initialScreenForm" class="initial-screen-form" hidden>
-          <section class="screen-print-summary" aria-label="Call summary snapshot">
+          <section class="screen-print-summary" aria-label="Initial screen summary">
             <div class="screen-print-summary-header">
               <div>
                 <p class="eyebrow">Summary</p>
-                <h2>Call summary snapshot</h2>
+                <h2 id="screenSummaryTitle">Intital Screen Summary: Candidate</h2>
+                <p id="screenSummaryContact" class="muted">Phone and email will appear here.</p>
               </div>
             </div>
 
@@ -120,8 +107,8 @@
                 </div>
 
                 <div class="screen-print-summary-card">
-                  <span class="screen-print-summary-label">Call Summary</span>
-                  <p id="screenSummaryCall" class="screen-print-summary-text">No call summary captured yet.</p>
+                  <span class="screen-print-summary-label">Initial Screen Summary</span>
+                  <p id="screenSummaryCall" class="screen-print-summary-text">No initial screen summary captured yet.</p>
                 </div>
               </div>
             </div>

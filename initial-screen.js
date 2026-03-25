@@ -5,7 +5,6 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260324";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const screenCandidateName = document.getElementById("screenCandidateName");
-const screenCandidateFirstName = document.getElementById("screenCandidateFirstName");
 const screenCandidateMeta = document.getElementById("screenCandidateMeta");
 const screenContactActions = document.getElementById("screenContactActions");
 const screenWhatsAppLink = document.getElementById("screenWhatsAppLink");
@@ -23,6 +22,8 @@ const scoreCountUnscored = document.getElementById("scoreCountUnscored");
 const screenSummaryOutcome = document.getElementById("screenSummaryOutcome");
 const screenSummaryNextSteps = document.getElementById("screenSummaryNextSteps");
 const screenSummaryCall = document.getElementById("screenSummaryCall");
+const screenSummaryTitle = document.getElementById("screenSummaryTitle");
+const screenSummaryContact = document.getElementById("screenSummaryContact");
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
 const fieldRefs = {
@@ -56,10 +57,19 @@ const directoryApi = createDirectoryApi(authController);
 let currentItemId = "";
 let saveBusy = false;
 let copyFeedbackTimer = 0;
+let restoreDocumentTitle = document.title;
 const SCORE_FIELD_KEYS = ["q1Score", "q2Score", "q3Score", "q4Score", "q5Score", "q6Score", "q7Score"];
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function getCandidateName() {
+  return cleanText(screenCandidateName?.textContent) || "Candidate";
+}
+
+function getCandidatePrintTitle() {
+  return `${getCandidateName()} Initial Screen`;
 }
 
 function escapeHtml(value) {
@@ -219,6 +229,8 @@ function saveScreenAsPdf() {
 
 function preparePrintLayout() {
   document.body.classList.add("is-printing");
+  restoreDocumentTitle = document.title;
+  document.title = getCandidatePrintTitle();
   for (const textarea of printableTextareas) {
     textarea.dataset.printHeight = textarea.style.height || "";
     textarea.style.height = "auto";
@@ -228,6 +240,7 @@ function preparePrintLayout() {
 
 function restorePrintLayout() {
   document.body.classList.remove("is-printing");
+  document.title = restoreDocumentTitle;
   for (const textarea of printableTextareas) {
     const originalHeight = textarea.dataset.printHeight;
     if (originalHeight) {
@@ -343,7 +356,10 @@ function renderScoreSummary() {
     screenSummaryNextSteps.textContent = cleanText(form.screenNextSteps) || "No next steps captured yet.";
   }
   if (screenSummaryCall) {
-    screenSummaryCall.textContent = cleanText(form.initialCallSummary) || "No call summary captured yet.";
+    screenSummaryCall.textContent = cleanText(form.initialCallSummary) || "No initial screen summary captured yet.";
+  }
+  if (screenSummaryTitle) {
+    screenSummaryTitle.textContent = `Intital Screen Summary: ${getCandidateName()}`;
   }
 }
 
@@ -351,12 +367,13 @@ function buildCopySummaryText() {
   const form = readForm();
   const counts = getScoreCounts();
   const lines = [
-    `Initial Screen Summary: ${cleanText(screenCandidateName?.textContent) || "Candidate"}`,
+    `Intital Screen Summary: ${getCandidateName()}`,
     cleanText(screenCandidateMeta?.textContent) ? `Details: ${cleanText(screenCandidateMeta.textContent)}` : "",
+    screenSummaryContact?.textContent ? `Contact: ${cleanText(screenSummaryContact.textContent)}` : "",
     `Scores: Green ${counts.Green} | Amber ${counts.Amber} | Red ${counts.Red} | Unscored ${counts.Unscored}`,
     form.screenOutcome ? `Outcome: ${cleanText(form.screenOutcome)}` : "",
     form.screenNextSteps ? `Next steps: ${cleanText(form.screenNextSteps)}` : "",
-    form.initialCallSummary ? `Call summary: ${cleanText(form.initialCallSummary)}` : "",
+    form.initialCallSummary ? `Initial screen summary: ${cleanText(form.initialCallSummary)}` : "",
     `Link: ${window.location.href}`,
   ];
   return lines.filter(Boolean).join("\n");
@@ -365,8 +382,9 @@ function buildCopySummaryText() {
 function buildCopySummaryHtml() {
   const form = readForm();
   const counts = getScoreCounts();
-  const candidateName = cleanText(screenCandidateName?.textContent) || "Candidate";
+  const candidateName = getCandidateName();
   const candidateMeta = cleanText(screenCandidateMeta?.textContent);
+  const candidateContact = cleanText(screenSummaryContact?.textContent);
   const summaryText = cleanText(form.initialCallSummary);
   const screenOutcome = cleanText(form.screenOutcome);
   const screenNextSteps = cleanText(form.screenNextSteps);
@@ -374,8 +392,9 @@ function buildCopySummaryHtml() {
 
   return `
     <div style="font-family: Manrope, Segoe UI, Arial, sans-serif; color: #1c2433; line-height: 1.45;">
-      <h2 style="margin: 0 0 8px; font-size: 20px;">Initial Screen Summary: ${escapeHtml(candidateName)}</h2>
+      <h2 style="margin: 0 0 8px; font-size: 20px;">Intital Screen Summary: ${escapeHtml(candidateName)}</h2>
       ${candidateMeta ? `<p style="margin: 0 0 12px; color: #5b6576;">${escapeHtml(candidateMeta)}</p>` : ""}
+      ${candidateContact ? `<p style="margin: 0 0 12px; color: #5b6576;">${escapeHtml(candidateContact)}</p>` : ""}
       <table style="border-collapse: collapse; margin: 0 0 14px;">
         <tr>
           <td style="padding: 6px 10px; border-radius: 999px; background: #ecfaf2; color: #0f6a3b; font-weight: 700;">Green: ${counts.Green}</td>
@@ -403,7 +422,7 @@ function buildCopySummaryHtml() {
       ${
         summaryText
           ? `<div style="margin: 0 0 14px;">
-              <div style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #1b5467; font-weight: 800;">Call Summary</div>
+              <div style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #1b5467; font-weight: 800;">Intital Screen Summary</div>
               <div style="padding: 12px 14px; border: 1px solid #d8e1ed; border-radius: 12px; background: #fbfdff; white-space: pre-wrap;">${escapeHtml(summaryText)}</div>
             </div>`
           : ""
@@ -462,12 +481,27 @@ async function copyScreenSummary() {
 
 function renderCandidateHeader(item) {
   const candidateName = cleanText(item?.candidateName) || "Initial 10-Minute Call";
-  const parts = [cleanText(item?.status), cleanText(item?.location), cleanText(item?.phoneNumber), cleanText(item?.email)].filter(Boolean);
+  const phoneNumber = cleanText(item?.phoneNumber);
+  const email = cleanText(item?.email);
+  const parts = [cleanText(item?.status), cleanText(item?.location), phoneNumber, email].filter(Boolean);
+  const contactParts = [];
+  if (phoneNumber) {
+    contactParts.push(`Phone: ${phoneNumber}`);
+  }
+  if (email) {
+    contactParts.push(`Email: ${email}`);
+  }
   const whatsappUrl = getWhatsAppUrl(item?.phoneNumber, item?.candidateName);
   const teamsCallUrl = getTeamsCallUrl(item?.phoneNumber);
   screenCandidateName.textContent = candidateName;
-  screenCandidateFirstName.textContent = candidateName.split(/\s+/)[0] || "there";
   screenCandidateMeta.textContent = parts.length ? parts.join(" • ") : "Recruitment screening";
+  if (screenSummaryTitle) {
+    screenSummaryTitle.textContent = `Intital Screen Summary: ${candidateName}`;
+  }
+  if (screenSummaryContact) {
+    screenSummaryContact.textContent = contactParts.length ? contactParts.join(" | ") : "Phone and email not available.";
+  }
+  document.title = getCandidatePrintTitle();
   if (screenContactActions) {
     screenContactActions.hidden = !whatsappUrl && !teamsCallUrl;
   }
