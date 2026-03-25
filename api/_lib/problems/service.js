@@ -82,10 +82,8 @@ function generateTitle(originalInput) {
     return "Untitled problem";
   }
 
-  const firstChunk = source.split(/[.!?;:]/)[0] || source;
-  const words = cleanText(firstChunk).split(" ").filter(Boolean);
-  const concise = words.slice(0, 8).join(" ");
-  return sentenceCase(clampText(concise || source, 64));
+  const firstChunk = cleanText(source.split(/[.!?]/)[0] || source);
+  return sentenceCase(clampText(firstChunk || source, 120));
 }
 
 function deriveFocusPhrase(originalInput, clarification) {

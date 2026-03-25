@@ -52,6 +52,7 @@ const saveSequenceById = new Map();
 let recognition = null;
 let voiceListening = false;
 let voiceSeedText = "";
+const titleRefreshQueue = new Set();
 
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -143,6 +144,19 @@ function detectProblemType(...parts) {
 }
 
 function generateTitle(originalInput) {
+  const source = cleanText(originalInput)
+    .replace(/^(i need to|we need to|need to|there(?:'s| is)|problem with|issue with|concern about)\s+/i, "")
+    .replace(/^[^a-z0-9]+/i, "");
+
+  if (!source) {
+    return "Untitled problem";
+  }
+
+  const firstChunk = cleanText(source.split(/[.!?]/)[0] || source);
+  return sentenceCase(clampText(firstChunk || source, 120));
+}
+
+function generateLegacyTitle(originalInput) {
   const source = cleanText(originalInput)
     .replace(/^(i need to|we need to|need to|there(?:'s| is)|problem with|issue with|concern about)\s+/i, "")
     .replace(/^[^a-z0-9]+/i, "");
@@ -809,13 +823,23 @@ function renderProblems() {
 }
 
 function normalizeProblem(problem) {
+  const originalInput = cleanText(problem?.originalInput || "");
+  const nextGeneratedTitle = generateTitle(originalInput);
+  const savedTitle = cleanText(problem?.title || "");
+  const legacyGeneratedTitle = generateLegacyTitle(originalInput);
+  const title = !savedTitle || savedTitle === legacyGeneratedTitle ? nextGeneratedTitle : savedTitle;
+
+  if (problem?.id && savedTitle && savedTitle !== title) {
+    titleRefreshQueue.add(problem.id);
+  }
+
   return {
     id: problem?.id || "",
     ownerEmail: cleanText(problem?.ownerEmail || currentUser?.email || "").toLowerCase(),
     ownerName: cleanText(problem?.ownerName || ""),
-    title: cleanText(problem?.title || generateTitle(problem?.originalInput || "")),
-    originalInput: cleanText(problem?.originalInput || ""),
-    problemType: normalizeProblemType(problem?.problemType || detectProblemType(problem?.originalInput || "", problem?.clarification || "")),
+    title,
+    originalInput,
+    problemType: normalizeProblemType(problem?.problemType || detectProblemType(originalInput, problem?.clarification || "")),
     clarification: cleanText(problem?.clarification || ""),
     reframes: Array.isArray(problem?.reframes)
       ? problem.reframes.map((entry) => clampText(entry, 160)).filter(Boolean).slice(0, 3)
@@ -831,11 +855,16 @@ function normalizeProblem(problem) {
 async function refreshProblems() {
   setPageStatus("Loading problems...");
   try {
+    titleRefreshQueue.clear();
     const payload = await directoryApi.listProblemsToSolve();
     const nextProblems = Array.isArray(payload?.problems) ? payload.problems.map(normalizeProblem) : [];
     problems = sortProblems(nextProblems);
     renderProblems();
     setPageStatus(`${problems.length} problem${problems.length === 1 ? "" : "s"} ready.`);
+
+    for (const problemId of titleRefreshQueue) {
+      queueProblemSave(problemId, { delay: 150 });
+    }
   } catch (error) {
     console.error("[problems] Refresh failed", error);
     setPageStatus(error?.message || "Could not load problems.", true);
