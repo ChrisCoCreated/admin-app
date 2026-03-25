@@ -1653,6 +1653,19 @@ dd {
   cursor: not-allowed;
 }
 
+.recruitment-dropzone-compact {
+  padding: 0.8rem 0.95rem;
+}
+
+.recruitment-json-import-wrap {
+  margin-bottom: 1rem;
+}
+
+.recruitment-json-import-wrap h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+}
+
 .import-preview-wrap {
   margin-top: 0.75rem;
 }

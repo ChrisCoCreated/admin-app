@@ -325,6 +325,20 @@
         </div>
         <p id="addRecruitmentError" class="muted error" hidden></p>
         <form id="addRecruitmentForm" class="modal-form">
+          <div class="recruitment-json-import-wrap">
+            <h4>Upload JSON</h4>
+            <div
+              id="addRecruitmentJsonDropZone"
+              class="recruitment-dropzone recruitment-dropzone-compact"
+              tabindex="0"
+              role="button"
+              aria-label="Upload recruitment candidate JSON"
+            >
+              <p>Drag and drop JSON here, or click to choose file.</p>
+              <input id="addRecruitmentJsonFileInput" type="file" accept=".json,application/json" hidden />
+            </div>
+            <p id="addRecruitmentJsonFileName" class="muted">No JSON file selected.</p>
+          </div>
           <div class="mapping-form-grid">
             <label class="field" for="addCandidateNameInput">
               Candidate Name

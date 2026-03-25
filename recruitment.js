@@ -37,6 +37,9 @@ const addRecruitmentModal = document.getElementById("addRecruitmentModal");
 const addRecruitmentCloseBtn = document.getElementById("addRecruitmentCloseBtn");
 const addRecruitmentForm = document.getElementById("addRecruitmentForm");
 const addRecruitmentError = document.getElementById("addRecruitmentError");
+const addRecruitmentJsonDropZone = document.getElementById("addRecruitmentJsonDropZone");
+const addRecruitmentJsonFileInput = document.getElementById("addRecruitmentJsonFileInput");
+const addRecruitmentJsonFileName = document.getElementById("addRecruitmentJsonFileName");
 const addCandidateNameInput = document.getElementById("addCandidateNameInput");
 const addCandidateStatusSelect = document.getElementById("addCandidateStatusSelect");
 const addCandidateEmailInput = document.getElementById("addCandidateEmailInput");
@@ -178,6 +181,127 @@ function getInitialScreenUrl(candidateId) {
   return url.toString();
 }
 
+function formatAppliedOnDate(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return "";
+  }
+  const parsed = new Date(numeric);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toLocaleDateString();
+}
+
+function normalizeJsonJobLocation(value) {
+  const raw = cleanText(value);
+  if (!raw) {
+    return "";
+  }
+  return raw.replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
+
+function extractRecruitmentJsonCandidate(payload) {
+  const applicant = payload?.analytics?.applicant || payload?.applicant || {};
+  const job = payload?.job || {};
+  const screenerAnswers = Array.isArray(payload?.screenerQuestionsAndAnswers?.questionsAndAnswers)
+    ? payload.screenerQuestionsAndAnswers.questionsAndAnswers
+    : [];
+
+  const notes = [];
+  const currentRole = [cleanText(applicant?.jobTitle), cleanText(applicant?.companyName)].filter(Boolean).join(" at ");
+  if (currentRole) {
+    notes.push(`Current role: ${currentRole}`);
+  }
+  const appliedOn = formatAppliedOnDate(payload?.appliedOnMillis);
+  if (appliedOn) {
+    notes.push(`Applied on: ${appliedOn}`);
+  }
+  if (cleanText(job?.jobTitle)) {
+    notes.push(`Applied for: ${cleanText(job.jobTitle)}`);
+  }
+
+  const screenerSummary = screenerAnswers
+    .slice(0, 6)
+    .map((entry) => {
+      const question = cleanText(entry?.question?.question);
+      const answer =
+        cleanText(entry?.answer?.label) ||
+        cleanText(entry?.answer?.value) ||
+        cleanText(entry?.answer);
+      if (!question || !answer) {
+        return "";
+      }
+      return `${question}: ${answer}`;
+    })
+    .filter(Boolean);
+  if (screenerSummary.length) {
+    notes.push(`Screener: ${screenerSummary.join(" | ")}`);
+  }
+
+  return {
+    candidateName: cleanText(applicant?.fullName),
+    status: "Initial Call",
+    email: cleanText(applicant?.email),
+    phoneNumber: cleanText(applicant?.phoneNumber),
+    livesIn: cleanText(applicant?.location?.city),
+    location: normalizeJsonJobLocation(job?.jobLocation),
+    source: "Indeed - JSON upload",
+    active: true,
+    notes: notes.join("\n"),
+  };
+}
+
+function applyRecruitmentJsonCandidate(prefill) {
+  if (addCandidateNameInput) {
+    addCandidateNameInput.value = cleanText(prefill?.candidateName);
+  }
+  if (addCandidateStatusSelect) {
+    addCandidateStatusSelect.value = cleanText(prefill?.status) || "Initial Call";
+  }
+  if (addCandidateEmailInput) {
+    addCandidateEmailInput.value = cleanText(prefill?.email);
+  }
+  if (addCandidatePhoneInput) {
+    addCandidatePhoneInput.value = cleanText(prefill?.phoneNumber);
+  }
+  if (addCandidateLivesInInput) {
+    addCandidateLivesInInput.value = cleanText(prefill?.livesIn);
+  }
+  if (addCandidateJobLocationInput) {
+    addCandidateJobLocationInput.value = cleanText(prefill?.location);
+  }
+  if (addCandidateSourceInput) {
+    addCandidateSourceInput.value = cleanText(prefill?.source);
+  }
+  if (addCandidateActiveInput) {
+    addCandidateActiveInput.checked = prefill?.active !== false;
+  }
+  if (addCandidateNotesInput) {
+    addCandidateNotesInput.value = cleanText(prefill?.notes);
+  }
+}
+
+async function handleAddRecruitmentJsonFile(file) {
+  if (!file) {
+    return;
+  }
+  if (addRecruitmentJsonFileName) {
+    addRecruitmentJsonFileName.textContent = `Selected: ${file.name}`;
+  }
+
+  try {
+    const raw = await file.text();
+    const parsed = JSON.parse(raw);
+    const prefill = extractRecruitmentJsonCandidate(parsed);
+    if (!prefill.candidateName) {
+      throw new Error("Could not find candidate details in this JSON file.");
+    }
+    applyRecruitmentJsonCandidate(prefill);
+    setAddRecruitmentError("");
+  } catch (error) {
+    console.error(error);
+    setAddRecruitmentError(error?.message || "Could not read candidate JSON.");
+  }
+}
+
 function setAddRecruitmentError(message = "") {
   if (!addRecruitmentError) {
     return;
@@ -195,6 +319,12 @@ function resetAddRecruitmentForm() {
   if (addCandidateActiveInput) {
     addCandidateActiveInput.checked = true;
   }
+  if (addRecruitmentJsonFileName) {
+    addRecruitmentJsonFileName.textContent = "No JSON file selected.";
+  }
+  if (addRecruitmentJsonFileInput) {
+    addRecruitmentJsonFileInput.value = "";
+  }
   setAddRecruitmentError("");
 }
 
@@ -208,6 +338,7 @@ function setCreateCandidateBusy(disabled) {
     cancelAddRecruitmentBtn.disabled = disabled;
   }
   for (const field of [
+    addRecruitmentJsonFileInput,
     addCandidateNameInput,
     addCandidateStatusSelect,
     addCandidateEmailInput,
@@ -221,6 +352,9 @@ function setCreateCandidateBusy(disabled) {
     if (field) {
       field.disabled = disabled;
     }
+  }
+  if (addRecruitmentJsonDropZone) {
+    addRecruitmentJsonDropZone.classList.toggle("is-disabled", disabled);
   }
 }
 
@@ -1628,6 +1762,49 @@ toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
 });
 addRecruitmentItemBtn?.addEventListener("click", () => {
   openAddRecruitmentModal();
+});
+addRecruitmentJsonDropZone?.addEventListener("click", () => {
+  if (createCandidateBusy) {
+    return;
+  }
+  addRecruitmentJsonFileInput?.click();
+});
+addRecruitmentJsonDropZone?.addEventListener("keydown", (event) => {
+  if (createCandidateBusy) {
+    return;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    addRecruitmentJsonFileInput?.click();
+  }
+});
+addRecruitmentJsonDropZone?.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  if (!createCandidateBusy) {
+    addRecruitmentJsonDropZone.classList.add("is-dragover");
+  }
+});
+addRecruitmentJsonDropZone?.addEventListener("dragleave", () => {
+  addRecruitmentJsonDropZone.classList.remove("is-dragover");
+});
+addRecruitmentJsonDropZone?.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  addRecruitmentJsonDropZone.classList.remove("is-dragover");
+  if (createCandidateBusy) {
+    return;
+  }
+  const file = event.dataTransfer?.files?.[0] || null;
+  if (!file) {
+    return;
+  }
+  await handleAddRecruitmentJsonFile(file);
+});
+addRecruitmentJsonFileInput?.addEventListener("change", async () => {
+  const file = addRecruitmentJsonFileInput.files?.[0] || null;
+  if (!file || createCandidateBusy) {
+    return;
+  }
+  await handleAddRecruitmentJsonFile(file);
 });
 addRecruitmentForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
