@@ -19,6 +19,7 @@ const SCREEN_FIELDS = [
   "Status",
   "Location",
   "PhoneNumber",
+  "Email",
   "Active",
   "Q1_Notes_Availability",
   "Q1_Score",
@@ -122,6 +123,7 @@ function mapInitialScreenItem(item) {
     status: normalizeText(fields.Status),
     location: normalizeText(fields.Location),
     phoneNumber: normalizeText(fields.PhoneNumber),
+    email: normalizeText(fields.Email),
     active: toBoolean(fields.Active),
     responses: {
       q1NotesAvailability: normalizeText(fields.Q1_Notes_Availability),

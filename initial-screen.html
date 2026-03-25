@@ -73,6 +73,60 @@
         <p id="screenStatusMessage" class="muted">Loading screening form...</p>
 
         <form id="initialScreenForm" class="initial-screen-form" hidden>
+          <section class="screen-print-summary" aria-label="Call summary snapshot">
+            <div class="screen-print-summary-header">
+              <div>
+                <p class="eyebrow">Summary</p>
+                <h2>Call summary snapshot</h2>
+              </div>
+            </div>
+
+            <div class="screen-print-summary-grid">
+              <div class="screen-score-summary screen-score-summary-compact">
+                <div class="screen-score-summary-header">
+                  <h3>Score Summary</h3>
+                  <button id="copyScreenSummaryBtn" type="button" class="secondary">Copy Summary</button>
+                </div>
+                <div class="screen-score-summary-grid">
+                  <div class="screen-score-pill score-pill-green">
+                    <span class="screen-score-pill-label">Green</span>
+                    <strong id="scoreCountGreen">0</strong>
+                  </div>
+                  <div class="screen-score-pill score-pill-amber">
+                    <span class="screen-score-pill-label">Amber</span>
+                    <strong id="scoreCountAmber">0</strong>
+                  </div>
+                  <div class="screen-score-pill score-pill-red">
+                    <span class="screen-score-pill-label">Red</span>
+                    <strong id="scoreCountRed">0</strong>
+                  </div>
+                  <div class="screen-score-pill score-pill-neutral">
+                    <span class="screen-score-pill-label">Unscored</span>
+                    <strong id="scoreCountUnscored">7</strong>
+                  </div>
+                </div>
+                <p class="muted">Scores update as you work through the call.</p>
+              </div>
+
+              <div class="screen-print-summary-fields">
+                <div class="screen-print-summary-card">
+                  <span class="screen-print-summary-label">Outcome</span>
+                  <strong id="screenSummaryOutcome">Not set</strong>
+                </div>
+
+                <div class="screen-print-summary-card">
+                  <span class="screen-print-summary-label">Next Steps</span>
+                  <p id="screenSummaryNextSteps" class="screen-print-summary-text">No next steps captured yet.</p>
+                </div>
+
+                <div class="screen-print-summary-card">
+                  <span class="screen-print-summary-label">Call Summary</span>
+                  <p id="screenSummaryCall" class="screen-print-summary-text">No call summary captured yet.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="screen-section">
             <div class="screen-section-heading">
               <p class="eyebrow">Availability & Travel</p>
@@ -247,32 +301,6 @@
               Screen Next Steps
               <textarea id="screenNextSteps" placeholder="Capture the agreed next action, owner, and anything that needs to happen after this call."></textarea>
             </label>
-
-            <div class="screen-score-summary">
-              <div class="screen-score-summary-header">
-                <h3>Score Summary</h3>
-                <button id="copyScreenSummaryBtn" type="button" class="secondary">Copy Summary</button>
-              </div>
-              <div class="screen-score-summary-grid">
-                <div class="screen-score-pill score-pill-green">
-                  <span class="screen-score-pill-label">Green</span>
-                  <strong id="scoreCountGreen">0</strong>
-                </div>
-                <div class="screen-score-pill score-pill-amber">
-                  <span class="screen-score-pill-label">Amber</span>
-                  <strong id="scoreCountAmber">0</strong>
-                </div>
-                <div class="screen-score-pill score-pill-red">
-                  <span class="screen-score-pill-label">Red</span>
-                  <strong id="scoreCountRed">0</strong>
-                </div>
-                <div class="screen-score-pill score-pill-neutral">
-                  <span class="screen-score-pill-label">Unscored</span>
-                  <strong id="scoreCountUnscored">7</strong>
-                </div>
-              </div>
-              <p id="screenScoreSummaryNote" class="muted">Scores update as you work through the call.</p>
-            </div>
           </section>
 
           <div class="screen-actions">

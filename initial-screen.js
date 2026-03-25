@@ -20,6 +20,9 @@ const scoreCountGreen = document.getElementById("scoreCountGreen");
 const scoreCountAmber = document.getElementById("scoreCountAmber");
 const scoreCountRed = document.getElementById("scoreCountRed");
 const scoreCountUnscored = document.getElementById("scoreCountUnscored");
+const screenSummaryOutcome = document.getElementById("screenSummaryOutcome");
+const screenSummaryNextSteps = document.getElementById("screenSummaryNextSteps");
+const screenSummaryCall = document.getElementById("screenSummaryCall");
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
 const fieldRefs = {
@@ -305,6 +308,16 @@ function renderScoreSummary() {
   if (scoreCountUnscored) {
     scoreCountUnscored.textContent = String(counts.Unscored);
   }
+  const form = readForm();
+  if (screenSummaryOutcome) {
+    screenSummaryOutcome.textContent = cleanText(form.screenOutcome) || "Not set";
+  }
+  if (screenSummaryNextSteps) {
+    screenSummaryNextSteps.textContent = cleanText(form.screenNextSteps) || "No next steps captured yet.";
+  }
+  if (screenSummaryCall) {
+    screenSummaryCall.textContent = cleanText(form.initialCallSummary) || "No call summary captured yet.";
+  }
 }
 
 function buildCopySummaryText() {
@@ -422,7 +435,7 @@ async function copyScreenSummary() {
 
 function renderCandidateHeader(item) {
   const candidateName = cleanText(item?.candidateName) || "Initial 10-Minute Call";
-  const parts = [cleanText(item?.status), cleanText(item?.location), cleanText(item?.phoneNumber)].filter(Boolean);
+  const parts = [cleanText(item?.status), cleanText(item?.location), cleanText(item?.phoneNumber), cleanText(item?.email)].filter(Boolean);
   const whatsappUrl = getWhatsAppUrl(item?.phoneNumber, item?.candidateName);
   const teamsCallUrl = getTeamsCallUrl(item?.phoneNumber);
   screenCandidateName.textContent = candidateName;
