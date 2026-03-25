@@ -8,6 +8,7 @@ const locationFilterSelect = document.getElementById("locationFilterSelect");
 const statusFilterSelect = document.getElementById("statusFilterSelect");
 const sourceFilterSelect = document.getElementById("sourceFilterSelect");
 const activeFilterSelect = document.getElementById("activeFilterSelect");
+const sortFilterSelect = document.getElementById("sortFilterSelect");
 const recruitmentTableBody = document.getElementById("recruitmentTableBody");
 const emptyState = document.getElementById("emptyState");
 const statusMessage = document.getElementById("statusMessage");
@@ -779,6 +780,15 @@ function formatDate(value) {
   return parsed.toLocaleDateString();
 }
 
+function toSortTimestamp(value) {
+  const raw = cleanText(value);
+  if (!raw) {
+    return 0;
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
 function setLinkField(node, url) {
   if (!node) {
     return;
@@ -978,6 +988,7 @@ function renderFilterOptions() {
   const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
   const selectedActive = cleanText(activeFilterSelect?.value || "active");
+  const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
 
   locationFilterSelect.innerHTML = '<option value="all">All locations</option>';
   statusFilterSelect.innerHTML =
@@ -1010,6 +1021,18 @@ function renderFilterOptions() {
   if (activeFilterSelect) {
     activeFilterSelect.value = ["active", "inactive", "all"].includes(selectedActive) ? selectedActive : "active";
   }
+  if (sortFilterSelect) {
+    sortFilterSelect.value = [
+      "updated_desc",
+      "updated_asc",
+      "created_desc",
+      "created_asc",
+      "name_asc",
+      "name_desc",
+    ].includes(selectedSort)
+      ? selectedSort
+      : "updated_desc";
+  }
 }
 
 function getFilteredCandidates() {
@@ -1018,8 +1041,9 @@ function getFilteredCandidates() {
   const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
   const selectedActive = cleanText(activeFilterSelect?.value || "active");
+  const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
 
-  return allCandidates.filter((candidate) => {
+  const filtered = allCandidates.filter((candidate) => {
     if (selectedActive === "active" && candidate.active !== true) {
       return false;
     }
@@ -1055,6 +1079,27 @@ function getFilteredCandidates() {
       normalizeText(candidate.notes).includes(query)
     );
   });
+
+  filtered.sort((left, right) => {
+    if (selectedSort === "updated_asc") {
+      return toSortTimestamp(left.updated) - toSortTimestamp(right.updated);
+    }
+    if (selectedSort === "created_desc") {
+      return toSortTimestamp(right.created) - toSortTimestamp(left.created);
+    }
+    if (selectedSort === "created_asc") {
+      return toSortTimestamp(left.created) - toSortTimestamp(right.created);
+    }
+    if (selectedSort === "name_asc") {
+      return cleanText(left.candidateName).localeCompare(cleanText(right.candidateName));
+    }
+    if (selectedSort === "name_desc") {
+      return cleanText(right.candidateName).localeCompare(cleanText(left.candidateName));
+    }
+    return toSortTimestamp(right.updated) - toSortTimestamp(left.updated);
+  });
+
+  return filtered;
 }
 
 function renderCandidates() {
@@ -1555,9 +1600,9 @@ async function init() {
     }
 
     renderTopNavigation({ role });
-    setStatus("Loading active candidates...");
+    setStatus("Loading recruitment candidates...");
     await loadRecruitmentCandidates();
-    setStatus(`Loaded ${allCandidates.length} active candidate(s).`);
+    setStatus(`Loaded ${allCandidates.length} candidate(s).`);
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("recruitment");
@@ -1577,6 +1622,7 @@ locationFilterSelect?.addEventListener("change", renderCandidates);
 statusFilterSelect?.addEventListener("change", renderCandidates);
 sourceFilterSelect?.addEventListener("change", renderCandidates);
 activeFilterSelect?.addEventListener("change", renderCandidates);
+sortFilterSelect?.addEventListener("change", renderCandidates);
 toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
   setRecruitmentToolbarVisible(recruitmentToolbarContent?.hidden);
 });

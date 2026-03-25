@@ -197,6 +197,7 @@ function normalizeRecruitmentItem(item) {
     earmarkedFor: normalizeText(fields.EarmarkedFor),
     oneTouchLink: parseHyperlink(fields.OnetouchLink),
     created: normalizeText(fields.Created || item?.createdDateTime),
+    updated: normalizeText(fields.Modified || item?.lastModifiedDateTime || fields.Created || item?.createdDateTime),
   };
 }
 
@@ -219,6 +220,7 @@ async function fetchRecruitmentItems(graphClient, siteId, listId) {
     "EarmarkedFor",
     "OnetouchLink",
     "Created",
+    "Modified",
   ];
 
   const params = new URLSearchParams({
@@ -250,6 +252,7 @@ async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {
     "EarmarkedFor",
     "OnetouchLink",
     "Created",
+    "Modified",
   ];
   const params = new URLSearchParams({
     $expand: `fields($select=${selectFields.join(",")})`,
