@@ -12,6 +12,8 @@ const screenWhatsAppLink = document.getElementById("screenWhatsAppLink");
 const screenTeamsCallLink = document.getElementById("screenTeamsCallLink");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
 const initialScreenForm = document.getElementById("initialScreenForm");
+const savePdfBtn = document.getElementById("savePdfBtn");
+const savePdfBottomBtn = document.getElementById("savePdfBottomBtn");
 const saveInitialScreenBtn = document.getElementById("saveInitialScreenBtn");
 const copyScreenSummaryBtn = document.getElementById("copyScreenSummaryBtn");
 const scoreCountGreen = document.getElementById("scoreCountGreen");
@@ -178,6 +180,12 @@ function getItemIdFromUrl() {
 }
 
 function setFormEnabled(enabled) {
+  if (savePdfBtn) {
+    savePdfBtn.disabled = !enabled || saveBusy;
+  }
+  if (savePdfBottomBtn) {
+    savePdfBottomBtn.disabled = !enabled || saveBusy;
+  }
   if (saveInitialScreenBtn) {
     saveInitialScreenBtn.disabled = !enabled || saveBusy;
   }
@@ -195,6 +203,10 @@ function setFormEnabled(enabled) {
       button.disabled = !enabled || saveBusy;
     }
   }
+}
+
+function saveScreenAsPdf() {
+  window.print();
 }
 
 function syncScoreChipGroup(fieldId, value) {
@@ -550,6 +562,20 @@ copyScreenSummaryBtn?.addEventListener("click", async () => {
     return;
   }
   await copyScreenSummary();
+});
+
+savePdfBtn?.addEventListener("click", () => {
+  if (savePdfBtn.disabled) {
+    return;
+  }
+  saveScreenAsPdf();
+});
+
+savePdfBottomBtn?.addEventListener("click", () => {
+  if (savePdfBottomBtn.disabled) {
+    return;
+  }
+  saveScreenAsPdf();
 });
 
 signOutBtn?.addEventListener("click", async () => {

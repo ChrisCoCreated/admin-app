@@ -501,6 +501,10 @@ button.secondary.active {
   color: #165f49;
 }
 
+.home-page #signOutBtn {
+  margin-top: 16px;
+}
+
 #signOutBtn {
   min-width: 0;
 }
@@ -1302,6 +1306,13 @@ dd {
   margin-top: 12px;
 }
 
+.screen-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .initial-screen-panel {
   display: grid;
   gap: 18px;
@@ -1570,6 +1581,47 @@ dd {
 
   .screen-score-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .topbar,
+  #signOutBtn,
+  #primaryNav,
+  .screen-header-actions,
+  .screen-contact-actions,
+  .screen-actions,
+  .status-quick-menu {
+    display: none !important;
+  }
+
+  .container {
+    width: 100%;
+    margin: 0;
+    padding: 0 16px 20px;
+  }
+
+  .panel,
+  .screen-question-card,
+  .screen-score-summary,
+  .screen-intro-card {
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  textarea,
+  select {
+    border: 1px solid #d0d7e2;
+    background: #ffffff;
+    color: #11141a;
+  }
+
+  .screen-section {
+    break-inside: avoid;
   }
 }
 

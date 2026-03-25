@@ -74,6 +74,7 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 const AGENDA_SUMMARY_CACHE_PREFIX = "thrive.agendas.summary.v1";
 const AGENDA_STAGING_CACHE_PREFIX = "thrive.agendas.staging.v1";
+const AGENDA_SHORTCUT_CACHE_PREFIX = "thrive.agendas.shortcuts.v1";
 const AGENDA_SHORTCUT_PHOTO_CACHE_PREFIX = "thrive.agendas.shortcut-photos.v2";
 const AGENDA_SHORTCUT_PHOTO_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const GLOBAL_AGENDA_STAGING_KEY = "__global__";
@@ -233,6 +234,48 @@ function normalizeEmail(value) {
 
 function agendaShortcutPhotoCacheKey(email) {
   return `${AGENDA_SHORTCUT_PHOTO_CACHE_PREFIX}:${normalizeEmail(email)}`;
+}
+
+function agendaShortcutCacheKey(email) {
+  return `${AGENDA_SHORTCUT_CACHE_PREFIX}:${normalizeEmail(email)}`;
+}
+
+function readCachedAgendaShortcuts() {
+  const email = normalizeEmail(currentUser?.email);
+  if (!email) {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(agendaShortcutCacheKey(email));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.shortcuts) ? parsed.shortcuts : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCachedAgendaShortcuts() {
+  const email = normalizeEmail(currentUser?.email);
+  if (!email) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      agendaShortcutCacheKey(email),
+      JSON.stringify({
+        shortcuts: agendaShortcuts.map((shortcut) => ({
+          ...shortcut,
+          photoDataUrl: "",
+        })),
+        cachedAt: new Date().toISOString(),
+      })
+    );
+  } catch {
+    // Ignore local cache write failures.
+  }
 }
 
 function readCachedAgendaShortcutPhoto(email) {
@@ -920,6 +963,25 @@ function hydrateAgendaShortcutPhotos() {
   });
 }
 
+function hydrateAgendaShortcutsFromCache() {
+  if (String(currentUser?.role || "").trim().toLowerCase() !== "admin") {
+    agendaShortcuts = [];
+    renderAgendaShortcuts();
+    return false;
+  }
+  const cachedShortcuts = readCachedAgendaShortcuts();
+  if (!cachedShortcuts.length) {
+    return false;
+  }
+  agendaShortcuts = cachedShortcuts.map((shortcut) => ({
+    ...shortcut,
+    photoDataUrl: "",
+  }));
+  hydrateAgendaShortcutPhotos();
+  renderAgendaShortcuts();
+  return true;
+}
+
 async function loadAgendaShortcuts() {
   if (String(currentUser?.role || "").trim().toLowerCase() !== "admin") {
     agendaShortcuts = [];
@@ -932,6 +994,7 @@ async function loadAgendaShortcuts() {
       ...shortcut,
       photoDataUrl: "",
     }));
+    writeCachedAgendaShortcuts();
     hydrateAgendaShortcutPhotos();
     renderAgendaShortcuts();
   } catch (error) {
@@ -1923,7 +1986,7 @@ async function loadAgendas(status = "", options = {}) {
   applyAgendaSummaries(nextAgendas);
   writeCachedAgendaSummaries();
   renderAgendaList();
-  await loadAgendaShortcuts();
+  void loadAgendaShortcuts();
   renderAgendaDetail();
   if (selectedAgendaId) {
     void loadAgendaDetail(selectedAgendaId, { force: options.forceSelectedDetail === true });
@@ -2105,6 +2168,7 @@ async function init() {
     setItemSearchExpanded(false);
     setAgendaStagingExpanded(true);
     syncAgendaItemEditorState();
+    hydrateAgendaShortcutsFromCache();
     hydrateAgendasFromCache();
     await loadAgendas();
   } catch (error) {
