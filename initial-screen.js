@@ -45,6 +45,8 @@ const fieldRefs = {
   screenNextSteps: document.getElementById("screenNextSteps"),
 };
 
+const printableTextareas = Object.values(fieldRefs).filter((field) => field instanceof HTMLTextAreaElement);
+
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
@@ -209,7 +211,32 @@ function setFormEnabled(enabled) {
 }
 
 function saveScreenAsPdf() {
-  window.print();
+  preparePrintLayout();
+  window.requestAnimationFrame(() => {
+    window.print();
+  });
+}
+
+function preparePrintLayout() {
+  document.body.classList.add("is-printing");
+  for (const textarea of printableTextareas) {
+    textarea.dataset.printHeight = textarea.style.height || "";
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.max(textarea.scrollHeight, 120)}px`;
+  }
+}
+
+function restorePrintLayout() {
+  document.body.classList.remove("is-printing");
+  for (const textarea of printableTextareas) {
+    const originalHeight = textarea.dataset.printHeight;
+    if (originalHeight) {
+      textarea.style.height = originalHeight;
+    } else {
+      textarea.style.removeProperty("height");
+    }
+    delete textarea.dataset.printHeight;
+  }
 }
 
 function syncScoreChipGroup(fieldId, value) {
@@ -590,6 +617,9 @@ savePdfBottomBtn?.addEventListener("click", () => {
   }
   saveScreenAsPdf();
 });
+
+window.addEventListener("beforeprint", preparePrintLayout);
+window.addEventListener("afterprint", restorePrintLayout);
 
 signOutBtn?.addEventListener("click", async () => {
   try {

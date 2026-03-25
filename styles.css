@@ -1650,6 +1650,8 @@ dd {
 @media print {
   body {
     background: #ffffff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .topbar,
@@ -1693,10 +1695,46 @@ dd {
     border: 1px solid #d0d7e2;
     background: #ffffff;
     color: #11141a;
+    height: auto !important;
+    min-height: 0;
+    overflow: visible;
+    resize: none;
   }
 
   .screen-section {
-    break-inside: avoid;
+    break-inside: auto;
+  }
+
+  .screen-question-top {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .score-chip,
+  .screen-score-pill {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .score-chip.is-active.score-green,
+  .score-pill-green {
+    border-color: #72c596 !important;
+    background: #dff6e8 !important;
+    color: #0f6a3b !important;
+  }
+
+  .score-chip.is-active.score-amber,
+  .score-pill-amber {
+    border-color: #e0b15b !important;
+    background: #fff1d2 !important;
+    color: #8a5a00 !important;
+  }
+
+  .score-chip.is-active.score-red,
+  .score-pill-red {
+    border-color: #de8a8a !important;
+    background: #fde1e1 !important;
+    color: #a22a2a !important;
   }
 }
 
