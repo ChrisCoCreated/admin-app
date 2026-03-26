@@ -92,6 +92,19 @@ function parseHyperlink(value) {
   return text.slice(0, commaIndex).trim();
 }
 
+function extractIndeedProfileUrl(notes) {
+  const text = normalizeText(notes);
+  if (!text) {
+    return "";
+  }
+  const matched = text.match(/Indeed\s+Profile:\s*(https?:\/\/\S+)/i);
+  return matched ? normalizeText(matched[1]) : "";
+}
+
+function normalizePhoneKey(value) {
+  return normalizeText(value).replace(/\D/g, "");
+}
+
 function normalizeRecruitmentItem(item) {
   const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
   const active = toBoolean(fields.Active);
@@ -111,11 +124,22 @@ function normalizeRecruitmentItem(item) {
     livesIn: normalizeText(fields.LivesIn),
     firstInterviewDate: normalizeText(fields._x0031_stInterviewDate),
     notes: normalizeText(fields.Notes),
+    indeedProfileUrl: extractIndeedProfileUrl(fields.Notes),
     source: normalizeText(fields.Source),
     earmarkedFor: normalizeText(fields.EarmarkedFor),
     oneTouchLink: parseHyperlink(fields.OnetouchLink),
     created: normalizeText(fields.Created || item?.createdDateTime),
   };
+}
+
+async function fetchRecruitmentItemsByPhone(graphClient, siteId, listId) {
+  const params = new URLSearchParams({
+    $top: "200",
+    $expand: "fields($select=Title,Email,PhoneNumber,LivesIn,Location,Source,Status,Notes,Active,InterviewBooked,InterviewWith,InterviewWithLookupId,KeepinMind,_x0031_stInterviewDate,EarmarkedFor,OnetouchLink,Created)",
+  });
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
+  const items = await graphClient.fetchAllPages(url);
+  return items.map(normalizeRecruitmentItem);
 }
 
 module.exports = async (req, res) => {
@@ -149,6 +173,46 @@ module.exports = async (req, res) => {
     const graphClient = createGraphDelegatedClient(req.authUser?.graphAccessToken);
     const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
     const listId = await resolveListId(graphClient, siteId, config.listName);
+    const phoneKey = normalizePhoneKey(req.body?.phoneNumber);
+    const shouldUpdateExisting = req.body?.updateExistingByPhone === true && Boolean(phoneKey);
+
+    if (shouldUpdateExisting) {
+      const existingItems = await fetchRecruitmentItemsByPhone(graphClient, siteId, listId);
+      const matched = existingItems.find((item) => normalizePhoneKey(item.phoneNumber) === phoneKey);
+      if (matched?.id) {
+        const patchFields = {
+          Title: candidateName || matched.candidateName,
+          Email: normalizeText(req.body?.email) || matched.email,
+          PhoneNumber: normalizeText(req.body?.phoneNumber) || matched.phoneNumber,
+          LivesIn: normalizeText(req.body?.livesIn) || matched.livesIn,
+          Location: normalizeText(req.body?.location) || matched.location,
+          Source: normalizeText(req.body?.source) || matched.source,
+          Status: normalizeText(req.body?.status) || matched.status || "Initial Call",
+          Notes: normalizeText(req.body?.notes) || matched.notes,
+          Active: req.body?.active === undefined ? matched.active : toBoolean(req.body?.active),
+        };
+        const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(matched.id)}/fields`;
+        await graphClient.fetchJson(patchUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(patchFields),
+        });
+
+        const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
+          matched.id
+        )}?$expand=fields`;
+        const fullItem = await graphClient.fetchJson(itemUrl);
+        res.setHeader("Cache-Control", "no-store");
+        res.status(200).json({
+          success: true,
+          updatedExisting: true,
+          item: normalizeRecruitmentItem(fullItem),
+        });
+        return;
+      }
+    }
 
     const fields = {
       Title: candidateName,
@@ -179,6 +243,7 @@ module.exports = async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
       success: true,
+      updatedExisting: false,
       item: normalizeRecruitmentItem(fullItem),
     });
   } catch (error) {

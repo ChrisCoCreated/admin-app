@@ -51,6 +51,7 @@ const addCandidateLivesInInput = document.getElementById("addCandidateLivesInInp
 const addCandidateJobLocationInput = document.getElementById("addCandidateJobLocationInput");
 const addCandidateSourceInput = document.getElementById("addCandidateSourceInput");
 const addCandidateActiveInput = document.getElementById("addCandidateActiveInput");
+const addCandidateUpdateExistingInput = document.getElementById("addCandidateUpdateExistingInput");
 const addCandidateNotesInput = document.getElementById("addCandidateNotesInput");
 const saveRecruitmentCandidateBtn = document.getElementById("saveRecruitmentCandidateBtn");
 const cancelAddRecruitmentBtn = document.getElementById("cancelAddRecruitmentBtn");
@@ -326,6 +327,9 @@ function applyRecruitmentJsonCandidate(prefill) {
   if (addCandidateActiveInput) {
     addCandidateActiveInput.checked = prefill?.active !== false;
   }
+  if (addCandidateUpdateExistingInput) {
+    addCandidateUpdateExistingInput.checked = true;
+  }
   if (addCandidateNotesInput) {
     addCandidateNotesInput.value = cleanText(prefill?.notes);
   }
@@ -371,6 +375,9 @@ function resetAddRecruitmentForm() {
   if (addCandidateActiveInput) {
     addCandidateActiveInput.checked = true;
   }
+  if (addCandidateUpdateExistingInput) {
+    addCandidateUpdateExistingInput.checked = true;
+  }
   if (addRecruitmentJsonFileName) {
     addRecruitmentJsonFileName.textContent = "No JSON file selected.";
   }
@@ -399,6 +406,7 @@ function setCreateCandidateBusy(disabled) {
     addCandidateJobLocationInput,
     addCandidateSourceInput,
     addCandidateActiveInput,
+    addCandidateUpdateExistingInput,
     addCandidateNotesInput,
   ]) {
     if (field) {
@@ -1907,6 +1915,7 @@ async function createRecruitmentCandidate() {
       location: cleanText(addCandidateJobLocationInput?.value),
       source: cleanText(addCandidateSourceInput?.value),
       active: addCandidateActiveInput?.checked !== false,
+      updateExistingByPhone: addCandidateUpdateExistingInput?.checked === true,
       notes: cleanText(addCandidateNotesInput?.value),
     });
     await loadRecruitmentCandidates();
@@ -1918,7 +1927,11 @@ async function createRecruitmentCandidate() {
       openCandidateDetail(createdCandidate);
     }
     closeAddRecruitmentModal({ force: true });
-    setStatus(`Candidate added: ${candidateName}.`);
+    setStatus(
+      result?.updatedExisting
+        ? `Updated existing candidate by phone match: ${candidateName}.`
+        : `Candidate added: ${candidateName}.`
+    );
   } catch (error) {
     console.error(error);
     setAddRecruitmentError(error?.message || "Could not add candidate.");
