@@ -15,6 +15,7 @@ const statusMessage = document.getElementById("statusMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const detailRoot = document.getElementById("candidateDetail");
 const sharePointListLink = document.getElementById("sharePointListLink");
+const openIndeedBtn = document.getElementById("openIndeedBtn");
 const openOneTouchBtn = document.getElementById("openOneTouchBtn");
 const statusUpdateSelect = document.getElementById("statusUpdateSelect");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
@@ -251,6 +252,7 @@ function extractRecruitmentJsonCandidate(payload) {
   const screenerAnswers = Array.isArray(payload?.screenerQuestionsAndAnswers?.questionsAndAnswers)
     ? payload.screenerQuestionsAndAnswers.questionsAndAnswers
     : [];
+  const indeedProfileUrl = cleanText(applicant?.publicProfileUrl || payload?.publicProfileUrl);
 
   const notes = [];
   const currentRole = [cleanText(applicant?.jobTitle), cleanText(applicant?.companyName)].filter(Boolean).join(" at ");
@@ -281,6 +283,9 @@ function extractRecruitmentJsonCandidate(payload) {
     .filter(Boolean);
   if (screenerSummary.length) {
     notes.push(`Screener: ${screenerSummary.join(" | ")}`);
+  }
+  if (indeedProfileUrl) {
+    notes.push(`Indeed Profile: ${indeedProfileUrl}`);
   }
 
   return {
@@ -493,6 +498,10 @@ function getTeamsCallUrl(phoneNumber) {
     return "";
   }
   return `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(normalized)}`;
+}
+
+function getIndeedProfileUrl(candidate) {
+  return cleanText(candidate?.indeedProfileUrl);
 }
 
 function setAddButtonsBusy(disabled) {
@@ -1006,6 +1015,17 @@ function setOneTouchButton(url) {
   openOneTouchBtn.classList.toggle("is-disabled", !enabled);
 }
 
+function setIndeedButton(url) {
+  if (!openIndeedBtn) {
+    return;
+  }
+  const cleanUrl = cleanText(url);
+  const enabled = Boolean(cleanUrl);
+  openIndeedBtn.href = enabled ? cleanUrl : "#";
+  openIndeedBtn.setAttribute("aria-disabled", enabled ? "false" : "true");
+  openIndeedBtn.classList.toggle("is-disabled", !enabled);
+}
+
 function syncActiveToggleButton(button, isActive) {
   if (!button) {
     return;
@@ -1163,6 +1183,7 @@ function setDetail(candidate) {
     }
     renderTagPreview(detailTagsPreview, []);
     setDetailFormEnabled(false);
+    setIndeedButton("");
     setOneTouchButton("");
     if (statusUpdateSelect) {
       statusUpdateSelect.value = "";
@@ -1192,6 +1213,7 @@ function setDetail(candidate) {
   detailFields.firstInterviewDate.textContent = formatDate(candidate.firstInterviewDate);
   detailFields.earmarkedFor.textContent = cleanText(candidate.earmarkedFor) || "-";
   detailFields.created.textContent = formatDate(candidate.created);
+  setIndeedButton(candidate.indeedProfileUrl);
   setLinkField(detailFields.oneTouchLink, candidate.oneTouchLink);
   setOneTouchButton(candidate.oneTouchLink);
   detailFields.notes.textContent = cleanText(candidate.notes) || "-";
@@ -1369,6 +1391,7 @@ function renderCandidates() {
     tr.classList.toggle("selected", candidate.id === selectedCandidateId);
     const whatsappUrl = getWhatsAppUrl(candidate.phoneNumber, candidate.candidateName);
     const teamsCallUrl = getTeamsCallUrl(candidate.phoneNumber);
+    const indeedUrl = getIndeedProfileUrl(candidate);
     tr.innerHTML = `
       <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
@@ -1401,6 +1424,11 @@ function renderCandidates() {
           ${
             teamsCallUrl
               ? `<a class="recruitment-quick-link recruitment-teams-link" href="${escapeHtml(teamsCallUrl)}" target="_blank" rel="noopener noreferrer">Call in Teams</a>`
+              : ""
+          }
+          ${
+            indeedUrl
+              ? `<a class="recruitment-quick-link" href="${escapeHtml(indeedUrl)}" target="_blank" rel="noopener noreferrer">Open in Indeed</a>`
               : ""
           }
           ${

@@ -14,6 +14,7 @@ const SCREEN_FIELDS = [
   "PhoneNumber",
   "Email",
   "Active",
+  "Notes",
   "Tags",
   "KeepinMind",
   "Q1_Notes_Availability",
@@ -68,6 +69,15 @@ function normalizeScore(value) {
   return "";
 }
 
+function extractIndeedProfileUrl(notes) {
+  const text = normalizeText(notes);
+  if (!text) {
+    return "";
+  }
+  const matched = text.match(/Indeed\s+Profile:\s*(https?:\/\/\S+)/i);
+  return matched ? normalizeText(matched[1]) : "";
+}
+
 function parseSiteConfig() {
   const siteUrlValue = normalizeText(process.env.SHAREPOINT_RECRUITMENT_SITE_URL || DEFAULT_SITE_URL);
   const listName = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_NAME || DEFAULT_LIST_NAME);
@@ -119,6 +129,7 @@ function mapInitialScreenItem(item) {
     location: normalizeText(fields.Location),
     phoneNumber: normalizeText(fields.PhoneNumber),
     email: normalizeText(fields.Email),
+    indeedProfileUrl: extractIndeedProfileUrl(fields.Notes),
     active: toBoolean(fields.Active),
     responses: {
       q1NotesAvailability: normalizeText(fields.Q1_Notes_Availability),

@@ -9,6 +9,7 @@ const screenCandidateMeta = document.getElementById("screenCandidateMeta");
 const screenContactActions = document.getElementById("screenContactActions");
 const screenWhatsAppLink = document.getElementById("screenWhatsAppLink");
 const screenTeamsCallLink = document.getElementById("screenTeamsCallLink");
+const screenIndeedLink = document.getElementById("screenIndeedLink");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
 const initialScreenForm = document.getElementById("initialScreenForm");
 const savePdfBtn = document.getElementById("savePdfBtn");
@@ -154,6 +155,10 @@ function getTeamsCallUrl(phoneNumber) {
     return "";
   }
   return `https://teams.microsoft.com/l/call/0/0?users=${encodeURIComponent(normalized)}`;
+}
+
+function getIndeedProfileUrl(item) {
+  return cleanText(item?.indeedProfileUrl);
 }
 
 function getDraftStorageKey(itemId) {
@@ -517,6 +522,7 @@ function renderCandidateHeader(item) {
   }
   const whatsappUrl = getWhatsAppUrl(item?.phoneNumber, item?.candidateName);
   const teamsCallUrl = getTeamsCallUrl(item?.phoneNumber);
+  const indeedUrl = getIndeedProfileUrl(item);
   screenCandidateName.textContent = candidateName;
   screenCandidateMeta.textContent = parts.length ? parts.join(" • ") : "Recruitment screening";
   if (screenSummaryTitle) {
@@ -528,7 +534,7 @@ function renderCandidateHeader(item) {
   document.title = getCandidatePrintTitle();
   renderTagPreview(screenSummaryTags, item?.responses?.tags);
   if (screenContactActions) {
-    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl;
+    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !indeedUrl;
   }
   if (screenWhatsAppLink) {
     screenWhatsAppLink.href = whatsappUrl || "#";
@@ -537,6 +543,10 @@ function renderCandidateHeader(item) {
   if (screenTeamsCallLink) {
     screenTeamsCallLink.href = teamsCallUrl || "#";
     screenTeamsCallLink.hidden = !teamsCallUrl;
+  }
+  if (screenIndeedLink) {
+    screenIndeedLink.href = indeedUrl || "#";
+    screenIndeedLink.hidden = !indeedUrl;
   }
 }
 

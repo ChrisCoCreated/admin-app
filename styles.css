@@ -842,6 +842,15 @@ dd {
   color: #fff;
 }
 
+.button-link.is-disabled {
+  background: #a2aec3;
+  box-shadow: none;
+  filter: none;
+  opacity: 0.86;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .button-link-one-touch {
   display: inline-flex;
   align-items: center;

@@ -143,6 +143,15 @@ function parseHyperlink(value) {
   return text.slice(0, commaIndex).trim();
 }
 
+function extractIndeedProfileUrl(notes) {
+  const text = normalizeText(notes);
+  if (!text) {
+    return "";
+  }
+  const matched = text.match(/Indeed\s+Profile:\s*(https?:\/\/\S+)/i);
+  return matched ? normalizeText(matched[1]) : "";
+}
+
 function buildOneTouchProfileUrl(oneTouchId) {
   const url = new URL(ONETOUCH_CARER_PROFILE_BASE_URL);
   url.searchParams.set("p", normalizeText(oneTouchId));
@@ -186,6 +195,7 @@ function normalizeRecruitmentItem(item) {
     livesIn: normalizeText(fields.LivesIn),
     firstInterviewDate: normalizeText(fields._x0031_stInterviewDate),
     notes: normalizeText(fields.Notes),
+    indeedProfileUrl: extractIndeedProfileUrl(fields.Notes),
     tags: normalizeText(fields.Tags),
     source: normalizeText(fields.Source),
     earmarkedFor: normalizeText(fields.EarmarkedFor),
