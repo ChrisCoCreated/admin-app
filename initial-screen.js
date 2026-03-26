@@ -10,6 +10,8 @@ const screenContactActions = document.getElementById("screenContactActions");
 const screenWhatsAppLink = document.getElementById("screenWhatsAppLink");
 const screenTeamsCallLink = document.getElementById("screenTeamsCallLink");
 const screenIndeedLink = document.getElementById("screenIndeedLink");
+const screenHeaderIndeedLink = document.getElementById("screenHeaderIndeedLink");
+const screenEmailLink = document.getElementById("screenEmailLink");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
 const initialScreenForm = document.getElementById("initialScreenForm");
 const savePdfBtn = document.getElementById("savePdfBtn");
@@ -72,6 +74,10 @@ function getCandidateName() {
 }
 
 function getCandidatePrintTitle() {
+  return `${getCandidateName()} Initial Screen`;
+}
+
+function getInitialScreenLabel() {
   return `${getCandidateName()} Initial Screen`;
 }
 
@@ -159,6 +165,27 @@ function getTeamsCallUrl(phoneNumber) {
 
 function getIndeedProfileUrl(item) {
   return cleanText(item?.indeedProfileUrl);
+}
+
+function getEmailDraftUrl(item) {
+  const candidateName = cleanText(item?.candidateName) || "Candidate";
+  const indeedUrl = getIndeedProfileUrl(item);
+  const initialScreenUrl = window.location.href;
+  const subject = `Initial Screen: ${candidateName}`;
+  const bodyLines = [
+    `Hi Michalina,`,
+    "",
+    `Here is the initial screen for ${candidateName}:`,
+    initialScreenUrl,
+    indeedUrl ? "" : null,
+    indeedUrl ? `Indeed profile:` : null,
+    indeedUrl || null,
+  ].filter((line) => line !== null);
+  const mailto = new URL("mailto:michalina@thrivehomecare.co.uk");
+  mailto.searchParams.set("cc", "Rebecca@planwithcare.co.uk");
+  mailto.searchParams.set("subject", subject);
+  mailto.searchParams.set("body", bodyLines.join("\n"));
+  return mailto.toString();
 }
 
 function getDraftStorageKey(itemId) {
@@ -380,8 +407,9 @@ function renderScoreSummary() {
 function buildCopySummaryText() {
   const form = readForm();
   const counts = getScoreCounts();
+  const candidateName = getCandidateName();
   const lines = [
-    `Intital Screen Summary: ${getCandidateName()}`,
+    `Intital Screen Summary: ${candidateName}`,
     cleanText(screenCandidateMeta?.textContent) ? `Details: ${cleanText(screenCandidateMeta.textContent)}` : "",
     screenSummaryContact?.textContent ? `Contact: ${cleanText(screenSummaryContact.textContent)}` : "",
     `Scores: Green ${counts.Green} | Amber ${counts.Amber} | Red ${counts.Red} | Unscored ${counts.Unscored}`,
@@ -389,7 +417,8 @@ function buildCopySummaryText() {
     form.tags ? `Tags: ${cleanText(form.tags)}` : "",
     form.screenNextSteps ? `Next steps: ${cleanText(form.screenNextSteps)}` : "",
     form.initialCallSummary ? `Initial screen summary: ${cleanText(form.initialCallSummary)}` : "",
-    `Link: ${window.location.href}`,
+    `Initial Screen: ${candidateName}`,
+    `Initial Screen URL: ${window.location.href}`,
   ];
   return lines.filter(Boolean).join("\n");
 }
@@ -456,7 +485,9 @@ function buildCopySummaryHtml() {
             </div>`
           : ""
       }
-      <p style="margin: 0;"><a href="${escapeHtml(pageUrl)}" style="color: #1f3f89; font-weight: 700;">Open Initial Screen</a></p>
+      <p style="margin: 0;"><a href="${escapeHtml(pageUrl)}" style="color: #1f3f89; font-weight: 700;">${escapeHtml(
+        getInitialScreenLabel()
+      )}</a></p>
     </div>
   `.trim();
 }
@@ -523,6 +554,7 @@ function renderCandidateHeader(item) {
   const whatsappUrl = getWhatsAppUrl(item?.phoneNumber, item?.candidateName);
   const teamsCallUrl = getTeamsCallUrl(item?.phoneNumber);
   const indeedUrl = getIndeedProfileUrl(item);
+  const emailDraftUrl = getEmailDraftUrl(item);
   screenCandidateName.textContent = candidateName;
   screenCandidateMeta.textContent = parts.length ? parts.join(" • ") : "Recruitment screening";
   if (screenSummaryTitle) {
@@ -547,6 +579,13 @@ function renderCandidateHeader(item) {
   if (screenIndeedLink) {
     screenIndeedLink.href = indeedUrl || "#";
     screenIndeedLink.hidden = !indeedUrl;
+  }
+  if (screenHeaderIndeedLink) {
+    screenHeaderIndeedLink.href = indeedUrl || "#";
+    screenHeaderIndeedLink.hidden = !indeedUrl;
+  }
+  if (screenEmailLink) {
+    screenEmailLink.href = emailDraftUrl || "#";
   }
 }
 
