@@ -1704,7 +1704,8 @@ dd {
   .screen-actions,
   .status-quick-menu,
   .screen-intro-card,
-  #screenStatusMessage {
+  #screenStatusMessage,
+  .checkbox-field {
     display: none !important;
   }
 
@@ -1714,12 +1715,25 @@ dd {
     padding: 0 16px 20px;
   }
 
+  .initial-screen-form {
+    display: block;
+  }
+
+  .initial-screen-form > * + * {
+    margin-top: 18px;
+  }
+
   .panel,
   .screen-question-card,
   .screen-score-summary,
   .screen-print-summary {
     box-shadow: none !important;
-    break-inside: avoid;
+  }
+
+  .screen-print-summary,
+  .screen-question-card {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
   }
 
   .screen-print-summary {
@@ -1728,12 +1742,33 @@ dd {
     background: #ffffff;
   }
 
+  .screen-print-summary-grid,
+  .screen-question-top,
+  .screen-section {
+    display: block;
+  }
+
+  .screen-print-summary-fields,
+  .screen-section-heading,
+  .screen-question-card > .field,
+  .screen-question-card > label,
+  .screen-question-card > div,
+  .screen-section > * + *,
+  .screen-print-summary-fields > * + * {
+    margin-top: 10px;
+  }
+
   .screen-print-summary-card {
     background: #ffffff;
   }
 
+  .compact-field {
+    margin-top: 10px;
+  }
+
   textarea,
-  select {
+  select,
+  input[type="text"] {
     border: 1px solid #d0d7e2;
     background: #ffffff;
     color: #11141a;
@@ -1741,27 +1776,30 @@ dd {
     min-height: 0;
     overflow: visible;
     resize: none;
+    position: static !important;
   }
 
   .screen-section {
     break-inside: auto;
   }
 
-  .screen-question-top {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+  .screen-question-card textarea,
+  .initial-screen-form textarea {
+    min-height: 72px;
   }
 
   .score-chip,
   .screen-score-pill {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    box-shadow: none !important;
+    transform: none !important;
   }
 
   .score-chip.is-active.score-green,
   .score-pill-green {
-    border-color: #72c596 !important;
-    background: #dff6e8 !important;
+    border-color: #94c8a9 !important;
+    background: #eef8f1 !important;
     color: #0f6a3b !important;
   }
 
@@ -1777,6 +1815,14 @@ dd {
     border-color: #de8a8a !important;
     background: #fde1e1 !important;
     color: #a22a2a !important;
+  }
+
+  .score-chip-group.has-selection .score-chip:not(.is-active),
+  .score-pill-neutral {
+    filter: none !important;
+    background: #f5f7fa !important;
+    color: #808999 !important;
+    border-color: #e1e6ed !important;
   }
 }
 

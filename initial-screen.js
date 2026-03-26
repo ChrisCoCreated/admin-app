@@ -25,7 +25,6 @@ const screenSummaryCall = document.getElementById("screenSummaryCall");
 const screenSummaryTitle = document.getElementById("screenSummaryTitle");
 const screenSummaryContact = document.getElementById("screenSummaryContact");
 const screenSummaryTags = document.getElementById("screenSummaryTags");
-const screenSummaryKeepInMind = document.getElementById("screenSummaryKeepInMind");
 const screenTagsPreview = document.getElementById("screenTagsPreview");
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
@@ -266,7 +265,7 @@ function preparePrintLayout() {
   for (const textarea of printableTextareas) {
     textarea.dataset.printHeight = textarea.style.height || "";
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.max(textarea.scrollHeight, 120)}px`;
+    textarea.style.height = `${textarea.scrollHeight}px`;
   }
 }
 
@@ -396,9 +395,6 @@ function renderScoreSummary() {
   }
   renderTagPreview(screenTagsPreview, form.tags);
   renderTagPreview(screenSummaryTags, form.tags);
-  if (screenSummaryKeepInMind) {
-    screenSummaryKeepInMind.textContent = form.keepInMind === true ? "Yes" : "No";
-  }
   if (screenSummaryTitle) {
     screenSummaryTitle.textContent = `Intital Screen Summary: ${getCandidateName()}`;
   }
@@ -413,7 +409,6 @@ function buildCopySummaryText() {
     screenSummaryContact?.textContent ? `Contact: ${cleanText(screenSummaryContact.textContent)}` : "",
     `Scores: Green ${counts.Green} | Amber ${counts.Amber} | Red ${counts.Red} | Unscored ${counts.Unscored}`,
     form.screenOutcome ? `Outcome: ${cleanText(form.screenOutcome)}` : "",
-    form.keepInMind === true ? "Keep in mind: Yes" : "",
     form.tags ? `Tags: ${cleanText(form.tags)}` : "",
     form.screenNextSteps ? `Next steps: ${cleanText(form.screenNextSteps)}` : "",
     form.initialCallSummary ? `Initial screen summary: ${cleanText(form.initialCallSummary)}` : "",
@@ -432,7 +427,6 @@ function buildCopySummaryHtml() {
   const screenOutcome = cleanText(form.screenOutcome);
   const screenNextSteps = cleanText(form.screenNextSteps);
   const tags = splitTagList(form.tags);
-  const keepInMind = form.keepInMind === true;
   const pageUrl = window.location.href;
 
   return `
@@ -456,7 +450,6 @@ function buildCopySummaryHtml() {
           ? `<p style="margin: 0 0 10px;"><strong>Outcome:</strong> ${escapeHtml(screenOutcome)}</p>`
           : ""
       }
-      ${keepInMind ? `<p style="margin: 0 0 10px;"><strong>Keep in Mind:</strong> Yes</p>` : ""}
       ${
         tags.length
           ? `<div style="margin: 0 0 14px;">
