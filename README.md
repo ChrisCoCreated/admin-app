@@ -124,6 +124,14 @@ Set comma-separated email lists with these env vars:
 - `ACCESS_ENQUIRIES_EMAILS` for enquiries-only access
 - `ACCESS_CONSULTANT_EMAILS` for `consultant`
 
+Recruitment access is granted by these existing env assignments:
+
+- `ACCESS_FULL_EMAILS`
+- `ACCESS_HR_EMAILS`
+- `ACCESS_HR_EMAILS` + `ACCESS_CLIENTS_EMAILS`
+- `ACCESS_TIME_EMAILS` + `ACCESS_HR_EMAILS`
+- `ACCESS_TIME_EMAILS` + `ACCESS_HR_EMAILS` + `ACCESS_CLIENTS_EMAILS`
+
 ## Redirect URI notes
 
 For local sign-in, add your SPA redirect in Entra app registration, for example:

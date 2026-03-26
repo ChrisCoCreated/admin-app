@@ -5,16 +5,9 @@ const {
   getOneTouchPositionOptions,
   getOneTouchStatusOptions,
 } = require("../_lib/onetouch-client");
+const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
 
-const ALLOWED_ROLES = [
-  "admin",
-  "care_manager",
-  "operations",
-  "hr_only",
-  "hr_clients",
-  "time_hr",
-  "time_hr_clients",
-];
+const ALLOWED_ROLES = RECRUITMENT_ALLOWED_ROLES;
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") {

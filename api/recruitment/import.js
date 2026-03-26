@@ -1,18 +1,11 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
+const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
 
-const ALLOWED_ROLES = [
-  "admin",
-  "care_manager",
-  "operations",
-  "hr_only",
-  "hr_clients",
-  "time_hr",
-  "time_hr_clients",
-];
+const ALLOWED_ROLES = RECRUITMENT_ALLOWED_ROLES;
 
 const STATUS_PIPELINE_MAP = [
   { match: /\b(contacting|applied|application|new)\b/i, status: "Initial Call" },

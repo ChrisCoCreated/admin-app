@@ -1,6 +1,7 @@
 const { requireGraphAuth } = require("./_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("./_lib/tasks/graph-delegated-client");
 const { createCarer } = require("./_lib/onetouch-client");
+const { RECRUITMENT_ALLOWED_ROLES } = require("./_lib/recruitment-access");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -9,15 +10,7 @@ const DEFAULT_LIST_WEB_URL =
 const ONETOUCH_CARER_PROFILE_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerSummaryProfile.php";
 const DEFAULT_EXTERNAL_ID_PREFIX = "thrive-recruitment";
 
-const ALLOWED_ROLES = [
-  "admin",
-  "care_manager",
-  "operations",
-  "hr_only",
-  "hr_clients",
-  "time_hr",
-  "time_hr_clients",
-];
+const ALLOWED_ROLES = RECRUITMENT_ALLOWED_ROLES;
 
 function normalizeText(value) {
   return String(value || "").trim();
