@@ -70,7 +70,7 @@
         <div id="recruitmentToolbarContent" hidden>
           <label class="field" for="searchInput">
             Search
-            <input id="searchInput" type="search" placeholder="Search candidate, status, source, notes or phone" autocomplete="off" />
+            <input id="searchInput" type="search" placeholder="Search candidate, status, source, tags, notes or phone" autocomplete="off" />
           </label>
           <div class="mapping-form-grid">
             <label class="field" for="locationFilterSelect">
@@ -253,6 +253,14 @@
             <dt>Email</dt>
             <dd data-field="email">-</dd>
           </div>
+          <div class="recruitment-detail-tags-row">
+            <dt>Tags</dt>
+            <dd data-field="tags">
+              <div class="tag-chip-list">
+                <span class="tag-chip tag-chip-muted">No tags yet</span>
+              </div>
+            </dd>
+          </div>
           <div>
             <dt>Interview Booked</dt>
             <dd data-field="interviewBooked">-</dd>
@@ -290,6 +298,56 @@
             <dd data-field="notes">-</dd>
           </div>
         </dl>
+        <form id="candidateDetailEditForm" class="modal-form recruitment-detail-edit-form">
+          <div class="mapping-form-grid">
+            <label class="field" for="detailCandidateNameInput">
+              Candidate
+              <input id="detailCandidateNameInput" type="text" autocomplete="name" />
+            </label>
+            <label class="field" for="detailLocationInput">
+              Location
+              <input id="detailLocationInput" type="text" autocomplete="address-level2" />
+            </label>
+            <label class="field" for="detailSourceInput">
+              Source
+              <input id="detailSourceInput" type="text" />
+            </label>
+            <label class="field" for="detailPhoneInput">
+              Phone Number
+              <input id="detailPhoneInput" type="text" autocomplete="tel" />
+            </label>
+            <label class="field" for="detailEmailInput">
+              Email
+              <input id="detailEmailInput" type="email" autocomplete="email" />
+            </label>
+            <label class="field" for="detailLivesInInput">
+              Lives In
+              <input id="detailLivesInInput" type="text" autocomplete="address-level2" />
+            </label>
+            <label class="field" for="detailEarmarkedForInput">
+              Earmarked For
+              <input id="detailEarmarkedForInput" type="text" />
+            </label>
+          </div>
+
+          <label class="field" for="detailTagsInput">
+            Tags
+            <input
+              id="detailTagsInput"
+              type="text"
+              placeholder="Add tags separated by commas"
+              autocomplete="off"
+            />
+          </label>
+          <div id="detailTagsPreview" class="tag-chip-list" aria-live="polite">
+            <span class="tag-chip tag-chip-muted">No tags yet</span>
+          </div>
+
+          <label class="field" for="detailNotesInput">
+            Notes
+            <textarea id="detailNotesInput" placeholder="Capture any relevant context, availability or follow-up notes."></textarea>
+          </label>
+        </form>
         <div class="row wrap-row">
           <label class="field" for="statusUpdateSelect">
             Change Status
@@ -298,6 +356,7 @@
             </select>
           </label>
           <button id="saveStatusBtn" type="button">Save Status</button>
+          <button id="saveDetailBtn" type="button" class="secondary">Save Details</button>
         </div>
         <div class="row wrap-row">
           <a

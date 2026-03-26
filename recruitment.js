@@ -18,6 +18,7 @@ const sharePointListLink = document.getElementById("sharePointListLink");
 const openOneTouchBtn = document.getElementById("openOneTouchBtn");
 const statusUpdateSelect = document.getElementById("statusUpdateSelect");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
+const saveDetailBtn = document.getElementById("saveDetailBtn");
 const importDropZone = document.getElementById("importDropZone");
 const importFileInput = document.getElementById("importFileInput");
 const importFileName = document.getElementById("importFileName");
@@ -33,6 +34,7 @@ const recruitmentToolbarContent = document.getElementById("recruitmentToolbarCon
 const candidateDetailModal = document.getElementById("candidateDetailModal");
 const candidateDetailModalTitle = document.getElementById("candidateDetailModalTitle");
 const candidateDetailCloseBtn = document.getElementById("candidateDetailCloseBtn");
+const candidateDetailEditForm = document.getElementById("candidateDetailEditForm");
 const addRecruitmentModal = document.getElementById("addRecruitmentModal");
 const addRecruitmentCloseBtn = document.getElementById("addRecruitmentCloseBtn");
 const addRecruitmentForm = document.getElementById("addRecruitmentForm");
@@ -71,6 +73,7 @@ const detailFields = {
   source: detailRoot?.querySelector('[data-field="source"]'),
   phoneNumber: detailRoot?.querySelector('[data-field="phoneNumber"]'),
   email: detailRoot?.querySelector('[data-field="email"]'),
+  tags: detailRoot?.querySelector('[data-field="tags"]'),
   interviewBooked: detailRoot?.querySelector('[data-field="interviewBooked"]'),
   interviewWith: detailRoot?.querySelector('[data-field="interviewWith"]'),
   keepInMind: detailRoot?.querySelector('[data-field="keepInMind"]'),
@@ -81,6 +84,20 @@ const detailFields = {
   oneTouchLink: detailRoot?.querySelector('[data-field="oneTouchLink"]'),
   notes: detailRoot?.querySelector('[data-field="notes"]'),
 };
+
+const detailInputs = {
+  candidateName: document.getElementById("detailCandidateNameInput"),
+  location: document.getElementById("detailLocationInput"),
+  source: document.getElementById("detailSourceInput"),
+  phoneNumber: document.getElementById("detailPhoneInput"),
+  email: document.getElementById("detailEmailInput"),
+  livesIn: document.getElementById("detailLivesInInput"),
+  earmarkedFor: document.getElementById("detailEarmarkedForInput"),
+  tags: document.getElementById("detailTagsInput"),
+  notes: document.getElementById("detailNotesInput"),
+};
+
+const detailTagsPreview = document.getElementById("detailTagsPreview");
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -103,6 +120,7 @@ let activeUpdateBusy = false;
 let statusQuickMenuCandidateId = "";
 let createCandidateBusy = false;
 let activeHideRefreshTimer = 0;
+let detailSaveBusy = false;
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
@@ -138,6 +156,33 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function splitTagList(value) {
+  return Array.from(
+    new Set(
+      String(value || "")
+        .split(/[,\n;|]+/)
+        .map((part) => cleanText(part))
+        .filter(Boolean)
+    )
+  );
+}
+
+function normalizeTagString(value) {
+  return splitTagList(value).join(", ");
+}
+
+function renderTagPreview(node, tags, emptyLabel = "No tags yet") {
+  if (!node) {
+    return;
+  }
+  const list = Array.isArray(tags) ? tags : splitTagList(tags);
+  if (!list.length) {
+    node.innerHTML = `<span class="tag-chip tag-chip-muted">${escapeHtml(emptyLabel)}</span>`;
+    return;
+  }
+  node.innerHTML = list.map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("");
 }
 
 function setStatus(message, isError = false) {
@@ -388,6 +433,18 @@ function openCandidateDetail(candidate) {
 function closeCandidateDetail() {
   if (candidateDetailModal) {
     candidateDetailModal.hidden = true;
+  }
+}
+
+function setDetailFormEnabled(enabled) {
+  for (const field of Object.values(detailInputs)) {
+    if (!field) {
+      continue;
+    }
+    field.disabled = !enabled || detailSaveBusy;
+  }
+  if (saveDetailBtn) {
+    saveDetailBtn.disabled = !enabled || detailSaveBusy;
   }
 }
 
@@ -1081,6 +1138,7 @@ function setDetail(candidate) {
     detailFields.source.textContent = "-";
     detailFields.phoneNumber.textContent = "-";
     detailFields.email.textContent = "-";
+    renderTagPreview(detailFields.tags, []);
     detailFields.interviewBooked.textContent = "-";
     detailFields.interviewWith.textContent = "-";
     detailFields.keepInMind.textContent = "-";
@@ -1090,6 +1148,19 @@ function setDetail(candidate) {
     detailFields.created.textContent = "-";
     detailFields.oneTouchLink.textContent = "-";
     detailFields.notes.textContent = "-";
+    if (detailInputs.candidateName) {
+      detailInputs.candidateName.value = "";
+      detailInputs.location.value = "";
+      detailInputs.source.value = "";
+      detailInputs.phoneNumber.value = "";
+      detailInputs.email.value = "";
+      detailInputs.livesIn.value = "";
+      detailInputs.earmarkedFor.value = "";
+      detailInputs.tags.value = "";
+      detailInputs.notes.value = "";
+    }
+    renderTagPreview(detailTagsPreview, []);
+    setDetailFormEnabled(false);
     setOneTouchButton("");
     if (statusUpdateSelect) {
       statusUpdateSelect.value = "";
@@ -1111,6 +1182,7 @@ function setDetail(candidate) {
   detailFields.source.textContent = cleanText(candidate.source) || "-";
   detailFields.phoneNumber.textContent = cleanText(candidate.phoneNumber) || "-";
   detailFields.email.textContent = cleanText(candidate.email) || "-";
+  renderTagPreview(detailFields.tags, candidate.tags);
   detailFields.interviewBooked.textContent = formatBoolean(candidate.interviewBooked);
   detailFields.interviewWith.textContent = cleanText(candidate.interviewWith) || "-";
   detailFields.keepInMind.textContent = formatBoolean(candidate.keepInMind);
@@ -1121,6 +1193,19 @@ function setDetail(candidate) {
   setLinkField(detailFields.oneTouchLink, candidate.oneTouchLink);
   setOneTouchButton(candidate.oneTouchLink);
   detailFields.notes.textContent = cleanText(candidate.notes) || "-";
+  if (detailInputs.candidateName) {
+    detailInputs.candidateName.value = cleanText(candidate.candidateName);
+    detailInputs.location.value = cleanText(candidate.location);
+    detailInputs.source.value = cleanText(candidate.source);
+    detailInputs.phoneNumber.value = cleanText(candidate.phoneNumber);
+    detailInputs.email.value = cleanText(candidate.email);
+    detailInputs.livesIn.value = cleanText(candidate.livesIn);
+    detailInputs.earmarkedFor.value = cleanText(candidate.earmarkedFor);
+    detailInputs.tags.value = normalizeTagString(candidate.tags);
+    detailInputs.notes.value = cleanText(candidate.notes);
+  }
+  renderTagPreview(detailTagsPreview, candidate.tags);
+  setDetailFormEnabled(true);
   renderStatusUpdateOptions();
   if (statusUpdateSelect) {
     statusUpdateSelect.value = cleanText(candidate.status);
@@ -1234,7 +1319,8 @@ function getFilteredCandidates() {
       normalizeText(candidate.source).includes(query) ||
       normalizeText(candidate.phoneNumber).includes(query) ||
       normalizeText(candidate.livesIn).includes(query) ||
-      normalizeText(candidate.notes).includes(query)
+      normalizeText(candidate.notes).includes(query) ||
+      normalizeText(candidate.tags).includes(query)
     );
   });
 
@@ -1670,6 +1756,55 @@ async function updateCandidateActiveById(candidateId, nextActive) {
   return true;
 }
 
+async function saveCandidateDetails() {
+  if (detailSaveBusy || !selectedCandidateId) {
+    return;
+  }
+
+  const payload = {
+    itemId: selectedCandidateId,
+    candidateName: cleanText(detailInputs.candidateName?.value),
+    location: cleanText(detailInputs.location?.value),
+    source: cleanText(detailInputs.source?.value),
+    phoneNumber: cleanText(detailInputs.phoneNumber?.value),
+    email: cleanText(detailInputs.email?.value),
+    livesIn: cleanText(detailInputs.livesIn?.value),
+    earmarkedFor: cleanText(detailInputs.earmarkedFor?.value),
+    tags: normalizeTagString(detailInputs.tags?.value),
+    notes: cleanText(detailInputs.notes?.value),
+  };
+
+  detailSaveBusy = true;
+  setDetailFormEnabled(false);
+  setStatus("Saving candidate details...");
+
+  try {
+    await directoryApi.updateRecruitmentDetails(payload);
+    const candidate = allCandidates.find((item) => item.id === selectedCandidateId);
+    if (candidate) {
+      candidate.candidateName = payload.candidateName;
+      candidate.location = payload.location;
+      candidate.source = payload.source;
+      candidate.phoneNumber = payload.phoneNumber;
+      candidate.email = payload.email;
+      candidate.livesIn = payload.livesIn;
+      candidate.earmarkedFor = payload.earmarkedFor;
+      candidate.tags = payload.tags;
+      candidate.notes = payload.notes;
+      setDetail(candidate);
+    }
+    renderFilterOptions();
+    renderCandidates();
+    setStatus("Candidate details saved.");
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not save candidate details.", true);
+  } finally {
+    detailSaveBusy = false;
+    setDetailFormEnabled(Boolean(selectedCandidateId));
+  }
+}
+
 async function saveCandidateStatus() {
   if (statusUpdateBusy || !statusUpdateSelect) {
     return;
@@ -1909,6 +2044,20 @@ runImportBtn?.addEventListener("click", async () => {
 });
 saveStatusBtn?.addEventListener("click", async () => {
   await saveCandidateStatus();
+});
+saveDetailBtn?.addEventListener("click", async () => {
+  await saveCandidateDetails();
+});
+candidateDetailEditForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveCandidateDetails();
+});
+detailInputs.tags?.addEventListener("input", () => {
+  renderTagPreview(detailTagsPreview, detailInputs.tags.value);
+});
+detailInputs.tags?.addEventListener("blur", () => {
+  detailInputs.tags.value = normalizeTagString(detailInputs.tags.value);
+  renderTagPreview(detailTagsPreview, detailInputs.tags.value);
 });
 
 oneTouchPickerCancelBtn?.addEventListener("click", () => {

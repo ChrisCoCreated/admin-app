@@ -21,6 +21,7 @@ const SCREEN_FIELDS = [
   "PhoneNumber",
   "Email",
   "Active",
+  "Tags",
   "Q1_Notes_Availability",
   "Q1_Score",
   "Q2_Notes_ShortNotice",
@@ -143,6 +144,7 @@ function mapInitialScreenItem(item) {
       initialCallSummary: normalizeText(fields.InitialCallSummary),
       screenOutcome: normalizeText(fields.ScreenOutcome),
       screenNextSteps: normalizeText(fields.ScreenNextSteps),
+      tags: normalizeText(fields.Tags),
     },
   };
 }
@@ -166,6 +168,7 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
+    Tags: normalizeText(input.tags),
   };
 }
 

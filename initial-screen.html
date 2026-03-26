@@ -110,6 +110,13 @@
                   <span class="screen-print-summary-label">Initial Screen Summary</span>
                   <p id="screenSummaryCall" class="screen-print-summary-text">No initial screen summary captured yet.</p>
                 </div>
+
+                <div class="screen-print-summary-card">
+                  <span class="screen-print-summary-label">Tags</span>
+                  <div id="screenSummaryTags" class="tag-chip-list">
+                    <span class="tag-chip tag-chip-muted">No tags yet</span>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -288,6 +295,19 @@
               Screen Next Steps
               <textarea id="screenNextSteps" placeholder="Capture the agreed next action, owner, and anything that needs to happen after this call."></textarea>
             </label>
+
+            <label class="field" for="screenTagsInput">
+              Tags
+              <input
+                id="screenTagsInput"
+                type="text"
+                placeholder="Add tags separated by commas, for example: strong values, full time, driver"
+                autocomplete="off"
+              />
+            </label>
+            <div id="screenTagsPreview" class="tag-chip-list" aria-live="polite">
+              <span class="tag-chip tag-chip-muted">No tags yet</span>
+            </div>
           </section>
 
           <div class="screen-actions">

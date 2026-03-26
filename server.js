@@ -20,6 +20,7 @@ const recruitmentCreateHandler = require("./api/recruitment/create");
 const recruitmentOneTouchOptionsHandler = require("./api/recruitment/onetouch-options");
 const recruitmentInitialScreenHandler = require("./api/recruitment/initial-screen");
 const recruitmentStatusHandler = require("./api/recruitment/status");
+const recruitmentDetailsHandler = require("./api/recruitment/details");
 const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
 const marketingPhotosHandler = require("./api/marketing/photos");
@@ -309,6 +310,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await recruitmentStatusHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/recruitment/details") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await recruitmentDetailsHandler(apiReq, apiRes);
     return true;
   }
 

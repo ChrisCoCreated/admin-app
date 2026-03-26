@@ -955,6 +955,16 @@ dd {
   white-space: pre-wrap;
 }
 
+.recruitment-detail-tags-row dd {
+  min-height: 42px;
+}
+
+.recruitment-detail-edit-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
 .recruitment-active-field {
   min-height: 42px;
   align-self: end;
@@ -1534,6 +1544,33 @@ dd {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.tag-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #d8e1ed;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #234156;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tag-chip-muted {
+  background: #f5f7fa;
+  color: #6a7486;
+  border-color: #e1e6ed;
 }
 
 .screen-score-summary {

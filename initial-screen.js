@@ -24,6 +24,8 @@ const screenSummaryNextSteps = document.getElementById("screenSummaryNextSteps")
 const screenSummaryCall = document.getElementById("screenSummaryCall");
 const screenSummaryTitle = document.getElementById("screenSummaryTitle");
 const screenSummaryContact = document.getElementById("screenSummaryContact");
+const screenSummaryTags = document.getElementById("screenSummaryTags");
+const screenTagsPreview = document.getElementById("screenTagsPreview");
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
 const fieldRefs = {
@@ -44,6 +46,7 @@ const fieldRefs = {
   initialCallSummary: document.getElementById("initialCallSummary"),
   screenOutcome: document.getElementById("screenOutcome"),
   screenNextSteps: document.getElementById("screenNextSteps"),
+  tags: document.getElementById("screenTagsInput"),
 };
 
 const printableTextareas = Object.values(fieldRefs).filter((field) => field instanceof HTMLTextAreaElement);
@@ -79,6 +82,33 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function splitTagList(value) {
+  return Array.from(
+    new Set(
+      String(value || "")
+        .split(/[,\n;|]+/)
+        .map((part) => cleanText(part))
+        .filter(Boolean)
+    )
+  );
+}
+
+function normalizeTagString(value) {
+  return splitTagList(value).join(", ");
+}
+
+function renderTagPreview(node, tags, emptyLabel = "No tags yet") {
+  if (!node) {
+    return;
+  }
+  const list = Array.isArray(tags) ? tags : splitTagList(tags);
+  if (!list.length) {
+    node.innerHTML = `<span class="tag-chip tag-chip-muted">${escapeHtml(emptyLabel)}</span>`;
+    return;
+  }
+  node.innerHTML = list.map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("");
 }
 
 function normalizePhoneForActions(phoneNumber) {
@@ -284,6 +314,7 @@ function fillForm(responses = {}) {
   fieldRefs.initialCallSummary.value = cleanText(responses.initialCallSummary);
   fieldRefs.screenOutcome.value = cleanText(responses.screenOutcome);
   fieldRefs.screenNextSteps.value = cleanText(responses.screenNextSteps);
+  fieldRefs.tags.value = normalizeTagString(responses.tags);
   syncScoreChipGroup("q1Score", fieldRefs.q1Score.value);
   syncScoreChipGroup("q2Score", fieldRefs.q2Score.value);
   syncScoreChipGroup("q3Score", fieldRefs.q3Score.value);
@@ -313,6 +344,7 @@ function readForm() {
     initialCallSummary: fieldRefs.initialCallSummary.value,
     screenOutcome: fieldRefs.screenOutcome.value,
     screenNextSteps: fieldRefs.screenNextSteps.value,
+    tags: normalizeTagString(fieldRefs.tags.value),
   };
 }
 
@@ -358,6 +390,8 @@ function renderScoreSummary() {
   if (screenSummaryCall) {
     screenSummaryCall.textContent = cleanText(form.initialCallSummary) || "No initial screen summary captured yet.";
   }
+  renderTagPreview(screenTagsPreview, form.tags);
+  renderTagPreview(screenSummaryTags, form.tags);
   if (screenSummaryTitle) {
     screenSummaryTitle.textContent = `Intital Screen Summary: ${getCandidateName()}`;
   }
@@ -372,6 +406,7 @@ function buildCopySummaryText() {
     screenSummaryContact?.textContent ? `Contact: ${cleanText(screenSummaryContact.textContent)}` : "",
     `Scores: Green ${counts.Green} | Amber ${counts.Amber} | Red ${counts.Red} | Unscored ${counts.Unscored}`,
     form.screenOutcome ? `Outcome: ${cleanText(form.screenOutcome)}` : "",
+    form.tags ? `Tags: ${cleanText(form.tags)}` : "",
     form.screenNextSteps ? `Next steps: ${cleanText(form.screenNextSteps)}` : "",
     form.initialCallSummary ? `Initial screen summary: ${cleanText(form.initialCallSummary)}` : "",
     `Link: ${window.location.href}`,
@@ -388,6 +423,7 @@ function buildCopySummaryHtml() {
   const summaryText = cleanText(form.initialCallSummary);
   const screenOutcome = cleanText(form.screenOutcome);
   const screenNextSteps = cleanText(form.screenNextSteps);
+  const tags = splitTagList(form.tags);
   const pageUrl = window.location.href;
 
   return `
@@ -409,6 +445,19 @@ function buildCopySummaryHtml() {
       ${
         screenOutcome
           ? `<p style="margin: 0 0 10px;"><strong>Outcome:</strong> ${escapeHtml(screenOutcome)}</p>`
+          : ""
+      }
+      ${
+        tags.length
+          ? `<div style="margin: 0 0 14px;">
+              <div style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #1b5467; font-weight: 800;">Tags</div>
+              <div>${tags
+                .map(
+                  (tag) =>
+                    `<span style="display: inline-block; margin: 0 8px 8px 0; padding: 6px 10px; border-radius: 999px; border: 1px solid #d8e1ed; background: #ffffff; font-weight: 700;">${escapeHtml(tag)}</span>`
+                )
+                .join("")}</div>
+            </div>`
           : ""
       }
       ${
@@ -502,6 +551,7 @@ function renderCandidateHeader(item) {
     screenSummaryContact.textContent = contactParts.length ? contactParts.join(" | ") : "Phone and email not available.";
   }
   document.title = getCandidatePrintTitle();
+  renderTagPreview(screenSummaryTags, item?.responses?.tags);
   if (screenContactActions) {
     screenContactActions.hidden = !whatsappUrl && !teamsCallUrl;
   }
@@ -631,6 +681,11 @@ for (const field of Object.values(fieldRefs)) {
   });
 }
 
+fieldRefs.tags?.addEventListener("input", () => {
+  renderScoreSummary();
+  saveLocalDraft();
+});
+
 copyScreenSummaryBtn?.addEventListener("click", async () => {
   if (copyScreenSummaryBtn.disabled) {
     return;
@@ -654,6 +709,12 @@ savePdfBottomBtn?.addEventListener("click", () => {
 
 window.addEventListener("beforeprint", preparePrintLayout);
 window.addEventListener("afterprint", restorePrintLayout);
+
+fieldRefs.tags?.addEventListener("blur", () => {
+  fieldRefs.tags.value = normalizeTagString(fieldRefs.tags.value);
+  renderScoreSummary();
+  saveLocalDraft();
+});
 
 signOutBtn?.addEventListener("click", async () => {
   try {
