@@ -50,8 +50,6 @@ const fieldRefs = {
   keepInMind: document.getElementById("screenKeepInMindInput"),
 };
 
-const printableTextareas = Object.values(fieldRefs).filter((field) => field instanceof HTMLTextAreaElement);
-
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
@@ -252,35 +250,9 @@ function setFormEnabled(enabled) {
 }
 
 function saveScreenAsPdf() {
-  preparePrintLayout();
-  window.requestAnimationFrame(() => {
-    window.print();
-  });
-}
-
-function preparePrintLayout() {
-  document.body.classList.add("is-printing");
   restoreDocumentTitle = document.title;
   document.title = getCandidatePrintTitle();
-  for (const textarea of printableTextareas) {
-    textarea.dataset.printHeight = textarea.style.height || "";
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  }
-}
-
-function restorePrintLayout() {
-  document.body.classList.remove("is-printing");
-  document.title = restoreDocumentTitle;
-  for (const textarea of printableTextareas) {
-    const originalHeight = textarea.dataset.printHeight;
-    if (originalHeight) {
-      textarea.style.height = originalHeight;
-    } else {
-      textarea.style.removeProperty("height");
-    }
-    delete textarea.dataset.printHeight;
-  }
+  window.print();
 }
 
 function syncScoreChipGroup(fieldId, value) {
@@ -709,9 +681,6 @@ savePdfBottomBtn?.addEventListener("click", () => {
   }
   saveScreenAsPdf();
 });
-
-window.addEventListener("beforeprint", preparePrintLayout);
-window.addEventListener("afterprint", restorePrintLayout);
 
 fieldRefs.tags?.addEventListener("blur", () => {
   fieldRefs.tags.value = normalizeTagString(fieldRefs.tags.value);
