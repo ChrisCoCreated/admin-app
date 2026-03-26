@@ -102,6 +102,7 @@ let statusUpdateBusy = false;
 let activeUpdateBusy = false;
 let statusQuickMenuCandidateId = "";
 let createCandidateBusy = false;
+let activeHideRefreshTimer = 0;
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
@@ -947,6 +948,29 @@ function setOneTouchButton(url) {
   openOneTouchBtn.classList.toggle("is-disabled", !enabled);
 }
 
+function syncActiveToggleButton(button, isActive) {
+  if (!button) {
+    return;
+  }
+  button.classList.toggle("is-active", isActive === true);
+  button.setAttribute("aria-pressed", isActive === true ? "true" : "false");
+  const label = button.querySelector(".recruitment-active-toggle-label");
+  if (label) {
+    label.textContent = isActive === true ? "Active" : "Inactive";
+  }
+}
+
+function candidateMatchesActiveFilter(candidate) {
+  const selectedActive = cleanText(activeFilterSelect?.value || "active");
+  if (selectedActive === "active") {
+    return candidate?.active === true;
+  }
+  if (selectedActive === "inactive") {
+    return candidate?.active === false;
+  }
+  return true;
+}
+
 function renderStatusUpdateOptions() {
   if (!statusUpdateSelect) {
     return;
@@ -1344,15 +1368,33 @@ function renderCandidates() {
       if (activeUpdateBusy) {
         return;
       }
+      const nextActive = candidate.active !== true;
       activeUpdateBusy = true;
+      if (activeToggle) {
+        activeToggle.disabled = true;
+      }
       try {
-        await updateCandidateActiveById(candidate.id, candidate.active !== true);
+        await updateCandidateActiveById(candidate.id, nextActive);
+        syncActiveToggleButton(activeToggle, nextActive);
+        if (candidate.id === selectedCandidateId) {
+          setDetail(candidate);
+        }
+        window.clearTimeout(activeHideRefreshTimer);
+        if (candidateMatchesActiveFilter(candidate)) {
+          renderCandidates();
+        } else {
+          activeHideRefreshTimer = window.setTimeout(() => {
+            renderCandidates();
+          }, 900);
+        }
       } catch (error) {
         console.error(error);
         setStatus(error?.message || "Could not update active status.", true);
       } finally {
         activeUpdateBusy = false;
-        renderCandidates();
+        if (activeToggle && document.body.contains(activeToggle)) {
+          activeToggle.disabled = false;
+        }
       }
     });
 
@@ -1624,7 +1666,6 @@ async function updateCandidateActiveById(candidateId, nextActive) {
   }
 
   renderFilterOptions();
-  renderCandidates();
   setStatus(`Candidate marked ${nextActive ? "active" : "inactive"}.`);
   return true;
 }
