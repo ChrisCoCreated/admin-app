@@ -965,6 +965,11 @@ dd {
   border-top: 1px solid #e2e8f0;
 }
 
+.recruitment-detail-checkbox-field {
+  align-self: end;
+  min-height: 48px;
+}
+
 .recruitment-active-field {
   min-height: 42px;
   align-self: end;

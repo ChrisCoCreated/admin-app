@@ -110,6 +110,7 @@ module.exports = async (req, res) => {
         Email: normalizeText(req.body?.email),
         LivesIn: normalizeText(req.body?.livesIn),
         EarmarkedFor: normalizeText(req.body?.earmarkedFor),
+        KeepinMind: req.body?.keepInMind === true,
         Tags: normalizeText(req.body?.tags),
         Notes: normalizeText(req.body?.notes),
       }),

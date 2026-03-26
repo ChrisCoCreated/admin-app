@@ -22,6 +22,7 @@ const SCREEN_FIELDS = [
   "Email",
   "Active",
   "Tags",
+  "KeepinMind",
   "Q1_Notes_Availability",
   "Q1_Score",
   "Q2_Notes_ShortNotice",
@@ -145,6 +146,7 @@ function mapInitialScreenItem(item) {
       screenOutcome: normalizeText(fields.ScreenOutcome),
       screenNextSteps: normalizeText(fields.ScreenNextSteps),
       tags: normalizeText(fields.Tags),
+      keepInMind: toBoolean(fields.KeepinMind),
     },
   };
 }
@@ -169,6 +171,7 @@ function buildPatchBody(input = {}) {
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
     Tags: normalizeText(input.tags),
+    KeepinMind: input.keepInMind === true,
   };
 }
 

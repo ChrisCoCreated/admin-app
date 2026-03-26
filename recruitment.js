@@ -93,6 +93,7 @@ const detailInputs = {
   email: document.getElementById("detailEmailInput"),
   livesIn: document.getElementById("detailLivesInInput"),
   earmarkedFor: document.getElementById("detailEarmarkedForInput"),
+  keepInMind: document.getElementById("detailKeepInMindInput"),
   tags: document.getElementById("detailTagsInput"),
   notes: document.getElementById("detailNotesInput"),
 };
@@ -1156,6 +1157,7 @@ function setDetail(candidate) {
       detailInputs.email.value = "";
       detailInputs.livesIn.value = "";
       detailInputs.earmarkedFor.value = "";
+      detailInputs.keepInMind.checked = false;
       detailInputs.tags.value = "";
       detailInputs.notes.value = "";
     }
@@ -1201,6 +1203,7 @@ function setDetail(candidate) {
     detailInputs.email.value = cleanText(candidate.email);
     detailInputs.livesIn.value = cleanText(candidate.livesIn);
     detailInputs.earmarkedFor.value = cleanText(candidate.earmarkedFor);
+    detailInputs.keepInMind.checked = candidate.keepInMind === true;
     detailInputs.tags.value = normalizeTagString(candidate.tags);
     detailInputs.notes.value = cleanText(candidate.notes);
   }
@@ -1770,6 +1773,7 @@ async function saveCandidateDetails() {
     email: cleanText(detailInputs.email?.value),
     livesIn: cleanText(detailInputs.livesIn?.value),
     earmarkedFor: cleanText(detailInputs.earmarkedFor?.value),
+    keepInMind: detailInputs.keepInMind?.checked === true,
     tags: normalizeTagString(detailInputs.tags?.value),
     notes: cleanText(detailInputs.notes?.value),
   };
@@ -1789,6 +1793,7 @@ async function saveCandidateDetails() {
       candidate.email = payload.email;
       candidate.livesIn = payload.livesIn;
       candidate.earmarkedFor = payload.earmarkedFor;
+      candidate.keepInMind = payload.keepInMind;
       candidate.tags = payload.tags;
       candidate.notes = payload.notes;
       setDetail(candidate);
