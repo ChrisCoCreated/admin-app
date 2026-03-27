@@ -1,7 +1,6 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
-const { patchSharePointUrlField } = require("../_lib/sharepoint-url-field");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -192,6 +191,7 @@ module.exports = async (req, res) => {
           Source: normalizeText(req.body?.source) || matched.source,
           Status: normalizeText(req.body?.status) || matched.status || "Initial Call",
           Notes: normalizeText(req.body?.notes) || matched.notes,
+          IndeedURL: indeedUrl || matched.indeedProfileUrl,
           Active: req.body?.active === undefined ? matched.active : toBoolean(req.body?.active),
         };
         const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(matched.id)}/fields`;
@@ -202,17 +202,6 @@ module.exports = async (req, res) => {
           },
           body: JSON.stringify(patchFields),
         });
-        await patchSharePointUrlField({
-          incomingToken: req.authUser?.graphAccessToken,
-          siteBaseUrl: `https://${config.hostName}${config.sitePath}`,
-          hostName: config.hostName,
-          listName: config.listName,
-          itemId: matched.id,
-          fieldInternalName: "IndeedURL",
-          urlValue: indeedUrl || matched.indeedProfileUrl,
-          description: "Indeed",
-        });
-
         const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
           matched.id
         )}?$expand=fields`;
@@ -236,6 +225,7 @@ module.exports = async (req, res) => {
       Source: normalizeText(req.body?.source),
       Status: normalizeText(req.body?.status) || "Initial Call",
       Notes: normalizeText(req.body?.notes),
+      IndeedURL: indeedUrl,
       Active: req.body?.active === undefined ? true : toBoolean(req.body?.active),
     };
 
@@ -251,19 +241,6 @@ module.exports = async (req, res) => {
     const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
       created?.id
     )}?$expand=fields`;
-    const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
-      created?.id
-    )}/fields`;
-    await patchSharePointUrlField({
-      incomingToken: req.authUser?.graphAccessToken,
-      siteBaseUrl: `https://${config.hostName}${config.sitePath}`,
-      hostName: config.hostName,
-      listName: config.listName,
-      itemId: created?.id,
-      fieldInternalName: "IndeedURL",
-      urlValue: indeedUrl,
-      description: "Indeed",
-    });
     const fullItem = await graphClient.fetchJson(itemUrl);
 
     res.setHeader("Cache-Control", "no-store");

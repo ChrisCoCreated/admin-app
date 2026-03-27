@@ -1,7 +1,6 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
-const { patchSharePointUrlField } = require("../_lib/sharepoint-url-field");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -195,6 +194,7 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
+    IndeedURL: normalizeText(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,
   };
@@ -253,32 +253,11 @@ module.exports = async (req, res) => {
         },
         body: JSON.stringify(buildPatchBody(req.body?.responses)),
       });
-      let indeedUrlWarning = "";
-      try {
-        await patchSharePointUrlField({
-          incomingToken: req.authUser?.graphAccessToken,
-          siteBaseUrl: `https://${config.hostName}${config.sitePath}`,
-          hostName: config.hostName,
-          listName: config.listName,
-          itemId,
-          fieldInternalName: "IndeedURL",
-          urlValue: req.body?.responses?.indeedUrl,
-          description: "Indeed",
-        });
-      } catch (error) {
-        indeedUrlWarning = error?.message || "Could not save Indeed URL.";
-        console.warn("[initial-screen] IndeedURL patch skipped after main save succeeded", {
-          itemId,
-          message: indeedUrlWarning,
-        });
-      }
-
       const updatedItem = mapInitialScreenItem(await graphClient.fetchJson(itemUrl));
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json({
         success: true,
         item: updatedItem,
-        warning: indeedUrlWarning,
       });
       return;
     }

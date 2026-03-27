@@ -1,7 +1,6 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
-const { patchSharePointUrlField } = require("../_lib/sharepoint-url-field");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -102,22 +101,13 @@ module.exports = async (req, res) => {
         Source: normalizeText(req.body?.source),
         PhoneNumber: normalizeText(req.body?.phoneNumber),
         Email: normalizeText(req.body?.email),
+        IndeedURL: normalizeText(req.body?.indeedUrl),
         LivesIn: normalizeText(req.body?.livesIn),
         EarmarkedFor: normalizeText(req.body?.earmarkedFor),
         KeepinMind: req.body?.keepInMind === true,
         Tags: normalizeText(req.body?.tags),
         Notes: normalizeText(req.body?.notes),
       }),
-    });
-    await patchSharePointUrlField({
-      incomingToken: req.authUser?.graphAccessToken,
-      siteBaseUrl: `https://${config.hostName}${config.sitePath}`,
-      hostName: config.hostName,
-      listName: config.listName,
-      itemId,
-      fieldInternalName: "IndeedURL",
-      urlValue: req.body?.indeedUrl,
-      description: "Indeed",
     });
 
     res.setHeader("Cache-Control", "no-store");
