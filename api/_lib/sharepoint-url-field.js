@@ -48,6 +48,46 @@ async function getOboToken(assertion, scope) {
   return payload.access_token;
 }
 
+async function getAppToken(scope) {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_API_CLIENT_ID;
+  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
+  }
+
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope,
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !payload?.access_token) {
+    const error = new Error(payload?.error_description || payload?.error || `Token request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload.access_token;
+}
+
 async function fetchSharePointJson(url, token, options = {}) {
   const response = await fetch(url, {
     method: options.method || "GET",
@@ -117,11 +157,8 @@ async function patchSharePointUrlField({
   description,
 }) {
   const scope = `https://${hostName}/.default`;
-  const token = await getOboToken(incomingToken, scope);
-  const digest = await getFormDigest(siteBaseUrl, token);
-  const listInfo = await resolveListInfo(siteBaseUrl, listName, token);
-  const payload = {
-    __metadata: { type: listInfo.entityTypeName },
+  const payloadFor = (entityTypeName) => ({
+    __metadata: { type: entityTypeName },
     [fieldInternalName]: normalizeText(urlValue)
       ? {
           __metadata: { type: "SP.FieldUrlValue" },
@@ -129,18 +166,53 @@ async function patchSharePointUrlField({
           Description: normalizeText(description) || normalizeText(urlValue),
         }
       : null,
+  });
+
+  const patchWithToken = async (token) => {
+    const digest = await getFormDigest(siteBaseUrl, token);
+    const listInfo = await resolveListInfo(siteBaseUrl, listName, token);
+    await fetchSharePointJson(`${siteBaseUrl}/_api/web/lists(guid'${listInfo.id}')/items(${encodeURIComponent(itemId)})`, token, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json;odata=verbose",
+        "X-RequestDigest": digest,
+        "IF-MATCH": "*",
+        "X-HTTP-Method": "MERGE",
+      },
+      body: JSON.stringify(payloadFor(listInfo.entityTypeName)),
+    });
   };
 
-  await fetchSharePointJson(`${siteBaseUrl}/_api/web/lists(guid'${listInfo.id}')/items(${encodeURIComponent(itemId)})`, token, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json;odata=verbose",
-      "X-RequestDigest": digest,
-      "IF-MATCH": "*",
-      "X-HTTP-Method": "MERGE",
-    },
-    body: JSON.stringify(payload),
-  });
+  let lastError = null;
+  try {
+    const appToken = await getAppToken(scope);
+    await patchWithToken(appToken);
+    return;
+  } catch (error) {
+    lastError = error;
+    console.warn("[sharepoint-url-field] App token patch failed", {
+      fieldInternalName,
+      itemId,
+      message: error?.message || String(error),
+    });
+  }
+
+  if (!incomingToken) {
+    throw lastError || new Error("No delegated token available for SharePoint URL patch.");
+  }
+
+  try {
+    const oboToken = await getOboToken(incomingToken, scope);
+    await patchWithToken(oboToken);
+    return;
+  } catch (error) {
+    console.warn("[sharepoint-url-field] OBO token patch failed", {
+      fieldInternalName,
+      itemId,
+      message: error?.message || String(error),
+    });
+    throw error;
+  }
 }
 
 module.exports = {
