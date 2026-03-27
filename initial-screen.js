@@ -61,6 +61,7 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 
 let currentItemId = "";
+let currentCandidateItem = null;
 let saveBusy = false;
 let copyFeedbackTimer = 0;
 let restoreDocumentTitle = document.title;
@@ -172,21 +173,62 @@ function getEmailDraftUrl(item) {
   const candidateName = cleanText(item?.candidateName) || "Candidate";
   const indeedUrl = getIndeedProfileUrl(item);
   const initialScreenUrl = window.location.href;
+  const form = readForm();
+  const counts = getScoreCounts();
   const subject = `Initial Screen: ${candidateName}`;
   const bodyLines = [
     `Hi Michalina,`,
     "",
     `Here is the initial screen for ${candidateName}:`,
     initialScreenUrl,
+    "",
+    `RAG scores:`,
+    `🟢 Green: ${counts.Green}`,
+    `🟠 Amber: ${counts.Amber}`,
+    `🔴 Red: ${counts.Red}`,
+    `⚪ Unscored: ${counts.Unscored}`,
+    form.screenOutcome ? "" : null,
+    form.screenOutcome ? `Outcome: ${cleanText(form.screenOutcome)}` : null,
+    form.initialCallSummary ? "" : null,
+    form.initialCallSummary ? `Summary:` : null,
+    form.initialCallSummary ? cleanText(form.initialCallSummary) : null,
+    form.screenNextSteps ? "" : null,
+    form.screenNextSteps ? `Next steps:` : null,
+    form.screenNextSteps ? cleanText(form.screenNextSteps) : null,
     indeedUrl ? "" : null,
     indeedUrl ? `Indeed profile:` : null,
     indeedUrl || null,
   ].filter((line) => line !== null);
-  const mailto = new URL("mailto:michalina@thrivehomecare.co.uk");
-  mailto.searchParams.set("cc", "Rebecca@planwithcare.co.uk");
-  mailto.searchParams.set("subject", subject);
-  mailto.searchParams.set("body", bodyLines.join("\n"));
-  return mailto.toString();
+  const params = [
+    `cc=${encodeURIComponent("Rebecca@planwithcare.co.uk")}`,
+    `subject=${encodeURIComponent(subject)}`,
+    `body=${encodeURIComponent(bodyLines.join("\n"))}`,
+  ].join("&");
+  return `mailto:michalina@thrivehomecare.co.uk?${params}`;
+}
+
+function refreshHeaderActionLinks() {
+  if (!currentCandidateItem) {
+    return;
+  }
+  const indeedUrl = getIndeedProfileUrl(currentCandidateItem);
+  const emailDraftUrl = getEmailDraftUrl(currentCandidateItem);
+  if (screenContactActions) {
+    const whatsappUrl = getWhatsAppUrl(currentCandidateItem?.phoneNumber, currentCandidateItem?.candidateName);
+    const teamsCallUrl = getTeamsCallUrl(currentCandidateItem?.phoneNumber);
+    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !indeedUrl;
+  }
+  if (screenIndeedLink) {
+    screenIndeedLink.href = indeedUrl || "#";
+    screenIndeedLink.hidden = !indeedUrl;
+  }
+  if (screenHeaderIndeedLink) {
+    screenHeaderIndeedLink.href = indeedUrl || "#";
+    screenHeaderIndeedLink.hidden = !indeedUrl;
+  }
+  if (screenEmailLink) {
+    screenEmailLink.href = emailDraftUrl || "#";
+  }
 }
 
 function getDraftStorageKey(itemId) {
@@ -403,6 +445,7 @@ function renderScoreSummary() {
   if (screenSummaryTitle) {
     screenSummaryTitle.textContent = `Intital Screen Summary: ${getCandidateName()}`;
   }
+  refreshHeaderActionLinks();
 }
 
 function buildCopySummaryText() {
@@ -541,6 +584,7 @@ async function copyScreenSummary() {
 }
 
 function renderCandidateHeader(item) {
+  currentCandidateItem = item || null;
   const candidateName = cleanText(item?.candidateName) || "Initial 10-Minute Call";
   const candidateFirstName = candidateName.split(/\s+/)[0] || "there";
   const phoneNumber = cleanText(item?.phoneNumber);
@@ -555,8 +599,6 @@ function renderCandidateHeader(item) {
   }
   const whatsappUrl = getWhatsAppUrl(item?.phoneNumber, item?.candidateName);
   const teamsCallUrl = getTeamsCallUrl(item?.phoneNumber);
-  const indeedUrl = getIndeedProfileUrl(item);
-  const emailDraftUrl = getEmailDraftUrl(item);
   screenCandidateName.textContent = candidateName;
   if (screenCandidateFirstName) {
     screenCandidateFirstName.textContent = candidateFirstName;
@@ -571,7 +613,7 @@ function renderCandidateHeader(item) {
   document.title = getCandidatePrintTitle();
   renderTagPreview(screenSummaryTags, item?.responses?.tags);
   if (screenContactActions) {
-    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !indeedUrl;
+    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !getIndeedProfileUrl(item);
   }
   if (screenWhatsAppLink) {
     screenWhatsAppLink.href = whatsappUrl || "#";
@@ -581,17 +623,7 @@ function renderCandidateHeader(item) {
     screenTeamsCallLink.href = teamsCallUrl || "#";
     screenTeamsCallLink.hidden = !teamsCallUrl;
   }
-  if (screenIndeedLink) {
-    screenIndeedLink.href = indeedUrl || "#";
-    screenIndeedLink.hidden = !indeedUrl;
-  }
-  if (screenHeaderIndeedLink) {
-    screenHeaderIndeedLink.href = indeedUrl || "#";
-    screenHeaderIndeedLink.hidden = !indeedUrl;
-  }
-  if (screenEmailLink) {
-    screenEmailLink.href = emailDraftUrl || "#";
-  }
+  refreshHeaderActionLinks();
 }
 
 async function loadInitialScreen() {
