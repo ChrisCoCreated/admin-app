@@ -124,7 +124,7 @@ function normalizeRecruitmentItem(item) {
     livesIn: normalizeText(fields.LivesIn),
     firstInterviewDate: normalizeText(fields._x0031_stInterviewDate),
     notes: normalizeText(fields.Notes),
-    indeedProfileUrl: extractIndeedProfileUrl(fields.Notes),
+    indeedProfileUrl: parseHyperlink(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
     source: normalizeText(fields.Source),
     earmarkedFor: normalizeText(fields.EarmarkedFor),
     oneTouchLink: parseHyperlink(fields.OnetouchLink),
@@ -135,7 +135,8 @@ function normalizeRecruitmentItem(item) {
 async function fetchRecruitmentItemsByPhone(graphClient, siteId, listId) {
   const params = new URLSearchParams({
     $top: "200",
-    $expand: "fields($select=Title,Email,PhoneNumber,LivesIn,Location,Source,Status,Notes,Active,InterviewBooked,InterviewWith,InterviewWithLookupId,KeepinMind,_x0031_stInterviewDate,EarmarkedFor,OnetouchLink,Created)",
+    $expand:
+      "fields($select=Title,Email,PhoneNumber,LivesIn,Location,Source,Status,Notes,IndeedURL,Active,InterviewBooked,InterviewWith,InterviewWithLookupId,KeepinMind,_x0031_stInterviewDate,EarmarkedFor,OnetouchLink,Created)",
   });
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
   const items = await graphClient.fetchAllPages(url);
@@ -158,6 +159,7 @@ module.exports = async (req, res) => {
   }
 
   const candidateName = normalizeText(req.body?.candidateName);
+  const indeedUrl = normalizeText(req.body?.indeedUrl);
   if (!candidateName) {
     res.status(400).json({
       error: {
@@ -189,6 +191,7 @@ module.exports = async (req, res) => {
           Source: normalizeText(req.body?.source) || matched.source,
           Status: normalizeText(req.body?.status) || matched.status || "Initial Call",
           Notes: normalizeText(req.body?.notes) || matched.notes,
+          IndeedURL: indeedUrl || matched.indeedProfileUrl,
           Active: req.body?.active === undefined ? matched.active : toBoolean(req.body?.active),
         };
         const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(matched.id)}/fields`;
@@ -223,6 +226,7 @@ module.exports = async (req, res) => {
       Source: normalizeText(req.body?.source),
       Status: normalizeText(req.body?.status) || "Initial Call",
       Notes: normalizeText(req.body?.notes),
+      IndeedURL: indeedUrl,
       Active: req.body?.active === undefined ? true : toBoolean(req.body?.active),
     };
 

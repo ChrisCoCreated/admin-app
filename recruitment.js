@@ -50,6 +50,7 @@ const addCandidatePhoneInput = document.getElementById("addCandidatePhoneInput")
 const addCandidateLivesInInput = document.getElementById("addCandidateLivesInInput");
 const addCandidateJobLocationInput = document.getElementById("addCandidateJobLocationInput");
 const addCandidateSourceInput = document.getElementById("addCandidateSourceInput");
+const addCandidateIndeedUrlInput = document.getElementById("addCandidateIndeedUrlInput");
 const addCandidateActiveInput = document.getElementById("addCandidateActiveInput");
 const addCandidateUpdateExistingInput = document.getElementById("addCandidateUpdateExistingInput");
 const addCandidateNotesInput = document.getElementById("addCandidateNotesInput");
@@ -93,6 +94,7 @@ const detailInputs = {
   source: document.getElementById("detailSourceInput"),
   phoneNumber: document.getElementById("detailPhoneInput"),
   email: document.getElementById("detailEmailInput"),
+  indeedUrl: document.getElementById("detailIndeedUrlInput"),
   livesIn: document.getElementById("detailLivesInInput"),
   earmarkedFor: document.getElementById("detailEarmarkedForInput"),
   keepInMind: document.getElementById("detailKeepInMindInput"),
@@ -297,6 +299,7 @@ function extractRecruitmentJsonCandidate(payload) {
     livesIn: cleanText(applicant?.location?.city),
     location: normalizeJsonJobLocation(job?.jobLocation),
     source: "Indeed - JSON upload",
+    indeedUrl: indeedProfileUrl,
     active: true,
     notes: notes.join("\n"),
   };
@@ -323,6 +326,9 @@ function applyRecruitmentJsonCandidate(prefill) {
   }
   if (addCandidateSourceInput) {
     addCandidateSourceInput.value = cleanText(prefill?.source);
+  }
+  if (addCandidateIndeedUrlInput) {
+    addCandidateIndeedUrlInput.value = cleanText(prefill?.indeedUrl);
   }
   if (addCandidateActiveInput) {
     addCandidateActiveInput.checked = prefill?.active !== false;
@@ -405,6 +411,7 @@ function setCreateCandidateBusy(disabled) {
     addCandidateLivesInInput,
     addCandidateJobLocationInput,
     addCandidateSourceInput,
+    addCandidateIndeedUrlInput,
     addCandidateActiveInput,
     addCandidateUpdateExistingInput,
     addCandidateNotesInput,
@@ -1183,6 +1190,7 @@ function setDetail(candidate) {
       detailInputs.source.value = "";
       detailInputs.phoneNumber.value = "";
       detailInputs.email.value = "";
+      detailInputs.indeedUrl.value = "";
       detailInputs.livesIn.value = "";
       detailInputs.earmarkedFor.value = "";
       detailInputs.keepInMind.checked = false;
@@ -1231,6 +1239,7 @@ function setDetail(candidate) {
     detailInputs.source.value = cleanText(candidate.source);
     detailInputs.phoneNumber.value = cleanText(candidate.phoneNumber);
     detailInputs.email.value = cleanText(candidate.email);
+    detailInputs.indeedUrl.value = cleanText(candidate.indeedProfileUrl);
     detailInputs.livesIn.value = cleanText(candidate.livesIn);
     detailInputs.earmarkedFor.value = cleanText(candidate.earmarkedFor);
     detailInputs.keepInMind.checked = candidate.keepInMind === true;
@@ -1807,6 +1816,7 @@ async function saveCandidateDetails() {
     source: cleanText(detailInputs.source?.value),
     phoneNumber: cleanText(detailInputs.phoneNumber?.value),
     email: cleanText(detailInputs.email?.value),
+    indeedUrl: cleanText(detailInputs.indeedUrl?.value),
     livesIn: cleanText(detailInputs.livesIn?.value),
     earmarkedFor: cleanText(detailInputs.earmarkedFor?.value),
     keepInMind: detailInputs.keepInMind?.checked === true,
@@ -1827,6 +1837,7 @@ async function saveCandidateDetails() {
       candidate.source = payload.source;
       candidate.phoneNumber = payload.phoneNumber;
       candidate.email = payload.email;
+      candidate.indeedProfileUrl = payload.indeedUrl;
       candidate.livesIn = payload.livesIn;
       candidate.earmarkedFor = payload.earmarkedFor;
       candidate.keepInMind = payload.keepInMind;
@@ -1914,6 +1925,7 @@ async function createRecruitmentCandidate() {
       livesIn: cleanText(addCandidateLivesInInput?.value),
       location: cleanText(addCandidateJobLocationInput?.value),
       source: cleanText(addCandidateSourceInput?.value),
+      indeedUrl: cleanText(addCandidateIndeedUrlInput?.value),
       active: addCandidateActiveInput?.checked !== false,
       updateExistingByPhone: addCandidateUpdateExistingInput?.checked === true,
       notes: cleanText(addCandidateNotesInput?.value),
@@ -2104,6 +2116,13 @@ detailInputs.tags?.addEventListener("input", () => {
 detailInputs.tags?.addEventListener("blur", () => {
   detailInputs.tags.value = normalizeTagString(detailInputs.tags.value);
   renderTagPreview(detailTagsPreview, detailInputs.tags.value);
+});
+detailInputs.indeedUrl?.addEventListener("input", () => {
+  setIndeedButton(detailInputs.indeedUrl.value);
+});
+detailInputs.indeedUrl?.addEventListener("blur", () => {
+  detailInputs.indeedUrl.value = cleanText(detailInputs.indeedUrl.value);
+  setIndeedButton(detailInputs.indeedUrl.value);
 });
 
 oneTouchPickerCancelBtn?.addEventListener("click", () => {

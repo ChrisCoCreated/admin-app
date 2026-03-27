@@ -101,6 +101,7 @@ module.exports = async (req, res) => {
         Source: normalizeText(req.body?.source),
         PhoneNumber: normalizeText(req.body?.phoneNumber),
         Email: normalizeText(req.body?.email),
+        IndeedURL: normalizeText(req.body?.indeedUrl),
         LivesIn: normalizeText(req.body?.livesIn),
         EarmarkedFor: normalizeText(req.body?.earmarkedFor),
         KeepinMind: req.body?.keepInMind === true,

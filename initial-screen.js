@@ -50,6 +50,7 @@ const fieldRefs = {
   initialCallSummary: document.getElementById("initialCallSummary"),
   screenOutcome: document.getElementById("screenOutcome"),
   screenNextSteps: document.getElementById("screenNextSteps"),
+  indeedUrl: document.getElementById("screenIndeedUrlInput"),
   tags: document.getElementById("screenTagsInput"),
   keepInMind: document.getElementById("screenKeepInMindInput"),
 };
@@ -171,7 +172,7 @@ function getIndeedProfileUrl(item) {
 
 function getEmailDraftUrl(item) {
   const candidateName = cleanText(item?.candidateName) || "Candidate";
-  const indeedUrl = getIndeedProfileUrl(item);
+  const indeedUrl = cleanText(fieldRefs.indeedUrl?.value) || getIndeedProfileUrl(item);
   const initialScreenUrl = window.location.href;
   const form = readForm();
   const counts = getScoreCounts();
@@ -211,7 +212,7 @@ function refreshHeaderActionLinks() {
   if (!currentCandidateItem) {
     return;
   }
-  const indeedUrl = getIndeedProfileUrl(currentCandidateItem);
+  const indeedUrl = cleanText(fieldRefs.indeedUrl?.value) || getIndeedProfileUrl(currentCandidateItem);
   const emailDraftUrl = getEmailDraftUrl(currentCandidateItem);
   if (screenContactActions) {
     const whatsappUrl = getWhatsAppUrl(currentCandidateItem?.phoneNumber, currentCandidateItem?.candidateName);
@@ -362,6 +363,7 @@ function fillForm(responses = {}) {
   fieldRefs.initialCallSummary.value = cleanText(responses.initialCallSummary);
   fieldRefs.screenOutcome.value = cleanText(responses.screenOutcome);
   fieldRefs.screenNextSteps.value = cleanText(responses.screenNextSteps);
+  fieldRefs.indeedUrl.value = cleanText(responses.indeedUrl);
   fieldRefs.tags.value = normalizeTagString(responses.tags);
   fieldRefs.keepInMind.checked = responses.keepInMind === true;
   syncScoreChipGroup("q1Score", fieldRefs.q1Score.value);
@@ -393,6 +395,7 @@ function readForm() {
     initialCallSummary: fieldRefs.initialCallSummary.value,
     screenOutcome: fieldRefs.screenOutcome.value,
     screenNextSteps: fieldRefs.screenNextSteps.value,
+    indeedUrl: cleanText(fieldRefs.indeedUrl.value),
     tags: normalizeTagString(fieldRefs.tags.value),
     keepInMind: fieldRefs.keepInMind.checked === true,
   };
@@ -613,7 +616,7 @@ function renderCandidateHeader(item) {
   document.title = getCandidatePrintTitle();
   renderTagPreview(screenSummaryTags, item?.responses?.tags);
   if (screenContactActions) {
-    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !getIndeedProfileUrl(item);
+    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !cleanText(item?.responses?.indeedUrl || item?.indeedProfileUrl);
   }
   if (screenWhatsAppLink) {
     screenWhatsAppLink.href = whatsappUrl || "#";
@@ -666,6 +669,9 @@ async function saveInitialScreen(event) {
       itemId: currentItemId,
       responses: readForm(),
     });
+    if (result?.item) {
+      renderCandidateHeader(result.item);
+    }
     fillForm(result?.item?.responses || {});
     clearLocalDraft(currentItemId);
     setStatus("Initial screening notes saved.");

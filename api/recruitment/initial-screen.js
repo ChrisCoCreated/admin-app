@@ -15,6 +15,7 @@ const SCREEN_FIELDS = [
   "Email",
   "Active",
   "Notes",
+  "IndeedURL",
   "Tags",
   "KeepinMind",
   "Q1_Notes_Availability",
@@ -78,6 +79,24 @@ function extractIndeedProfileUrl(notes) {
   return matched ? normalizeText(matched[1]) : "";
 }
 
+function parseHyperlink(value) {
+  if (value && typeof value === "object") {
+    const fromObject = normalizeText(value.Url || value.url || value.Description || value.description);
+    if (fromObject) {
+      return fromObject;
+    }
+  }
+  const text = normalizeText(value);
+  if (!text) {
+    return "";
+  }
+  const commaIndex = text.indexOf(",");
+  if (commaIndex <= 0) {
+    return text;
+  }
+  return text.slice(0, commaIndex).trim();
+}
+
 function parseSiteConfig() {
   const siteUrlValue = normalizeText(process.env.SHAREPOINT_RECRUITMENT_SITE_URL || DEFAULT_SITE_URL);
   const listName = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_NAME || DEFAULT_LIST_NAME);
@@ -129,7 +148,7 @@ function mapInitialScreenItem(item) {
     location: normalizeText(fields.Location),
     phoneNumber: normalizeText(fields.PhoneNumber),
     email: normalizeText(fields.Email),
-    indeedProfileUrl: extractIndeedProfileUrl(fields.Notes),
+    indeedProfileUrl: parseHyperlink(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
     active: toBoolean(fields.Active),
     responses: {
       q1NotesAvailability: normalizeText(fields.Q1_Notes_Availability),
@@ -149,6 +168,7 @@ function mapInitialScreenItem(item) {
       initialCallSummary: normalizeText(fields.InitialCallSummary),
       screenOutcome: normalizeText(fields.ScreenOutcome),
       screenNextSteps: normalizeText(fields.ScreenNextSteps),
+      indeedUrl: parseHyperlink(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
       tags: normalizeText(fields.Tags),
       keepInMind: toBoolean(fields.KeepinMind),
     },
@@ -174,6 +194,7 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
+    IndeedURL: normalizeText(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,
   };
