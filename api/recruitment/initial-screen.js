@@ -41,6 +41,39 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+async function patchIndeedUrlField(graphClient, url, indeedUrl) {
+  const link = normalizeText(indeedUrl);
+  const attempts = link
+    ? [
+        { label: "plain_url", body: { IndeedURL: link } },
+        { label: "url_plus_description", body: { IndeedURL: `${link}, Indeed` } },
+        { label: "url_object", body: { IndeedURL: { Url: link, Description: "Indeed" } } },
+      ]
+    : [{ label: "clear", body: { IndeedURL: "" } }];
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      await graphClient.fetchJson(url, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(attempt.body),
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn("[initial-screen] SharePoint IndeedURL patch attempt failed", {
+        attempt: attempt.label,
+        message: error?.message || String(error),
+      });
+    }
+  }
+
+  throw lastError || new Error("Could not patch SharePoint IndeedURL field.");
+}
+
 function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -194,7 +227,6 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
-    IndeedURL: normalizeText(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,
   };
@@ -253,6 +285,7 @@ module.exports = async (req, res) => {
         },
         body: JSON.stringify(buildPatchBody(req.body?.responses)),
       });
+      await patchIndeedUrlField(graphClient, patchUrl, req.body?.responses?.indeedUrl);
 
       const updatedItem = mapInitialScreenItem(await graphClient.fetchJson(itemUrl));
       res.setHeader("Cache-Control", "no-store");

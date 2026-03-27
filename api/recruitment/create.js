@@ -92,6 +92,39 @@ function parseHyperlink(value) {
   return text.slice(0, commaIndex).trim();
 }
 
+async function patchIndeedUrlField(graphClient, url, indeedUrl) {
+  const link = normalizeText(indeedUrl);
+  const attempts = link
+    ? [
+        { label: "plain_url", body: { IndeedURL: link } },
+        { label: "url_plus_description", body: { IndeedURL: `${link}, Indeed` } },
+        { label: "url_object", body: { IndeedURL: { Url: link, Description: "Indeed" } } },
+      ]
+    : [{ label: "clear", body: { IndeedURL: "" } }];
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      await graphClient.fetchJson(url, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(attempt.body),
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn("[recruitment-create] SharePoint IndeedURL patch attempt failed", {
+        attempt: attempt.label,
+        message: error?.message || String(error),
+      });
+    }
+  }
+
+  throw lastError || new Error("Could not patch SharePoint IndeedURL field.");
+}
+
 function extractIndeedProfileUrl(notes) {
   const text = normalizeText(notes);
   if (!text) {
@@ -191,7 +224,6 @@ module.exports = async (req, res) => {
           Source: normalizeText(req.body?.source) || matched.source,
           Status: normalizeText(req.body?.status) || matched.status || "Initial Call",
           Notes: normalizeText(req.body?.notes) || matched.notes,
-          IndeedURL: indeedUrl || matched.indeedProfileUrl,
           Active: req.body?.active === undefined ? matched.active : toBoolean(req.body?.active),
         };
         const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(matched.id)}/fields`;
@@ -202,6 +234,7 @@ module.exports = async (req, res) => {
           },
           body: JSON.stringify(patchFields),
         });
+        await patchIndeedUrlField(graphClient, patchUrl, indeedUrl || matched.indeedProfileUrl);
 
         const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
           matched.id
@@ -226,7 +259,6 @@ module.exports = async (req, res) => {
       Source: normalizeText(req.body?.source),
       Status: normalizeText(req.body?.status) || "Initial Call",
       Notes: normalizeText(req.body?.notes),
-      IndeedURL: indeedUrl,
       Active: req.body?.active === undefined ? true : toBoolean(req.body?.active),
     };
 
@@ -242,6 +274,10 @@ module.exports = async (req, res) => {
     const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
       created?.id
     )}?$expand=fields`;
+    const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
+      created?.id
+    )}/fields`;
+    await patchIndeedUrlField(graphClient, patchUrl, indeedUrl);
     const fullItem = await graphClient.fetchJson(itemUrl);
 
     res.setHeader("Cache-Control", "no-store");

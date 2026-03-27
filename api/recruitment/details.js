@@ -11,6 +11,39 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+async function patchIndeedUrlField(graphClient, url, indeedUrl) {
+  const link = normalizeText(indeedUrl);
+  const attempts = link
+    ? [
+        { label: "plain_url", body: { IndeedURL: link } },
+        { label: "url_plus_description", body: { IndeedURL: `${link}, Indeed` } },
+        { label: "url_object", body: { IndeedURL: { Url: link, Description: "Indeed" } } },
+      ]
+    : [{ label: "clear", body: { IndeedURL: "" } }];
+
+  let lastError = null;
+  for (const attempt of attempts) {
+    try {
+      await graphClient.fetchJson(url, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(attempt.body),
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      console.warn("[recruitment-details] SharePoint IndeedURL patch attempt failed", {
+        attempt: attempt.label,
+        message: error?.message || String(error),
+      });
+    }
+  }
+
+  throw lastError || new Error("Could not patch SharePoint IndeedURL field.");
+}
+
 function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -101,7 +134,6 @@ module.exports = async (req, res) => {
         Source: normalizeText(req.body?.source),
         PhoneNumber: normalizeText(req.body?.phoneNumber),
         Email: normalizeText(req.body?.email),
-        IndeedURL: normalizeText(req.body?.indeedUrl),
         LivesIn: normalizeText(req.body?.livesIn),
         EarmarkedFor: normalizeText(req.body?.earmarkedFor),
         KeepinMind: req.body?.keepInMind === true,
@@ -109,6 +141,7 @@ module.exports = async (req, res) => {
         Notes: normalizeText(req.body?.notes),
       }),
     });
+    await patchIndeedUrlField(graphClient, url, req.body?.indeedUrl);
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
