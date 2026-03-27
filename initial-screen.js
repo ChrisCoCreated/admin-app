@@ -5,6 +5,7 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260324";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const screenCandidateName = document.getElementById("screenCandidateName");
+const screenCandidateFirstName = document.getElementById("screenCandidateFirstName");
 const screenCandidateMeta = document.getElementById("screenCandidateMeta");
 const screenContactActions = document.getElementById("screenContactActions");
 const screenWhatsAppLink = document.getElementById("screenWhatsAppLink");
@@ -541,6 +542,7 @@ async function copyScreenSummary() {
 
 function renderCandidateHeader(item) {
   const candidateName = cleanText(item?.candidateName) || "Initial 10-Minute Call";
+  const candidateFirstName = candidateName.split(/\s+/)[0] || "there";
   const phoneNumber = cleanText(item?.phoneNumber);
   const email = cleanText(item?.email);
   const parts = [cleanText(item?.status), cleanText(item?.location), phoneNumber, email].filter(Boolean);
@@ -556,6 +558,9 @@ function renderCandidateHeader(item) {
   const indeedUrl = getIndeedProfileUrl(item);
   const emailDraftUrl = getEmailDraftUrl(item);
   screenCandidateName.textContent = candidateName;
+  if (screenCandidateFirstName) {
+    screenCandidateFirstName.textContent = candidateFirstName;
+  }
   screenCandidateMeta.textContent = parts.length ? parts.join(" • ") : "Recruitment screening";
   if (screenSummaryTitle) {
     screenSummaryTitle.textContent = `Intital Screen Summary: ${candidateName}`;
