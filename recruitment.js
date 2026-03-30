@@ -130,10 +130,17 @@ const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
 const STATUS_FILTER_DEFAULT = "__default__";
+const ONE_TOUCH_ELIGIBLE_STATUSES = new Set([
+  "2nd Interview",
+  "Exploring an offer",
+  "Make Offer",
+  "Offered",
+  "Accepted",
+  "Start Date Agreed",
+  "Started",
+]);
 const RECRUITMENT_STATUS_OPTIONS = [
-  "Rejected",
-  "RED FLAG (Rejected)",
-  "Keep in Mind",
+  "Organise Initial Call",
   "Initial Call",
   "1st Interview",
   "2nd Interview",
@@ -224,6 +231,10 @@ function syncAddRecruitmentButton() {
 
 function hasOneTouchLink(candidate) {
   return Boolean(cleanText(candidate?.oneTouchLink));
+}
+
+function canAddToOneTouch(candidate) {
+  return ONE_TOUCH_ELIGIBLE_STATUSES.has(cleanText(candidate?.status));
 }
 
 function getInitialScreenUrl(candidateId) {
@@ -1457,7 +1468,9 @@ function renderCandidates() {
                   rel="noopener noreferrer"
                   >Open in OneTouch</a
                 >`
-              : `<button type="button" class="secondary recruitment-add-btn"${addToOneTouchBusy ? " disabled" : ""}>Add to OneTouch</button>`
+              : canAddToOneTouch(candidate)
+                ? `<button type="button" class="secondary recruitment-add-btn"${addToOneTouchBusy ? " disabled" : ""}>Add to OneTouch</button>`
+                : ""
           }
         </div>
       </td>
