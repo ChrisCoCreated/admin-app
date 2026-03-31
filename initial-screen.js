@@ -14,6 +14,7 @@ const screenIndeedLink = document.getElementById("screenIndeedLink");
 const screenHeaderIndeedLink = document.getElementById("screenHeaderIndeedLink");
 const screenEmailLink = document.getElementById("screenEmailLink");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
+const screenSaveFeedback = document.getElementById("screenSaveFeedback");
 const initialScreenForm = document.getElementById("initialScreenForm");
 const savePdfBtn = document.getElementById("savePdfBtn");
 const savePdfBottomBtn = document.getElementById("savePdfBottomBtn");
@@ -282,11 +283,16 @@ function clearLocalDraft(itemId) {
 }
 
 function setStatus(message, isError = false) {
-  if (!screenStatusMessage) {
-    return;
+  const text = cleanText(message);
+  if (screenSaveFeedback && initialScreenForm && initialScreenForm.hidden === false) {
+    screenSaveFeedback.textContent = text;
+    screenSaveFeedback.classList.toggle("error", isError);
   }
-  screenStatusMessage.textContent = message;
-  screenStatusMessage.classList.toggle("error", isError);
+  if (screenStatusMessage) {
+    screenStatusMessage.textContent = text;
+    screenStatusMessage.classList.toggle("error", isError);
+    screenStatusMessage.hidden = Boolean(text) && initialScreenForm && initialScreenForm.hidden === false;
+  }
 }
 
 function redirectToUnauthorized(pageKey) {

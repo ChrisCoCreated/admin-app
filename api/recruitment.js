@@ -195,7 +195,7 @@ function normalizeRecruitmentItem(item) {
     livesIn: normalizeText(fields.LivesIn),
     firstInterviewDate: normalizeText(fields._x0031_stInterviewDate),
     notes: normalizeText(fields.Notes),
-    indeedProfileUrl: parseHyperlink(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
+    indeedProfileUrl: normalizeText(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
     tags: normalizeText(fields.Tags),
     source: normalizeText(fields.Source),
     earmarkedFor: normalizeText(fields.EarmarkedFor),
