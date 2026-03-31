@@ -952,6 +952,32 @@ dd {
   gap: 0.9rem 1.1rem;
 }
 
+.recruitment-modal-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+.recruitment-modal-section-head h4,
+.recruitment-detail-toolbar-copy h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1f2a3d;
+}
+
+.recruitment-modal-section-head .muted,
+.recruitment-detail-toolbar-copy .muted {
+  margin: 4px 0 0;
+}
+
+.recruitment-modal-section-head-spaced {
+  margin-top: 18px;
+}
+
 .recruitment-detail-list > div {
   min-width: 0;
 }
@@ -969,9 +995,11 @@ dd {
 }
 
 .recruitment-detail-edit-form {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e2e8f0;
+  margin-top: 0;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
 }
 
 .recruitment-detail-checkbox-field {
@@ -1001,6 +1029,43 @@ dd {
 
 .recruitment-screen-link:hover {
   background: #e5ebf5;
+}
+
+.recruitment-detail-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.recruitment-detail-toolbar-card {
+  padding: 16px 18px;
+  border: 1px solid #d9e2f0;
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.recruitment-detail-toolbar-card-accent {
+  background: linear-gradient(135deg, rgba(49, 183, 200, 0.12), rgba(191, 73, 163, 0.12));
+}
+
+.recruitment-detail-toolbar-actions {
+  align-items: end;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.recruitment-status-field {
+  flex: 1 1 240px;
+  margin: 0;
+}
+
+.recruitment-detail-link-row {
+  gap: 12px;
+}
+
+.recruitment-detail-link-row > a {
+  flex: 1 1 220px;
 }
 
 .recruitment-detail-trigger {

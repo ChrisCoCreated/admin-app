@@ -224,6 +224,12 @@
           </div>
           <button id="candidateDetailCloseBtn" type="button" class="secondary">Close</button>
         </div>
+        <div class="recruitment-modal-section-head">
+          <div>
+            <h4>Current Snapshot</h4>
+            <p class="muted">Quick view of the saved SharePoint record.</p>
+          </div>
+        </div>
         <dl id="candidateDetail" class="detail-list recruitment-detail-list">
           <div>
             <dt>Candidate</dt>
@@ -298,6 +304,12 @@
             <dd data-field="notes">-</dd>
           </div>
         </dl>
+        <div class="recruitment-modal-section-head recruitment-modal-section-head-spaced">
+          <div>
+            <h4>Edit Candidate Details</h4>
+            <p class="muted">Update email, phone, location, tags, Indeed URL, notes and other saved details.</p>
+          </div>
+        </div>
         <form id="candidateDetailEditForm" class="modal-form recruitment-detail-edit-form">
           <div class="mapping-form-grid">
             <label class="field" for="detailCandidateNameInput">
@@ -356,17 +368,39 @@
             <textarea id="detailNotesInput" placeholder="Capture any relevant context, availability or follow-up notes."></textarea>
           </label>
         </form>
-        <div class="row wrap-row">
-          <label class="field" for="statusUpdateSelect">
-            Change Status
-            <select id="statusUpdateSelect">
-              <option value="">Select status</option>
-            </select>
-          </label>
-          <button id="saveStatusBtn" type="button">Save Status</button>
-          <button id="saveDetailBtn" type="button" class="secondary">Save Details</button>
+        <div class="recruitment-detail-toolbar">
+          <div class="recruitment-detail-toolbar-card">
+            <div class="recruitment-detail-toolbar-copy">
+              <h4>Edit Status Only</h4>
+              <p class="muted">Use this when you only want to move the candidate to a new stage.</p>
+            </div>
+            <div class="row wrap-row recruitment-detail-toolbar-actions">
+              <label class="field recruitment-status-field" for="statusUpdateSelect">
+                Status
+                <select id="statusUpdateSelect">
+                  <option value="">Select status</option>
+                </select>
+              </label>
+              <button id="saveStatusBtn" type="button">Save Status Only</button>
+            </div>
+          </div>
+          <div class="recruitment-detail-toolbar-card recruitment-detail-toolbar-card-accent">
+            <div class="recruitment-detail-toolbar-copy">
+              <h4>Save All Details</h4>
+              <p class="muted">Save the full editable form above, including email, phone, tags and notes.</p>
+            </div>
+            <div class="row wrap-row recruitment-detail-toolbar-actions">
+              <button id="saveDetailBtn" type="button">Save All Details</button>
+            </div>
+          </div>
         </div>
-        <div class="row wrap-row">
+        <div class="recruitment-modal-section-head recruitment-modal-section-head-spaced">
+          <div>
+            <h4>External Links</h4>
+            <p class="muted">Open related candidate records and source links.</p>
+          </div>
+        </div>
+        <div class="row wrap-row recruitment-detail-link-row">
           <a id="openIndeedBtn" class="button-link" href="#" target="_blank" rel="noopener noreferrer">Open in Indeed</a>
           <a
             id="openOneTouchBtn"
