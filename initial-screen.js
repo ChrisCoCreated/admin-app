@@ -674,7 +674,11 @@ async function saveInitialScreen(event) {
     }
     fillForm(result?.item?.responses || {});
     clearLocalDraft(currentItemId);
-    setStatus("Initial screening notes saved.");
+    if (cleanText(result?.warning)) {
+      setStatus(`Initial screening notes saved. Indeed URL was not saved: ${cleanText(result.warning)}`, true);
+    } else {
+      setStatus("Initial screening notes saved.");
+    }
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not save initial screening notes.", true);

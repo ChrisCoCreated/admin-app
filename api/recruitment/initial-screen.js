@@ -194,7 +194,6 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
-    IndeedURL: normalizeText(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,
   };
@@ -253,11 +252,31 @@ module.exports = async (req, res) => {
         },
         body: JSON.stringify(buildPatchBody(req.body?.responses)),
       });
+      let warning = "";
+      try {
+        await graphClient.fetchJson(patchUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            IndeedURL: normalizeText(req.body?.responses?.indeedUrl),
+          }),
+        });
+      } catch (error) {
+        warning = error?.message || "Could not save Indeed URL.";
+        console.warn("[initial-screen] IndeedURL patch failed after main save succeeded", {
+          itemId,
+          indeedUrl: normalizeText(req.body?.responses?.indeedUrl),
+          message: warning,
+        });
+      }
       const updatedItem = mapInitialScreenItem(await graphClient.fetchJson(itemUrl));
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json({
         success: true,
         item: updatedItem,
+        warning,
       });
       return;
     }
