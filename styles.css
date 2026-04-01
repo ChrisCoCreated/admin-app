@@ -932,6 +932,60 @@ dd {
   gap: 8px;
 }
 
+.recruitment-stage-grid {
+  display: grid;
+  gap: 8px;
+  min-width: 250px;
+}
+
+.recruitment-stage-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.recruitment-stage-card-positive {
+  border-color: rgba(43, 142, 102, 0.22);
+  background: linear-gradient(135deg, rgba(230, 249, 238, 0.95), rgba(243, 252, 247, 0.98));
+}
+
+.recruitment-stage-card-pending {
+  border-color: rgba(196, 151, 58, 0.26);
+  background: linear-gradient(135deg, rgba(255, 247, 226, 0.96), rgba(255, 251, 241, 0.98));
+}
+
+.recruitment-stage-card-negative {
+  border-color: rgba(192, 88, 100, 0.22);
+  background: linear-gradient(135deg, rgba(255, 239, 241, 0.96), rgba(255, 247, 248, 0.98));
+}
+
+.recruitment-stage-label {
+  font-size: 0.71rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #587089;
+}
+
+.recruitment-stage-outcome {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1f2a3d;
+}
+
+.recruitment-stage-next {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #556579;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .recruitment-modal-panel {
   width: min(820px, 100%);
   max-height: min(88vh, 920px);

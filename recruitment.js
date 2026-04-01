@@ -161,6 +161,80 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+function getStageTone(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return "neutral";
+  }
+  if (
+    normalized.includes("reject") ||
+    normalized.includes("red") ||
+    normalized.includes("fail") ||
+    normalized.includes("no")
+  ) {
+    return "negative";
+  }
+  if (
+    normalized.includes("progress") ||
+    normalized.includes("accept") ||
+    normalized.includes("offer") ||
+    normalized.includes("start") ||
+    normalized.includes("pass") ||
+    normalized.includes("yes")
+  ) {
+    return "positive";
+  }
+  if (
+    normalized.includes("hold") ||
+    normalized.includes("pending") ||
+    normalized.includes("review") ||
+    normalized.includes("arrange") ||
+    normalized.includes("organise")
+  ) {
+    return "pending";
+  }
+  return "neutral";
+}
+
+function renderStageSummary(candidate) {
+  const stages = [
+    {
+      label: "Initial Screen",
+      outcome: cleanText(candidate?.screenOutcome),
+      nextSteps: cleanText(candidate?.screenNextSteps),
+    },
+    {
+      label: "1st Interview",
+      outcome: cleanText(candidate?.firstInterviewOutcome),
+      nextSteps: cleanText(candidate?.firstInterviewNextSteps),
+    },
+    {
+      label: "2nd Interview",
+      outcome: cleanText(candidate?.secondInterviewOutcome),
+      nextSteps: cleanText(candidate?.secondInterviewNextSteps),
+    },
+  ];
+
+  return `
+    <div class="recruitment-stage-grid">
+      ${stages
+        .map((stage) => {
+          const outcome = stage.outcome || "Not recorded";
+          const tone = getStageTone(stage.outcome);
+          const nextSteps = stage.nextSteps || "No notes yet";
+          return `
+            <div class="recruitment-stage-card recruitment-stage-card-${tone}">
+              <span class="recruitment-stage-label">${escapeHtml(stage.label)}</span>
+              <span class="recruitment-stage-outcome">${escapeHtml(outcome)}</span>
+              <span class="recruitment-stage-next">${escapeHtml(nextSteps)}</span>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -1426,7 +1500,7 @@ function renderCandidates() {
       <td>
         <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
       </td>
-      <td>${escapeHtml(cleanText(candidate.phoneNumber) || "-")}</td>
+      <td>${renderStageSummary(candidate)}</td>
       <td>
         <button
           type="button"
