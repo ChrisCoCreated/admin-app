@@ -459,6 +459,21 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async updateRecruitmentStage(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment/stage"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment stage update request failed");
+      }
+      return response.json();
+    },
+
     async getRecruitmentOneTouchOptions() {
       const response = await authFetch(endpoint("/api/recruitment/onetouch-options"), {
         scopes: FRONTEND_CONFIG.graphTaskScopes,

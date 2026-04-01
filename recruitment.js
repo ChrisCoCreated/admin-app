@@ -126,6 +126,8 @@ let statusQuickMenuCandidateId = "";
 let createCandidateBusy = false;
 let activeHideRefreshTimer = 0;
 let detailSaveBusy = false;
+let stageUpdateBusyKey = "";
+const openStageKeys = new Set();
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
@@ -199,16 +201,19 @@ function getStageTone(value) {
 function renderStageSummary(candidate) {
   const stages = [
     {
+      key: "initial_screen",
       label: "Initial Screen",
       outcome: cleanText(candidate?.screenOutcome),
       nextSteps: cleanText(candidate?.screenNextSteps),
     },
     {
+      key: "first_interview",
       label: "1st Interview",
       outcome: cleanText(candidate?.firstInterviewOutcome),
       nextSteps: cleanText(candidate?.firstInterviewNextSteps),
     },
     {
+      key: "second_interview",
       label: "2nd Interview",
       outcome: cleanText(candidate?.secondInterviewOutcome),
       nextSteps: cleanText(candidate?.secondInterviewNextSteps),
@@ -221,13 +226,43 @@ function renderStageSummary(candidate) {
         .map((stage) => {
           const outcome = stage.outcome || "Not recorded";
           const tone = getStageTone(stage.outcome);
-          const nextSteps = stage.nextSteps || "No notes yet";
+          const isEmpty = !stage.outcome && !stage.nextSteps;
+          const nextSteps = stage.nextSteps || "";
+          const busyKey = `${cleanText(candidate?.id)}:${stage.key}`;
+          const isBusy = stageUpdateBusyKey === busyKey;
+          const openKey = `${cleanText(candidate?.id)}:${stage.key}`;
           return `
-            <div class="recruitment-stage-card recruitment-stage-card-${tone}">
-              <span class="recruitment-stage-label">${escapeHtml(stage.label)}</span>
-              <span class="recruitment-stage-outcome">${escapeHtml(outcome)}</span>
-              <span class="recruitment-stage-next">${escapeHtml(nextSteps)}</span>
-            </div>
+            <details class="recruitment-stage-card recruitment-stage-card-${tone}${isEmpty ? " recruitment-stage-card-empty" : ""}" data-item-id="${escapeHtml(
+              cleanText(candidate?.id)
+            )}" data-stage-key="${escapeHtml(stage.key)}"${openStageKeys.has(openKey) ? " open" : ""}>
+              <summary class="recruitment-stage-summary">
+                <span class="recruitment-stage-summary-main">
+                  <span class="recruitment-stage-label">${escapeHtml(stage.label)}</span>
+                  <span class="recruitment-stage-outcome">${escapeHtml(outcome)}</span>
+                </span>
+                <span class="recruitment-stage-summary-meta">${isEmpty ? "Add" : nextSteps ? "Notes" : "View"}</span>
+              </summary>
+              <div class="recruitment-stage-editor" data-stage-editor>
+                <label class="field compact-field">
+                  Outcome
+                  <select data-stage-outcome>
+                    <option value="">Not recorded</option>
+                    <option value="Progress"${stage.outcome === "Progress" ? " selected" : ""}>Progress</option>
+                    <option value="Hold"${stage.outcome === "Hold" ? " selected" : ""}>Hold</option>
+                    <option value="Reject"${stage.outcome === "Reject" ? " selected" : ""}>Reject</option>
+                  </select>
+                </label>
+                <label class="field compact-field">
+                  Next Steps
+                  <textarea data-stage-next-steps placeholder="Add notes or next steps...">${escapeHtml(nextSteps)}</textarea>
+                </label>
+                <div class="recruitment-stage-editor-actions">
+                  <button type="button" class="secondary recruitment-stage-save-btn" data-stage-save${isBusy ? " disabled" : ""}>${
+                    isBusy ? "Saving..." : "Save"
+                  }</button>
+                </div>
+              </div>
+            </details>
           `;
         })
         .join("")}
@@ -277,6 +312,26 @@ function setStatus(message, isError = false) {
   }
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
+}
+
+function applyStageUpdateToCandidate(candidate, stageKey, outcome, nextSteps) {
+  if (!candidate) {
+    return;
+  }
+  if (stageKey === "initial_screen") {
+    candidate.screenOutcome = outcome;
+    candidate.screenNextSteps = nextSteps;
+    return;
+  }
+  if (stageKey === "first_interview") {
+    candidate.firstInterviewOutcome = outcome;
+    candidate.firstInterviewNextSteps = nextSteps;
+    return;
+  }
+  if (stageKey === "second_interview") {
+    candidate.secondInterviewOutcome = outcome;
+    candidate.secondInterviewNextSteps = nextSteps;
+  }
 }
 
 function setRecruitmentToolbarVisible(visible) {
@@ -1717,6 +1772,37 @@ async function previewImportRows(rows) {
   }
 }
 
+async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps) {
+  const cleanItemId = cleanText(itemId);
+  const cleanStageKey = cleanText(stageKey);
+  if (!cleanItemId || !cleanStageKey) {
+    return;
+  }
+  openStageKeys.add(`${cleanItemId}:${cleanStageKey}`);
+  stageUpdateBusyKey = `${cleanItemId}:${cleanStageKey}`;
+  renderCandidates();
+  try {
+    await directoryApi.updateRecruitmentStage({
+      itemId: cleanItemId,
+      stageKey: cleanStageKey,
+      outcome: cleanText(outcome),
+      nextSteps: cleanText(nextSteps),
+    });
+    const candidate = allCandidates.find((item) => cleanText(item.id) === cleanItemId);
+    applyStageUpdateToCandidate(candidate, cleanStageKey, cleanText(outcome), cleanText(nextSteps));
+    renderCandidates();
+    setStatus("Stage notes saved.");
+  } catch (error) {
+    console.error(error);
+    stageUpdateBusyKey = "";
+    renderCandidates();
+    setStatus(error?.message || "Could not save stage notes.", true);
+    return;
+  }
+  stageUpdateBusyKey = "";
+  renderCandidates();
+}
+
 async function handleCsvFile(file) {
   if (!file) {
     return;
@@ -2197,6 +2283,44 @@ candidateDetailEditForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   await saveCandidateDetails();
 });
+recruitmentTableBody?.addEventListener("click", async (event) => {
+  const saveButton = event.target instanceof Element ? event.target.closest("[data-stage-save]") : null;
+  if (saveButton) {
+    event.stopPropagation();
+    const card = saveButton.closest(".recruitment-stage-card");
+    if (!card) {
+      return;
+    }
+    const itemId = cleanText(card.getAttribute("data-item-id"));
+    const stageKey = cleanText(card.getAttribute("data-stage-key"));
+    const outcome = cleanText(card.querySelector("[data-stage-outcome]")?.value);
+    const nextSteps = cleanText(card.querySelector("[data-stage-next-steps]")?.value);
+    await saveRecruitmentStage(itemId, stageKey, outcome, nextSteps);
+    return;
+  }
+
+  const stageCard = event.target instanceof Element ? event.target.closest(".recruitment-stage-card") : null;
+  if (stageCard) {
+    event.stopPropagation();
+  }
+}, true);
+recruitmentTableBody?.addEventListener("toggle", (event) => {
+  const detailsEl = event.target instanceof Element ? event.target.closest(".recruitment-stage-card") : null;
+  if (!(detailsEl instanceof HTMLDetailsElement)) {
+    return;
+  }
+  const itemId = cleanText(detailsEl.getAttribute("data-item-id"));
+  const stageKey = cleanText(detailsEl.getAttribute("data-stage-key"));
+  if (!itemId || !stageKey) {
+    return;
+  }
+  const stateKey = `${itemId}:${stageKey}`;
+  if (detailsEl.open) {
+    openStageKeys.add(stateKey);
+  } else {
+    openStageKeys.delete(stateKey);
+  }
+}, true);
 detailInputs.tags?.addEventListener("input", () => {
   renderTagPreview(detailTagsPreview, detailInputs.tags.value);
 });

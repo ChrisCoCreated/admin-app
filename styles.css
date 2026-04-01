@@ -934,17 +934,20 @@ dd {
 
 .recruitment-stage-grid {
   display: grid;
-  gap: 8px;
-  min-width: 250px;
+  gap: 6px;
+  min-width: 220px;
 }
 
 .recruitment-stage-card {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
+  display: block;
+  padding: 0;
   border: 1px solid #dbe4ef;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #f8fbff;
+}
+
+.recruitment-stage-card[open] {
+  box-shadow: 0 8px 18px rgba(20, 45, 94, 0.08);
 }
 
 .recruitment-stage-card-positive {
@@ -971,19 +974,70 @@ dd {
 }
 
 .recruitment-stage-outcome {
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 800;
   color: #1f2a3d;
 }
 
-.recruitment-stage-next {
-  display: -webkit-box;
-  overflow: hidden;
-  color: #556579;
-  font-size: 0.8rem;
-  line-height: 1.4;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.recruitment-stage-card-empty {
+  border-color: #e8edf5;
+  background: #fbfcfe;
+}
+
+.recruitment-stage-card-empty .recruitment-stage-label,
+.recruitment-stage-card-empty .recruitment-stage-outcome,
+.recruitment-stage-card-empty .recruitment-stage-summary-meta {
+  color: #98a5b7;
+}
+
+.recruitment-stage-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.recruitment-stage-summary::-webkit-details-marker {
+  display: none;
+}
+
+.recruitment-stage-summary-main {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.recruitment-stage-summary-meta {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #6c7b8d;
+}
+
+.recruitment-stage-editor {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+  border-top: 1px solid rgba(205, 216, 231, 0.8);
+}
+
+.recruitment-stage-editor textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.recruitment-stage-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.recruitment-stage-save-btn {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
 }
 
 .recruitment-modal-panel {
