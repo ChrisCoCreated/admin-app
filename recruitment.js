@@ -130,6 +130,7 @@ let detailSaveBusy = false;
 let stageUpdateBusyKey = "";
 let statusFeedbackTimer = 0;
 let stageModeFilter = "all";
+let stageModeCountRenderToken = 0;
 const openStageKeys = new Set();
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
@@ -1608,7 +1609,6 @@ function renderFilterOptions() {
 function getFilteredCandidates() {
   const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
   const baseFiltered = getBaseFilteredCandidates();
-  updateStageModeFilterButtons(baseFiltered);
   const filtered = baseFiltered.filter((candidate) => candidateMatchesStageMode(candidate));
 
   filtered.sort((left, right) => {
@@ -1634,9 +1634,17 @@ function getFilteredCandidates() {
 }
 
 function renderCandidates() {
+  const renderToken = ++stageModeCountRenderToken;
   const filtered = getFilteredCandidates();
   recruitmentTableBody.innerHTML = "";
   closeStatusQuickMenu();
+
+  window.requestAnimationFrame(() => {
+    if (renderToken !== stageModeCountRenderToken) {
+      return;
+    }
+    updateStageModeFilterButtons(getBaseFilteredCandidates());
+  });
 
   if (!filtered.length) {
     emptyState.hidden = false;
