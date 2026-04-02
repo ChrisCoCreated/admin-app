@@ -127,6 +127,7 @@ let createCandidateBusy = false;
 let activeHideRefreshTimer = 0;
 let detailSaveBusy = false;
 let stageUpdateBusyKey = "";
+let statusFeedbackTimer = 0;
 const openStageKeys = new Set();
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
@@ -308,12 +309,26 @@ function renderTagPreview(node, tags, emptyLabel = "No tags yet") {
   node.innerHTML = list.map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("");
 }
 
-function setStatus(message, isError = false) {
+function setStatus(message, isError = false, options = {}) {
   if (!statusMessage) {
     return;
   }
-  statusMessage.textContent = message;
+  const text = cleanText(message);
+  const subtle = options.subtle === true && !isError;
+  const autoClear = options.autoClear !== false && !isError;
+  window.clearTimeout(statusFeedbackTimer);
+  statusMessage.textContent = isError && text ? `${text}${/try again\.?$/i.test(text) ? "" : " Try again."}` : text;
   statusMessage.classList.toggle("error", isError);
+  statusMessage.classList.toggle("status-subtle-success", subtle);
+  statusMessage.classList.toggle("status-prominent-error", isError);
+  statusMessage.hidden = !text;
+  if (autoClear && text) {
+    statusFeedbackTimer = window.setTimeout(() => {
+      statusMessage.textContent = "";
+      statusMessage.classList.remove("error", "status-subtle-success", "status-prominent-error");
+      statusMessage.hidden = true;
+    }, subtle ? 1400 : 2200);
+  }
 }
 
 function applyStageUpdateToCandidate(candidate, stageKey, outcome, nextSteps) {
@@ -1667,7 +1682,7 @@ function renderCandidates() {
         }
       } catch (error) {
         console.error(error);
-        setStatus(error?.message || "Could not update active status.", true);
+        setStatus(error?.message || "Could not update active status.", true, { autoClear: false });
       } finally {
         activeUpdateBusy = false;
         if (activeToggle && document.body.contains(activeToggle)) {
@@ -1780,6 +1795,18 @@ async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps) {
   if (!cleanItemId || !cleanStageKey) {
     return;
   }
+  const candidate = allCandidates.find((item) => cleanText(item.id) === cleanItemId);
+  const previousValues = candidate
+    ? {
+        screenOutcome: candidate.screenOutcome,
+        screenNextSteps: candidate.screenNextSteps,
+        firstInterviewOutcome: candidate.firstInterviewOutcome,
+        firstInterviewNextSteps: candidate.firstInterviewNextSteps,
+        secondInterviewOutcome: candidate.secondInterviewOutcome,
+        secondInterviewNextSteps: candidate.secondInterviewNextSteps,
+      }
+    : null;
+  applyStageUpdateToCandidate(candidate, cleanStageKey, cleanText(outcome), cleanText(nextSteps));
   openStageKeys.add(`${cleanItemId}:${cleanStageKey}`);
   stageUpdateBusyKey = `${cleanItemId}:${cleanStageKey}`;
   renderCandidates();
@@ -1790,15 +1817,16 @@ async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps) {
       outcome: cleanText(outcome),
       nextSteps: cleanText(nextSteps),
     });
-    const candidate = allCandidates.find((item) => cleanText(item.id) === cleanItemId);
-    applyStageUpdateToCandidate(candidate, cleanStageKey, cleanText(outcome), cleanText(nextSteps));
     renderCandidates();
-    setStatus("Stage notes saved.");
+    setStatus("Stage notes saved.", false, { subtle: true });
   } catch (error) {
     console.error(error);
+    if (candidate && previousValues) {
+      Object.assign(candidate, previousValues);
+    }
     stageUpdateBusyKey = "";
     renderCandidates();
-    setStatus(error?.message || "Could not save stage notes.", true);
+    setStatus(error?.message || "Could not save stage notes.", true, { autoClear: false });
     return;
   }
   stageUpdateBusyKey = "";
@@ -1898,7 +1926,6 @@ async function addCandidateToOneTouch(itemId) {
 
   setAddButtonsBusy(true);
   try {
-    setStatus("Adding candidate to OneTouch...");
     const result = await directoryApi.addRecruitmentCandidateToOneTouch({
       itemId: cleanItemId,
       area: selectedArea,
@@ -1919,11 +1946,11 @@ async function addCandidateToOneTouch(itemId) {
     }
     renderCandidates();
     closeOneTouchPicker();
-    setStatus(`Candidate added to OneTouch (ID: ${cleanText(result?.oneTouchId) || "-"})`);
+    setStatus(`Candidate added to OneTouch (ID: ${cleanText(result?.oneTouchId) || "-"})`, false, { subtle: true });
   } catch (error) {
     console.error(error);
     setOneTouchPickerError(error?.message || "Could not add candidate to OneTouch.");
-    setStatus(error?.message || "Could not add candidate to OneTouch.", true);
+    setStatus(error?.message || "Could not add candidate to OneTouch.", true, { autoClear: false });
   } finally {
     setAddButtonsBusy(false);
   }
@@ -1933,18 +1960,29 @@ async function updateCandidateStatusById(candidateId, selectedStatus) {
   const targetId = cleanText(candidateId);
   const nextStatus = cleanText(selectedStatus);
   if (!targetId || !nextStatus) {
-    setStatus("Select a status first.", true);
+    setStatus("Select a status first.", true, { autoClear: false });
     return false;
   }
-
-  await directoryApi.updateRecruitmentStatus({
-    itemId: targetId,
-    status: nextStatus,
-  });
-
   const candidate = allCandidates.find((item) => item.id === targetId);
+  const previousStatus = candidate ? cleanText(candidate.status) : "";
   if (candidate) {
     candidate.status = nextStatus;
+  }
+  renderFilterOptions();
+  renderCandidates();
+
+  try {
+    await directoryApi.updateRecruitmentStatus({
+      itemId: targetId,
+      status: nextStatus,
+    });
+  } catch (error) {
+    if (candidate) {
+      candidate.status = previousStatus;
+    }
+    renderFilterOptions();
+    renderCandidates();
+    throw error;
   }
 
   if (targetId === selectedCandidateId && statusUpdateSelect) {
@@ -1953,29 +1991,41 @@ async function updateCandidateStatusById(candidateId, selectedStatus) {
 
   renderFilterOptions();
   renderCandidates();
-  setStatus(`Status updated to ${nextStatus}.`);
+  setStatus(`Status updated to ${nextStatus}.`, false, { subtle: true });
   return true;
 }
 
 async function updateCandidateActiveById(candidateId, nextActive) {
   const targetId = cleanText(candidateId);
   if (!targetId || typeof nextActive !== "boolean") {
-    setStatus("Could not update active status.", true);
+    setStatus("Could not update active status.", true, { autoClear: false });
     return false;
   }
-
-  await directoryApi.updateRecruitmentActive({
-    itemId: targetId,
-    active: nextActive,
-  });
-
   const candidate = allCandidates.find((item) => item.id === targetId);
+  const previousActive = candidate?.active;
   if (candidate) {
     candidate.active = nextActive;
   }
+  renderFilterOptions();
+  renderCandidates();
+
+  try {
+    await directoryApi.updateRecruitmentActive({
+      itemId: targetId,
+      active: nextActive,
+    });
+  } catch (error) {
+    if (candidate) {
+      candidate.active = previousActive;
+    }
+    renderFilterOptions();
+    renderCandidates();
+    throw error;
+  }
 
   renderFilterOptions();
-  setStatus(`Candidate marked ${nextActive ? "active" : "inactive"}.`);
+  renderCandidates();
+  setStatus(`Candidate marked ${nextActive ? "active" : "inactive"}.`, false, { subtle: true });
   return true;
 }
 
@@ -2001,7 +2051,6 @@ async function saveCandidateDetails() {
 
   detailSaveBusy = true;
   setDetailFormEnabled(false);
-  setStatus("Saving candidate details...");
 
   try {
     await directoryApi.updateRecruitmentDetails(payload);
@@ -2022,10 +2071,10 @@ async function saveCandidateDetails() {
     }
     renderFilterOptions();
     renderCandidates();
-    setStatus("Candidate details saved.");
+    setStatus("Candidate details saved.", false, { subtle: true });
   } catch (error) {
     console.error(error);
-    setStatus(error?.message || "Could not save candidate details.", true);
+    setStatus(error?.message || "Could not save candidate details.", true, { autoClear: false });
   } finally {
     detailSaveBusy = false;
     setDetailFormEnabled(Boolean(selectedCandidateId));

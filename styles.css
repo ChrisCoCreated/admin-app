@@ -829,6 +829,34 @@ dd {
   color: var(--danger);
 }
 
+#statusMessage {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    opacity 160ms ease,
+    box-shadow 160ms ease;
+}
+
+#statusMessage.status-subtle-success {
+  color: #6e7f95;
+  opacity: 0.82;
+}
+
+#statusMessage.status-prominent-error {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid rgba(191, 70, 84, 0.22);
+  border-radius: 12px;
+  background: #fff3f4;
+  color: #a33345;
+  font-weight: 700;
+  box-shadow: 0 10px 18px rgba(163, 51, 69, 0.08);
+  opacity: 1;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;
