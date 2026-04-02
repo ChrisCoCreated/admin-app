@@ -144,7 +144,9 @@ const ONE_TOUCH_ELIGIBLE_STATUSES = new Set([
 const RECRUITMENT_STATUS_OPTIONS = [
   "Organise Initial Call",
   "Initial Call",
+  "Organise 1st Interview",
   "1st Interview",
+  "Organise 2nd Interview",
   "2nd Interview",
   "Exploring an offer",
   "Make Offer",
@@ -1553,22 +1555,22 @@ function renderCandidates() {
       <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
       <td>
-        <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
+        <div class="recruitment-status-cell">
+          <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
+          <button
+            type="button"
+            class="recruitment-active-toggle${candidate.active ? " is-active" : ""}"
+            aria-pressed="${candidate.active ? "true" : "false"}"
+            ${activeUpdateBusy ? " disabled" : ""}
+          >
+            <span class="recruitment-active-toggle-track">
+              <span class="recruitment-active-toggle-thumb"></span>
+            </span>
+            <span class="recruitment-active-toggle-label">${candidate.active ? "Active" : "Inactive"}</span>
+          </button>
+        </div>
       </td>
       <td>${renderStageSummary(candidate)}</td>
-      <td>
-        <button
-          type="button"
-          class="recruitment-active-toggle${candidate.active ? " is-active" : ""}"
-          aria-pressed="${candidate.active ? "true" : "false"}"
-          ${activeUpdateBusy ? " disabled" : ""}
-        >
-          <span class="recruitment-active-toggle-track">
-            <span class="recruitment-active-toggle-thumb"></span>
-          </span>
-          <span class="recruitment-active-toggle-label">${candidate.active ? "Active" : "Inactive"}</span>
-        </button>
-      </td>
       <td>
         <div class="recruitment-action-stack">
           <button type="button" class="secondary recruitment-screen-link recruitment-detail-trigger">View details</button>

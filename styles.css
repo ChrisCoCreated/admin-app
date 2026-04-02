@@ -1211,6 +1211,12 @@ dd {
   background: #e1e7ff;
 }
 
+.recruitment-status-cell {
+  display: grid;
+  gap: 8px;
+  min-width: 150px;
+}
+
 .recruitment-active-toggle {
   display: inline-flex;
   align-items: center;
