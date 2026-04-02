@@ -17,7 +17,6 @@ const screenStatusMessage = document.getElementById("screenStatusMessage");
 const screenSaveFeedback = document.getElementById("screenSaveFeedback");
 const initialScreenForm = document.getElementById("initialScreenForm");
 const savePdfBtn = document.getElementById("savePdfBtn");
-const savePdfBottomBtn = document.getElementById("savePdfBottomBtn");
 const saveInitialScreenBtn = document.getElementById("saveInitialScreenBtn");
 const copyScreenSummaryBtn = document.getElementById("copyScreenSummaryBtn");
 const scoreCountGreen = document.getElementById("scoreCountGreen");
@@ -308,9 +307,6 @@ function getItemIdFromUrl() {
 function setFormEnabled(enabled) {
   if (savePdfBtn) {
     savePdfBtn.disabled = !enabled || saveBusy;
-  }
-  if (savePdfBottomBtn) {
-    savePdfBottomBtn.disabled = !enabled || saveBusy;
   }
   if (saveInitialScreenBtn) {
     saveInitialScreenBtn.disabled = !enabled || saveBusy;
@@ -772,13 +768,6 @@ copyScreenSummaryBtn?.addEventListener("click", async () => {
 
 savePdfBtn?.addEventListener("click", () => {
   if (savePdfBtn.disabled) {
-    return;
-  }
-  saveScreenAsPdf();
-});
-
-savePdfBottomBtn?.addEventListener("click", () => {
-  if (savePdfBottomBtn.disabled) {
     return;
   }
   saveScreenAsPdf();
