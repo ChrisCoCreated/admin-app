@@ -189,7 +189,7 @@ function getEmailDraftUrl(item) {
   const counts = getScoreCounts();
   const subject = `Initial Screen: ${candidateName}`;
   const bodyLines = [
-    `Hi Michalina,`,
+    `Hi Miska,`,
     "",
     `Here is the initial screen for ${candidateName}:`,
     initialScreenUrl,
