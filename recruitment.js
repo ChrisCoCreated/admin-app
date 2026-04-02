@@ -185,12 +185,47 @@ function cleanText(value) {
 
 function setStageModeFilter(nextValue = "all") {
   const normalized = cleanText(nextValue);
-  stageModeFilter = ["all", "initial", "interviewing", "onboarding"].includes(normalized) ? normalized : "all";
+  stageModeFilter = ["all", "initial", "interviewing", "onboarding", "hold", "reject"].includes(normalized)
+    ? normalized
+    : "all";
   for (const button of stageModeFilterButtons) {
     const isActive = cleanText(button?.dataset?.stageModeFilter) === stageModeFilter;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", isActive ? "true" : "false");
   }
+}
+
+function getStageModeCount(mode, candidates) {
+  if (mode === "all") {
+    return Array.isArray(candidates) ? candidates.length : 0;
+  }
+  const previousMode = stageModeFilter;
+  stageModeFilter = mode;
+  const count = (Array.isArray(candidates) ? candidates : []).filter((candidate) => candidateMatchesStageMode(candidate)).length;
+  stageModeFilter = previousMode;
+  return count;
+}
+
+function updateStageModeFilterButtons(candidates) {
+  for (const button of stageModeFilterButtons) {
+    const mode = cleanText(button?.dataset?.stageModeFilter);
+    const baseLabel = cleanText(button?.dataset?.label || button?.textContent);
+    const count = getStageModeCount(mode, candidates);
+    button.dataset.label = baseLabel;
+    button.dataset.count = String(count);
+    button.textContent = `${baseLabel} ${count}`;
+    button.classList.toggle("has-items", count > 0);
+    button.classList.toggle("has-items-hold", mode === "hold" && count > 0);
+    button.classList.toggle("has-items-reject", mode === "reject" && count > 0);
+  }
+}
+
+function getCandidateProcessOutcomes(candidate) {
+  return [
+    cleanText(candidate?.screenOutcome),
+    cleanText(candidate?.firstInterviewOutcome),
+    cleanText(candidate?.secondInterviewOutcome),
+  ].filter(Boolean);
 }
 
 function candidateMatchesStageMode(candidate) {
@@ -204,7 +239,59 @@ function candidateMatchesStageMode(candidate) {
   if (stageModeFilter === "onboarding") {
     return ONBOARDING_STAGE_STATUSES.has(status);
   }
+  if (stageModeFilter === "hold") {
+    return getCandidateProcessOutcomes(candidate).some((outcome) => normalizeText(outcome) === "hold");
+  }
+  if (stageModeFilter === "reject") {
+    return getCandidateProcessOutcomes(candidate).some((outcome) => normalizeText(outcome) === "reject");
+  }
   return true;
+}
+
+function getBaseFilteredCandidates() {
+  const query = normalizeText(searchInput.value);
+  const selectedLocation = cleanText(locationFilterSelect.value || "all");
+  const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
+  const selectedSource = cleanText(sourceFilterSelect.value || "all");
+  const selectedActive = cleanText(activeFilterSelect?.value || "active");
+
+  return allCandidates.filter((candidate) => {
+    if (selectedActive === "active" && candidate.active !== true) {
+      return false;
+    }
+    if (selectedActive === "inactive" && candidate.active !== false) {
+      return false;
+    }
+    if (selectedLocation !== "all" && cleanText(candidate.location) !== selectedLocation) {
+      return false;
+    }
+    if (selectedStatus === STATUS_FILTER_DEFAULT && normalizeText(candidate.status) === "rejected") {
+      return false;
+    }
+    if (
+      selectedStatus !== "all" &&
+      selectedStatus !== STATUS_FILTER_DEFAULT &&
+      cleanText(candidate.status) !== selectedStatus
+    ) {
+      return false;
+    }
+    if (selectedSource !== "all" && cleanText(candidate.source) !== selectedSource) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
+    return (
+      normalizeText(candidate.candidateName).includes(query) ||
+      normalizeText(candidate.location).includes(query) ||
+      normalizeText(candidate.status).includes(query) ||
+      normalizeText(candidate.source).includes(query) ||
+      normalizeText(candidate.phoneNumber).includes(query) ||
+      normalizeText(candidate.livesIn).includes(query) ||
+      normalizeText(candidate.notes).includes(query) ||
+      normalizeText(candidate.tags).includes(query)
+    );
+  });
 }
 
 function getStageTone(value) {
@@ -1519,53 +1606,10 @@ function renderFilterOptions() {
 }
 
 function getFilteredCandidates() {
-  const query = normalizeText(searchInput.value);
-  const selectedLocation = cleanText(locationFilterSelect.value || "all");
-  const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
-  const selectedSource = cleanText(sourceFilterSelect.value || "all");
-  const selectedActive = cleanText(activeFilterSelect?.value || "active");
   const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
-
-  const filtered = allCandidates.filter((candidate) => {
-    if (!candidateMatchesStageMode(candidate)) {
-      return false;
-    }
-    if (selectedActive === "active" && candidate.active !== true) {
-      return false;
-    }
-    if (selectedActive === "inactive" && candidate.active !== false) {
-      return false;
-    }
-    if (selectedLocation !== "all" && cleanText(candidate.location) !== selectedLocation) {
-      return false;
-    }
-    if (selectedStatus === STATUS_FILTER_DEFAULT && normalizeText(candidate.status) === "rejected") {
-      return false;
-    }
-    if (
-      selectedStatus !== "all" &&
-      selectedStatus !== STATUS_FILTER_DEFAULT &&
-      cleanText(candidate.status) !== selectedStatus
-    ) {
-      return false;
-    }
-    if (selectedSource !== "all" && cleanText(candidate.source) !== selectedSource) {
-      return false;
-    }
-    if (!query) {
-      return true;
-    }
-    return (
-      normalizeText(candidate.candidateName).includes(query) ||
-      normalizeText(candidate.location).includes(query) ||
-      normalizeText(candidate.status).includes(query) ||
-      normalizeText(candidate.source).includes(query) ||
-      normalizeText(candidate.phoneNumber).includes(query) ||
-      normalizeText(candidate.livesIn).includes(query) ||
-      normalizeText(candidate.notes).includes(query) ||
-      normalizeText(candidate.tags).includes(query)
-    );
-  });
+  const baseFiltered = getBaseFilteredCandidates();
+  updateStageModeFilterButtons(baseFiltered);
+  const filtered = baseFiltered.filter((candidate) => candidateMatchesStageMode(candidate));
 
   filtered.sort((left, right) => {
     if (selectedSort === "updated_asc") {

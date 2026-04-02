@@ -1013,6 +1013,24 @@ dd {
   box-shadow: 0 10px 20px rgba(57, 86, 129, 0.08);
 }
 
+.recruitment-lane-filter.has-items:not(.is-active) {
+  border-color: rgba(49, 183, 200, 0.24);
+  background: linear-gradient(135deg, rgba(49, 183, 200, 0.12), rgba(191, 73, 163, 0.08));
+  color: #17324b;
+}
+
+.recruitment-lane-filter.has-items-hold:not(.is-active) {
+  border-color: rgba(196, 151, 58, 0.32);
+  background: linear-gradient(135deg, rgba(255, 245, 218, 0.94), rgba(255, 250, 237, 0.98));
+  color: #7d5a12;
+}
+
+.recruitment-lane-filter.has-items-reject:not(.is-active) {
+  border-color: rgba(192, 88, 100, 0.3);
+  background: linear-gradient(135deg, rgba(255, 237, 240, 0.96), rgba(255, 247, 248, 0.98));
+  color: #9b3344;
+}
+
 .recruitment-stage-grid {
   display: grid;
   gap: 6px;
