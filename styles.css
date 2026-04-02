@@ -960,6 +960,59 @@ dd {
   gap: 8px;
 }
 
+.recruitment-list-header {
+  align-items: center;
+  gap: 14px;
+}
+
+.recruitment-lane-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.recruitment-lane-filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid #d8e1ef;
+  border-radius: 999px;
+  background: #f6f8fc;
+  color: #4e617d;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.recruitment-lane-filter:hover {
+  border-color: #bbcade;
+  background: #edf3fb;
+  color: #21314d;
+  transform: translateY(-1px);
+}
+
+.recruitment-lane-filter:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(49, 183, 200, 0.18);
+}
+
+.recruitment-lane-filter.is-active {
+  border-color: rgba(49, 183, 200, 0.32);
+  background: linear-gradient(135deg, rgba(49, 183, 200, 0.16), rgba(191, 73, 163, 0.12));
+  color: #17324b;
+  box-shadow: 0 10px 20px rgba(57, 86, 129, 0.08);
+}
+
 .recruitment-stage-grid {
   display: grid;
   gap: 6px;
@@ -1297,9 +1350,11 @@ dd {
 .status-pill-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
   min-height: 32px;
-  padding: 5px 12px;
+  padding: 5px 14px;
   border: 1px solid #adc0da;
   border-radius: 999px;
   background: linear-gradient(180deg, #f8fbff 0%, #edf3fb 100%);
@@ -1317,6 +1372,7 @@ dd {
 
 .status-pill-trigger::after {
   content: "";
+  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border-right: 2px solid #425a7f;

@@ -9,6 +9,7 @@ const statusFilterSelect = document.getElementById("statusFilterSelect");
 const sourceFilterSelect = document.getElementById("sourceFilterSelect");
 const activeFilterSelect = document.getElementById("activeFilterSelect");
 const sortFilterSelect = document.getElementById("sortFilterSelect");
+const stageModeFilterButtons = Array.from(document.querySelectorAll("[data-stage-mode-filter]"));
 const recruitmentTableBody = document.getElementById("recruitmentTableBody");
 const emptyState = document.getElementById("emptyState");
 const statusMessage = document.getElementById("statusMessage");
@@ -128,6 +129,7 @@ let activeHideRefreshTimer = 0;
 let detailSaveBusy = false;
 let stageUpdateBusyKey = "";
 let statusFeedbackTimer = 0;
+let stageModeFilter = "all";
 const openStageKeys = new Set();
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
@@ -157,6 +159,21 @@ const RECRUITMENT_STATUS_OPTIONS = [
   "Started",
   "Lost",
 ];
+const INITIAL_STAGE_STATUSES = new Set(["Organise Initial Call", "Initial Call"]);
+const INTERVIEWING_STAGE_STATUSES = new Set([
+  "Organise 1st Interview",
+  "1st Interview",
+  "Organise 2nd Interview",
+  "2nd Interview",
+]);
+const ONBOARDING_STAGE_STATUSES = new Set([
+  "Exploring an offer",
+  "Make Offer",
+  "Offered",
+  "Accepted",
+  "Start Date Agreed",
+  "Started",
+]);
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -164,6 +181,30 @@ function normalizeText(value) {
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function setStageModeFilter(nextValue = "all") {
+  const normalized = cleanText(nextValue);
+  stageModeFilter = ["all", "initial", "interviewing", "onboarding"].includes(normalized) ? normalized : "all";
+  for (const button of stageModeFilterButtons) {
+    const isActive = cleanText(button?.dataset?.stageModeFilter) === stageModeFilter;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  }
+}
+
+function candidateMatchesStageMode(candidate) {
+  const status = cleanText(candidate?.status);
+  if (stageModeFilter === "initial") {
+    return INITIAL_STAGE_STATUSES.has(status);
+  }
+  if (stageModeFilter === "interviewing") {
+    return INTERVIEWING_STAGE_STATUSES.has(status);
+  }
+  if (stageModeFilter === "onboarding") {
+    return ONBOARDING_STAGE_STATUSES.has(status);
+  }
+  return true;
 }
 
 function getStageTone(value) {
@@ -450,7 +491,7 @@ function extractRecruitmentJsonCandidate(payload) {
 
   return {
     candidateName: cleanText(applicant?.fullName),
-    status: "Initial Call",
+    status: "Organise Initial Call",
     email: cleanText(applicant?.email),
     phoneNumber: cleanText(applicant?.phoneNumber),
     livesIn: cleanText(applicant?.location?.city),
@@ -467,7 +508,7 @@ function applyRecruitmentJsonCandidate(prefill) {
     addCandidateNameInput.value = cleanText(prefill?.candidateName);
   }
   if (addCandidateStatusSelect) {
-    addCandidateStatusSelect.value = cleanText(prefill?.status) || "Initial Call";
+    addCandidateStatusSelect.value = cleanText(prefill?.status) || "Organise Initial Call";
   }
   if (addCandidateEmailInput) {
     addCandidateEmailInput.value = cleanText(prefill?.email);
@@ -533,7 +574,7 @@ function setAddRecruitmentError(message = "") {
 function resetAddRecruitmentForm() {
   addRecruitmentForm?.reset();
   if (addCandidateStatusSelect) {
-    addCandidateStatusSelect.value = "Initial Call";
+    addCandidateStatusSelect.value = "Organise Initial Call";
   }
   if (addCandidateActiveInput) {
     addCandidateActiveInput.checked = true;
@@ -932,10 +973,10 @@ function normalizeImportStatus(statusValue, interestLevelValue) {
   const interest = cleanText(interestLevelValue);
   const merged = `${status} ${interest}`.trim().toLowerCase();
   if (!merged) {
-    return "Initial Call";
+    return "Organise Initial Call";
   }
   if (/\b(contacting|applied|application|new)\b/.test(merged)) {
-    return "Initial Call";
+    return "Organise Initial Call";
   }
   if (/\b(interview|screening|screen)\b/.test(merged)) {
     return "1st Interview";
@@ -952,7 +993,7 @@ function normalizeImportStatus(statusValue, interestLevelValue) {
   if (/\blost\b/.test(merged)) {
     return "Lost";
   }
-  return status || "Initial Call";
+  return status || "Organise Initial Call";
 }
 
 function getCsvValue(row, key) {
@@ -1486,6 +1527,9 @@ function getFilteredCandidates() {
   const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
 
   const filtered = allCandidates.filter((candidate) => {
+    if (!candidateMatchesStageMode(candidate)) {
+      return false;
+    }
     if (selectedActive === "active" && candidate.active !== true) {
       return false;
     }
@@ -2143,7 +2187,7 @@ async function createRecruitmentCandidate() {
   try {
     const result = await directoryApi.createRecruitmentCandidate({
       candidateName,
-      status: cleanText(addCandidateStatusSelect?.value) || "Initial Call",
+      status: cleanText(addCandidateStatusSelect?.value) || "Organise Initial Call",
       email: cleanText(addCandidateEmailInput?.value),
       phoneNumber: cleanText(addCandidatePhoneInput?.value),
       livesIn: cleanText(addCandidateLivesInInput?.value),
@@ -2212,6 +2256,12 @@ async function init() {
 searchInput?.addEventListener("input", renderCandidates);
 locationFilterSelect?.addEventListener("change", renderCandidates);
 statusFilterSelect?.addEventListener("change", renderCandidates);
+for (const button of stageModeFilterButtons) {
+  button.addEventListener("click", () => {
+    setStageModeFilter(button.dataset.stageModeFilter);
+    renderCandidates();
+  });
+}
 sourceFilterSelect?.addEventListener("change", renderCandidates);
 activeFilterSelect?.addEventListener("change", renderCandidates);
 sortFilterSelect?.addEventListener("change", renderCandidates);
@@ -2472,5 +2522,6 @@ signOutBtn?.addEventListener("click", async () => {
   }
 });
 
+setStageModeFilter("all");
 syncAddRecruitmentButton();
 void init();

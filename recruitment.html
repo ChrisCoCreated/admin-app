@@ -152,7 +152,15 @@
 
       <section class="clients-grid">
         <article class="panel list-panel">
-          <h2>Active Candidates</h2>
+          <div class="card-header-row recruitment-list-header">
+            <h2>Active Candidates</h2>
+            <div class="recruitment-lane-filters" role="group" aria-label="Candidate stage filters">
+              <button type="button" class="recruitment-lane-filter is-active" data-stage-mode-filter="all">All</button>
+              <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="initial">Initial</button>
+              <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="interviewing">Interviewing</button>
+              <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="onboarding">Onboarding</button>
+            </div>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
