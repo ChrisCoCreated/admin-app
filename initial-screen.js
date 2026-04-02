@@ -11,7 +11,6 @@ const screenContactActions = document.getElementById("screenContactActions");
 const screenWhatsAppLink = document.getElementById("screenWhatsAppLink");
 const screenTeamsCallLink = document.getElementById("screenTeamsCallLink");
 const screenIndeedLink = document.getElementById("screenIndeedLink");
-const screenHeaderIndeedLink = document.getElementById("screenHeaderIndeedLink");
 const screenEmailLink = document.getElementById("screenEmailLink");
 const screenStatusMessage = document.getElementById("screenStatusMessage");
 const screenSaveFeedback = document.getElementById("screenSaveFeedback");
@@ -170,6 +169,18 @@ function getIndeedProfileUrl(item) {
   return cleanText(item?.indeedProfileUrl);
 }
 
+function focusIndeedUrlInput() {
+  const indeedInput = fieldRefs.indeedUrl;
+  if (!indeedInput) {
+    return;
+  }
+  indeedInput.scrollIntoView({ behavior: "smooth", block: "center" });
+  window.setTimeout(() => {
+    indeedInput.focus({ preventScroll: true });
+    indeedInput.select?.();
+  }, 180);
+}
+
 function getEmailDraftUrl(item) {
   const candidateName = cleanText(item?.candidateName) || "Candidate";
   const indeedUrl = cleanText(fieldRefs.indeedUrl?.value) || getIndeedProfileUrl(item);
@@ -217,15 +228,18 @@ function refreshHeaderActionLinks() {
   if (screenContactActions) {
     const whatsappUrl = getWhatsAppUrl(currentCandidateItem?.phoneNumber, currentCandidateItem?.candidateName);
     const teamsCallUrl = getTeamsCallUrl(currentCandidateItem?.phoneNumber);
-    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !indeedUrl;
+    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !screenIndeedLink;
   }
   if (screenIndeedLink) {
     screenIndeedLink.href = indeedUrl || "#";
-    screenIndeedLink.hidden = !indeedUrl;
-  }
-  if (screenHeaderIndeedLink) {
-    screenHeaderIndeedLink.href = indeedUrl || "#";
-    screenHeaderIndeedLink.hidden = !indeedUrl;
+    screenIndeedLink.textContent = indeedUrl ? "Open in Indeed" : "Add Indeed URL";
+    screenIndeedLink.dataset.mode = indeedUrl ? "open" : "add";
+    screenIndeedLink.removeAttribute("target");
+    screenIndeedLink.removeAttribute("rel");
+    if (indeedUrl) {
+      screenIndeedLink.setAttribute("target", "_blank");
+      screenIndeedLink.setAttribute("rel", "noopener noreferrer");
+    }
   }
   if (screenEmailLink) {
     screenEmailLink.href = emailDraftUrl || "#";
@@ -618,7 +632,7 @@ function renderCandidateHeader(item) {
   document.title = getCandidatePrintTitle();
   renderTagPreview(screenSummaryTags, item?.responses?.tags);
   if (screenContactActions) {
-    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !cleanText(item?.responses?.indeedUrl || item?.indeedProfileUrl);
+    screenContactActions.hidden = !whatsappUrl && !teamsCallUrl && !screenIndeedLink;
   }
   if (screenWhatsAppLink) {
     screenWhatsAppLink.href = whatsappUrl || "#";
@@ -764,6 +778,15 @@ copyScreenSummaryBtn?.addEventListener("click", async () => {
     return;
   }
   await copyScreenSummary();
+});
+
+screenIndeedLink?.addEventListener("click", (event) => {
+  const indeedUrl = cleanText(fieldRefs.indeedUrl?.value) || getIndeedProfileUrl(currentCandidateItem);
+  if (indeedUrl) {
+    return;
+  }
+  event.preventDefault();
+  focusIndeedUrlInput();
 });
 
 savePdfBtn?.addEventListener("click", () => {
