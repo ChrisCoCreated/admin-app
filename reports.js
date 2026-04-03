@@ -11,6 +11,7 @@ const availabilityCapacityLink = document.getElementById("availabilityCapacityLi
 const areaCapacityLink = document.getElementById("areaCapacityLink");
 const clientHoursLink = document.getElementById("clientHoursLink");
 const carerHoursLink = document.getElementById("carerHoursLink");
+const associateHoursLink = document.getElementById("associateHoursLink");
 const financialAnalysisLink = document.getElementById("financialAnalysisLink");
 const dateRangeMessage = document.getElementById("dateRangeMessage");
 const wallchartQuickPicker = document.getElementById("wallchartQuickPicker");
@@ -236,6 +237,9 @@ function updateCapacityLinks() {
   }
   if (carerHoursLink) {
     carerHoursLink.href = buildCarerHoursUrl(start, end);
+  }
+  if (associateHoursLink) {
+    associateHoursLink.href = buildCarerHoursUrl(start, end);
   }
   if (financialAnalysisLink) {
     financialAnalysisLink.href = buildFinancialAnalysisUrl(start, end);
