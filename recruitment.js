@@ -2316,14 +2316,18 @@ function redirectToUnauthorized(pageKey) {
 async function loadRecruitmentCandidates() {
   const payload = await directoryApi.listRecruitment();
   allCandidates = Array.isArray(payload?.items) ? payload.items : [];
+  const recentOwnerSamples = [...allCandidates]
+    .sort((left, right) => toSortTimestamp(right?.updated) - toSortTimestamp(left?.updated))
+    .slice(0, 25);
   console.info("[recruitment-ui] Current owner samples", {
     totalItems: allCandidates.length,
-    sampleCount: Math.min(allCandidates.length, 25),
-    samples: allCandidates.slice(0, 25).map((candidate) => ({
+    sampleCount: recentOwnerSamples.length,
+    samples: recentOwnerSamples.map((candidate) => ({
       id: cleanText(candidate?.id),
       candidateName: cleanText(candidate?.candidateName),
       currentOwner: cleanText(candidate?.currentOwner),
       currentOwnerEmail: cleanText(candidate?.currentOwnerEmail),
+      updated: cleanText(candidate?.updated),
       status: cleanText(candidate?.status),
     })),
   });
