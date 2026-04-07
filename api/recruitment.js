@@ -9,6 +9,12 @@ const DEFAULT_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency/Lists/Associate%20Recruitment/Active.aspx?env=WebViewList";
 const ONETOUCH_CARER_PROFILE_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerSummaryProfile.php";
 const DEFAULT_EXTERNAL_ID_PREFIX = "thrive-recruitment";
+const CURRENT_OWNER_OPTIONS = [
+  { label: "Chris", email: "chris@planwithcare.co.uk" },
+  { label: "Rebecca", email: "rebecca@planwithcare.co.uk" },
+  { label: "Miśka", email: "michalina@thrivehomecare.co.uk" },
+  { label: "Peter", email: "peter@planwithcare.co.uk" },
+];
 
 const ALLOWED_ROLES = RECRUITMENT_ALLOWED_ROLES;
 
@@ -59,6 +65,42 @@ function quoteODataString(value) {
 
 function normalizeToken(value) {
   return normalizeText(value).replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeEmail(value) {
+  return normalizeText(value).toLowerCase();
+}
+
+function findCurrentOwnerOption(value) {
+  const normalized = normalizeEmail(value);
+  if (!normalized) {
+    return null;
+  }
+  return (
+    CURRENT_OWNER_OPTIONS.find(
+      (option) => normalized === option.email || normalized.includes(option.email) || normalized === option.label.toLowerCase()
+    ) || null
+  );
+}
+
+function extractEmail(value) {
+  const matched = String(value || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return matched ? normalizeEmail(matched[0]) : "";
+}
+
+function toFirstName(value) {
+  const text = normalizeText(value);
+  if (!text) {
+    return "";
+  }
+  const email = extractEmail(text);
+  if (email) {
+    const localPart = email.split("@")[0] || "";
+    const firstToken = localPart.split(/[._-]+/).find(Boolean) || localPart;
+    return firstToken ? firstToken.charAt(0).toUpperCase() + firstToken.slice(1) : "";
+  }
+  const firstWord = text.split(/\s+/).find(Boolean) || "";
+  return firstWord ? firstWord.charAt(0).toUpperCase() + firstWord.slice(1) : "";
 }
 
 async function resolveSiteId(graphClient, hostName, sitePath) {
@@ -180,6 +222,8 @@ function normalizeRecruitmentItem(item) {
   const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
   const active = toBoolean(fields.Active);
   const interviewWith = parsePersonField(fields.InterviewWith, fields.InterviewWithLookupId);
+  const currentOwnerRaw = parsePersonField(fields.CurrentOwner, fields.CurrentOwnerLookupId);
+  const currentOwnerOption = findCurrentOwnerOption(currentOwnerRaw);
 
   return {
     id: normalizeText(item?.id),
@@ -190,6 +234,8 @@ function normalizeRecruitmentItem(item) {
     interviewBooked: toBoolean(fields.InterviewBooked),
     interviewWith,
     status: normalizeText(fields.Status),
+    currentOwner: currentOwnerOption?.label || toFirstName(currentOwnerRaw),
+    currentOwnerEmail: currentOwnerOption?.email || extractEmail(currentOwnerRaw),
     active,
     keepInMind: toBoolean(fields.KeepinMind),
     livesIn: normalizeText(fields.LivesIn),
@@ -221,6 +267,8 @@ async function fetchRecruitmentItems(graphClient, siteId, listId) {
     "InterviewWith",
     "InterviewWithLookupId",
     "Status",
+    "CurrentOwner",
+    "CurrentOwnerLookupId",
     "Active",
     "KeepinMind",
     "LivesIn",
@@ -261,6 +309,8 @@ async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {
     "InterviewWith",
     "InterviewWithLookupId",
     "Status",
+    "CurrentOwner",
+    "CurrentOwnerLookupId",
     "Active",
     "KeepinMind",
     "LivesIn",

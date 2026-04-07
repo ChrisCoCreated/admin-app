@@ -459,6 +459,21 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async updateRecruitmentOwner(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment/owner"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment owner update request failed");
+      }
+      return response.json();
+    },
+
     async updateRecruitmentStage(payload = {}) {
       const response = await authFetch(endpoint("/api/recruitment/stage"), {
         method: "POST",

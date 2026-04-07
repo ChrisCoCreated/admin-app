@@ -1316,6 +1316,36 @@ dd {
   min-width: 150px;
 }
 
+.recruitment-owner-field {
+  display: grid;
+  gap: 5px;
+}
+
+.recruitment-owner-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7b93;
+}
+
+.recruitment-owner-select {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #d6dfec;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #21314d;
+  font: inherit;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.recruitment-owner-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .recruitment-active-toggle {
   display: inline-flex;
   align-items: center;

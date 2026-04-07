@@ -123,6 +123,7 @@ let oneTouchOptionsCache = null;
 let oneTouchPickerCandidateId = "";
 let statusUpdateBusy = false;
 let activeUpdateBusy = false;
+let ownerUpdateBusy = false;
 let statusQuickMenuCandidateId = "";
 let createCandidateBusy = false;
 let activeHideRefreshTimer = 0;
@@ -160,6 +161,12 @@ const RECRUITMENT_STATUS_OPTIONS = [
   "Started",
   "Lost",
 ];
+const RECRUITMENT_OWNER_OPTIONS = [
+  { label: "Chris", email: "chris@planwithcare.co.uk" },
+  { label: "Rebecca", email: "rebecca@planwithcare.co.uk" },
+  { label: "Miśka", email: "michalina@thrivehomecare.co.uk" },
+  { label: "Peter", email: "peter@planwithcare.co.uk" },
+];
 const INITIAL_STAGE_STATUSES = new Set(["Organise Initial Call", "Initial Call"]);
 const INTERVIEWING_STAGE_STATUSES = new Set([
   "Organise 1st Interview",
@@ -182,6 +189,16 @@ function normalizeText(value) {
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function normalizeEmail(value) {
+  return cleanText(value).toLowerCase();
+}
+
+function getCurrentOwnerLabel(candidate) {
+  const ownerEmail = normalizeEmail(candidate?.currentOwnerEmail);
+  const matched = RECRUITMENT_OWNER_OPTIONS.find((option) => option.email === ownerEmail);
+  return matched?.label || cleanText(candidate?.currentOwner) || "Unassigned";
 }
 
 function setStageModeFilter(nextValue = "all") {
@@ -1668,6 +1685,18 @@ function renderCandidates() {
       <td>
         <div class="recruitment-status-cell">
           <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
+          <label class="recruitment-owner-field">
+            <span class="recruitment-owner-label">Current owner</span>
+            <select class="recruitment-owner-select"${ownerUpdateBusy ? " disabled" : ""}>
+              <option value="">Unassigned</option>
+              ${RECRUITMENT_OWNER_OPTIONS.map(
+                (option) =>
+                  `<option value="${escapeHtml(option.email)}"${normalizeEmail(candidate.currentOwnerEmail) === option.email ? " selected" : ""}>${escapeHtml(
+                    option.label
+                  )}</option>`
+              ).join("")}
+            </select>
+          </label>
           <button
             type="button"
             class="recruitment-active-toggle${candidate.active ? " is-active" : ""}"
@@ -1750,6 +1779,35 @@ function renderCandidates() {
         return;
       }
       openStatusQuickMenu(candidate, statusTrigger);
+    });
+    const ownerSelect = tr.querySelector(".recruitment-owner-select");
+    ownerSelect?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    ownerSelect?.addEventListener("change", async (event) => {
+      event.stopPropagation();
+      if (ownerUpdateBusy) {
+        return;
+      }
+      const nextOwnerEmail = normalizeEmail(ownerSelect.value);
+      const previousOwnerEmail = normalizeEmail(candidate.currentOwnerEmail);
+      if (nextOwnerEmail === previousOwnerEmail) {
+        return;
+      }
+      ownerUpdateBusy = true;
+      ownerSelect.disabled = true;
+      try {
+        await updateCandidateOwnerById(candidate.id, nextOwnerEmail);
+      } catch (error) {
+        console.error(error);
+        ownerSelect.value = previousOwnerEmail;
+        setStatus(error?.message || "Could not update current owner.", true, { autoClear: false });
+      } finally {
+        ownerUpdateBusy = false;
+        if (ownerSelect && document.body.contains(ownerSelect)) {
+          ownerSelect.disabled = false;
+        }
+      }
     });
     const activeToggle = tr.querySelector(".recruitment-active-toggle");
     activeToggle?.addEventListener("click", async (event) => {
@@ -2122,6 +2180,45 @@ async function updateCandidateActiveById(candidateId, nextActive) {
   renderFilterOptions();
   renderCandidates();
   setStatus(`Candidate marked ${nextActive ? "active" : "inactive"}.`, false, { subtle: true });
+  return true;
+}
+
+async function updateCandidateOwnerById(candidateId, nextOwnerEmail) {
+  const targetId = cleanText(candidateId);
+  if (!targetId) {
+    setStatus("Could not update current owner.", true, { autoClear: false });
+    return false;
+  }
+
+  const candidate = allCandidates.find((item) => item.id === targetId);
+  const previousOwnerEmail = normalizeEmail(candidate?.currentOwnerEmail);
+  const previousOwner = cleanText(candidate?.currentOwner);
+  const nextOwner = RECRUITMENT_OWNER_OPTIONS.find((option) => option.email === normalizeEmail(nextOwnerEmail)) || null;
+  if (candidate) {
+    candidate.currentOwnerEmail = nextOwner?.email || "";
+    candidate.currentOwner = nextOwner?.label || "";
+  }
+  renderFilterOptions();
+  renderCandidates();
+
+  try {
+    await directoryApi.updateRecruitmentOwner({
+      itemId: targetId,
+      currentOwnerEmail: nextOwner?.email || "",
+    });
+  } catch (error) {
+    if (candidate) {
+      candidate.currentOwnerEmail = previousOwnerEmail;
+      candidate.currentOwner = previousOwner;
+    }
+    renderFilterOptions();
+    renderCandidates();
+    throw error;
+  }
+
+  renderFilterOptions();
+  renderCandidates();
+  setStatus(`Current owner updated to ${nextOwner?.label || "Unassigned"}.`, false, { subtle: true });
   return true;
 }
 
