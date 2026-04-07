@@ -5,10 +5,10 @@ const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
 const CURRENT_OWNER_OPTIONS = [
-  { label: "Chris", email: "chris@planwithcare.co.uk" },
-  { label: "Rebecca", email: "rebecca@planwithcare.co.uk" },
-  { label: "Miśka", email: "michalina@thrivehomecare.co.uk" },
-  { label: "Peter", email: "peter@planwithcare.co.uk" },
+  { label: "Chris" },
+  { label: "Rebecca" },
+  { label: "Miska" },
+  { label: "Peter" },
 ];
 
 const ALLOWED_ROLES = RECRUITMENT_ALLOWED_ROLES;
@@ -29,40 +29,12 @@ function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function normalizeEmail(value) {
-  return normalizeText(value).toLowerCase();
-}
-
 function findCurrentOwnerOption(value) {
-  const normalized = normalizeEmail(value);
+  const normalized = normalizeText(value).toLowerCase();
   if (!normalized) {
     return null;
   }
-  return (
-    CURRENT_OWNER_OPTIONS.find(
-      (option) => normalized === option.email || normalized.includes(option.email) || normalized === option.label.toLowerCase()
-    ) || null
-  );
-}
-
-function extractEmail(value) {
-  const matched = String(value || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  return matched ? normalizeEmail(matched[0]) : "";
-}
-
-function toFirstName(value) {
-  const text = normalizeText(value);
-  if (!text) {
-    return "";
-  }
-  const email = extractEmail(text);
-  if (email) {
-    const localPart = email.split("@")[0] || "";
-    const firstToken = localPart.split(/[._-]+/).find(Boolean) || localPart;
-    return firstToken ? firstToken.charAt(0).toUpperCase() + firstToken.slice(1) : "";
-  }
-  const firstWord = text.split(/\s+/).find(Boolean) || "";
-  return firstWord ? firstWord.charAt(0).toUpperCase() + firstWord.slice(1) : "";
+  return CURRENT_OWNER_OPTIONS.find((option) => normalized === option.label.toLowerCase()) || null;
 }
 
 function parseSiteConfig() {
@@ -151,7 +123,7 @@ function normalizeRecruitmentItem(item) {
   const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
   const active = toBoolean(fields.Active);
   const interviewWith = parsePersonField(fields.InterviewWith, fields.InterviewWithLookupId);
-  const currentOwnerRaw = parsePersonField(fields.CurrentOwner, fields.CurrentOwnerLookupId);
+  const currentOwnerRaw = normalizeText(fields.Current_x0020_Owner);
   const currentOwnerOption = findCurrentOwnerOption(currentOwnerRaw);
 
   return {
@@ -163,8 +135,7 @@ function normalizeRecruitmentItem(item) {
     interviewBooked: toBoolean(fields.InterviewBooked),
     interviewWith,
     status: normalizeText(fields.Status),
-    currentOwner: currentOwnerOption?.label || toFirstName(currentOwnerRaw),
-    currentOwnerEmail: currentOwnerOption?.email || extractEmail(currentOwnerRaw),
+    currentOwner: currentOwnerOption?.label || currentOwnerRaw,
     active,
     keepInMind: toBoolean(fields.KeepinMind),
     livesIn: normalizeText(fields.LivesIn),
@@ -182,7 +153,7 @@ async function fetchRecruitmentItemsByPhone(graphClient, siteId, listId) {
   const params = new URLSearchParams({
     $top: "200",
     $expand:
-      "fields($select=Title,Email,PhoneNumber,LivesIn,Location,Source,Status,CurrentOwner,CurrentOwnerLookupId,Notes,IndeedURL,Active,InterviewBooked,InterviewWith,InterviewWithLookupId,KeepinMind,_x0031_stInterviewDate,EarmarkedFor,OnetouchLink,Created)",
+      "fields($select=Title,Email,PhoneNumber,LivesIn,Location,Source,Status,Current_x0020_Owner,Notes,IndeedURL,Active,InterviewBooked,InterviewWith,InterviewWithLookupId,KeepinMind,_x0031_stInterviewDate,EarmarkedFor,OnetouchLink,Created)",
   });
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
   const items = await graphClient.fetchAllPages(url);

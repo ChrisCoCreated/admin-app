@@ -162,10 +162,10 @@ const RECRUITMENT_STATUS_OPTIONS = [
   "Lost",
 ];
 const RECRUITMENT_OWNER_OPTIONS = [
-  { label: "Chris", email: "chris@planwithcare.co.uk" },
-  { label: "Rebecca", email: "rebecca@planwithcare.co.uk" },
-  { label: "Miśka", email: "michalina@thrivehomecare.co.uk" },
-  { label: "Peter", email: "peter@planwithcare.co.uk" },
+  { label: "Chris" },
+  { label: "Rebecca" },
+  { label: "Miska" },
+  { label: "Peter" },
 ];
 const INITIAL_STAGE_STATUSES = new Set(["Organise Initial Call", "Initial Call"]);
 const INTERVIEWING_STAGE_STATUSES = new Set([
@@ -191,14 +191,10 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
-function normalizeEmail(value) {
-  return cleanText(value).toLowerCase();
-}
-
 function getCurrentOwnerLabel(candidate) {
-  const ownerEmail = normalizeEmail(candidate?.currentOwnerEmail);
-  const matched = RECRUITMENT_OWNER_OPTIONS.find((option) => option.email === ownerEmail);
-  return matched?.label || cleanText(candidate?.currentOwner) || "Unassigned";
+  const owner = cleanText(candidate?.currentOwner);
+  const matched = RECRUITMENT_OWNER_OPTIONS.find((option) => cleanText(option.label).toLowerCase() === owner.toLowerCase());
+  return matched?.label || owner || "Unassigned";
 }
 
 function setStageModeFilter(nextValue = "all") {
@@ -1691,7 +1687,7 @@ function renderCandidates() {
               <option value="">Unassigned</option>
               ${RECRUITMENT_OWNER_OPTIONS.map(
                 (option) =>
-                  `<option value="${escapeHtml(option.email)}"${normalizeEmail(candidate.currentOwnerEmail) === option.email ? " selected" : ""}>${escapeHtml(
+                  `<option value="${escapeHtml(option.label)}"${getCurrentOwnerLabel(candidate) === option.label ? " selected" : ""}>${escapeHtml(
                     option.label
                   )}</option>`
               ).join("")}
@@ -1789,18 +1785,18 @@ function renderCandidates() {
       if (ownerUpdateBusy) {
         return;
       }
-      const nextOwnerEmail = normalizeEmail(ownerSelect.value);
-      const previousOwnerEmail = normalizeEmail(candidate.currentOwnerEmail);
-      if (nextOwnerEmail === previousOwnerEmail) {
+      const nextOwner = cleanText(ownerSelect.value);
+      const previousOwner = cleanText(candidate.currentOwner);
+      if (nextOwner === previousOwner) {
         return;
       }
       ownerUpdateBusy = true;
       ownerSelect.disabled = true;
       try {
-        await updateCandidateOwnerById(candidate.id, nextOwnerEmail);
+        await updateCandidateOwnerById(candidate.id, nextOwner);
       } catch (error) {
         console.error(error);
-        ownerSelect.value = previousOwnerEmail;
+        ownerSelect.value = previousOwner;
         setStatus(error?.message || "Could not update current owner.", true, { autoClear: false });
       } finally {
         ownerUpdateBusy = false;
@@ -2192,11 +2188,9 @@ async function updateCandidateOwnerById(candidateId, nextOwnerEmail) {
   }
 
   const candidate = allCandidates.find((item) => item.id === targetId);
-  const previousOwnerEmail = normalizeEmail(candidate?.currentOwnerEmail);
   const previousOwner = cleanText(candidate?.currentOwner);
-  const nextOwner = RECRUITMENT_OWNER_OPTIONS.find((option) => option.email === normalizeEmail(nextOwnerEmail)) || null;
+  const nextOwner = RECRUITMENT_OWNER_OPTIONS.find((option) => cleanText(option.label) === cleanText(nextOwnerEmail)) || null;
   if (candidate) {
-    candidate.currentOwnerEmail = nextOwner?.email || "";
     candidate.currentOwner = nextOwner?.label || "";
   }
   renderFilterOptions();
@@ -2205,11 +2199,10 @@ async function updateCandidateOwnerById(candidateId, nextOwnerEmail) {
   try {
     await directoryApi.updateRecruitmentOwner({
       itemId: targetId,
-      currentOwnerEmail: nextOwner?.email || "",
+      currentOwner: nextOwner?.label || "",
     });
   } catch (error) {
     if (candidate) {
-      candidate.currentOwnerEmail = previousOwnerEmail;
       candidate.currentOwner = previousOwner;
     }
     renderFilterOptions();
@@ -2316,21 +2309,6 @@ function redirectToUnauthorized(pageKey) {
 async function loadRecruitmentCandidates() {
   const payload = await directoryApi.listRecruitment();
   allCandidates = Array.isArray(payload?.items) ? payload.items : [];
-  const recentOwnerSamples = [...allCandidates]
-    .sort((left, right) => toSortTimestamp(right?.updated) - toSortTimestamp(left?.updated))
-    .slice(0, 25);
-  console.info("[recruitment-ui] Current owner samples", {
-    totalItems: allCandidates.length,
-    sampleCount: recentOwnerSamples.length,
-    samples: recentOwnerSamples.map((candidate) => ({
-      id: cleanText(candidate?.id),
-      candidateName: cleanText(candidate?.candidateName),
-      currentOwner: cleanText(candidate?.currentOwner),
-      currentOwnerEmail: cleanText(candidate?.currentOwnerEmail),
-      updated: cleanText(candidate?.updated),
-      status: cleanText(candidate?.status),
-    })),
-  });
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
   }
