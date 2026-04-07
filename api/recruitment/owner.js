@@ -21,6 +21,26 @@ function normalizeEmail(value) {
   return normalizeText(value).toLowerCase();
 }
 
+function extractEmail(value) {
+  const matched = String(value || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return matched ? normalizeEmail(matched[0]) : "";
+}
+
+function inferOwnerEmail(value) {
+  const normalized = normalizeEmail(value);
+  if (!normalized) {
+    return "";
+  }
+  if (CURRENT_OWNER_OPTIONS.has(normalized)) {
+    return normalized;
+  }
+  const extracted = extractEmail(value);
+  if (CURRENT_OWNER_OPTIONS.has(extracted)) {
+    return extracted;
+  }
+  return "";
+}
+
 function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -67,6 +87,32 @@ async function resolveListId(graphClient, siteId, listName) {
   return String(list.id);
 }
 
+async function inferCurrentOwnerLookupId(graphClient, siteId, listId, ownerEmail) {
+  const normalizedOwnerEmail = normalizeEmail(ownerEmail);
+  if (!normalizedOwnerEmail) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    $top: "200",
+    $expand: "fields($select=CurrentOwner,CurrentOwnerLookupId)",
+  });
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
+  const payload = await graphClient.fetchJson(url);
+  const items = Array.isArray(payload?.value) ? payload.value : [];
+
+  for (const item of items) {
+    const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
+    const inferredEmail = inferOwnerEmail(fields.CurrentOwner);
+    const lookupId = Number(fields.CurrentOwnerLookupId);
+    if (inferredEmail === normalizedOwnerEmail && Number.isFinite(lookupId) && lookupId > 0) {
+      return lookupId;
+    }
+  }
+
+  return null;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({
@@ -109,15 +155,17 @@ module.exports = async (req, res) => {
     const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
     const listId = await resolveListId(graphClient, siteId, config.listName);
     const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
+    const lookupId = ownerEmail ? await inferCurrentOwnerLookupId(graphClient, siteId, listId, ownerEmail) : null;
+    const patchBody = lookupId
+      ? { CurrentOwnerLookupId: lookupId }
+      : { CurrentOwner: ownerEmail || "" };
 
     await graphClient.fetchJson(url, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        CurrentOwner: ownerEmail || "",
-      }),
+      body: JSON.stringify(patchBody),
     });
 
     res.setHeader("Cache-Control", "no-store");
@@ -125,6 +173,7 @@ module.exports = async (req, res) => {
       success: true,
       itemId,
       currentOwnerEmail: ownerEmail,
+      lookupId: lookupId || null,
     });
   } catch (error) {
     res.status(Number(error?.status) || 502).json({

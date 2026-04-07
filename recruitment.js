@@ -1687,7 +1687,7 @@ function renderCandidates() {
           <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
           <label class="recruitment-owner-field">
             <span class="recruitment-owner-label">Current owner</span>
-            <select class="recruitment-owner-select"${ownerUpdateBusy ? " disabled" : ""}>
+            <select class="recruitment-owner-select">
               <option value="">Unassigned</option>
               ${RECRUITMENT_OWNER_OPTIONS.map(
                 (option) =>
@@ -1807,6 +1807,7 @@ function renderCandidates() {
         if (ownerSelect && document.body.contains(ownerSelect)) {
           ownerSelect.disabled = false;
         }
+        renderCandidates();
       }
     });
     const activeToggle = tr.querySelector(".recruitment-active-toggle");
