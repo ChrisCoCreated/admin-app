@@ -4,7 +4,6 @@ const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
-const CURRENT_OWNER_OPTIONS = new Set(["Chris", "Rebecca", "Miska", "Peter"]);
 
 const ALLOWED_ROLES = RECRUITMENT_ALLOWED_ROLES;
 
@@ -58,6 +57,24 @@ async function resolveListId(graphClient, siteId, listName) {
   return String(list.id);
 }
 
+async function resolveCurrentOwnerChoices(graphClient, siteId, listId) {
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName,choice&$top=200`;
+  while (nextUrl) {
+    const payload = await graphClient.fetchJson(nextUrl);
+    const values = Array.isArray(payload?.value) ? payload.value : [];
+    for (const column of values) {
+      const internalName = normalizeText(column?.name);
+      const displayName = normalizeText(column?.displayName).toLowerCase();
+      if (internalName !== "Current_x0020_Owner" && displayName !== "current owner") {
+        continue;
+      }
+      return Array.isArray(column?.choice?.choices) ? column.choice.choices.map(normalizeText).filter(Boolean) : [];
+    }
+    nextUrl = String(payload?.["@odata.nextLink"] || "");
+  }
+  return [];
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({
@@ -84,21 +101,22 @@ module.exports = async (req, res) => {
     });
     return;
   }
-  if (currentOwner && !CURRENT_OWNER_OPTIONS.has(currentOwner)) {
-    res.status(400).json({
-      error: {
-        code: "BAD_REQUEST",
-        message: "Invalid current owner.",
-      },
-    });
-    return;
-  }
 
   try {
     const config = parseSiteConfig();
     const graphClient = createGraphDelegatedClient(req.authUser?.graphAccessToken);
     const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
     const listId = await resolveListId(graphClient, siteId, config.listName);
+    const currentOwnerChoices = await resolveCurrentOwnerChoices(graphClient, siteId, listId);
+    if (currentOwner && currentOwnerChoices.length && !currentOwnerChoices.includes(currentOwner)) {
+      res.status(400).json({
+        error: {
+          code: "BAD_REQUEST",
+          message: "Invalid current owner.",
+        },
+      });
+      return;
+    }
     const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
 
     await graphClient.fetchJson(url, {

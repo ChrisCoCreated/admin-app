@@ -9,12 +9,6 @@ const DEFAULT_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency/Lists/Associate%20Recruitment/Active.aspx?env=WebViewList";
 const ONETOUCH_CARER_PROFILE_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerSummaryProfile.php";
 const DEFAULT_EXTERNAL_ID_PREFIX = "thrive-recruitment";
-const CURRENT_OWNER_OPTIONS = [
-  { label: "Chris" },
-  { label: "Rebecca" },
-  { label: "Miska" },
-  { label: "Peter" },
-];
 
 const ALLOWED_ROLES = RECRUITMENT_ALLOWED_ROLES;
 
@@ -65,14 +59,6 @@ function quoteODataString(value) {
 
 function normalizeToken(value) {
   return normalizeText(value).replace(/[^a-z0-9]/g, "");
-}
-
-function findCurrentOwnerOption(value) {
-  const normalized = normalizeText(value).toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  return CURRENT_OWNER_OPTIONS.find((option) => normalized === option.label.toLowerCase()) || null;
 }
 
 async function resolveSiteId(graphClient, hostName, sitePath) {
@@ -128,6 +114,36 @@ async function resolveOneTouchLinkFieldName(graphClient, siteId, listId) {
   }
 
   return candidates[0] || "OnetouchLink";
+}
+
+async function resolveChoiceColumnOptions(graphClient, siteId, listId) {
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName,choice&$top=200`;
+  const options = {
+    status: [],
+    currentOwner: [],
+  };
+
+  while (nextUrl) {
+    const payload = await graphClient.fetchJson(nextUrl);
+    const values = Array.isArray(payload?.value) ? payload.value : [];
+    for (const column of values) {
+      const internalName = normalizeText(column?.name);
+      const displayName = normalizeText(column?.displayName).toLowerCase();
+      const choices = Array.isArray(column?.choice?.choices) ? column.choice.choices.map(normalizeText).filter(Boolean) : [];
+      if (!choices.length) {
+        continue;
+      }
+      if (internalName === "Status" || displayName === "status") {
+        options.status = choices;
+      }
+      if (internalName === "Current_x0020_Owner" || displayName === "current owner") {
+        options.currentOwner = choices;
+      }
+    }
+    nextUrl = String(payload?.["@odata.nextLink"] || "");
+  }
+
+  return options;
 }
 
 function parsePersonField(value, lookupIdValue) {
@@ -195,7 +211,6 @@ function normalizeRecruitmentItem(item) {
   const active = toBoolean(fields.Active);
   const interviewWith = parsePersonField(fields.InterviewWith, fields.InterviewWithLookupId);
   const currentOwnerRaw = normalizeText(fields.Current_x0020_Owner);
-  const currentOwnerOption = findCurrentOwnerOption(currentOwnerRaw);
 
   return {
     id: normalizeText(item?.id),
@@ -206,7 +221,7 @@ function normalizeRecruitmentItem(item) {
     interviewBooked: toBoolean(fields.InterviewBooked),
     interviewWith,
     status: normalizeText(fields.Status),
-    currentOwner: currentOwnerOption?.label || currentOwnerRaw,
+    currentOwner: currentOwnerRaw,
     active,
     keepInMind: toBoolean(fields.KeepinMind),
     livesIn: normalizeText(fields.LivesIn),
@@ -458,11 +473,13 @@ module.exports = async (req, res) => {
     }
 
     const items = await fetchRecruitmentItems(graphClient, siteId, list.id);
+    const choiceOptions = await resolveChoiceColumnOptions(graphClient, siteId, list.id);
 
     res.setHeader("Cache-Control", "private, max-age=30");
     res.status(200).json({
       listUrl: list.webUrl || config.listWebUrl,
       count: items.length,
+      choiceOptions,
       items,
     });
   } catch (error) {

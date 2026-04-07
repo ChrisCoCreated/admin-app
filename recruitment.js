@@ -132,6 +132,8 @@ let stageUpdateBusyKey = "";
 let statusFeedbackTimer = 0;
 let stageModeFilter = "all";
 let stageModeCountRenderToken = 0;
+let recruitmentStatusOptions = [];
+let recruitmentOwnerOptions = [];
 const openStageKeys = new Set();
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
@@ -146,7 +148,7 @@ const ONE_TOUCH_ELIGIBLE_STATUSES = new Set([
   "Start Date Agreed",
   "Started",
 ]);
-const RECRUITMENT_STATUS_OPTIONS = [
+const DEFAULT_RECRUITMENT_STATUS_OPTIONS = [
   "Organise Initial Call",
   "Initial Call",
   "Organise 1st Interview",
@@ -161,12 +163,14 @@ const RECRUITMENT_STATUS_OPTIONS = [
   "Started",
   "Lost",
 ];
-const RECRUITMENT_OWNER_OPTIONS = [
+const DEFAULT_RECRUITMENT_OWNER_OPTIONS = [
   { label: "Chris" },
   { label: "Rebecca" },
   { label: "Miska" },
   { label: "Peter" },
 ];
+recruitmentStatusOptions = [...DEFAULT_RECRUITMENT_STATUS_OPTIONS];
+recruitmentOwnerOptions = [...DEFAULT_RECRUITMENT_OWNER_OPTIONS];
 const INITIAL_STAGE_STATUSES = new Set(["Organise Initial Call", "Initial Call"]);
 const INTERVIEWING_STAGE_STATUSES = new Set([
   "Organise 1st Interview",
@@ -191,9 +195,20 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+function normalizeStatusOptions(options) {
+  const list = Array.isArray(options) ? options.map(cleanText).filter(Boolean) : [];
+  return list.length ? Array.from(new Set(list)) : [...DEFAULT_RECRUITMENT_STATUS_OPTIONS];
+}
+
+function normalizeOwnerOptions(options) {
+  const list = Array.isArray(options) ? options.map(cleanText).filter(Boolean) : [];
+  const labels = list.length ? Array.from(new Set(list)) : DEFAULT_RECRUITMENT_OWNER_OPTIONS.map((option) => option.label);
+  return labels.map((label) => ({ label }));
+}
+
 function getCurrentOwnerLabel(candidate) {
   const owner = cleanText(candidate?.currentOwner);
-  const matched = RECRUITMENT_OWNER_OPTIONS.find((option) => cleanText(option.label).toLowerCase() === owner.toLowerCase());
+  const matched = recruitmentOwnerOptions.find((option) => cleanText(option.label).toLowerCase() === owner.toLowerCase());
   return matched?.label || owner || "Unassigned";
 }
 
@@ -672,11 +687,27 @@ function setAddRecruitmentError(message = "") {
   addRecruitmentError.textContent = text;
 }
 
+function renderAddRecruitmentStatusOptions() {
+  if (!addCandidateStatusSelect) {
+    return;
+  }
+  const current = cleanText(addCandidateStatusSelect.value);
+  addCandidateStatusSelect.innerHTML = "";
+  for (const status of recruitmentStatusOptions) {
+    const option = document.createElement("option");
+    option.value = status;
+    option.textContent = status;
+    addCandidateStatusSelect.appendChild(option);
+  }
+  const fallback = recruitmentStatusOptions.includes("Organise Initial Call")
+    ? "Organise Initial Call"
+    : recruitmentStatusOptions[0] || "";
+  addCandidateStatusSelect.value = recruitmentStatusOptions.includes(current) ? current : fallback;
+}
+
 function resetAddRecruitmentForm() {
   addRecruitmentForm?.reset();
-  if (addCandidateStatusSelect) {
-    addCandidateStatusSelect.value = "Organise Initial Call";
-  }
+  renderAddRecruitmentStatusOptions();
   if (addCandidateActiveInput) {
     addCandidateActiveInput.checked = true;
   }
@@ -1369,13 +1400,13 @@ function renderStatusUpdateOptions() {
   }
   const current = cleanText(statusUpdateSelect.value);
   statusUpdateSelect.innerHTML = '<option value="">Select status</option>';
-  for (const status of RECRUITMENT_STATUS_OPTIONS) {
+  for (const status of recruitmentStatusOptions) {
     const option = document.createElement("option");
     option.value = status;
     option.textContent = status;
     statusUpdateSelect.appendChild(option);
   }
-  statusUpdateSelect.value = RECRUITMENT_STATUS_OPTIONS.includes(current) ? current : "";
+  statusUpdateSelect.value = recruitmentStatusOptions.includes(current) ? current : "";
 }
 
 function closeStatusQuickMenu() {
@@ -1401,7 +1432,7 @@ function openStatusQuickMenu(candidate, anchorEl) {
 
   statusQuickMenuCandidateId = candidateId;
   const currentStatus = cleanText(candidate.status);
-  const optionsHtml = RECRUITMENT_STATUS_OPTIONS.map((status) => {
+  const optionsHtml = recruitmentStatusOptions.map((status) => {
     const activeClass = currentStatus === status ? " is-active" : "";
     return `<button type="button" class="status-quick-option${activeClass}" data-status="${escapeHtml(status)}">${escapeHtml(status)}</button>`;
   }).join("");
@@ -1685,7 +1716,7 @@ function renderCandidates() {
             <span class="recruitment-owner-label">Current owner</span>
             <select class="recruitment-owner-select">
               <option value="">Unassigned</option>
-              ${RECRUITMENT_OWNER_OPTIONS.map(
+              ${recruitmentOwnerOptions.map(
                 (option) =>
                   `<option value="${escapeHtml(option.label)}"${getCurrentOwnerLabel(candidate) === option.label ? " selected" : ""}>${escapeHtml(
                     option.label
@@ -2189,7 +2220,7 @@ async function updateCandidateOwnerById(candidateId, nextOwnerEmail) {
 
   const candidate = allCandidates.find((item) => item.id === targetId);
   const previousOwner = cleanText(candidate?.currentOwner);
-  const nextOwner = RECRUITMENT_OWNER_OPTIONS.find((option) => cleanText(option.label) === cleanText(nextOwnerEmail)) || null;
+  const nextOwner = recruitmentOwnerOptions.find((option) => cleanText(option.label) === cleanText(nextOwnerEmail)) || null;
   if (candidate) {
     candidate.currentOwner = nextOwner?.label || "";
   }
@@ -2309,6 +2340,9 @@ function redirectToUnauthorized(pageKey) {
 async function loadRecruitmentCandidates() {
   const payload = await directoryApi.listRecruitment();
   allCandidates = Array.isArray(payload?.items) ? payload.items : [];
+  recruitmentStatusOptions = normalizeStatusOptions(payload?.choiceOptions?.status);
+  recruitmentOwnerOptions = normalizeOwnerOptions(payload?.choiceOptions?.currentOwner);
+  renderAddRecruitmentStatusOptions();
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
   }
