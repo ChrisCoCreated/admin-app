@@ -2316,6 +2316,17 @@ function redirectToUnauthorized(pageKey) {
 async function loadRecruitmentCandidates() {
   const payload = await directoryApi.listRecruitment();
   allCandidates = Array.isArray(payload?.items) ? payload.items : [];
+  console.info("[recruitment-ui] Current owner samples", {
+    totalItems: allCandidates.length,
+    sampleCount: Math.min(allCandidates.length, 25),
+    samples: allCandidates.slice(0, 25).map((candidate) => ({
+      id: cleanText(candidate?.id),
+      candidateName: cleanText(candidate?.candidateName),
+      currentOwner: cleanText(candidate?.currentOwner),
+      currentOwnerEmail: cleanText(candidate?.currentOwnerEmail),
+      status: cleanText(candidate?.status),
+    })),
+  });
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
   }
