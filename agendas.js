@@ -207,6 +207,18 @@ function setActionStatus(message, isError = false) {
   actionStatus.classList.toggle("error", isError);
 }
 
+function scrollAgendaItemEditorIntoView() {
+  if (!agendaItemForm) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    agendaItemForm.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
+}
+
 function handleAgendaItemSaveShortcut(event) {
   if (!event || busy) {
     return;
@@ -1449,6 +1461,7 @@ function renderAgendaItems(agenda) {
     card.querySelector(".agenda-item-edit-icon")?.addEventListener("click", (event) => {
       event.stopPropagation();
       populateItemForm(item);
+      scrollAgendaItemEditorIntoView();
       setActionStatus("");
       renderAgendaItems(agenda);
     });
