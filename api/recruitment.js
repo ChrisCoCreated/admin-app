@@ -218,6 +218,30 @@ function buildRecruitmentExternalId(candidateId) {
   return `${configuredPrefix}-${id}`;
 }
 
+function logCurrentOwnerFieldSamples(items) {
+  const rows = Array.isArray(items) ? items : [];
+  const samples = rows
+    .slice(0, 25)
+    .map((item) => {
+      const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
+      return {
+        itemId: normalizeText(item?.id),
+        title: normalizeText(fields.Title),
+        currentOwnerType: fields.CurrentOwner === null ? "null" : Array.isArray(fields.CurrentOwner) ? "array" : typeof fields.CurrentOwner,
+        currentOwner: fields.CurrentOwner,
+        currentOwnerLookupId: fields.CurrentOwnerLookupId,
+        fieldKeys: Object.keys(fields).filter((key) => key.toLowerCase().includes("currentowner")),
+      };
+    })
+    .filter((sample) => sample.currentOwner || sample.currentOwnerLookupId || sample.fieldKeys.length > 0);
+
+  console.info("[recruitment] CurrentOwner field samples", {
+    totalItems: rows.length,
+    sampleCount: samples.length,
+    samples,
+  });
+}
+
 function normalizeRecruitmentItem(item) {
   const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
   const active = toBoolean(fields.Active);
@@ -296,6 +320,7 @@ async function fetchRecruitmentItems(graphClient, siteId, listId) {
 
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
   const items = await graphClient.fetchAllPages(url);
+  logCurrentOwnerFieldSamples(items);
   return items.map(normalizeRecruitmentItem);
 }
 
