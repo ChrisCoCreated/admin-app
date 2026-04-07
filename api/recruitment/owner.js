@@ -1,5 +1,4 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
-const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
@@ -21,26 +20,6 @@ function normalizeEmail(value) {
   return normalizeText(value).toLowerCase();
 }
 
-function extractEmail(value) {
-  const matched = String(value || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  return matched ? normalizeEmail(matched[0]) : "";
-}
-
-function inferOwnerEmail(value) {
-  const normalized = normalizeEmail(value);
-  if (!normalized) {
-    return "";
-  }
-  if (CURRENT_OWNER_OPTIONS.has(normalized)) {
-    return normalized;
-  }
-  const extracted = extractEmail(value);
-  if (CURRENT_OWNER_OPTIONS.has(extracted)) {
-    return extracted;
-  }
-  return "";
-}
-
 function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -59,58 +38,149 @@ function parseSiteConfig() {
   return {
     hostName: siteUrl.hostname,
     sitePath,
+    siteBaseUrl: `${siteUrl.origin}${sitePath}`,
     listName,
   };
 }
 
-async function resolveSiteId(graphClient, hostName, sitePath) {
-  const url = `https://graph.microsoft.com/v1.0/sites/${hostName}:${sitePath}?$select=id`;
-  const payload = await graphClient.fetchJson(url);
-  if (!payload?.id) {
-    throw new Error("Could not resolve SharePoint site id.");
+async function getAppToken(scope) {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_API_CLIENT_ID;
+  const clientSecret = process.env.AZURE_API_CLIENT_SECRET;
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Missing AZURE_TENANT_ID, AZURE_API_CLIENT_ID, or AZURE_API_CLIENT_SECRET.");
   }
-  return payload.id;
+
+  const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope,
+  });
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok || !payload?.access_token) {
+    const error = new Error(payload?.error_description || payload?.error || `Token request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload.access_token;
 }
 
-async function resolveListId(graphClient, siteId, listName) {
-  const params = new URLSearchParams({
-    $select: "id,displayName",
-    $filter: `displayName eq ${quoteODataString(listName)}`,
-    $top: "1",
+async function fetchSharePointJson(url, token, options = {}) {
+  const response = await fetch(url, {
+    method: options.method || "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json;odata=verbose",
+      ...(options.headers || {}),
+    },
+    body: options.body,
   });
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?${params.toString()}`;
-  const payload = await graphClient.fetchJson(url);
-  const list = Array.isArray(payload?.value) ? payload.value[0] : null;
-  if (!list?.id) {
-    throw new Error(`Could not find SharePoint list '${listName}'.`);
+  const text = await response.text();
+  let payload = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
   }
-  return String(list.id);
+
+  if (!response.ok) {
+    const message =
+      payload?.error?.message?.value ||
+      payload?.odata?.error?.message?.value ||
+      payload?.error_description ||
+      text ||
+      `SharePoint request failed (${response.status}).`;
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload;
 }
 
-async function inferCurrentOwnerLookupId(graphClient, siteId, listId, ownerEmail) {
-  const normalizedOwnerEmail = normalizeEmail(ownerEmail);
-  if (!normalizedOwnerEmail) {
-    return null;
-  }
-
-  const params = new URLSearchParams({
-    $top: "200",
-    $expand: "fields($select=CurrentOwner,CurrentOwnerLookupId)",
+async function getFormDigest(siteBaseUrl, token) {
+  const payload = await fetchSharePointJson(`${siteBaseUrl}/_api/contextinfo`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json;odata=verbose",
+    },
   });
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?${params.toString()}`;
-  const payload = await graphClient.fetchJson(url);
-  const items = Array.isArray(payload?.value) ? payload.value : [];
+  return normalizeText(payload?.d?.GetContextWebInformation?.FormDigestValue);
+}
 
-  for (const item of items) {
-    const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
-    const inferredEmail = inferOwnerEmail(fields.CurrentOwner);
-    const lookupId = Number(fields.CurrentOwnerLookupId);
-    if (inferredEmail === normalizedOwnerEmail && Number.isFinite(lookupId) && lookupId > 0) {
-      return lookupId;
-    }
+async function resolveListInfo(siteBaseUrl, listName, token) {
+  const url = `${siteBaseUrl}/_api/web/lists?$select=Id,Title,ListItemEntityTypeFullName&$filter=Title eq ${encodeURIComponent(
+    quoteODataString(listName)
+  )}`;
+  const payload = await fetchSharePointJson(url, token);
+  const list = Array.isArray(payload?.d?.results) ? payload.d.results[0] : null;
+  if (!list?.Id || !list?.ListItemEntityTypeFullName) {
+    throw new Error(`Could not resolve SharePoint list '${listName}' over REST.`);
   }
+  return {
+    id: normalizeText(list.Id),
+    entityTypeName: normalizeText(list.ListItemEntityTypeFullName),
+  };
+}
 
-  return null;
+async function ensureUser(siteBaseUrl, token, digest, email) {
+  const payload = await fetchSharePointJson(`${siteBaseUrl}/_api/web/ensureuser`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json;odata=verbose",
+      "X-RequestDigest": digest,
+    },
+    body: JSON.stringify({
+      logonName: `i:0#.f|membership|${normalizeEmail(email)}`,
+    }),
+  });
+
+  const userId = Number(payload?.d?.Id);
+  if (!Number.isFinite(userId) || userId <= 0) {
+    throw new Error(`Could not resolve SharePoint user lookup id for ${email}.`);
+  }
+  return userId;
+}
+
+async function patchCurrentOwner({ siteBaseUrl, listName, itemId, ownerEmail, token }) {
+  const digest = await getFormDigest(siteBaseUrl, token);
+  const listInfo = await resolveListInfo(siteBaseUrl, listName, token);
+  const ownerLookupId = ownerEmail ? await ensureUser(siteBaseUrl, token, digest, ownerEmail) : null;
+  const payload = {
+    __metadata: { type: listInfo.entityTypeName },
+    CurrentOwnerId: ownerLookupId,
+  };
+
+  await fetchSharePointJson(`${siteBaseUrl}/_api/web/lists(guid'${listInfo.id}')/items(${encodeURIComponent(itemId)})`, token, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json;odata=verbose",
+      "X-RequestDigest": digest,
+      "IF-MATCH": "*",
+      "X-HTTP-Method": "MERGE",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return ownerLookupId;
 }
 
 module.exports = async (req, res) => {
@@ -151,21 +221,14 @@ module.exports = async (req, res) => {
 
   try {
     const config = parseSiteConfig();
-    const graphClient = createGraphDelegatedClient(req.authUser?.graphAccessToken);
-    const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
-    const listId = await resolveListId(graphClient, siteId, config.listName);
-    const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
-    const lookupId = ownerEmail ? await inferCurrentOwnerLookupId(graphClient, siteId, listId, ownerEmail) : null;
-    const patchBody = lookupId
-      ? { CurrentOwnerLookupId: lookupId }
-      : { CurrentOwner: ownerEmail || "" };
-
-    await graphClient.fetchJson(url, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(patchBody),
+    const scope = `https://${config.hostName}/.default`;
+    const appToken = await getAppToken(scope);
+    const ownerLookupId = await patchCurrentOwner({
+      siteBaseUrl: config.siteBaseUrl,
+      listName: config.listName,
+      itemId,
+      ownerEmail,
+      token: appToken,
     });
 
     res.setHeader("Cache-Control", "no-store");
@@ -173,9 +236,15 @@ module.exports = async (req, res) => {
       success: true,
       itemId,
       currentOwnerEmail: ownerEmail,
-      lookupId: lookupId || null,
+      ownerLookupId,
     });
   } catch (error) {
+    console.error("[recruitment-owner] CurrentOwner save failed", {
+      itemId,
+      ownerEmail,
+      message: error?.message || String(error),
+      status: Number(error?.status || 0) || undefined,
+    });
     res.status(Number(error?.status) || 502).json({
       error: {
         code: String(error?.code || "OWNER_PATCH_FAILED"),
