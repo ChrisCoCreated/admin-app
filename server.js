@@ -22,6 +22,7 @@ const recruitmentInitialScreenHandler = require("./api/recruitment/initial-scree
 const recruitmentStageHandler = require("./api/recruitment/stage");
 const recruitmentStatusHandler = require("./api/recruitment/status");
 const recruitmentOwnerHandler = require("./api/recruitment/owner");
+const recruitmentKeepInMindHandler = require("./api/recruitment/keep-in-mind");
 const recruitmentDetailsHandler = require("./api/recruitment/details");
 const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
@@ -328,6 +329,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await recruitmentOwnerHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/recruitment/keep-in-mind") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await recruitmentKeepInMindHandler(apiReq, apiRes);
     return true;
   }
 

@@ -474,6 +474,21 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async updateRecruitmentKeepInMind(payload = {}) {
+      const response = await authFetch(endpoint("/api/recruitment/keep-in-mind"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment keep in mind update request failed");
+      }
+      return response.json();
+    },
+
     async updateRecruitmentStage(payload = {}) {
       const response = await authFetch(endpoint("/api/recruitment/stage"), {
         method: "POST",

@@ -1316,6 +1316,13 @@ dd {
   min-width: 150px;
 }
 
+.recruitment-status-cell.is-inactive-review {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 245, 210, 0.72), rgba(255, 252, 238, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(214, 173, 74, 0.18);
+}
+
 .recruitment-owner-field {
   display: grid;
   gap: 5px;
@@ -1344,6 +1351,44 @@ dd {
 .recruitment-owner-select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.recruitment-inactive-review {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(214, 173, 74, 0.22);
+  animation: recruitmentInactiveReviewSlide 180ms ease;
+}
+
+.recruitment-inactive-review-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #7a5c16;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.recruitment-inactive-review-done {
+  min-height: 34px;
+  padding: 6px 14px;
+}
+
+@keyframes recruitmentInactiveReviewSlide {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .recruitment-active-toggle {
@@ -6055,7 +6100,13 @@ body.lightbox-open {
   }
 
   .agenda-shortcut-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(2, auto);
+    align-items: start;
+    align-content: start;
     gap: 0.45rem;
+    overflow-x: auto;
   }
 
   .agenda-shortcut-chip {

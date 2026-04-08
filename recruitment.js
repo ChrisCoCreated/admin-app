@@ -134,6 +134,8 @@ let stageModeFilter = "all";
 let stageModeCountRenderToken = 0;
 let recruitmentStatusOptions = [];
 let recruitmentOwnerOptions = [];
+const pendingInactiveReviewIds = new Set();
+const dismissedInactiveReviewIds = new Set();
 const openStageKeys = new Set();
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
@@ -285,7 +287,11 @@ function getBaseFilteredCandidates() {
   const selectedActive = cleanText(activeFilterSelect?.value || "active");
 
   return allCandidates.filter((candidate) => {
-    if (selectedActive === "active" && candidate.active !== true) {
+    const candidateId = cleanText(candidate?.id);
+    if (dismissedInactiveReviewIds.has(candidateId)) {
+      return false;
+    }
+    if (selectedActive === "active" && candidate.active !== true && !pendingInactiveReviewIds.has(candidateId)) {
       return false;
     }
     if (selectedActive === "inactive" && candidate.active !== false) {
@@ -1384,14 +1390,22 @@ function syncActiveToggleButton(button, isActive) {
 }
 
 function candidateMatchesActiveFilter(candidate) {
+  const candidateId = cleanText(candidate?.id);
+  if (dismissedInactiveReviewIds.has(candidateId)) {
+    return false;
+  }
   const selectedActive = cleanText(activeFilterSelect?.value || "active");
   if (selectedActive === "active") {
-    return candidate?.active === true;
+    return candidate?.active === true || pendingInactiveReviewIds.has(candidateId);
   }
   if (selectedActive === "inactive") {
     return candidate?.active === false;
   }
   return true;
+}
+
+function isInactiveReviewPending(candidate) {
+  return pendingInactiveReviewIds.has(cleanText(candidate?.id));
 }
 
 function renderStatusUpdateOptions() {
@@ -1706,11 +1720,12 @@ function renderCandidates() {
     const whatsappUrl = getWhatsAppUrl(candidate.phoneNumber, candidate.candidateName);
     const teamsCallUrl = getTeamsCallUrl(candidate.phoneNumber);
     const indeedUrl = getIndeedProfileUrl(candidate);
+    const showInactiveReview = isInactiveReviewPending(candidate);
     tr.innerHTML = `
       <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
       <td>
-        <div class="recruitment-status-cell">
+        <div class="recruitment-status-cell${showInactiveReview ? " is-inactive-review" : ""}">
           <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
           <label class="recruitment-owner-field">
             <span class="recruitment-owner-label">Current owner</span>
@@ -1731,10 +1746,21 @@ function renderCandidates() {
             ${activeUpdateBusy ? " disabled" : ""}
           >
             <span class="recruitment-active-toggle-track">
-              <span class="recruitment-active-toggle-thumb"></span>
+            <span class="recruitment-active-toggle-thumb"></span>
             </span>
             <span class="recruitment-active-toggle-label">${candidate.active ? "Active" : "Inactive"}</span>
           </button>
+          ${
+            showInactiveReview
+              ? `<div class="recruitment-inactive-review">
+                  <label class="recruitment-inactive-review-checkbox">
+                    <input type="checkbox" class="recruitment-keep-in-mind-toggle"${candidate.keepInMind ? " checked" : ""} />
+                    <span>Keep in mind</span>
+                  </label>
+                  <button type="button" class="secondary recruitment-inactive-review-done">Done</button>
+                </div>`
+              : ""
+          }
         </div>
       </td>
       <td>${renderStageSummary(candidate)}</td>
@@ -1837,6 +1863,37 @@ function renderCandidates() {
         renderCandidates();
       }
     });
+    const keepInMindToggle = tr.querySelector(".recruitment-keep-in-mind-toggle");
+    keepInMindToggle?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    keepInMindToggle?.addEventListener("change", async (event) => {
+      event.stopPropagation();
+      const nextKeepInMind = keepInMindToggle.checked === true;
+      const previousKeepInMind = candidate.keepInMind === true;
+      candidate.keepInMind = nextKeepInMind;
+      renderCandidates();
+      try {
+        await directoryApi.updateRecruitmentKeepInMind({
+          itemId: candidate.id,
+          keepInMind: nextKeepInMind,
+        });
+        setStatus(`Keep in mind ${nextKeepInMind ? "enabled" : "cleared"}.`, false, { subtle: true });
+      } catch (error) {
+        candidate.keepInMind = previousKeepInMind;
+        renderCandidates();
+        console.error(error);
+        setStatus(error?.message || "Could not update keep in mind.", true, { autoClear: false });
+      }
+    });
+    const inactiveReviewDoneBtn = tr.querySelector(".recruitment-inactive-review-done");
+    inactiveReviewDoneBtn?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const candidateId = cleanText(candidate.id);
+      pendingInactiveReviewIds.delete(candidateId);
+      dismissedInactiveReviewIds.add(candidateId);
+      renderCandidates();
+    });
     const activeToggle = tr.querySelector(".recruitment-active-toggle");
     activeToggle?.addEventListener("click", async (event) => {
       event.stopPropagation();
@@ -1844,25 +1901,32 @@ function renderCandidates() {
         return;
       }
       const nextActive = candidate.active !== true;
+      const candidateId = cleanText(candidate.id);
       activeUpdateBusy = true;
       if (activeToggle) {
         activeToggle.disabled = true;
       }
       try {
+        if (nextActive === false) {
+          pendingInactiveReviewIds.add(candidateId);
+          dismissedInactiveReviewIds.delete(candidateId);
+        } else {
+          pendingInactiveReviewIds.delete(candidateId);
+          dismissedInactiveReviewIds.delete(candidateId);
+        }
         await updateCandidateActiveById(candidate.id, nextActive);
         syncActiveToggleButton(activeToggle, nextActive);
         if (candidate.id === selectedCandidateId) {
           setDetail(candidate);
         }
         window.clearTimeout(activeHideRefreshTimer);
-        if (candidateMatchesActiveFilter(candidate)) {
-          renderCandidates();
-        } else {
-          activeHideRefreshTimer = window.setTimeout(() => {
-            renderCandidates();
-          }, 900);
-        }
+        renderCandidates();
       } catch (error) {
+        if (nextActive === false) {
+          pendingInactiveReviewIds.delete(candidateId);
+        } else if (candidate.active === false) {
+          pendingInactiveReviewIds.add(candidateId);
+        }
         console.error(error);
         setStatus(error?.message || "Could not update active status.", true, { autoClear: false });
       } finally {
