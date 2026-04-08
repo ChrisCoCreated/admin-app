@@ -121,10 +121,6 @@
               </select>
             </label>
           </div>
-          <label class="checkbox-field" for="mineOnlyFilterInput">
-            <input id="mineOnlyFilterInput" type="checkbox" />
-            Mine only
-          </label>
           <p id="statusMessage" class="muted">Loading active candidates...</p>
           <div class="recruitment-import-wrap">
             <h3>Import CSV</h3>
@@ -168,13 +164,19 @@
         <article class="panel list-panel">
           <div class="card-header-row recruitment-list-header">
             <h2>Active Candidates</h2>
-            <div class="recruitment-lane-filters" role="group" aria-label="Candidate stage filters">
+            <div class="recruitment-list-header-controls">
+              <label class="checkbox-field recruitment-mine-only-toggle" for="mineOnlyFilterInput">
+                <input id="mineOnlyFilterInput" type="checkbox" />
+                Mine only
+              </label>
+              <div class="recruitment-lane-filters" role="group" aria-label="Candidate stage filters">
               <button type="button" class="recruitment-lane-filter is-active" data-stage-mode-filter="all">All</button>
               <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="initial">Initial</button>
               <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="interviewing">Interviewing</button>
               <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="onboarding">Onboarding</button>
               <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="hold">Hold</button>
               <button type="button" class="recruitment-lane-filter" data-stage-mode-filter="reject">Reject</button>
+              </div>
             </div>
           </div>
           <div class="table-wrap">

@@ -965,6 +965,25 @@ dd {
   gap: 14px;
 }
 
+.recruitment-list-header-controls {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.recruitment-mine-only-toggle {
+  min-height: 36px;
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid #d8e1ef;
+  border-radius: 999px;
+  background: #f6f8fc;
+  color: #31415e;
+  font-weight: 700;
+}
+
 .recruitment-sort-header {
   display: inline-flex;
   align-items: center;
