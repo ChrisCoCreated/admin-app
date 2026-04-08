@@ -965,6 +965,47 @@ dd {
   gap: 14px;
 }
 
+.recruitment-sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.recruitment-sort-header::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid #8290a7;
+  border-bottom: 2px solid #8290a7;
+  transform: rotate(45deg) translateY(-2px);
+  opacity: 0.55;
+  transition: transform 120ms ease, opacity 120ms ease, border-color 120ms ease;
+}
+
+.recruitment-sort-header:hover::after,
+.recruitment-sort-header.is-active::after {
+  opacity: 0.92;
+  border-color: #425a7f;
+}
+
+.recruitment-sort-header[data-direction="asc"]::after {
+  transform: rotate(225deg) translateY(-1px);
+}
+
+.recruitment-sort-header[data-direction="desc"]::after {
+  transform: rotate(45deg) translateY(-2px);
+}
+
 .recruitment-lane-filters {
   display: inline-flex;
   flex-wrap: wrap;

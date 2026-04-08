@@ -7,9 +7,12 @@ const searchInput = document.getElementById("searchInput");
 const locationFilterSelect = document.getElementById("locationFilterSelect");
 const statusFilterSelect = document.getElementById("statusFilterSelect");
 const sourceFilterSelect = document.getElementById("sourceFilterSelect");
+const ownerFilterSelect = document.getElementById("ownerFilterSelect");
 const activeFilterSelect = document.getElementById("activeFilterSelect");
 const sortFilterSelect = document.getElementById("sortFilterSelect");
+const mineOnlyFilterInput = document.getElementById("mineOnlyFilterInput");
 const stageModeFilterButtons = Array.from(document.querySelectorAll("[data-stage-mode-filter]"));
+const sortHeaderButtons = Array.from(document.querySelectorAll("[data-sort-header]"));
 const recruitmentTableBody = document.getElementById("recruitmentTableBody");
 const emptyState = document.getElementById("emptyState");
 const statusMessage = document.getElementById("statusMessage");
@@ -134,6 +137,8 @@ let stageModeFilter = "all";
 let stageModeCountRenderToken = 0;
 let recruitmentStatusOptions = [];
 let recruitmentOwnerOptions = [];
+let currentUserEmail = "";
+let currentUserOwnerChoice = "";
 const pendingInactiveReviewIds = new Set();
 const dismissedInactiveReviewIds = new Set();
 const openStageKeys = new Set();
@@ -197,6 +202,14 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+function getFirstNameSortValue(candidateName) {
+  const fullName = cleanText(candidateName);
+  if (!fullName) {
+    return "";
+  }
+  return cleanText(fullName.split(/\s+/).find(Boolean) || "").toLowerCase();
+}
+
 function normalizeStatusOptions(options) {
   const list = Array.isArray(options) ? options.map(cleanText).filter(Boolean) : [];
   return list.length ? Array.from(new Set(list)) : [...DEFAULT_RECRUITMENT_STATUS_OPTIONS];
@@ -206,6 +219,71 @@ function normalizeOwnerOptions(options) {
   const list = Array.isArray(options) ? options.map(cleanText).filter(Boolean) : [];
   const labels = list.length ? Array.from(new Set(list)) : DEFAULT_RECRUITMENT_OWNER_OPTIONS.map((option) => option.label);
   return labels.map((label) => ({ label }));
+}
+
+function syncSortHeaderButtons() {
+  const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
+  for (const button of sortHeaderButtons) {
+    const headerKey = cleanText(button?.dataset?.sortHeader);
+    let direction = "";
+    if (headerKey === "candidate") {
+      direction = selectedSort === "name_asc" ? "asc" : selectedSort === "name_desc" ? "desc" : "";
+    } else if (headerKey === "location") {
+      direction = selectedSort === "location_asc" ? "asc" : selectedSort === "location_desc" ? "desc" : "";
+    } else if (headerKey === "status") {
+      direction = selectedSort === "status_asc" ? "asc" : selectedSort === "status_desc" ? "desc" : "";
+    }
+    button.dataset.direction = direction;
+    button.classList.toggle("is-active", Boolean(direction));
+  }
+}
+
+function toggleHeaderSort(headerKey) {
+  if (!sortFilterSelect) {
+    return;
+  }
+  const selectedSort = cleanText(sortFilterSelect.value || "updated_desc");
+  let nextSort = "updated_desc";
+  if (headerKey === "candidate") {
+    nextSort = selectedSort === "name_asc" ? "name_desc" : "name_asc";
+  } else if (headerKey === "location") {
+    nextSort = selectedSort === "location_asc" ? "location_desc" : "location_asc";
+  } else if (headerKey === "status") {
+    nextSort = selectedSort === "status_asc" ? "status_desc" : "status_asc";
+  }
+  sortFilterSelect.value = nextSort;
+  syncSortHeaderButtons();
+  renderCandidates();
+}
+
+function normalizeComparable(value) {
+  return cleanText(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function resolveMineOwnerChoice(email, options) {
+  const normalizedEmail = cleanText(email).toLowerCase();
+  if (!normalizedEmail) {
+    return "";
+  }
+  const explicitCandidates = {
+    "chris@planwithcare.co.uk": ["chris"],
+    "rebecca@planwithcare.co.uk": ["rebecca"],
+    "peter@planwithcare.co.uk": ["peter"],
+    "michalina@thrivehomecare.co.uk": ["miska", "miśka", "michalina"],
+  };
+  const candidates = explicitCandidates[normalizedEmail] || [normalizedEmail.split("@")[0] || ""];
+  const option = options.find((entry) => {
+    const comparable = normalizeComparable(entry?.label);
+    return candidates.some((candidate) => {
+      const target = normalizeComparable(candidate);
+      return target && (comparable === target || comparable.includes(target) || target.includes(comparable));
+    });
+  });
+  return cleanText(option?.label);
 }
 
 function getCurrentOwnerLabel(candidate) {
@@ -284,7 +362,9 @@ function getBaseFilteredCandidates() {
   const selectedLocation = cleanText(locationFilterSelect.value || "all");
   const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
+  const selectedOwner = cleanText(ownerFilterSelect?.value || "all");
   const selectedActive = cleanText(activeFilterSelect?.value || "active");
+  const mineOnly = mineOnlyFilterInput?.checked === true;
 
   return allCandidates.filter((candidate) => {
     const candidateId = cleanText(candidate?.id);
@@ -311,6 +391,12 @@ function getBaseFilteredCandidates() {
       return false;
     }
     if (selectedSource !== "all" && cleanText(candidate.source) !== selectedSource) {
+      return false;
+    }
+    if (selectedOwner !== "all" && cleanText(candidate.currentOwner) !== selectedOwner) {
+      return false;
+    }
+    if (mineOnly && (!currentUserOwnerChoice || cleanText(candidate.currentOwner) !== currentUserOwnerChoice)) {
       return false;
     }
     if (!query) {
@@ -1612,10 +1698,17 @@ function renderFilterOptions() {
   const sourceOptions = Array.from(
     new Set(allCandidates.map((candidate) => cleanText(candidate.source)).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
+  const ownerOptions = Array.from(
+    new Set(
+      [...recruitmentOwnerOptions.map((option) => cleanText(option.label)), ...allCandidates.map((candidate) => cleanText(candidate.currentOwner))]
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
 
   const selectedLocation = cleanText(locationFilterSelect.value || "all");
   const selectedStatus = cleanText(statusFilterSelect.value || STATUS_FILTER_DEFAULT);
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
+  const selectedOwner = cleanText(ownerFilterSelect?.value || "all");
   const selectedActive = cleanText(activeFilterSelect?.value || "active");
   const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
 
@@ -1623,6 +1716,9 @@ function renderFilterOptions() {
   statusFilterSelect.innerHTML =
     `<option value="${STATUS_FILTER_DEFAULT}">All except rejected</option><option value="all">All statuses</option>`;
   sourceFilterSelect.innerHTML = '<option value="all">All sources</option>';
+  if (ownerFilterSelect) {
+    ownerFilterSelect.innerHTML = '<option value="all">All owners</option>';
+  }
 
   for (const location of locationOptions) {
     const option = document.createElement("option");
@@ -1642,11 +1738,20 @@ function renderFilterOptions() {
     option.textContent = source;
     sourceFilterSelect.appendChild(option);
   }
+  for (const owner of ownerOptions) {
+    const option = document.createElement("option");
+    option.value = owner;
+    option.textContent = owner;
+    ownerFilterSelect?.appendChild(option);
+  }
 
   locationFilterSelect.value = locationOptions.includes(selectedLocation) ? selectedLocation : "all";
   statusFilterSelect.value =
     selectedStatus === STATUS_FILTER_DEFAULT || statusOptions.includes(selectedStatus) ? selectedStatus : STATUS_FILTER_DEFAULT;
   sourceFilterSelect.value = sourceOptions.includes(selectedSource) ? selectedSource : "all";
+  if (ownerFilterSelect) {
+    ownerFilterSelect.value = ownerOptions.includes(selectedOwner) ? selectedOwner : "all";
+  }
   if (activeFilterSelect) {
     activeFilterSelect.value = ["active", "inactive", "all"].includes(selectedActive) ? selectedActive : "active";
   }
@@ -1658,10 +1763,15 @@ function renderFilterOptions() {
       "created_asc",
       "name_asc",
       "name_desc",
+      "location_asc",
+      "location_desc",
+      "status_asc",
+      "status_desc",
     ].includes(selectedSort)
       ? selectedSort
       : "updated_desc";
   }
+  syncSortHeaderButtons();
 }
 
 function getFilteredCandidates() {
@@ -1680,10 +1790,22 @@ function getFilteredCandidates() {
       return toSortTimestamp(left.created) - toSortTimestamp(right.created);
     }
     if (selectedSort === "name_asc") {
-      return cleanText(left.candidateName).localeCompare(cleanText(right.candidateName));
+      return getFirstNameSortValue(left.candidateName).localeCompare(getFirstNameSortValue(right.candidateName));
     }
     if (selectedSort === "name_desc") {
-      return cleanText(right.candidateName).localeCompare(cleanText(left.candidateName));
+      return getFirstNameSortValue(right.candidateName).localeCompare(getFirstNameSortValue(left.candidateName));
+    }
+    if (selectedSort === "location_asc") {
+      return cleanText(left.location).localeCompare(cleanText(right.location));
+    }
+    if (selectedSort === "location_desc") {
+      return cleanText(right.location).localeCompare(cleanText(left.location));
+    }
+    if (selectedSort === "status_asc") {
+      return cleanText(left.status).localeCompare(cleanText(right.status));
+    }
+    if (selectedSort === "status_desc") {
+      return cleanText(right.status).localeCompare(cleanText(left.status));
     }
     return toSortTimestamp(right.updated) - toSortTimestamp(left.updated);
   });
@@ -2406,6 +2528,13 @@ async function loadRecruitmentCandidates() {
   allCandidates = Array.isArray(payload?.items) ? payload.items : [];
   recruitmentStatusOptions = normalizeStatusOptions(payload?.choiceOptions?.status);
   recruitmentOwnerOptions = normalizeOwnerOptions(payload?.choiceOptions?.currentOwner);
+  currentUserOwnerChoice = resolveMineOwnerChoice(currentUserEmail, recruitmentOwnerOptions);
+  if (mineOnlyFilterInput) {
+    mineOnlyFilterInput.disabled = !currentUserOwnerChoice;
+    if (!currentUserOwnerChoice) {
+      mineOnlyFilterInput.checked = false;
+    }
+  }
   renderAddRecruitmentStatusOptions();
   if (sharePointListLink) {
     sharePointListLink.href = cleanText(payload?.listUrl) || "#";
@@ -2470,6 +2599,7 @@ async function init() {
     }
 
     const profile = await directoryApi.getCurrentUser();
+    currentUserEmail = cleanText(profile?.email).toLowerCase();
     const role = String(profile?.role || "").trim().toLowerCase();
     if (!canAccessPage(role, "recruitment")) {
       redirectToUnauthorized("recruitment");
@@ -2497,6 +2627,8 @@ async function init() {
 searchInput?.addEventListener("input", renderCandidates);
 locationFilterSelect?.addEventListener("change", renderCandidates);
 statusFilterSelect?.addEventListener("change", renderCandidates);
+ownerFilterSelect?.addEventListener("change", renderCandidates);
+mineOnlyFilterInput?.addEventListener("change", renderCandidates);
 for (const button of stageModeFilterButtons) {
   button.addEventListener("click", () => {
     setStageModeFilter(button.dataset.stageModeFilter);
@@ -2506,6 +2638,11 @@ for (const button of stageModeFilterButtons) {
 sourceFilterSelect?.addEventListener("change", renderCandidates);
 activeFilterSelect?.addEventListener("change", renderCandidates);
 sortFilterSelect?.addEventListener("change", renderCandidates);
+for (const button of sortHeaderButtons) {
+  button.addEventListener("click", () => {
+    toggleHeaderSort(button.dataset.sortHeader);
+  });
+}
 toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
   setRecruitmentToolbarVisible(recruitmentToolbarContent?.hidden);
 });

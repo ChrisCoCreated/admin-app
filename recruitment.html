@@ -91,6 +91,12 @@
                 <option value="all">All sources</option>
               </select>
             </label>
+            <label class="field" for="ownerFilterSelect">
+              Current Owner
+              <select id="ownerFilterSelect">
+                <option value="all">All owners</option>
+              </select>
+            </label>
             <label class="field" for="activeFilterSelect">
               Active
               <select id="activeFilterSelect">
@@ -106,11 +112,19 @@
                 <option value="updated_asc">Oldest updated</option>
                 <option value="created_desc">Recently created</option>
                 <option value="created_asc">Oldest created</option>
-                <option value="name_asc">Name A-Z</option>
-                <option value="name_desc">Name Z-A</option>
+                <option value="name_asc">First name A-Z</option>
+                <option value="name_desc">First name Z-A</option>
+                <option value="location_asc">Location A-Z</option>
+                <option value="location_desc">Location Z-A</option>
+                <option value="status_asc">Status A-Z</option>
+                <option value="status_desc">Status Z-A</option>
               </select>
             </label>
           </div>
+          <label class="checkbox-field" for="mineOnlyFilterInput">
+            <input id="mineOnlyFilterInput" type="checkbox" />
+            Mine only
+          </label>
           <p id="statusMessage" class="muted">Loading active candidates...</p>
           <div class="recruitment-import-wrap">
             <h3>Import CSV</h3>
@@ -167,9 +181,21 @@
             <table>
               <thead>
                 <tr>
-                  <th>Candidate</th>
-                  <th>Location</th>
-                  <th>Status</th>
+                  <th>
+                    <button type="button" class="recruitment-sort-header" data-sort-header="candidate">
+                      Candidate
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="recruitment-sort-header" data-sort-header="location">
+                      Location
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="recruitment-sort-header" data-sort-header="status">
+                      Status
+                    </button>
+                  </th>
                   <th>Stages</th>
                   <th>Action</th>
                 </tr>
