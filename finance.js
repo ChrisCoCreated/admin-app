@@ -409,7 +409,6 @@ function convertExpensesRows(sourceRows) {
     skippedAlreadyInvoiced,
     skippedNonChargeable,
     invoiceDate,
-    dueDate,
   };
 }
 
@@ -567,8 +566,13 @@ function refreshLinks() {
 async function init() {
   try {
     setStatus("Checking access...");
-    await authController.initialize();
-    const profile = await directoryApi.getMyProfile();
+    const account = await authController.restoreSession();
+    if (!account) {
+      window.location.href = "./index.html";
+      return;
+    }
+
+    const profile = await directoryApi.getCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
 
     if (!canAccessPage(role, "finance")) {
@@ -585,17 +589,23 @@ async function init() {
     resetExpensesOutput();
     refreshLinks();
   } catch (error) {
+    if (error?.status === 403) {
+      redirectToUnauthorized("finance");
+      return;
+    }
     console.error("Finance page failed to initialise", error);
     setStatus(error?.message || "Unable to load the finance page.", true);
+  } finally {
+    document.body.classList.remove("auth-pending");
   }
 }
 
 signOutBtn?.addEventListener("click", async () => {
   try {
+    signOutBtn.disabled = true;
     await authController.signOut();
-  } catch (error) {
-    console.error("Sign out failed", error);
-    setStatus("Unable to sign out right now.", true);
+  } finally {
+    window.location.href = "./index.html";
   }
 });
 
@@ -614,4 +624,4 @@ expensesCsvInput?.addEventListener("change", () => {
   }
 });
 
-init();
+void init();
