@@ -5964,6 +5964,20 @@ body.lightbox-open {
   gap: 14px;
 }
 
+.problem-archive-section,
+.problem-archive-body {
+  display: grid;
+  gap: 12px;
+}
+
+.problem-archive-empty {
+  padding: 6px 4px 2px;
+}
+
+.problem-archive-empty p {
+  margin: 0;
+}
+
 .problem-empty {
   padding: 28px 14px 12px;
   text-align: center;

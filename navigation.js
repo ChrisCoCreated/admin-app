@@ -23,6 +23,7 @@ const ROLE_PAGES = {
     "mapping",
     "drivetime",
     "reports",
+    "finance",
     "emailtemplates",
     "suppliers",
     "consultant",
@@ -63,8 +64,9 @@ const ROLE_PAGES = {
     "emailtemplates",
     "suppliers",
   ],
+  finance: ["finance"],
   consultant: ["consultant", "agendas"],
-  director: ["agendas", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers"],
+  director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers"],
   marketing: ["marketing", "photolayout", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
@@ -96,6 +98,7 @@ const PAGE_META = {
   mapping: { href: "./mapping.html", label: "Time Mapping" },
   drivetime: { href: "./drive-time-map.html", label: "Our Geography", shortcutLabel: "Map" },
   reports: { href: "./reports.html", label: "Reports" },
+  finance: { href: "./finance.html", label: "Finance" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates", shortcutLabel: "Email" },
   suppliers: { href: "./suppliers.html", label: "Suppliers & Experiences" },
   consultant: { href: "./consultant.html", label: "Consultant" },
@@ -103,7 +106,7 @@ const PAGE_META = {
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
 };
 
-const ADMIN_HOME_PAGES = ["reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
+const ADMIN_HOME_PAGES = ["finance", "reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
 const MENU_GROUPS = [
   {
     title: "People",
@@ -119,7 +122,7 @@ const MENU_GROUPS = [
   },
   {
     title: "Performance",
-    pages: ["reports", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
+    pages: ["reports", "finance", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
   },
   {
     title: "Marketing & Content",

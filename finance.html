@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Finance</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260324" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <h1>Finance</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel">
+        <h2>Period-Based Finance Tools</h2>
+        <p class="muted">Choose a period once, then open the finance reports you need in OneTouch.</p>
+        <div class="row wrap-row">
+          <label class="field" for="periodPresetSelect">
+            Period
+            <select id="periodPresetSelect">
+              <option value="this_month">This month</option>
+              <option value="last_month" selected>Last month</option>
+              <option value="next_month">Next month</option>
+              <option value="this_week">This week (Mon-Sun)</option>
+              <option value="last_week">Last week (Mon-Sun)</option>
+              <option value="next_week">Next week (Mon-Sun)</option>
+            </select>
+          </label>
+        </div>
+        <p id="dateRangeMessage" class="muted row-note"></p>
+
+        <div class="reports-grid">
+          <article class="report-card">
+            <h3>Financial Analysis</h3>
+            <p class="muted">Review pay-related financial analysis for the selected period.</p>
+            <p class="row">
+              <a id="financialAnalysisLink" class="button-link-one-touch" href="#" target="_blank" rel="noopener noreferrer"
+                >Open Financial Analysis</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Payroll</h3>
+            <p class="muted">Open payroll totals for the selected period to review actual staffing cost.</p>
+            <p class="row">
+              <a id="payrollLink" class="button-link-one-touch" href="#" target="_blank" rel="noopener noreferrer"
+                >Open Payroll</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Client Hours</h3>
+            <p class="muted">Check client-hour totals for the selected period to support billing review.</p>
+            <p class="row">
+              <a id="clientHoursLink" class="button-link-one-touch" href="#" target="_blank" rel="noopener noreferrer"
+                >Open Client Hours</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Carer Hours</h3>
+            <p class="muted">Check carer-hour totals for the selected period to support payroll review.</p>
+            <p class="row">
+              <a id="carerHoursLink" class="button-link-one-touch" href="#" target="_blank" rel="noopener noreferrer"
+                >Open Carer Hours</a
+              >
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Finance Shortcuts</h2>
+        <p class="muted">Direct links for the most common finance destinations.</p>
+        <div class="reports-grid">
+          <article class="report-card">
+            <h3>Invoice Reports</h3>
+            <p class="muted">Open the invoice reporting area in OneTouch to review billed income.</p>
+            <p class="row">
+              <a
+                class="button-link-one-touch"
+                href="https://care2.onetouchhealth.net/cm/in/clientBilling_new_ld_split_contacts_wds.php"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open Invoice Reports</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>All Finance Reports</h3>
+            <p class="muted">Jump straight to the finance reports menu in OneTouch.</p>
+            <p class="row">
+              <a
+                class="button-link-one-touch"
+                href="https://care2.onetouchhealth.net/cm/in/financeMenuReports.php"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open Finance Menu</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>All Reports</h3>
+            <p class="muted">Open the wider OneTouch reporting area if you need a non-finance report.</p>
+            <p class="row">
+              <a
+                class="button-link-one-touch"
+                href="https://care2.onetouchhealth.net/cm/in/allReportsSection.php"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open All Reports</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Prices</h3>
+            <p class="muted">Open the Thrive prices page in a new tab for quick rate reference.</p>
+            <p class="row">
+              <a class="button-link" href="https://www.thrivehomecare.co.uk/prices" target="_blank" rel="noopener noreferrer"
+                >Open Prices</a
+              >
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Expenses Import Prep</h2>
+            <p class="muted">Upload an expenses CSV and convert it into the Xero sales invoice import template.</p>
+          </div>
+          <a
+            class="button-link"
+            href="https://go.xero.com/Import/Import.aspx?type=IMPORTTYPE/ARINVOICES"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Open Xero Import</a
+          >
+        </div>
+
+        <div class="suppliers-filter-grid">
+          <label class="field" for="expensesCsvInput">
+            Expenses CSV
+            <input id="expensesCsvInput" type="file" accept=".csv,text/csv" />
+          </label>
+          <label class="field" for="invoiceDateInput">
+            Invoice date
+            <input id="invoiceDateInput" type="date" />
+          </label>
+          <label class="field" for="dueDaysInput">
+            Due in days
+            <input id="dueDaysInput" type="number" min="0" step="1" value="0" />
+          </label>
+          <label class="field" for="taxTypeInput">
+            Tax type
+            <input id="taxTypeInput" type="text" value="" />
+          </label>
+          <label class="field" for="currencyInput">
+            Currency
+            <input id="currencyInput" type="text" value="" />
+          </label>
+          <label class="field suppliers-checkbox-field" for="excludeInvoicedInput">
+            Export rule
+            <span class="suppliers-checkbox-wrap">
+              <input id="excludeInvoicedInput" type="checkbox" checked />
+              <span>Exclude rows already marked invoiced</span>
+            </span>
+          </label>
+          <label class="field suppliers-checkbox-field" for="onlyChargeableInput">
+            Chargeable filter
+            <span class="suppliers-checkbox-wrap">
+              <input id="onlyChargeableInput" type="checkbox" checked />
+              <span>Only include reimbursable or client-behalf spend</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="row wrap-row">
+          <button id="convertExpensesBtn" type="button">Convert to Sales Invoice CSV</button>
+          <button id="downloadSalesInvoiceBtn" class="secondary" type="button" disabled>Download Sales Invoice CSV</button>
+          <a
+            class="button-link"
+            href="https://go.xero.com/Import/Import.aspx?type=IMPORTTYPE/ARINVOICES"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Go to Xero upload</a
+          >
+        </div>
+
+        <p id="expensesImportStatus" class="muted row-note">
+          Upload an expenses export, convert it, then download the Xero-ready CSV for import.
+        </p>
+        <p id="expensesImportSummary" class="muted row-note"></p>
+        <div id="expensesImportErrors" class="muted" hidden></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Contact</th>
+                <th>Invoice Number</th>
+                <th>Invoice Date</th>
+                <th>Description</th>
+                <th>Unit Amount</th>
+                <th>Account Code</th>
+                <th>Tax Type</th>
+              </tr>
+            </thead>
+            <tbody id="expensesImportPreviewBody">
+              <tr>
+                <td colspan="7" class="muted">No converted rows yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./finance.js"></script>
+  </body>
+</html>

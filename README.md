@@ -118,6 +118,7 @@ Set comma-separated email lists with these env vars:
 - `ACCESS_DIRECTOR_EMAILS` for `director`
 - `ACCESS_MARKETING_EMAILS` for `marketing`
 - `ACCESS_PHOTO_LAYOUT_EMAILS` for `photo_layout`
+- `ACCESS_FINANCE_EMAILS` for `finance`
 - `ACCESS_TIME_EMAILS` for time-mapping roles
 - `ACCESS_HR_EMAILS` for HR roles
 - `ACCESS_CLIENTS_EMAILS` for client roles

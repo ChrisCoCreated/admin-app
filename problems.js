@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260324";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260409";
 
 const problemComposerForm = document.getElementById("problemComposerForm");
 const problemInput = document.getElementById("problemInput");
@@ -53,6 +53,8 @@ let recognition = null;
 let voiceListening = false;
 let voiceSeedText = "";
 const titleRefreshQueue = new Set();
+let doneSectionExpanded = false;
+let parkedSectionExpanded = false;
 
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -810,6 +812,9 @@ function renderProblems() {
 
   const sorted = sortProblems(problems);
   problems = sorted;
+  const activeProblems = sorted.filter((problem) => problem.state !== "done" && problem.state !== "parked");
+  const doneProblems = sorted.filter((problem) => problem.state === "done");
+  const parkedProblems = sorted.filter((problem) => problem.state === "parked");
 
   if (!sorted.length) {
     problemsEmptyState.hidden = false;
@@ -817,9 +822,78 @@ function renderProblems() {
   }
 
   problemsEmptyState.hidden = true;
-  for (const problem of sorted) {
+  for (const problem of activeProblems) {
     problemsList.appendChild(buildProblemCard(problem));
   }
+
+  if (!activeProblems.length) {
+    const activeEmpty = document.createElement("div");
+    activeEmpty.className = "problem-archive-empty";
+    activeEmpty.innerHTML = '<p class="muted">No active problems right now.</p>';
+    problemsList.appendChild(activeEmpty);
+  }
+
+  function appendCollapsedSection({ title, items, expanded, setExpanded }) {
+    if (!items.length) {
+      return;
+    }
+
+    const wrap = document.createElement("section");
+    wrap.className = "problem-archive-section";
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "agenda-section-toggle";
+    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+
+    const label = document.createElement("span");
+    label.textContent = `${title} (${items.length})`;
+
+    const icon = document.createElement("span");
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = expanded ? "⌃" : "⌄";
+
+    toggle.appendChild(label);
+    toggle.appendChild(icon);
+
+    const body = document.createElement("div");
+    body.className = "problem-archive-body";
+    body.hidden = !expanded;
+
+    for (const problem of items) {
+      body.appendChild(buildProblemCard(problem));
+    }
+
+    toggle.addEventListener("click", () => {
+      const nextExpanded = !body.hidden;
+      body.hidden = nextExpanded;
+      toggle.setAttribute("aria-expanded", nextExpanded ? "false" : "true");
+      icon.textContent = nextExpanded ? "⌄" : "⌃";
+      setExpanded(!nextExpanded);
+    });
+
+    wrap.appendChild(toggle);
+    wrap.appendChild(body);
+    problemsList.appendChild(wrap);
+  }
+
+  appendCollapsedSection({
+    title: "Done",
+    items: doneProblems,
+    expanded: doneSectionExpanded,
+    setExpanded: (value) => {
+      doneSectionExpanded = value;
+    },
+  });
+
+  appendCollapsedSection({
+    title: "Parked",
+    items: parkedProblems,
+    expanded: parkedSectionExpanded,
+    setExpanded: (value) => {
+      parkedSectionExpanded = value;
+    },
+  });
 }
 
 function normalizeProblem(problem) {
