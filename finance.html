@@ -185,13 +185,9 @@
             Due in days
             <input id="dueDaysInput" type="number" min="0" step="1" value="0" />
           </label>
-          <label class="field" for="taxTypeInput">
-            Tax type
-            <input id="taxTypeInput" type="text" value="" />
-          </label>
-          <label class="field" for="currencyInput">
-            Currency
-            <input id="currencyInput" type="text" value="" />
+          <label class="field" for="startingInvoiceNumberInput">
+            Starting invoice number
+            <input id="startingInvoiceNumberInput" type="number" min="1" step="1" value="1000" />
           </label>
           <label class="field suppliers-checkbox-field" for="excludeInvoicedInput">
             Export rule
@@ -230,13 +226,13 @@
           <table>
             <thead>
               <tr>
+                <th>Contact ID</th>
                 <th>Contact</th>
                 <th>Invoice Number</th>
                 <th>Invoice Date</th>
                 <th>Description</th>
                 <th>Unit Amount</th>
                 <th>Account Code</th>
-                <th>Tax Type</th>
               </tr>
             </thead>
             <tbody id="expensesImportPreviewBody">

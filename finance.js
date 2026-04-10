@@ -14,8 +14,7 @@ const carerHoursLink = document.getElementById("carerHoursLink");
 const expensesCsvInput = document.getElementById("expensesCsvInput");
 const invoiceDateInput = document.getElementById("invoiceDateInput");
 const dueDaysInput = document.getElementById("dueDaysInput");
-const taxTypeInput = document.getElementById("taxTypeInput");
-const currencyInput = document.getElementById("currencyInput");
+const startingInvoiceNumberInput = document.getElementById("startingInvoiceNumberInput");
 const excludeInvoicedInput = document.getElementById("excludeInvoicedInput");
 const onlyChargeableInput = document.getElementById("onlyChargeableInput");
 const convertExpensesBtn = document.getElementById("convertExpensesBtn");
@@ -254,14 +253,14 @@ function downloadCsv(filename, csvText) {
   URL.revokeObjectURL(url);
 }
 
-function buildInvoiceNumber(row, index, invoiceDate) {
-  const existingId = cleanCell(row["Invoice ID"]);
-  if (existingId) {
-    return existingId;
+function buildInvoiceNumber(startingNumber, index) {
+  const baseNumber = String(startingNumber ?? "").trim();
+  const numeric = Number(baseNumber);
+  if (!Number.isInteger(numeric) || numeric < 1) {
+    return String(index + 1);
   }
-  const contact = cleanCell(row.Client).replace(/[^A-Za-z0-9]+/g, "").slice(0, 8).toUpperCase() || "CLIENT";
-  const stamp = `${invoiceDate.getFullYear()}${String(invoiceDate.getMonth() + 1).padStart(2, "0")}${String(invoiceDate.getDate()).padStart(2, "0")}`;
-  return `EXP-${stamp}-${contact}-${String(index + 1).padStart(3, "0")}`;
+  const width = baseNumber.length;
+  return String(numeric + index).padStart(width, "0");
 }
 
 function buildDescription(row) {
@@ -297,13 +296,13 @@ function renderExpensesPreview(rows) {
   for (const row of rows.slice(0, 8)) {
     const tr = document.createElement("tr");
     for (const value of [
+      row.ContactID,
       row["*ContactName"],
       row["*InvoiceNumber"],
       row["*InvoiceDate"],
       row["*Description"],
       row["*UnitAmount"],
       row["*AccountCode"],
-      row["*TaxType"],
     ]) {
       const td = document.createElement("td");
       td.textContent = value;
@@ -323,8 +322,10 @@ function resetExpensesOutput() {
 function convertExpensesRows(sourceRows) {
   const invoiceDate = parseSourceDate(invoiceDateInput?.value) || new Date();
   const dueInDays = Math.max(0, Number(dueDaysInput?.value || 0) || 0);
+  const startingInvoiceNumber = cleanCell(startingInvoiceNumberInput?.value);
   const excludeInvoiced = excludeInvoicedInput?.checked !== false;
   const onlyChargeable = onlyChargeableInput?.checked !== false;
+  const groupedRows = new Map();
   const outputRows = [];
   const issues = [];
   let skippedAlreadyInvoiced = 0;
@@ -348,10 +349,14 @@ function convertExpensesRows(sourceRows) {
     const amount = parseCurrencyAmount(row.Amount);
     const accountCode = cleanCell(row["Account Code - Invoice"]);
     const contactName = cleanCell(row.Client);
-    const invoiceRowDate = parseSourceDate(row.Created) || invoiceDate;
+    const contactId = cleanCell(row["Client:XeroID"]);
 
     if (!contactName) {
       issues.push(`Row ${index + 2} skipped: missing Client.`);
+      return;
+    }
+    if (!contactId) {
+      issues.push(`Row ${index + 2} skipped: missing Client:XeroID.`);
       return;
     }
     if (amount === null) {
@@ -363,45 +368,76 @@ function convertExpensesRows(sourceRows) {
       return;
     }
 
-    const invoiceNumber = buildInvoiceNumber(row, index, invoiceRowDate);
     const description = buildDescription(row);
     const referenceParts = [cleanCell(row["Claim From"]), cleanCell(row["Client: Job Type"])]
       .filter(Boolean)
       .join(" - ");
+    const existingGroup = groupedRows.get(contactId);
 
-    outputRows.push({
-      ContactID: cleanCell(row["Client:XeroID"]),
-      "*ContactName": contactName,
-      EmailAddress: "",
-      POAddressLine1: "",
-      POAddressLine2: "",
-      POAddressLine3: "",
-      POAddressLine4: "",
-      POCity: "",
-      PORegion: "",
-      POPostalCode: "",
-      POCountry: "",
-      "*InvoiceNumber": invoiceNumber,
-      Reference: referenceParts || cleanCell(row.Description),
-      "*InvoiceDate": formatSlashDate(invoiceRowDate),
-      "*DueDate": formatSlashDate(addDays(invoiceRowDate, dueInDays)),
-      Total: amount.toFixed(2),
-      InventoryItemCode: "",
-      "*Description": description,
-      "*Quantity": "1",
-      "*UnitAmount": amount.toFixed(2),
-      Discount: "",
-      "*AccountCode": accountCode,
-      "*TaxType": "",
-      TaxAmount: "",
-      TrackingName1: "",
-      TrackingOption1: "",
-      TrackingName2: "",
-      TrackingOption2: "",
-      Currency: "",
-      BrandingTheme: "",
-    });
+    if (!existingGroup) {
+      groupedRows.set(contactId, {
+        contactId,
+        contactName,
+        accountCode,
+        total: amount,
+        descriptions: [description],
+        references: referenceParts ? [referenceParts] : [],
+      });
+      return;
+    }
+
+    if (existingGroup.accountCode !== accountCode) {
+      issues.push(
+        `Row ${index + 2} has a different account code for ContactID ${contactId}. Using ${existingGroup.accountCode}.`
+      );
+    }
+    if (existingGroup.contactName !== contactName) {
+      issues.push(`Row ${index + 2} has a different client name for ContactID ${contactId}. Using ${existingGroup.contactName}.`);
+    }
+
+    existingGroup.total += amount;
+    existingGroup.descriptions.push(description);
+    if (referenceParts) {
+      existingGroup.references.push(referenceParts);
+    }
   });
+
+  Array.from(groupedRows.values())
+    .sort((left, right) => left.contactName.localeCompare(right.contactName, undefined, { sensitivity: "base" }))
+    .forEach((group, index) => {
+      outputRows.push({
+        ContactID: group.contactId,
+        "*ContactName": group.contactName,
+        EmailAddress: "",
+        POAddressLine1: "",
+        POAddressLine2: "",
+        POAddressLine3: "",
+        POAddressLine4: "",
+        POCity: "",
+        PORegion: "",
+        POPostalCode: "",
+        POCountry: "",
+        "*InvoiceNumber": buildInvoiceNumber(startingInvoiceNumber, index),
+        Reference: Array.from(new Set(group.references)).join(" | "),
+        "*InvoiceDate": formatSlashDate(invoiceDate),
+        "*DueDate": formatSlashDate(addDays(invoiceDate, dueInDays)),
+        Total: group.total.toFixed(2),
+        InventoryItemCode: "",
+        "*Description": group.descriptions.filter(Boolean).join("\n\n"),
+        "*Quantity": "1",
+        "*UnitAmount": group.total.toFixed(2),
+        Discount: "",
+        "*AccountCode": group.accountCode,
+        "*TaxType": "",
+        TaxAmount: "",
+        TrackingName1: "",
+        TrackingOption1: "",
+        TrackingName2: "",
+        TrackingOption2: "",
+        Currency: "",
+        BrandingTheme: "",
+      });
+    });
 
   return {
     rows: outputRows,
@@ -439,7 +475,7 @@ async function handleExpensesConvert() {
 
     if (expensesImportSummary) {
       expensesImportSummary.textContent =
-        `Imported ${parsed.rows.length} source row(s). Prepared ${converted.rows.length} sales invoice row(s). ` +
+        `Imported ${parsed.rows.length} source row(s). Prepared ${converted.rows.length} sales invoice(s). ` +
         `Skipped ${converted.skippedAlreadyInvoiced} already invoiced row(s) and ${converted.skippedNonChargeable} non-chargeable row(s).`;
     }
 
