@@ -87,6 +87,8 @@ Set values in `frontend-config.js`:
 - `ONETOUCH_CARERS_TIMEOUT_MS` (optional; default `12000`)
 - `ONETOUCH_VISITS_TIMEOUT_MS` (optional; default `6000`)
 - `ONETOUCH_CARER_DETAIL_CONCURRENCY` (optional; default `4`)
+- `DEEPSEEK_API_KEY` for the Wellbeing Intake AI extraction flow
+- `DEEPSEEK_MODEL` (optional; default `deepseek-chat`)
 
 Optional fallback toggles:
 

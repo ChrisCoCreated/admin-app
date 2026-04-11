@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Wellbeing Intake</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260411b" />
+  </head>
+  <body class="auth-pending wellbeing-intake-page">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container wellbeing-intake-main">
+      <section class="hero compact wellbeing-intake-hero">
+        <div>
+          <p class="suppliers-kicker">AI to SharePoint</p>
+          <h1>Wellbeing Intake</h1>
+          <p id="statusMessage" class="muted">Checking access and loading the SharePoint form...</p>
+        </div>
+        <div class="supplier-actions">
+          <a id="openListLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer">Open SharePoint list</a>
+        </div>
+      </section>
+
+      <section class="wellbeing-intake-layout">
+        <article class="panel wellbeing-intake-compose">
+          <div class="panel-head">
+            <div>
+              <h2>Paste Text</h2>
+              <p class="muted">Paste notes, an email, or copied text and let AI draft the SharePoint entry.</p>
+            </div>
+          </div>
+
+          <label class="field" for="sourceTextInput">
+            Source text
+            <textarea
+              id="sourceTextInput"
+              class="wellbeing-intake-source"
+              placeholder="Paste the text you want to turn into a SharePoint entry..."
+            ></textarea>
+          </label>
+
+          <div class="wellbeing-intake-actions">
+            <button id="extractBtn" type="button">Extract with AI</button>
+            <button id="clearSourceBtn" class="secondary" type="button">Clear</button>
+          </div>
+          <p id="extractStatus" class="muted">
+            The AI draft will appear in the editable form. Nothing is saved until you click save.
+          </p>
+        </article>
+
+        <article class="panel wellbeing-intake-review">
+          <div class="panel-head">
+            <div>
+              <h2>Review Before Saving</h2>
+              <p id="formMeta" class="muted">Loading supported SharePoint fields...</p>
+            </div>
+          </div>
+
+          <form id="reviewForm" class="wellbeing-intake-form"></form>
+
+          <div id="unsupportedFieldsWrap" class="wellbeing-intake-unsupported" hidden>
+            <h3>Skipped fields</h3>
+            <p id="unsupportedFieldsText" class="muted"></p>
+          </div>
+
+          <div class="wellbeing-intake-actions">
+            <button id="saveBtn" type="button">Save to SharePoint</button>
+            <button id="resetDraftBtn" class="secondary" type="button">Reset Draft</button>
+          </div>
+          <p id="saveStatus" class="muted">Review and edit the draft before saving.</p>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="./wellbeing-intake.js"></script>
+  </body>
+</html>

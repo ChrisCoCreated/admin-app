@@ -323,6 +323,20 @@ export function createDirectoryApi(authController) {
       return response.blob();
     },
 
+    async parseWellbeingIntake(payload = {}) {
+      const response = await authFetch(endpoint("/api/wellbeing-intake/parse"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Wellbeing intake parse failed");
+      }
+      return response.json();
+    },
+
     async getClientsReconcilePreview() {
       const response = await authFetch(endpoint("/api/clients/reconcile/preview"));
       if (!response.ok) {

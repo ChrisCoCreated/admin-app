@@ -147,7 +147,7 @@ export function createSharePointApi({ siteUrl, getToken }) {
     const includeHidden = Boolean(options?.includeHidden);
     const hiddenFilter = includeHidden ? "" : "&$filter=Hidden eq false";
     const data = await request(
-      `/_api/web/lists(guid'${listId}')/fields?$select=Title,InternalName,TypeAsString,Hidden,ReadOnlyField,Choices,LookupList,LookupField,AllowMultipleValues${hiddenFilter}`,
+      `/_api/web/lists(guid'${listId}')/fields?$select=Title,InternalName,TypeAsString,Hidden,ReadOnlyField,Choices,LookupList,LookupField,AllowMultipleValues,Required,Description${hiddenFilter}`,
     );
     return Array.isArray(data?.d?.results) ? data.d.results : [];
   }

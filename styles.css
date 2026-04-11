@@ -2683,6 +2683,48 @@ dd {
   padding-bottom: 36px;
 }
 
+.wellbeing-intake-main {
+  padding-bottom: 36px;
+}
+
+.wellbeing-intake-hero {
+  align-items: flex-start;
+}
+
+.wellbeing-intake-layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.wellbeing-intake-source {
+  min-height: 280px;
+}
+
+.wellbeing-intake-form {
+  display: grid;
+  gap: 14px;
+}
+
+.wellbeing-intake-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+.wellbeing-field-help {
+  display: block;
+  margin-top: 6px;
+}
+
+.wellbeing-intake-unsupported {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #dbe4ef;
+}
+
 .consultant-grid {
   margin-top: 12px;
   display: grid;
@@ -4639,6 +4681,10 @@ body.lightbox-open {
 
   .suppliers-entry-panel {
     position: static;
+  }
+
+  .wellbeing-intake-layout {
+    grid-template-columns: 1fr;
   }
 }
 

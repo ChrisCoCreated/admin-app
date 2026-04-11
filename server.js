@@ -46,6 +46,7 @@ const mapsDriveTimeHandler = require("./api/maps/drive-time");
 const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 const consultantReportDocxHandler = require("./api/consultant/report-docx");
+const wellbeingIntakeParseHandler = require("./api/wellbeing-intake/parse");
 const scorecardHandler = require("./api/scorecard");
 const scorecardDefinitionsHandler = require("./api/scorecard/definitions");
 
@@ -510,6 +511,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await consultantReportDocxHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/wellbeing-intake/parse") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await wellbeingIntakeParseHandler(apiReq, apiRes);
     return true;
   }
 
