@@ -145,8 +145,11 @@ function buildFieldHelpText(field) {
   if (field.required) {
     parts.push("Required");
   }
-  if (field.type === "Choice" && field.choices.length) {
+  if (field.type === "Choice" && field.choices.length && normalizeKey(field.title) !== "supplier type") {
     parts.push(`Choices: ${field.choices.join(", ")}`);
+  }
+  if (normalizeKey(field.title) === "supplier type" && field.choices.length) {
+    parts.push(`Suggestions: ${field.choices.join(", ")}`);
   }
   if (field.description) {
     parts.push(field.description);
@@ -161,11 +164,12 @@ function buildInputId(field) {
 function createFieldControl(field) {
   const inputId = buildInputId(field);
   let control;
+  const isSupplierTypeField = normalizeKey(field.title) === "supplier type";
 
   if (field.type === "Note") {
     control = document.createElement("textarea");
     control.rows = 4;
-  } else if (field.type === "Choice") {
+  } else if (field.type === "Choice" && !isSupplierTypeField) {
     control = document.createElement("select");
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
@@ -197,6 +201,19 @@ function createFieldControl(field) {
     }
     if (field.type === "URL") {
       control.placeholder = "https://";
+    }
+    if (isSupplierTypeField && field.choices.length) {
+      const listId = `${inputId}-suggestions`;
+      const datalist = document.createElement("datalist");
+      datalist.id = listId;
+      for (const choice of field.choices) {
+        const option = document.createElement("option");
+        option.value = choice;
+        datalist.appendChild(option);
+      }
+      reviewForm.appendChild(datalist);
+      control.setAttribute("list", listId);
+      control.placeholder = "Type a supplier category";
     }
   }
 

@@ -75,8 +75,17 @@ function buildPrompt({ sourceText, fields }) {
   return [
     "Return valid json only.",
     "Turn the pasted text into a draft SharePoint list entry.",
+    "This is for a suppliers and experiences SharePoint list.",
     "Only use facts present in the text.",
     "If a field is not clearly present, return null.",
+    "Do not copy email headers or quoted thread text into Notes unless truly needed.",
+    "Prefer concise cleaned values over raw pasted blocks.",
+    "For Title, prefer the supplier or contact name.",
+    "For Contact Details, include the clean email address and any phone number, not the full email header.",
+    "For Notes, summarise the service offered, coverage area, home-visit availability, and pricing.",
+    "Only choose a Supplier Type when one of the available choices is clearly supported by the text; otherwise return null.",
+    "Only choose Town when one of the exact available choices is clearly mentioned.",
+    "If places mentioned are in Kent and County has Kent as an option, choose Kent.",
     "For choice fields, use the closest exact choice string when possible.",
     "For booleans, return 'true' or 'false' as strings.",
     "For dates, prefer YYYY-MM-DD when the date is clear.",
@@ -115,6 +124,284 @@ function parseJsonContent(content) {
 
   const parsed = JSON.parse(content);
   return parsed && typeof parsed === "object" ? parsed : {};
+}
+
+function fieldByTitle(fields, candidates) {
+  for (const candidate of candidates) {
+    const matched = fields.find((field) => normalizeText(field.title).toLowerCase() === normalizeText(candidate).toLowerCase());
+    if (matched) {
+      return matched;
+    }
+  }
+  return null;
+}
+
+function extractEmail(sourceText) {
+  const matched = String(sourceText || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return matched ? normalizeText(matched[0]) : "";
+}
+
+function extractUrl(sourceText) {
+  const matched = String(sourceText || "").match(/https?:\/\/\S+/i);
+  return matched ? normalizeText(matched[0].replace(/[),.;]+$/, "")) : "";
+}
+
+function extractName(sourceText) {
+  const fromMatch = String(sourceText || "").match(/From:\s*([^<\n\r]+?)\s*</i);
+  if (fromMatch?.[1]) {
+    return normalizeText(fromMatch[1]);
+  }
+
+  const signoffMatch = String(sourceText || "").match(/thank you\s+([A-Z][A-Za-z' -]{1,80})/i);
+  if (signoffMatch?.[1]) {
+    return normalizeText(signoffMatch[1]);
+  }
+
+  return "";
+}
+
+function extractBodyText(sourceText) {
+  const lines = String(sourceText || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const kept = [];
+  for (const line of lines) {
+    if (/^(from|to|subject|date):/i.test(line)) {
+      continue;
+    }
+    if (/^sent from my iphone$/i.test(line)) {
+      continue;
+    }
+    if (/^on .* wrote:$/i.test(line)) {
+      break;
+    }
+    if (/^www\./i.test(line) || /^thrive homecare$/i.test(line)) {
+      continue;
+    }
+    if (/^<image/i.test(line)) {
+      continue;
+    }
+    kept.push(line);
+  }
+
+  return kept.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function titleCaseWords(values) {
+  return values.map((value) =>
+    value
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ")
+  );
+}
+
+function extractLocations(sourceText) {
+  const text = ` ${String(sourceText || "").toLowerCase()} `;
+  const placeMap = new Map([
+    ["faversham", "Faversham"],
+    ["tenyham", "Tenyham"],
+    ["teynham", "Teynham"],
+    ["hernebay", "Hernebay"],
+    ["herne bay", "Herne Bay"],
+    ["ashford", "Ashford"],
+    ["lenham", "Lenham"],
+    ["kent", "Kent"],
+  ]);
+
+  const found = [];
+  for (const [needle, label] of placeMap.entries()) {
+    if (text.includes(` ${needle} `)) {
+      found.push(label);
+    }
+  }
+
+  return Array.from(new Set(found));
+}
+
+function inferCounty(sourceText, countyField) {
+  if (!countyField?.choices?.length) {
+    return "";
+  }
+
+  const locations = extractLocations(sourceText).map((value) => value.toLowerCase());
+  if (locations.some((value) => ["faversham", "teynham", "tenyham", "herne bay", "hernebay", "ashford", "lenham", "kent"].includes(value))) {
+    const kentChoice = countyField.choices.find((choice) => normalizeText(choice).toLowerCase() === "kent");
+    return kentChoice || "";
+  }
+
+  return "";
+}
+
+function inferTown(sourceText, townField) {
+  if (!townField?.choices?.length) {
+    return "";
+  }
+  const lowerText = String(sourceText || "").toLowerCase();
+  return townField.choices.find((choice) => lowerText.includes(normalizeText(choice).toLowerCase())) || "";
+}
+
+function inferSupplierType(sourceText, supplierTypeField) {
+  if (!supplierTypeField?.choices?.length) {
+    return "";
+  }
+
+  const text = String(sourceText || "").toLowerCase();
+  const exact = supplierTypeField.choices.find((choice) => text.includes(normalizeText(choice).toLowerCase()));
+  if (exact) {
+    return exact;
+  }
+
+  if (/\bhome visits?\b/.test(text)) {
+    const domCare = supplierTypeField.choices.find((choice) => normalizeText(choice).toLowerCase() === "dom care");
+    if (domCare) {
+      return domCare;
+    }
+  }
+
+  return "";
+}
+
+function inferTags(sourceText, tagsField) {
+  const text = String(sourceText || "").toLowerCase();
+  const matched = [];
+  const candidates = Array.isArray(tagsField?.choices) ? tagsField.choices : [];
+
+  for (const choice of candidates) {
+    const normalizedChoice = normalizeText(choice).toLowerCase();
+    if (normalizedChoice && text.includes(normalizedChoice)) {
+      matched.push(choice);
+    }
+  }
+
+  if (!matched.length && text.includes("namaste")) {
+    matched.push("namaste");
+  }
+
+  return Array.from(new Set(matched)).join(", ");
+}
+
+function extractPricePhrase(sourceText) {
+  const matched = String(sourceText || "").match(/£\s*\d+(?:\.\d{1,2})?(?:\s*(?:plus|per|\/)\s*[A-Za-z ]+)?/i);
+  return matched ? normalizeText(matched[0].replace(/\s+/g, " ")) : "";
+}
+
+function buildNotesSummary(sourceText) {
+  const bodyText = extractBodyText(sourceText);
+  const sentences = [];
+
+  if (/namaste/i.test(bodyText)) {
+    sentences.push("Offers namaste services.");
+  }
+  if (/\bhome visits?\b/i.test(bodyText)) {
+    sentences.push("Provides home visits.");
+  }
+
+  const locations = extractLocations(bodyText).filter((value) => value.toLowerCase() !== "kent");
+  if (locations.length) {
+    sentences.push(`Coverage area includes ${titleCaseWords(locations).join(", ")}.`);
+  }
+
+  const price = extractPricePhrase(bodyText);
+  if (price) {
+    sentences.push(`Charges ${price}.`);
+  }
+
+  if (!sentences.length && bodyText) {
+    sentences.push(bodyText);
+  }
+
+  return sentences.join(" ");
+}
+
+function buildContactDetails(sourceText) {
+  const parts = [];
+  const name = extractName(sourceText);
+  const email = extractEmail(sourceText);
+
+  if (name) {
+    parts.push(name);
+  }
+  if (email) {
+    parts.push(email);
+  }
+
+  return parts.join(" - ");
+}
+
+function applyHeuristics({ values, fields, sourceText }) {
+  const next = values && typeof values === "object" ? { ...values } : {};
+  const titleField = fieldByTitle(fields, ["Title"]);
+  const contactField = fieldByTitle(fields, ["Contact Details"]);
+  const countyField = fieldByTitle(fields, ["County"]);
+  const notesField = fieldByTitle(fields, ["Notes"]);
+  const townField = fieldByTitle(fields, ["Town"]);
+  const websiteField = fieldByTitle(fields, ["Website"]);
+  const supplierTypeField = fieldByTitle(fields, ["Supplier Type"]);
+  const tagsField = fieldByTitle(fields, ["Tags"]);
+
+  if (titleField?.internalName) {
+    const title = normalizeText(next[titleField.internalName]) || extractName(sourceText);
+    if (title) {
+      next[titleField.internalName] = title;
+    }
+  }
+
+  if (contactField?.internalName) {
+    const contactDetails = buildContactDetails(sourceText);
+    if (contactDetails) {
+      next[contactField.internalName] = contactDetails;
+    }
+  }
+
+  if (countyField?.internalName && !normalizeText(next[countyField.internalName])) {
+    const county = inferCounty(sourceText, countyField);
+    if (county) {
+      next[countyField.internalName] = county;
+    }
+  }
+
+  if (townField?.internalName && !normalizeText(next[townField.internalName])) {
+    const town = inferTown(sourceText, townField);
+    if (town) {
+      next[townField.internalName] = town;
+    }
+  }
+
+  if (supplierTypeField?.internalName && !normalizeText(next[supplierTypeField.internalName])) {
+    const supplierType = inferSupplierType(sourceText, supplierTypeField);
+    if (supplierType) {
+      next[supplierTypeField.internalName] = supplierType;
+    }
+  }
+
+  if (tagsField?.internalName && !normalizeText(next[tagsField.internalName])) {
+    const tags = inferTags(sourceText, tagsField);
+    if (tags) {
+      next[tagsField.internalName] = tags;
+    }
+  }
+
+  if (websiteField?.internalName) {
+    const url = normalizeText(next[websiteField.internalName]) || extractUrl(sourceText);
+    if (url && /^https?:\/\//i.test(url)) {
+      next[websiteField.internalName] = url;
+    } else if (!normalizeText(next[websiteField.internalName])) {
+      next[websiteField.internalName] = null;
+    }
+  }
+
+  if (notesField?.internalName) {
+    const notes = buildNotesSummary(sourceText);
+    if (notes) {
+      next[notesField.internalName] = notes;
+    }
+  }
+
+  return next;
 }
 
 async function callDeepSeek({ fields, sourceText }) {
@@ -203,7 +490,8 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const values = await callDeepSeek({ fields, sourceText });
+    const aiValues = await callDeepSeek({ fields, sourceText });
+    const values = applyHeuristics({ values: aiValues, fields, sourceText });
     res.status(200).json({
       success: true,
       values,
