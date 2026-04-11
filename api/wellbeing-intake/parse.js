@@ -147,6 +147,11 @@ function extractUrl(sourceText) {
 }
 
 function extractName(sourceText) {
+  const contactMatch = String(sourceText || "").match(/Contact:\s*([^\n\r]+)/i);
+  if (contactMatch?.[1]) {
+    return normalizeText(contactMatch[1]);
+  }
+
   const fromMatch = String(sourceText || "").match(/From:\s*([^<\n\r]+?)\s*</i);
   if (fromMatch?.[1]) {
     return normalizeText(fromMatch[1]);
@@ -158,6 +163,11 @@ function extractName(sourceText) {
   }
 
   return "";
+}
+
+function extractPhone(sourceText) {
+  const matched = String(sourceText || "").match(/(?:\+44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{3,4}/i);
+  return matched ? normalizeText(matched[0].replace(/\s+/g, " ")) : "";
 }
 
 function extractBodyText(sourceText) {
@@ -187,6 +197,51 @@ function extractBodyText(sourceText) {
   }
 
   return kept.join(" ").replace(/\s+/g, " ").trim();
+}
+
+function splitLines(sourceText) {
+  return String(sourceText || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim());
+}
+
+function isLikelyHeading(line) {
+  const value = normalizeText(line);
+  if (!value || value.length > 80) {
+    return false;
+  }
+  return /^[A-Z][A-Za-z0-9 /&()+-]+$/.test(value);
+}
+
+function extractStructuredSections(sourceText) {
+  const lines = splitLines(sourceText);
+  const sections = [];
+  let current = null;
+
+  for (const rawLine of lines) {
+    const line = normalizeText(rawLine);
+    if (!line) {
+      continue;
+    }
+    if (/^(from|to|subject|date):/i.test(line)) {
+      continue;
+    }
+    if (/^on .* wrote:$/i.test(line) || /^sent from my iphone$/i.test(line) || /^<image/i.test(line)) {
+      continue;
+    }
+
+    if (isLikelyHeading(line)) {
+      current = { heading: line, values: [] };
+      sections.push(current);
+      continue;
+    }
+
+    if (current) {
+      current.values.push(line.replace(/^[•*-]\s*/, ""));
+    }
+  }
+
+  return sections.filter((section) => section.values.length > 0);
 }
 
 function titleCaseWords(values) {
@@ -246,6 +301,13 @@ function inferTown(sourceText, townField) {
 
 function inferSupplierType(sourceText, supplierTypeField) {
   if (!supplierTypeField?.choices?.length) {
+    const lowerText = String(sourceText || "").toLowerCase();
+    if (lowerText.includes("namaste")) {
+      return "Namaste";
+    }
+    if (lowerText.includes("therapy")) {
+      return "Therapy";
+    }
     return "";
   }
 
@@ -260,6 +322,10 @@ function inferSupplierType(sourceText, supplierTypeField) {
     if (domCare) {
       return domCare;
     }
+  }
+
+  if (text.includes("namaste")) {
+    return "Namaste";
   }
 
   return "";
@@ -290,6 +356,13 @@ function extractPricePhrase(sourceText) {
 }
 
 function buildNotesSummary(sourceText) {
+  const structuredSections = extractStructuredSections(sourceText);
+  if (structuredSections.length) {
+    return structuredSections
+      .map((section) => `${section.heading}: ${section.values.join("; ")}`)
+      .join("\n");
+  }
+
   const bodyText = extractBodyText(sourceText);
   const sentences = [];
 
@@ -320,16 +393,38 @@ function buildNotesSummary(sourceText) {
 function buildContactDetails(sourceText) {
   const parts = [];
   const name = extractName(sourceText);
+  const phone = extractPhone(sourceText);
   const email = extractEmail(sourceText);
 
   if (name) {
     parts.push(name);
+  }
+  if (phone) {
+    parts.push(phone);
   }
   if (email) {
     parts.push(email);
   }
 
   return parts.join(" - ");
+}
+
+function mergeTextBlocks(primary, secondary) {
+  const left = normalizeText(primary);
+  const right = normalizeText(secondary);
+  if (left && right) {
+    if (left.toLowerCase() === right.toLowerCase()) {
+      return left;
+    }
+    if (left.toLowerCase().includes(right.toLowerCase())) {
+      return left;
+    }
+    if (right.toLowerCase().includes(left.toLowerCase())) {
+      return right;
+    }
+    return `${left}\n${right}`;
+  }
+  return left || right || "";
 }
 
 function applyHeuristics({ values, fields, sourceText }) {
@@ -342,9 +437,13 @@ function applyHeuristics({ values, fields, sourceText }) {
   const websiteField = fieldByTitle(fields, ["Website"]);
   const supplierTypeField = fieldByTitle(fields, ["Supplier Type"]);
   const tagsField = fieldByTitle(fields, ["Tags"]);
+  const structuredSections = extractStructuredSections(sourceText);
+  const serviceName = normalizeText(
+    structuredSections.find((section) => normalizeText(section.heading).toLowerCase() === "service name")?.values?.[0]
+  );
 
   if (titleField?.internalName) {
-    const title = normalizeText(next[titleField.internalName]) || extractName(sourceText);
+    const title = normalizeText(next[titleField.internalName]) || serviceName || extractName(sourceText);
     if (title) {
       next[titleField.internalName] = title;
     }
@@ -353,7 +452,7 @@ function applyHeuristics({ values, fields, sourceText }) {
   if (contactField?.internalName) {
     const contactDetails = buildContactDetails(sourceText);
     if (contactDetails) {
-      next[contactField.internalName] = contactDetails;
+      next[contactField.internalName] = mergeTextBlocks(next[contactField.internalName], contactDetails);
     }
   }
 
@@ -397,7 +496,7 @@ function applyHeuristics({ values, fields, sourceText }) {
   if (notesField?.internalName) {
     const notes = buildNotesSummary(sourceText);
     if (notes) {
-      next[notesField.internalName] = notes;
+      next[notesField.internalName] = mergeTextBlocks(next[notesField.internalName], notes);
     }
   }
 

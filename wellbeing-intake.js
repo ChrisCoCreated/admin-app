@@ -142,13 +142,14 @@ function toFieldDefinition(field) {
 
 function buildFieldHelpText(field) {
   const parts = [];
+  const normalizedTitle = normalizeKey(field.title);
   if (field.required) {
     parts.push("Required");
   }
-  if (field.type === "Choice" && field.choices.length && normalizeKey(field.title) !== "supplier type") {
+  if (field.type === "Choice" && field.choices.length && !["supplier type", "town"].includes(normalizedTitle)) {
     parts.push(`Choices: ${field.choices.join(", ")}`);
   }
-  if (normalizeKey(field.title) === "supplier type" && field.choices.length) {
+  if (["supplier type", "town"].includes(normalizedTitle) && field.choices.length) {
     parts.push(`Suggestions: ${field.choices.join(", ")}`);
   }
   if (field.description) {
@@ -165,11 +166,13 @@ function createFieldControl(field) {
   const inputId = buildInputId(field);
   let control;
   const isSupplierTypeField = normalizeKey(field.title) === "supplier type";
+  const isTownField = normalizeKey(field.title) === "town";
+  const useFreeTextSuggestions = isSupplierTypeField || isTownField;
 
   if (field.type === "Note") {
     control = document.createElement("textarea");
     control.rows = 4;
-  } else if (field.type === "Choice" && !isSupplierTypeField) {
+  } else if (field.type === "Choice" && !useFreeTextSuggestions) {
     control = document.createElement("select");
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
@@ -202,7 +205,7 @@ function createFieldControl(field) {
     if (field.type === "URL") {
       control.placeholder = "https://";
     }
-    if (isSupplierTypeField && field.choices.length) {
+    if (useFreeTextSuggestions && field.choices.length) {
       const listId = `${inputId}-suggestions`;
       const datalist = document.createElement("datalist");
       datalist.id = listId;
@@ -213,7 +216,7 @@ function createFieldControl(field) {
       }
       reviewForm.appendChild(datalist);
       control.setAttribute("list", listId);
-      control.placeholder = "Type a supplier category";
+      control.placeholder = isTownField ? "Type a town" : "Type a supplier category";
     }
   }
 
