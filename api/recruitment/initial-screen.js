@@ -215,17 +215,6 @@ module.exports = async (req, res) => {
     const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}?$expand=fields($select=${SCREEN_FIELDS.join(",")})`;
 
     if (req.method === "POST") {
-      const currentItem = mapInitialScreenItem(await graphClient.fetchJson(itemUrl));
-      if (!currentItem.active) {
-        res.status(409).json({
-          error: {
-            code: "INACTIVE_CANDIDATE",
-            message: "Only active candidates can be screened.",
-          },
-        });
-        return;
-      }
-
       const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
       await graphClient.fetchJson(patchUrl, {
         method: "PATCH",
@@ -264,15 +253,6 @@ module.exports = async (req, res) => {
     }
 
     const item = mapInitialScreenItem(await graphClient.fetchJson(itemUrl));
-    if (!item.active) {
-      res.status(404).json({
-        error: {
-          code: "NOT_FOUND",
-          message: "Candidate is not active.",
-        },
-      });
-      return;
-    }
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
