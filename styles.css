@@ -2679,6 +2679,14 @@ dd {
   min-height: 320px;
 }
 
+.email-attachment-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed #c9d1e1;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
 .consultant-main {
   padding-bottom: 36px;
 }

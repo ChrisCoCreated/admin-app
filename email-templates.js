@@ -9,6 +9,7 @@ const templateSelect = document.getElementById("templateSelect");
 const toInput = document.getElementById("toInput");
 const subjectInput = document.getElementById("subjectInput");
 const bodyInput = document.getElementById("bodyInput");
+const attachmentNotice = document.getElementById("attachmentNotice");
 const draftOutlookBtn = document.getElementById("draftOutlookBtn");
 const draftWebBtn = document.getElementById("draftWebBtn");
 const copyBodyBtn = document.getElementById("copyBodyBtn");
@@ -41,10 +42,25 @@ function applyTemplate(template) {
   if (!template) {
     subjectInput.value = "";
     bodyInput.value = "";
+    if (attachmentNotice) {
+      attachmentNotice.hidden = true;
+      attachmentNotice.textContent = "";
+    }
     return;
   }
   subjectInput.value = String(template.subject || "");
   bodyInput.value = String(template.body || "");
+
+  if (attachmentNotice) {
+    const attachments = Array.isArray(template.attachments) ? template.attachments.filter(Boolean) : [];
+    if (attachments.length) {
+      attachmentNotice.textContent = `Remember to attach: ${attachments.join(", ")}`;
+      attachmentNotice.hidden = false;
+    } else {
+      attachmentNotice.hidden = true;
+      attachmentNotice.textContent = "";
+    }
+  }
 }
 
 function renderTemplateOptions() {
