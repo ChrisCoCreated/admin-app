@@ -63,7 +63,16 @@
           <textarea id="bodyInput"></textarea>
         </label>
 
-        <div id="attachmentNotice" class="email-attachment-note muted" hidden></div>
+        <div id="attachmentPanel" class="email-attachment-note" hidden>
+          <p id="attachmentNotice" class="muted"></p>
+          <p class="row email-attachment-actions">
+            <a id="attachmentDownloadLink" class="button-link secondary-button-link" href="#" download hidden>Download brochure</a>
+          </p>
+          <label id="attachmentConfirmLabel" class="email-attachment-confirm" hidden>
+            <input id="attachmentConfirmCheckbox" type="checkbox" />
+            <span>I have downloaded or attached the brochure</span>
+          </label>
+        </div>
 
         <div class="row wrap-row">
           <button id="draftOutlookBtn" type="button">Draft in Outlook</button>

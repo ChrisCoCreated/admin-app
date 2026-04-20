@@ -9,13 +9,18 @@ const templateSelect = document.getElementById("templateSelect");
 const toInput = document.getElementById("toInput");
 const subjectInput = document.getElementById("subjectInput");
 const bodyInput = document.getElementById("bodyInput");
+const attachmentPanel = document.getElementById("attachmentPanel");
 const attachmentNotice = document.getElementById("attachmentNotice");
+const attachmentDownloadLink = document.getElementById("attachmentDownloadLink");
+const attachmentConfirmLabel = document.getElementById("attachmentConfirmLabel");
+const attachmentConfirmCheckbox = document.getElementById("attachmentConfirmCheckbox");
 const draftOutlookBtn = document.getElementById("draftOutlookBtn");
 const draftWebBtn = document.getElementById("draftWebBtn");
 const copyBodyBtn = document.getElementById("copyBodyBtn");
 const actionStatus = document.getElementById("actionStatus");
 
 let templates = [];
+let selectedTemplate = null;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -38,39 +43,101 @@ function redirectToUnauthorized(pageKey) {
   window.location.href = `./unauthorized.html?page=${page}`;
 }
 
+function requiresAttachmentConfirmation(template) {
+  const attachments = Array.isArray(template?.attachments) ? template.attachments.filter(Boolean) : [];
+  return attachments.length > 0;
+}
+
+function updateDraftButtons() {
+  const requiresConfirmation = requiresAttachmentConfirmation(selectedTemplate);
+  const confirmationComplete = !requiresConfirmation || Boolean(attachmentConfirmCheckbox?.checked);
+
+  if (draftOutlookBtn) {
+    draftOutlookBtn.disabled = !confirmationComplete;
+  }
+  if (draftWebBtn) {
+    draftWebBtn.disabled = !confirmationComplete;
+  }
+}
+
 function applyTemplate(template) {
+  selectedTemplate = template || null;
   if (!template) {
     subjectInput.value = "";
     bodyInput.value = "";
+    if (attachmentPanel) {
+      attachmentPanel.hidden = true;
+    }
     if (attachmentNotice) {
-      attachmentNotice.hidden = true;
       attachmentNotice.textContent = "";
     }
+    if (attachmentDownloadLink) {
+      attachmentDownloadLink.hidden = true;
+      attachmentDownloadLink.href = "#";
+      attachmentDownloadLink.removeAttribute("download");
+    }
+    if (attachmentConfirmCheckbox) {
+      attachmentConfirmCheckbox.checked = false;
+    }
+    if (attachmentConfirmLabel) {
+      attachmentConfirmLabel.hidden = true;
+    }
+    updateDraftButtons();
     return;
   }
   subjectInput.value = String(template.subject || "");
   bodyInput.value = String(template.body || "");
 
-  if (attachmentNotice) {
+  if (attachmentConfirmCheckbox) {
+    attachmentConfirmCheckbox.checked = false;
+  }
+
+  if (attachmentPanel && attachmentNotice) {
     const attachments = Array.isArray(template.attachments) ? template.attachments.filter(Boolean) : [];
     if (attachments.length) {
+      attachmentPanel.hidden = false;
       attachmentNotice.textContent = `Remember to attach: ${attachments.join(", ")}`;
-      attachmentNotice.hidden = false;
+      if (attachmentDownloadLink) {
+        const downloadHref = String(template.attachmentDownloadHref || "").trim();
+        if (downloadHref) {
+          attachmentDownloadLink.href = downloadHref;
+          attachmentDownloadLink.hidden = false;
+          attachmentDownloadLink.setAttribute("download", attachments[0]);
+        } else {
+          attachmentDownloadLink.hidden = true;
+          attachmentDownloadLink.href = "#";
+          attachmentDownloadLink.removeAttribute("download");
+        }
+      }
+      if (attachmentConfirmLabel) {
+        attachmentConfirmLabel.hidden = false;
+      }
     } else {
-      attachmentNotice.hidden = true;
+      attachmentPanel.hidden = true;
       attachmentNotice.textContent = "";
+      if (attachmentDownloadLink) {
+        attachmentDownloadLink.hidden = true;
+        attachmentDownloadLink.href = "#";
+        attachmentDownloadLink.removeAttribute("download");
+      }
+      if (attachmentConfirmLabel) {
+        attachmentConfirmLabel.hidden = true;
+      }
     }
   }
+
+  updateDraftButtons();
 }
 
 function renderTemplateOptions() {
   templateSelect.innerHTML = "";
 
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = "Selected Template";
+  templateSelect.appendChild(placeholderOption);
+
   if (!templates.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No templates available";
-    templateSelect.appendChild(option);
     applyTemplate(null);
     return;
   }
@@ -82,8 +149,8 @@ function renderTemplateOptions() {
     templateSelect.appendChild(option);
   }
 
-  templateSelect.selectedIndex = 0;
-  applyTemplate(templates[0]);
+  templateSelect.value = "";
+  applyTemplate(null);
 }
 
 async function loadTemplates() {
@@ -128,6 +195,10 @@ function openOutlookDraft() {
     setActionStatus("Subject and body are required.", true);
     return;
   }
+  if (requiresAttachmentConfirmation(selectedTemplate) && !attachmentConfirmCheckbox?.checked) {
+    setActionStatus("Please confirm the brochure has been downloaded or attached first.", true);
+    return;
+  }
 
   const mailtoParts = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
   const mailtoUrl = `mailto:${encodeURIComponent(to)}?${mailtoParts.join("&")}`;
@@ -142,6 +213,10 @@ function openWebDraft() {
 
   if (!subject || !body) {
     setActionStatus("Subject and body are required.", true);
+    return;
+  }
+  if (requiresAttachmentConfirmation(selectedTemplate) && !attachmentConfirmCheckbox?.checked) {
+    setActionStatus("Please confirm the brochure has been downloaded or attached first.", true);
     return;
   }
 
@@ -193,9 +268,16 @@ async function init() {
 
 templateSelect?.addEventListener("change", () => {
   const selectedId = String(templateSelect.value || "");
-  const selectedTemplate = templates.find((template) => String(template.id || template.subject || "") === selectedId);
-  applyTemplate(selectedTemplate || templates[0] || null);
+  const matchingTemplate = templates.find((template) => String(template.id || template.subject || "") === selectedId);
+  applyTemplate(matchingTemplate || null);
   setActionStatus("");
+});
+
+attachmentConfirmCheckbox?.addEventListener("change", () => {
+  updateDraftButtons();
+  if (attachmentConfirmCheckbox.checked) {
+    setActionStatus("");
+  }
 });
 
 copyBodyBtn?.addEventListener("click", () => {
