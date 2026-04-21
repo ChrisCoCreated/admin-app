@@ -5,6 +5,8 @@ import { renderTopNavigation } from "./navigation.js?v=20260409";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const deniedMessage = document.getElementById("deniedMessage");
+const retrySignInBtn = document.getElementById("retrySignInBtn");
+const differentAccountBtn = document.getElementById("differentAccountBtn");
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -20,6 +22,9 @@ const PAGE_LABELS = {
   drivetime: "Our Geography",
   consultant: "Consultant",
   marketing: "Marketing",
+  photolayout: "Photo Layout",
+  emailtemplates: "Email Templates",
+  reports: "Reports",
 };
 
 function getPageLabel(page) {
@@ -52,13 +57,42 @@ async function init() {
   }
 }
 
+async function restartSignInFlow({ forceAccountSelection }) {
+  const redirectUri = new URL("./index.html", window.location.href);
+  if (forceAccountSelection) {
+    redirectUri.searchParams.set("reauth", "1");
+  }
+
+  try {
+    retrySignInBtn && (retrySignInBtn.disabled = true);
+    differentAccountBtn && (differentAccountBtn.disabled = true);
+    signOutBtn && (signOutBtn.disabled = true);
+    await authController.signOut({
+      redirectUri: redirectUri.toString(),
+      forceAccountSelection,
+    });
+  } finally {
+    window.location.href = redirectUri.toString();
+  }
+}
+
 signOutBtn?.addEventListener("click", async () => {
   try {
     signOutBtn.disabled = true;
-    await authController.signOut();
+    await authController.signOut({
+      redirectUri: new URL("./index.html", window.location.href).toString(),
+    });
   } finally {
     window.location.href = "./index.html";
   }
+});
+
+retrySignInBtn?.addEventListener("click", () => {
+  void restartSignInFlow({ forceAccountSelection: false });
+});
+
+differentAccountBtn?.addEventListener("click", () => {
+  void restartSignInFlow({ forceAccountSelection: true });
 });
 
 setDeniedMessage();

@@ -3,6 +3,7 @@ const MSAL_SOURCES = [
   "https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.39.0/lib/msal-browser.min.js",
   "https://unpkg.com/@azure/msal-browser@2.39.0/lib/msal-browser.min.js",
 ];
+const FORCE_ACCOUNT_SELECTION_KEY = "thrive.auth.forceAccountSelection";
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -47,6 +48,32 @@ export function createAuthController(options) {
   let msalInstance = null;
   let account = null;
   let signOutWrap = null;
+
+  function canUseSessionStorage() {
+    return typeof window !== "undefined" && !!window.sessionStorage;
+  }
+
+  function setForceAccountSelection(enabled) {
+    if (!canUseSessionStorage()) {
+      return;
+    }
+    if (enabled) {
+      window.sessionStorage.setItem(FORCE_ACCOUNT_SELECTION_KEY, "true");
+      return;
+    }
+    window.sessionStorage.removeItem(FORCE_ACCOUNT_SELECTION_KEY);
+  }
+
+  function consumeForceAccountSelection() {
+    if (!canUseSessionStorage()) {
+      return false;
+    }
+    const enabled = window.sessionStorage.getItem(FORCE_ACCOUNT_SELECTION_KEY) === "true";
+    if (enabled) {
+      window.sessionStorage.removeItem(FORCE_ACCOUNT_SELECTION_KEY);
+    }
+    return enabled;
+  }
 
   function getErrorCode(error) {
     return String(error?.errorCode || error?.code || "").toLowerCase();
@@ -128,29 +155,52 @@ export function createAuthController(options) {
       await msalInstance.initialize();
     }
 
+    const shouldForceAccountSelection = consumeForceAccountSelection();
     const redirectResult = await msalInstance.handleRedirectPromise();
     if (redirectResult?.account) {
       account = redirectResult.account;
       msalInstance.setActiveAccount(account);
+      console.info("[Auth] Completed interactive sign-in redirect.", {
+        username: redirectResult.account?.username || "",
+      });
     }
 
-    if (!account) {
+    if (!account && !shouldForceAccountSelection) {
       const active = msalInstance.getActiveAccount();
       const all = msalInstance.getAllAccounts();
       account = active || all[0] || null;
       if (account) {
         msalInstance.setActiveAccount(account);
+        console.info("[Auth] Restored cached Microsoft account.", {
+          username: account.username || "",
+          source: active ? "active_account" : "accounts_cache",
+          cachedAccounts: all.length,
+        });
       }
+    } else if (!account && shouldForceAccountSelection) {
+      console.info("[Auth] Skipping cached account restore to force account selection.");
     }
 
     return account;
   }
 
-  async function signIn({ scopes = ["openid", "profile"], prompt = "select_account" } = {}) {
+  async function signIn({
+    scopes = ["openid", "profile"],
+    prompt = "select_account",
+    forcePrompt = false,
+  } = {}) {
     await init();
 
-    if (!account) {
+    if (forcePrompt) {
+      account = null;
+      if (msalInstance) {
+        msalInstance.setActiveAccount(null);
+      }
+    }
+
+    if (!account || forcePrompt) {
       if (shouldPreferRedirectAuth()) {
+        setForceAccountSelection(forcePrompt);
         await msalInstance.loginRedirect({ scopes, prompt });
         return null;
       }
@@ -164,6 +214,7 @@ export function createAuthController(options) {
           throw error;
         }
 
+        setForceAccountSelection(forcePrompt);
         await msalInstance.loginRedirect({ scopes, prompt });
         return null;
       }
@@ -222,8 +273,15 @@ export function createAuthController(options) {
     return acquireToken([`${siteHost}/AllSites.Write`]);
   }
 
-  async function signOut() {
+  async function signOut(options = {}) {
+    const redirectUri =
+      typeof options.redirectUri === "string" && options.redirectUri.trim()
+        ? options.redirectUri.trim()
+        : window.location.href;
+    const forceAccountSelection = options.forceAccountSelection === true;
+
     await init();
+    setForceAccountSelection(forceAccountSelection);
     if (!account) {
       setAuthUi(false);
       return;
@@ -233,17 +291,20 @@ export function createAuthController(options) {
       if (shouldPreferRedirectAuth()) {
         await msalInstance.logoutRedirect({
           account,
-          postLogoutRedirectUri: window.location.href,
+          postLogoutRedirectUri: redirectUri,
         });
         return;
       }
 
       await msalInstance.logoutPopup({
         account,
-        postLogoutRedirectUri: window.location.href,
+        postLogoutRedirectUri: redirectUri,
       });
     } finally {
       account = null;
+      if (msalInstance) {
+        msalInstance.setActiveAccount(null);
+      }
       setAuthUi(false);
       if (typeof onSignedOut === "function") {
         onSignedOut();
@@ -259,5 +320,6 @@ export function createAuthController(options) {
     signOut,
     getAccount: () => account,
     setAuthUi,
+    requestAccountSelection: () => setForceAccountSelection(true),
   };
 }

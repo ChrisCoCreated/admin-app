@@ -4,6 +4,18 @@ const { getAuthorizedUsersMap } = require("./authorized-users");
 const openIdConfigCache = new Map();
 const jwksCache = new Map();
 const authorizedUsers = getAuthorizedUsersMap();
+const API_AUTH_DEBUG = process.env.API_AUTH_DEBUG === "1";
+
+function logApiAuthDebug(message, details) {
+  if (!API_AUTH_DEBUG) {
+    return;
+  }
+  if (details !== undefined) {
+    console.log(`[api-auth] ${message}`, details);
+    return;
+  }
+  console.log(`[api-auth] ${message}`);
+}
 
 function base64UrlDecode(input) {
   const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
@@ -171,6 +183,7 @@ async function requireApiAuth(req, res, options = {}) {
   const match = /^Bearer\s+(.+)$/i.exec(authHeader);
 
   if (!match) {
+    logApiAuthDebug("Authorization header missing bearer token.");
     res.status(401).json({ error: "Missing bearer token." });
     return null;
   }
@@ -179,11 +192,27 @@ async function requireApiAuth(req, res, options = {}) {
     const claims = await validateBearerToken(match[1]);
     const email = resolveUserEmail(claims);
     const role = authorizedUsers.get(email);
+    logApiAuthDebug("Validated bearer token.", {
+      email,
+      role: role || "",
+      aud: claims?.aud || "",
+      iss: claims?.iss || "",
+      scp: claims?.scp || "",
+    });
     if (!email || !role) {
+      logApiAuthDebug("Token resolved to an unauthorized email.", {
+        email,
+        knownUser: Boolean(role),
+      });
       res.status(403).json({ error: "Forbidden." });
       return null;
     }
     if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+      logApiAuthDebug("Authenticated role is not permitted for route.", {
+        email,
+        role,
+        allowedRoles,
+      });
       res.status(403).json({ error: "Forbidden." });
       return null;
     }
@@ -193,7 +222,11 @@ async function requireApiAuth(req, res, options = {}) {
       claims,
     };
     return claims;
-  } catch {
+  } catch (error) {
+    logApiAuthDebug("Bearer token rejected.", {
+      reason: error?.message || String(error),
+      routeMethod: req?.method || "",
+    });
     res.status(401).json({ error: "Unauthorized." });
     return null;
   }

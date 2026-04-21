@@ -44,6 +44,20 @@ if (authCard) {
   authCard.hidden = true;
 }
 
+function shouldForceReauth() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("reauth") === "1";
+}
+
+function clearReauthQueryParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("reauth")) {
+    return;
+  }
+  url.searchParams.delete("reauth");
+  window.history.replaceState({}, "", url.toString());
+}
+
 function setStatus(message, isError = false) {
   authState.textContent = message;
   authState.classList.toggle("error", isError);
@@ -255,6 +269,18 @@ async function renderRoleMenu() {
 async function init() {
   try {
     setStatus("Checking session...");
+    if (shouldForceReauth()) {
+      clearReauthQueryParam();
+      setStatus("Choose the Microsoft account to continue.");
+      setSignedOutUi();
+      await authController.signIn({
+        scopes: ["openid", "profile", FRONTEND_CONFIG.apiScope],
+        prompt: "select_account",
+        forcePrompt: true,
+      });
+      return;
+    }
+
     const account = await authController.restoreSession();
     if (!account) {
       setStatus("Please sign in.");
