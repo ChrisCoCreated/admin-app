@@ -92,7 +92,7 @@ function resolveRoleFromFlags(flags) {
   }
 
   const pageKey = canonicalizePagesKey(pages);
-  return ROLE_BY_PAGE_KEY.get(pageKey) || null;
+  return ROLE_BY_PAGE_KEY.get(pageKey) || (pageKey ? `pages:${pageKey}` : null);
 }
 
 function buildAuthorizedUsersFromEnv() {

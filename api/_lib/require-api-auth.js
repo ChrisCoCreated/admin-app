@@ -5,6 +5,95 @@ const openIdConfigCache = new Map();
 const jwksCache = new Map();
 const authorizedUsers = getAuthorizedUsersMap();
 const API_AUTH_DEBUG = process.env.API_AUTH_DEBUG === "1";
+const ROLE_PAGES = {
+  admin: [
+    "clients",
+    "carers",
+    "timesheets",
+    "recruitment",
+    "wellbeingintake",
+    "enquiries",
+    "agendas",
+    "problems",
+    "scorecard",
+    "scorecarddefinitions",
+    "scorecardgoals",
+    "whiteboard",
+    "simpletasks",
+    "tasks",
+    "taskstest",
+    "mapping",
+    "drivetime",
+    "reports",
+    "finance",
+    "emailtemplates",
+    "suppliers",
+    "consultant",
+    "marketing",
+    "photolayout",
+  ],
+  care_manager: [
+    "clients",
+    "carers",
+    "timesheets",
+    "recruitment",
+    "wellbeingintake",
+    "enquiries",
+    "agendas",
+    "scorecard",
+    "whiteboard",
+    "simpletasks",
+    "tasks",
+    "mapping",
+    "drivetime",
+    "reports",
+    "emailtemplates",
+    "suppliers",
+  ],
+  operations: [
+    "clients",
+    "carers",
+    "timesheets",
+    "recruitment",
+    "wellbeingintake",
+    "enquiries",
+    "agendas",
+    "scorecard",
+    "whiteboard",
+    "simpletasks",
+    "tasks",
+    "mapping",
+    "drivetime",
+    "reports",
+    "emailtemplates",
+    "suppliers",
+  ],
+  finance: ["finance"],
+  consultant: ["consultant", "agendas"],
+  director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
+  marketing: ["marketing", "photolayout", "emailtemplates", "agendas"],
+  photo_layout: ["photolayout", "agendas"],
+  time_only: ["timesheets", "mapping", "drivetime", "agendas"],
+  hr_only: ["carers", "timesheets", "recruitment", "agendas"],
+  clients_only: ["clients", "agendas"],
+  enquiries_only: ["enquiries", "agendas"],
+  hr_clients: ["clients", "carers", "timesheets", "recruitment", "agendas"],
+  time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
+  time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
+  time_hr_clients: ["clients", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
+  logged_in: ["drivetime"],
+};
+const ACCESS_PAGE_EXPANSIONS = {
+  marketing: ["marketing", "photolayout", "emailtemplates", "agendas"],
+  photolayout: ["photolayout", "agendas"],
+  finance: ["finance"],
+  mapping: ["timesheets", "mapping", "drivetime", "agendas"],
+  drivetime: ["timesheets", "mapping", "drivetime", "agendas"],
+  carers: ["carers", "timesheets", "recruitment", "agendas"],
+  clients: ["clients", "agendas"],
+  enquiries: ["enquiries", "agendas"],
+  consultant: ["consultant", "agendas"],
+};
 
 function logApiAuthDebug(message, details) {
   if (!API_AUTH_DEBUG) {
@@ -15,6 +104,62 @@ function logApiAuthDebug(message, details) {
     return;
   }
   console.log(`[api-auth] ${message}`);
+}
+
+function normalizeRole(role) {
+  return String(role || "").trim().toLowerCase();
+}
+
+function getDynamicAccessiblePages(role) {
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole.startsWith("pages:")) {
+    return [];
+  }
+
+  const pages = normalizedRole
+    .slice("pages:".length)
+    .split(",")
+    .map((page) => String(page || "").trim().toLowerCase())
+    .filter(Boolean);
+  const accessible = new Set();
+
+  for (const page of pages) {
+    const expandedPages = ACCESS_PAGE_EXPANSIONS[page] || [page];
+    for (const expandedPage of expandedPages) {
+      accessible.add(expandedPage);
+    }
+  }
+
+  return Array.from(accessible);
+}
+
+function getAccessiblePages(role) {
+  const normalizedRole = normalizeRole(role);
+  const pages = ROLE_PAGES[normalizedRole] || getDynamicAccessiblePages(normalizedRole);
+  if (!Array.isArray(pages)) {
+    return [];
+  }
+  if (pages.includes("drivetime")) {
+    return pages;
+  }
+  return [...pages, "drivetime"];
+}
+
+function roleMatchesAllowedRoles(role, allowedRoles) {
+  const normalizedRole = normalizeRole(role);
+  if (allowedRoles.includes(normalizedRole)) {
+    return true;
+  }
+
+  const userPages = new Set(getAccessiblePages(normalizedRole));
+  if (!userPages.size) {
+    return false;
+  }
+
+  return allowedRoles.some((allowedRole) => {
+    const requiredPages = getAccessiblePages(allowedRole);
+    return requiredPages.length > 0 && requiredPages.every((page) => userPages.has(page));
+  });
 }
 
 function base64UrlDecode(input) {
@@ -207,7 +352,7 @@ async function requireApiAuth(req, res, options = {}) {
       res.status(403).json({ error: "Forbidden." });
       return null;
     }
-    if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    if (allowedRoles && allowedRoles.length > 0 && !roleMatchesAllowedRoles(role, allowedRoles)) {
       logApiAuthDebug("Authenticated role is not permitted for route.", {
         email,
         role,

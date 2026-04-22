@@ -83,6 +83,18 @@ const ROLE_PAGES = {
   logged_in: ["drivetime"],
 };
 
+const ACCESS_PAGE_EXPANSIONS = {
+  marketing: ["marketing", "photolayout", "emailtemplates", "agendas"],
+  photolayout: ["photolayout", "agendas"],
+  finance: ["finance"],
+  mapping: ["timesheets", "mapping", "drivetime", "agendas"],
+  drivetime: ["timesheets", "mapping", "drivetime", "agendas"],
+  carers: ["carers", "timesheets", "recruitment", "agendas"],
+  clients: ["clients", "agendas"],
+  enquiries: ["enquiries", "agendas"],
+  consultant: ["consultant", "agendas"],
+};
+
 const PAGE_META = {
   clients: { href: "./clients.html", label: "Clients" },
   carers: { href: "./carers.html", label: "Carers" },
@@ -138,6 +150,29 @@ function normalizeRole(role) {
   return String(role || "").trim().toLowerCase();
 }
 
+function getDynamicAccessiblePages(role) {
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole.startsWith("pages:")) {
+    return [];
+  }
+
+  const pages = normalizedRole
+    .slice("pages:".length)
+    .split(",")
+    .map((page) => String(page || "").trim().toLowerCase())
+    .filter(Boolean);
+  const accessible = new Set();
+
+  for (const page of pages) {
+    const expandedPages = ACCESS_PAGE_EXPANSIONS[page] || [page];
+    for (const expandedPage of expandedPages) {
+      accessible.add(expandedPage);
+    }
+  }
+
+  return Array.from(accessible);
+}
+
 function normalizePath(pathname) {
   const lastSegment = String(pathname || "").split("/").pop() || "";
   return lastSegment.toLowerCase();
@@ -145,7 +180,7 @@ function normalizePath(pathname) {
 
 export function getAccessiblePages(role) {
   const normalizedRole = normalizeRole(role);
-  const pages = ROLE_PAGES[normalizedRole];
+  const pages = ROLE_PAGES[normalizedRole] || getDynamicAccessiblePages(normalizedRole);
   if (!Array.isArray(pages)) {
     return [];
   }
