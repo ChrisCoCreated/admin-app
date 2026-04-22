@@ -5,6 +5,7 @@ import { renderTopNavigation } from "./navigation.js?v=20260409";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const deniedMessage = document.getElementById("deniedMessage");
+const deniedEmail = document.getElementById("deniedEmail");
 const retrySignInBtn = document.getElementById("retrySignInBtn");
 const differentAccountBtn = document.getElementById("differentAccountBtn");
 
@@ -41,14 +42,25 @@ function setDeniedMessage() {
   deniedMessage.textContent = `You do not have permission to view ${getPageLabel(page)}.`;
 }
 
+function setDeniedEmail(email, sourceLabel = "Microsoft account") {
+  if (!deniedEmail) {
+    return;
+  }
+  const normalizedEmail = String(email || "").trim();
+  deniedEmail.textContent = normalizedEmail ? `${sourceLabel}: ${normalizedEmail}` : "";
+  deniedEmail.hidden = !normalizedEmail;
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
+    setDeniedEmail(account?.username || authController.getCachedAccount()?.username || "");
     if (!account) {
       return;
     }
 
     const profile = await directoryApi.getCurrentUser();
+    setDeniedEmail(profile?.email || account?.username || "", "Signed in as");
     renderTopNavigation({ role: profile?.role, currentPathname: window.location.pathname });
   } catch (error) {
     console.error(error);

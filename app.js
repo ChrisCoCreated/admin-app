@@ -10,6 +10,7 @@ const mainContainer = document.querySelector("main.container");
 const signOutBtn = document.getElementById("signOutBtn");
 const topbarActions = document.getElementById("topbarActions");
 const heroSignInMessage = document.getElementById("heroSignInMessage");
+const homeCachedEmail = document.getElementById("homeCachedEmail");
 const homeUserEmail = document.getElementById("homeUserEmail");
 const homeUserPermissions = document.getElementById("homeUserPermissions");
 const homeQuickLinks = document.getElementById("homeQuickLinks");
@@ -96,6 +97,13 @@ function setSignedOutUi() {
   if (signInBtn) {
     signInBtn.disabled = false;
   }
+
+  const cachedAccount = authController.getCachedAccount();
+  if (homeCachedEmail) {
+    const cachedEmail = String(cachedAccount?.username || "").trim();
+    homeCachedEmail.textContent = cachedEmail ? `Microsoft account in browser: ${cachedEmail}` : "";
+    homeCachedEmail.hidden = !cachedEmail;
+  }
 }
 
 function setSignedInUi() {
@@ -107,6 +115,10 @@ function setSignedInUi() {
   }
   if (heroSignInMessage) {
     heroSignInMessage.hidden = true;
+  }
+  if (homeCachedEmail) {
+    homeCachedEmail.hidden = true;
+    homeCachedEmail.textContent = "";
   }
 }
 

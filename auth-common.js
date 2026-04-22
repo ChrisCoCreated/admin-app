@@ -4,6 +4,7 @@ const MSAL_SOURCES = [
   "https://unpkg.com/@azure/msal-browser@2.39.0/lib/msal-browser.min.js",
 ];
 const FORCE_ACCOUNT_SELECTION_KEY = "thrive.auth.forceAccountSelection";
+const AUTO_RESTORE_SUPPRESSED_KEY = "thrive.auth.autoRestoreSuppressed";
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -62,6 +63,33 @@ export function createAuthController(options) {
       return;
     }
     window.sessionStorage.removeItem(FORCE_ACCOUNT_SELECTION_KEY);
+  }
+
+  function isAutoRestoreSuppressed() {
+    if (!canUseSessionStorage()) {
+      return false;
+    }
+    return window.sessionStorage.getItem(AUTO_RESTORE_SUPPRESSED_KEY) === "true";
+  }
+
+  function setAutoRestoreSuppressed(enabled) {
+    if (!canUseSessionStorage()) {
+      return;
+    }
+    if (enabled) {
+      window.sessionStorage.setItem(AUTO_RESTORE_SUPPRESSED_KEY, "true");
+      return;
+    }
+    window.sessionStorage.removeItem(AUTO_RESTORE_SUPPRESSED_KEY);
+  }
+
+  function getCachedAccountCandidate() {
+    if (!msalInstance) {
+      return null;
+    }
+    const active = msalInstance.getActiveAccount();
+    const all = msalInstance.getAllAccounts();
+    return active || all[0] || null;
   }
 
   function consumeForceAccountSelection() {
@@ -156,16 +184,18 @@ export function createAuthController(options) {
     }
 
     const shouldForceAccountSelection = consumeForceAccountSelection();
+    const suppressAutoRestore = isAutoRestoreSuppressed();
     const redirectResult = await msalInstance.handleRedirectPromise();
     if (redirectResult?.account) {
       account = redirectResult.account;
       msalInstance.setActiveAccount(account);
+      setAutoRestoreSuppressed(false);
       console.info("[Auth] Completed interactive sign-in redirect.", {
         username: redirectResult.account?.username || "",
       });
     }
 
-    if (!account && !shouldForceAccountSelection) {
+    if (!account && !shouldForceAccountSelection && !suppressAutoRestore) {
       const active = msalInstance.getActiveAccount();
       const all = msalInstance.getAllAccounts();
       account = active || all[0] || null;
@@ -177,6 +207,11 @@ export function createAuthController(options) {
           cachedAccounts: all.length,
         });
       }
+    } else if (!account && suppressAutoRestore) {
+      const cachedAccount = getCachedAccountCandidate();
+      console.info("[Auth] Skipping cached account restore because the user signed out.", {
+        username: cachedAccount?.username || "",
+      });
     } else if (!account && shouldForceAccountSelection) {
       console.info("[Auth] Skipping cached account restore to force account selection.");
     }
@@ -199,6 +234,7 @@ export function createAuthController(options) {
     }
 
     if (!account || forcePrompt) {
+      setAutoRestoreSuppressed(false);
       if (shouldPreferRedirectAuth()) {
         setForceAccountSelection(forcePrompt);
         await msalInstance.loginRedirect({ scopes, prompt });
@@ -209,6 +245,7 @@ export function createAuthController(options) {
         const loginResult = await msalInstance.loginPopup({ scopes, prompt });
         account = loginResult.account;
         msalInstance.setActiveAccount(account);
+        setAutoRestoreSuppressed(false);
       } catch (error) {
         if (!shouldFallbackToRedirectOnInteractiveError(error)) {
           throw error;
@@ -282,6 +319,7 @@ export function createAuthController(options) {
 
     await init();
     setForceAccountSelection(forceAccountSelection);
+    setAutoRestoreSuppressed(true);
     if (!account) {
       setAuthUi(false);
       return;
@@ -319,6 +357,7 @@ export function createAuthController(options) {
     acquireSharePointToken,
     signOut,
     getAccount: () => account,
+    getCachedAccount: () => getCachedAccountCandidate(),
     setAuthUi,
     requestAccountSelection: () => setForceAccountSelection(true),
   };
