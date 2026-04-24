@@ -29,7 +29,7 @@ const ADMIN_HOME_EXTERNAL_LINKS = [
       {
         href: "https://www.thrivehomecare.co.uk/prices",
         label: "East Kent",
-        description: "Current",
+        description: "Priceing on Thrive Website",
         current: true,
       },
       {
