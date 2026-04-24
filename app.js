@@ -21,10 +21,23 @@ const homeAdminLinksGrid = document.getElementById("homeAdminLinksGrid");
 
 const ADMIN_HOME_EXTERNAL_LINKS = [
   {
-    href: "https://www.thrivehomecare.co.uk/prices",
     label: "Prices",
-    description: "Thrive HomeCare",
+    description: "Regional rate links",
     iconText: "£",
+    expandable: true,
+    items: [
+      {
+        href: "https://www.thrivehomecare.co.uk/prices",
+        label: "East Kent",
+        description: "Current",
+        current: true,
+      },
+      {
+        href: "https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Rates/AllItems.aspx?env=WebViewList",
+        label: "London Plus",
+        description: "SharePoint rates table",
+      },
+    ],
   },
   {
     href: "https://care2.onetouchhealth.net/cm/in/menuNewV.php",
@@ -200,36 +213,60 @@ function renderAdminHomeLinks(role) {
   }
 
   for (const linkMeta of ADMIN_HOME_EXTERNAL_LINKS) {
+    if (linkMeta.expandable && Array.isArray(linkMeta.items) && linkMeta.items.length) {
+      const group = document.createElement("details");
+      group.className = "home-menu-link home-menu-link-expandable";
+      group.open = true;
+
+      const summary = document.createElement("summary");
+      summary.className = "home-menu-link-summary";
+      summary.appendChild(buildAdminLinkHeading(linkMeta));
+
+      const description = document.createElement("span");
+      description.className = "home-menu-link-meta";
+      description.textContent = linkMeta.description;
+      summary.appendChild(description);
+
+      const table = document.createElement("div");
+      table.className = "home-menu-link-table";
+
+      for (const item of linkMeta.items) {
+        const row = document.createElement("a");
+        row.className = "home-menu-link-table-row";
+        if (item.current) {
+          row.classList.add("is-current");
+        }
+        row.href = item.href;
+        row.target = "_blank";
+        row.rel = "noreferrer";
+
+        const label = document.createElement("span");
+        label.className = "home-menu-link-table-label";
+        label.textContent = item.label;
+        row.appendChild(label);
+
+        if (item.description) {
+          const note = document.createElement("span");
+          note.className = "home-menu-link-table-note";
+          note.textContent = item.description;
+          row.appendChild(note);
+        }
+
+        table.appendChild(row);
+      }
+
+      group.append(summary, table);
+      homeAdminLinksGrid.appendChild(group);
+      continue;
+    }
+
     const link = document.createElement("a");
     link.className = "home-menu-link home-menu-link-external";
     link.href = linkMeta.href;
     link.target = "_blank";
     link.rel = "noreferrer";
 
-    const titleRow = document.createElement("span");
-    titleRow.className = "home-menu-link-title-row";
-
-    const title = document.createElement("span");
-    title.className = "home-menu-link-title";
-    title.textContent = linkMeta.label;
-
-    if (linkMeta.iconText) {
-      const icon = document.createElement("span");
-      icon.className = "home-menu-link-icon home-menu-link-icon-text";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = linkMeta.iconText;
-      titleRow.appendChild(icon);
-    } else if (linkMeta.iconSrc) {
-      const icon = document.createElement("img");
-      icon.className = "home-menu-link-icon home-menu-link-icon-image";
-      icon.src = linkMeta.iconSrc;
-      icon.alt = linkMeta.iconAlt || "";
-      icon.width = 20;
-      icon.height = 20;
-      titleRow.appendChild(icon);
-    }
-
-    titleRow.appendChild(title);
+    const titleRow = buildAdminLinkHeading(linkMeta);
 
     const description = document.createElement("span");
     description.className = "home-menu-link-meta";
@@ -241,6 +278,34 @@ function renderAdminHomeLinks(role) {
   }
 
   homeAdminLinks.hidden = !homeAdminLinksGrid.children.length;
+}
+
+function buildAdminLinkHeading(linkMeta) {
+  const titleRow = document.createElement("span");
+  titleRow.className = "home-menu-link-title-row";
+
+  if (linkMeta.iconText) {
+    const icon = document.createElement("span");
+    icon.className = "home-menu-link-icon home-menu-link-icon-text";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = linkMeta.iconText;
+    titleRow.appendChild(icon);
+  } else if (linkMeta.iconSrc) {
+    const icon = document.createElement("img");
+    icon.className = "home-menu-link-icon home-menu-link-icon-image";
+    icon.src = linkMeta.iconSrc;
+    icon.alt = linkMeta.iconAlt || "";
+    icon.width = 20;
+    icon.height = 20;
+    titleRow.appendChild(icon);
+  }
+
+  const title = document.createElement("span");
+  title.className = "home-menu-link-title";
+  title.textContent = linkMeta.label;
+  titleRow.appendChild(title);
+
+  return titleRow;
 }
 
 const authController = createAuthController({
