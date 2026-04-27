@@ -212,7 +212,17 @@ function getFirstNameSortValue(candidateName) {
 
 function normalizeStatusOptions(options) {
   const list = Array.isArray(options) ? options.map(cleanText).filter(Boolean) : [];
-  return list.length ? Array.from(new Set(list)) : [...DEFAULT_RECRUITMENT_STATUS_OPTIONS];
+  const deduped = list.length ? Array.from(new Set(list)) : [...DEFAULT_RECRUITMENT_STATUS_OPTIONS];
+  const trailingRejected = [];
+  const leadingStatuses = [];
+  for (const status of deduped) {
+    if (status === "Rejected" || status === "RED FLAG (Rejected)") {
+      trailingRejected.push(status);
+    } else {
+      leadingStatuses.push(status);
+    }
+  }
+  return [...leadingStatuses, ...trailingRejected];
 }
 
 function normalizeOwnerOptions(options) {
