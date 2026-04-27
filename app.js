@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { getAccessiblePages, getHomePageTiles, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260409";
+import { getAccessiblePages, getHomePageTiles, getPageMeta, renderTopNavigation } from "./navigation.js?v=20260427";
 
 const signInBtn = document.getElementById("signInBtn");
 const authState = document.getElementById("authState");
@@ -181,7 +181,7 @@ function renderHomeQuickLinks(role) {
   if (homeQuickLinksMessage) {
     homeQuickLinksMessage.textContent = isAdmin
       ? "Common admin destinations are pinned here for quicker access."
-      : "All of your available pages are shown here because you only have access to a few.";
+      : "Your available pages are shown here for quicker access.";
   }
 
   for (const pageKey of pageKeys) {

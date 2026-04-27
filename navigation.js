@@ -123,6 +123,7 @@ const PAGE_META = {
 };
 
 const ADMIN_HOME_PAGES = ["finance", "reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
+const MAX_STANDARD_ROLE_HOME_PAGES = 8;
 const MENU_GROUPS = [
   {
     title: "People",
@@ -204,7 +205,7 @@ export function getHomePageTiles(role) {
   if (normalizedRole === "admin") {
     return ADMIN_HOME_PAGES.filter((pageKey) => accessiblePages.includes(pageKey));
   }
-  if (accessiblePages.length <= 4) {
+  if (normalizedRole.startsWith("pages:") || accessiblePages.length <= MAX_STANDARD_ROLE_HOME_PAGES) {
     return accessiblePages;
   }
   return [];

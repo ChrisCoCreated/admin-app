@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260409";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260427";
 
 const ORG_PEOPLE = [
   { name: "Nathan", email: "nathan@planwithcare.co.uk" },

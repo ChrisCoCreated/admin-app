@@ -132,6 +132,9 @@ export function createAuthController(options) {
     if (signOutWrap || !mainContainer) {
       return;
     }
+    if (document.getElementById("signOutBtn")) {
+      return;
+    }
 
     signOutWrap = document.createElement("div");
     signOutWrap.className = "signout-row";
