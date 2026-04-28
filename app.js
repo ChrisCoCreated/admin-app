@@ -19,7 +19,7 @@ const homeMenuGrid = document.getElementById("homeMenuGrid");
 const homeAdminLinks = document.getElementById("homeAdminLinks");
 const homeAdminLinksGrid = document.getElementById("homeAdminLinksGrid");
 
-const ADMIN_HOME_EXTERNAL_LINKS = [
+const HOME_EXTERNAL_LINKS = [
   {
     label: "Prices",
     description: "Regional rate links",
@@ -29,7 +29,7 @@ const ADMIN_HOME_EXTERNAL_LINKS = [
       {
         href: "https://www.thrivehomecare.co.uk/prices",
         label: "East Kent",
-        description: "Priceing on Thrive Website",
+        description: "Pricing on Thrive website",
         current: true,
       },
       {
@@ -199,20 +199,14 @@ function renderHomeQuickLinks(role) {
   homeQuickLinks.hidden = !homeMenuGrid.children.length;
 }
 
-function renderAdminHomeLinks(role) {
+function renderAdminHomeLinks() {
   if (!homeAdminLinks || !homeAdminLinksGrid) {
     return;
   }
 
-  const isAdmin = String(role || "").trim().toLowerCase() === "admin";
   homeAdminLinksGrid.innerHTML = "";
 
-  if (!isAdmin) {
-    homeAdminLinks.hidden = true;
-    return;
-  }
-
-  for (const linkMeta of ADMIN_HOME_EXTERNAL_LINKS) {
+  for (const linkMeta of HOME_EXTERNAL_LINKS) {
     if (linkMeta.expandable && Array.isArray(linkMeta.items) && linkMeta.items.length) {
       const group = document.createElement("details");
       group.className = "home-menu-link home-menu-link-expandable";
@@ -339,7 +333,7 @@ async function renderRoleMenu() {
   setSignedInUi();
   renderUserSummary(profile);
   renderHomeQuickLinks(role);
-  renderAdminHomeLinks(role);
+  renderAdminHomeLinks();
   renderTopNavigation({ role, currentPathname: "./index.html" });
 }
 
