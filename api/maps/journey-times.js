@@ -22,6 +22,17 @@ function normalizeStatus(value) {
   return normalizeComparable(value);
 }
 
+function normalizeAudience(value) {
+  const normalized = normalizeComparable(value);
+  if (normalized === "associate" || normalized === "associates") {
+    return "associates";
+  }
+  if (normalized === "client" || normalized === "clients") {
+    return "clients";
+  }
+  return "clients";
+}
+
 function getDefaultDepartureTimeIso() {
   const now = new Date();
   const nowMs = now.getTime();
@@ -101,57 +112,61 @@ function buildClientAddress(client) {
   return normalizeText(client?.postcode || client?.location || "");
 }
 
-function buildDestinationRows(clients, carers, selectedArea) {
+function buildDestinationRows(clients, carers, selectedArea, audience) {
   const selectedAreaKey = normalizeComparable(selectedArea);
   const rows = [];
 
-  for (const client of clients) {
-    const status = normalizeStatus(client?.status);
-    if (!ACTIVE_PENDING_STATUSES.has(status)) {
-      continue;
+  if (audience === "clients") {
+    for (const client of clients) {
+      const status = normalizeStatus(client?.status);
+      if (!ACTIVE_PENDING_STATUSES.has(status)) {
+        continue;
+      }
+      const area = getClientArea(client);
+      if (normalizeComparable(area) !== selectedAreaKey) {
+        continue;
+      }
+      const address = buildClientAddress(client);
+      const postcode = normalizeText(client?.postcode);
+      if (!address && !postcode) {
+        continue;
+      }
+      rows.push({
+        type: "client",
+        name: normalizeText(client?.name || "Unnamed client"),
+        id: normalizeText(client?.id),
+        status,
+        area,
+        postcode,
+        query: address || postcode,
+      });
     }
-    const area = getClientArea(client);
-    if (normalizeComparable(area) !== selectedAreaKey) {
-      continue;
-    }
-    const address = buildClientAddress(client);
-    const postcode = normalizeText(client?.postcode);
-    if (!address && !postcode) {
-      continue;
-    }
-    rows.push({
-      type: "client",
-      name: normalizeText(client?.name || "Unnamed client"),
-      id: normalizeText(client?.id),
-      status,
-      area,
-      postcode,
-      query: address || postcode,
-    });
   }
 
-  for (const carer of carers) {
-    const status = normalizeStatus(carer?.status);
-    if (!ACTIVE_PENDING_STATUSES.has(status)) {
-      continue;
+  if (audience === "associates") {
+    for (const carer of carers) {
+      const status = normalizeStatus(carer?.status);
+      if (!ACTIVE_PENDING_STATUSES.has(status)) {
+        continue;
+      }
+      const area = getCarerArea(carer);
+      if (normalizeComparable(area) !== selectedAreaKey) {
+        continue;
+      }
+      const postcode = normalizeText(carer?.postcode);
+      if (!postcode) {
+        continue;
+      }
+      rows.push({
+        type: "associate",
+        name: normalizeText(carer?.name || "Unnamed associate"),
+        id: normalizeText(carer?.id),
+        status,
+        area,
+        postcode,
+        query: postcode,
+      });
     }
-    const area = getCarerArea(carer);
-    if (normalizeComparable(area) !== selectedAreaKey) {
-      continue;
-    }
-    const postcode = normalizeText(carer?.postcode);
-    if (!postcode) {
-      continue;
-    }
-    rows.push({
-      type: "associate",
-      name: normalizeText(carer?.name || "Unnamed associate"),
-      id: normalizeText(carer?.id),
-      status,
-      area,
-      postcode,
-      query: postcode,
-    });
   }
 
   return rows;
@@ -358,6 +373,7 @@ module.exports = async (req, res) => {
 
   const originQuery = normalizeText(req.body?.origin || req.body?.postcode);
   const selectedArea = normalizeText(req.body?.area);
+  const audience = normalizeAudience(req.body?.audience || req.body?.type);
   if (!originQuery) {
     res.status(400).json({ error: "Postcode is required." });
     return;
@@ -383,7 +399,7 @@ module.exports = async (req, res) => {
       readCarersDirectoryData(),
       geocodeLocation(originQuery, apiKey, region),
     ]);
-    const rows = buildDestinationRows(directory.clients || [], carersDirectory.carers || [], selectedArea);
+    const rows = buildDestinationRows(directory.clients || [], carersDirectory.carers || [], selectedArea, audience);
     const geocodeCache = await geocodeUniqueDestinations(rows, apiKey, region);
     const results = await attachTravelTimes(origin, rows, geocodeCache, apiKey, departureTime);
     const sorted = results.sort((a, b) => {
@@ -404,6 +420,7 @@ module.exports = async (req, res) => {
         longitude: origin.longitude,
       },
       area: selectedArea,
+      audience,
       departureTime,
       counts: {
         total: sorted.length,

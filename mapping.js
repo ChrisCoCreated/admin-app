@@ -21,7 +21,8 @@ const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
 const journeyOriginInput = document.getElementById("journeyOriginInput");
 const journeyAreaSelect = document.getElementById("journeyAreaSelect");
-const calculateJourneyTimesBtn = document.getElementById("calculateJourneyTimesBtn");
+const calculateClientJourneyTimesBtn = document.getElementById("calculateClientJourneyTimesBtn");
+const calculateAssociateJourneyTimesBtn = document.getElementById("calculateAssociateJourneyTimesBtn");
 const journeyTimesStatus = document.getElementById("journeyTimesStatus");
 const journeyTimesResults = document.getElementById("journeyTimesResults");
 const journeyTimesSummary = document.getElementById("journeyTimesSummary");
@@ -133,8 +134,11 @@ function setJourneyTimesStatus(message, isError = false) {
 }
 
 function setJourneyTimesBusy(isBusy) {
-  if (calculateJourneyTimesBtn) {
-    calculateJourneyTimesBtn.disabled = isBusy;
+  if (calculateClientJourneyTimesBtn) {
+    calculateClientJourneyTimesBtn.disabled = isBusy;
+  }
+  if (calculateAssociateJourneyTimesBtn) {
+    calculateAssociateJourneyTimesBtn.disabled = isBusy;
   }
   if (journeyOriginInput) {
     journeyOriginInput.disabled = isBusy;
@@ -482,34 +486,7 @@ function getAreaOptions() {
 }
 
 function getJourneyAreaOptions() {
-  const optionsByKey = new Map();
-  const addArea = (area) => {
-    const label = normalizeLocationQuery(area);
-    if (!label) {
-      return;
-    }
-    const fixed = FIXED_AREAS.find((item) => item.toLowerCase() === label.toLowerCase());
-    optionsByKey.set(label.toLowerCase(), fixed || label);
-  };
-
-  FIXED_AREAS.forEach(addArea);
-  for (const client of allClients) {
-    if (passesStatusFilter(client?.status, DEFAULT_STATUS_FILTERS)) {
-      addArea(getClientArea(client));
-    }
-  }
-  for (const carer of allCarers) {
-    if (passesStatusFilter(carer?.status, DEFAULT_STATUS_FILTERS)) {
-      addArea(carer?.area || "");
-    }
-  }
-
-  const found = Array.from(optionsByKey.values());
-  const fixed = FIXED_AREAS.filter((area) => found.some((item) => item.toLowerCase() === area.toLowerCase()));
-  const remaining = found
-    .filter((area) => !fixed.some((item) => item.toLowerCase() === area.toLowerCase()))
-    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  return [...fixed, ...remaining];
+  return ["London Plus", "Central", "East Kent"];
 }
 
 function renderJourneyAreaOptions() {
@@ -517,14 +494,9 @@ function renderJourneyAreaOptions() {
     return;
   }
 
-  const current = String(journeyAreaSelect.value || "");
+  const current = String(journeyAreaSelect.value || "East Kent");
   const options = getJourneyAreaOptions();
   journeyAreaSelect.innerHTML = "";
-
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = options.length ? "Select area" : "No active/pending areas";
-  journeyAreaSelect.appendChild(placeholder);
 
   for (const area of options) {
     const option = document.createElement("option");
@@ -535,10 +507,8 @@ function renderJourneyAreaOptions() {
 
   if (options.includes(current)) {
     journeyAreaSelect.value = current;
-  } else if (options.length === 1) {
-    journeyAreaSelect.value = options[0];
   } else {
-    journeyAreaSelect.value = "";
+    journeyAreaSelect.value = "East Kent";
   }
 }
 
@@ -760,17 +730,25 @@ function formatJourneyResultType(type) {
   return type === "associate" ? "Associate" : "Client";
 }
 
+function formatJourneyAudience(audience, plural = true) {
+  if (audience === "associates") {
+    return plural ? "associates" : "associate";
+  }
+  return plural ? "clients" : "client";
+}
+
 function renderJourneyTimes(data) {
   if (!journeyTimesResults || !journeyTimesBody) {
     return;
   }
 
   const results = Array.isArray(data?.results) ? data.results : [];
+  const audience = String(data?.audience || "clients");
   journeyTimesBody.innerHTML = "";
 
   if (!results.length) {
     journeyTimesResults.hidden = true;
-    setJourneyTimesStatus("No active or pending clients or associates found in that area.");
+    setJourneyTimesStatus(`No active or pending ${formatJourneyAudience(audience)} found in that area.`);
     return;
   }
 
@@ -778,7 +756,7 @@ function renderJourneyTimes(data) {
   const withTravel = Number(counts.withTravel || 0);
   const total = Number(counts.total || results.length);
   if (journeyTimesSummary) {
-    journeyTimesSummary.textContent = `${withTravel} of ${total} result(s) have journey times from ${data?.origin?.formattedAddress || data?.origin?.query || "the postcode"}.`;
+    journeyTimesSummary.textContent = `${withTravel} of ${total} ${formatJourneyAudience(audience)} have travel times from ${data?.origin?.formattedAddress || data?.origin?.query || "the postcode"}.`;
   }
 
   for (const item of results) {
@@ -796,7 +774,7 @@ function renderJourneyTimes(data) {
   }
 
   journeyTimesResults.hidden = false;
-  setJourneyTimesStatus(`Journey times loaded for ${data?.area || "selected area"}.`);
+  setJourneyTimesStatus(`${formatJourneyAudience(audience, false).replace(/^./, (char) => char.toUpperCase())} travel times loaded for ${data?.area || "selected area"}.`);
 }
 
 function buildMapsDirectionsUrl(origin, destination, waypoints) {
@@ -1353,7 +1331,8 @@ async function calculateRun() {
   }
 }
 
-async function calculateJourneyTimes() {
+async function calculateJourneyTimes(audience) {
+  const normalizedAudience = audience === "associates" ? "associates" : "clients";
   const origin = normalizeLocationQuery(journeyOriginInput?.value || "");
   const area = normalizeLocationQuery(journeyAreaSelect?.value || "");
   if (!origin) {
@@ -1374,7 +1353,7 @@ async function calculateJourneyTimes() {
     journeyTimesBody.innerHTML = "";
   }
   setJourneyTimesBusy(true);
-  setJourneyTimesStatus("Calculating journey times...");
+  setJourneyTimesStatus(`Calculating ${formatJourneyAudience(normalizedAudience)} travel times...`);
 
   try {
     const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
@@ -1388,6 +1367,7 @@ async function calculateJourneyTimes() {
       body: JSON.stringify({
         origin,
         area,
+        audience: normalizedAudience,
         departureTime: buildDepartureTimeIso(),
       }),
     });
@@ -1398,13 +1378,13 @@ async function calculateJourneyTimes() {
         redirectToUnauthorized("mapping");
         return;
       }
-      throw new Error(data?.detail || data?.error || `Journey time request failed (${response.status}).`);
+      throw new Error(data?.detail || data?.error || `Travel time request failed (${response.status}).`);
     }
 
     renderJourneyTimes(data);
   } catch (error) {
     console.error(error);
-    setJourneyTimesStatus(error?.message || "Could not calculate journey times.", true);
+    setJourneyTimesStatus(error?.message || "Could not calculate travel times.", true);
   } finally {
     setJourneyTimesBusy(false);
   }
@@ -1504,14 +1484,18 @@ calculateRunBtn?.addEventListener("click", () => {
   void calculateRun();
 });
 
-calculateJourneyTimesBtn?.addEventListener("click", () => {
-  void calculateJourneyTimes();
+calculateClientJourneyTimesBtn?.addEventListener("click", () => {
+  void calculateJourneyTimes("clients");
+});
+
+calculateAssociateJourneyTimesBtn?.addEventListener("click", () => {
+  void calculateJourneyTimes("associates");
 });
 
 journeyOriginInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
-    void calculateJourneyTimes();
+    void calculateJourneyTimes("clients");
   }
 });
 

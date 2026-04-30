@@ -48,12 +48,15 @@
           <label class="field" for="journeyAreaSelect">
             Area
             <select id="journeyAreaSelect">
-              <option value="">Loading areas...</option>
+              <option value="London Plus">London Plus</option>
+              <option value="Central">Central</option>
+              <option value="East Kent" selected>East Kent</option>
             </select>
           </label>
         </div>
         <div class="row">
-          <button id="calculateJourneyTimesBtn" type="button">Show journey times</button>
+          <button id="calculateClientJourneyTimesBtn" type="button">Show client travel times</button>
+          <button id="calculateAssociateJourneyTimesBtn" class="secondary" type="button">Show associate travel times</button>
         </div>
         <p id="journeyTimesStatus" class="muted">Enter a postcode and choose an area.</p>
         <div id="journeyTimesResults" hidden>
