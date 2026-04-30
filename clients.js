@@ -532,41 +532,10 @@ function createActionButton(label, onClick, disabled = false) {
   return btn;
 }
 
-function logClientAreaDebug(clients) {
-  console.groupCollapsed(`[Clients] OneTouch area debug: ${clients.length} client(s)`);
-  console.table(
-    clients.map((client) => ({
-      id: client.id || "",
-      name: client.name || "",
-      normalizedArea: client.area || "",
-      displayedArea: getClientArea(client),
-      location: client.location || "",
-      rawArea: client.raw?.area || "",
-      rawOrganisationArea: client.raw?.organisation?.area?.name || "",
-      rawLocation: client.raw?.location || "",
-      rawZone: client.raw?.zone || "",
-      rawPatch: client.raw?.patch || "",
-      town: client.town || client.raw?.town || "",
-      county: client.county || client.raw?.county || "",
-      postcode: client.postcode || "",
-    }))
-  );
-  for (const client of clients) {
-    console.log("[Clients] Full OneTouch client data", {
-      id: client.id || "",
-      name: client.name || "",
-      normalizedArea: client.area || "",
-      fullClient: client,
-    });
-  }
-  console.groupEnd();
-}
-
 async function refreshClientsData() {
   setStatus("Loading clients...");
   const payload = await directoryApi.listOneTouchClients({ limit: 500 });
   allClients = Array.isArray(payload?.clients) ? payload.clients : [];
-  logClientAreaDebug(allClients);
   const warnings = Array.isArray(payload?.warnings) ? payload.warnings.filter(Boolean) : [];
   warningState.hidden = warnings.length === 0;
   warningState.textContent = warnings.join(" ");
