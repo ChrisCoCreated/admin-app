@@ -780,28 +780,6 @@ function resolveLocation(record) {
   );
 }
 
-const VALID_CLIENT_AREAS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
-
-function resolveClientArea(record) {
-  const normalizedAreas = new Map(VALID_CLIENT_AREAS.map((area) => [area.toLowerCase(), area]));
-  const candidates = collectNonEmptyValues([
-    record?.area,
-    record?.organisation?.area?.name,
-    record?.location,
-    record?.zone,
-    record?.patch,
-  ]);
-
-  for (const candidate of candidates) {
-    const area = normalizedAreas.get(candidate.toLowerCase());
-    if (area) {
-      return area;
-    }
-  }
-
-  return "";
-}
-
 function parseDateOfBirth(value) {
   const raw = asString(value);
   if (!raw) {
@@ -882,7 +860,6 @@ function normalizeClient(record) {
     dateOfBirth: parseDateOfBirth(
       record?.date_of_birth || record?.dob || record?.birth_date || record?.birthdate
     ),
-    area: resolveClientArea(record),
     location: resolveLocation(record),
     careType: resolveCareType(record),
     address: asString(record?.address || record?.address_1 || record?.address1),

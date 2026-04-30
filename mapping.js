@@ -59,7 +59,7 @@ let selectedArea = "ALL";
 const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
 const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
 let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
-const FIXED_AREAS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
+const FIXED_AREAS = ["Central", "London Plus", "East Kent"];
 const DEFAULT_VISIT_DURATION_MINUTES = 60;
 const SAVED_RUNS_KEY = "thrive.mapping.savedRuns.v1";
 let scheduleRows = [];
@@ -345,7 +345,7 @@ function getClientLabel(client) {
 }
 
 function getClientArea(client) {
-  return normalizeLocationQuery(client.area || "");
+  return normalizeLocationQuery(client.area || client.location || "");
 }
 
 function normalizeStatus(value) {
@@ -486,7 +486,7 @@ function getAreaOptions() {
 }
 
 function getJourneyAreaOptions() {
-  return FIXED_AREAS;
+  return ["London Plus", "Central", "East Kent"];
 }
 
 function renderJourneyAreaOptions() {

@@ -4,7 +4,6 @@ import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260427";
 
 const searchInput = document.getElementById("searchInput");
-const areaFilterSelect = document.getElementById("areaFilterSelect");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientStatusFilters = document.getElementById("clientStatusFilters");
@@ -37,7 +36,6 @@ const updateAllBtn = document.getElementById("updateAllBtn");
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
   name: detailRoot?.querySelector('[data-field="name"]'),
-  area: detailRoot?.querySelector('[data-field="area"]'),
   postcode: detailRoot?.querySelector('[data-field="postcode"]'),
   email: detailRoot?.querySelector('[data-field="email"]'),
   phone: detailRoot?.querySelector('[data-field="phone"]'),
@@ -47,12 +45,9 @@ const detailFields = {
 
 const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
 const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
-const VALID_CLIENT_AREAS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
-const VALID_CLIENT_AREA_BY_KEY = new Map(VALID_CLIENT_AREAS.map((area) => [area.toLowerCase(), area]));
 
 let allClients = [];
 let selectedClientId = "";
-let selectedArea = "all";
 let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
 let account = null;
 let currentRole = "";
@@ -197,7 +192,6 @@ function setDetail(client) {
   if (!client) {
     detailFields.id.textContent = "-";
     detailFields.name.textContent = "Select a client";
-    detailFields.area.textContent = "-";
     detailFields.postcode.textContent = "-";
     detailFields.email.textContent = "-";
     detailFields.phone.textContent = "-";
@@ -208,7 +202,6 @@ function setDetail(client) {
 
   detailFields.id.textContent = client.id || "-";
   detailFields.name.textContent = client.name || "-";
-  detailFields.area.textContent = getClientArea(client);
   detailFields.postcode.textContent = client.postcode || "-";
   detailFields.email.textContent = client.email || "-";
   detailFields.phone.textContent = client.phone || "-";
@@ -216,9 +209,8 @@ function setDetail(client) {
   detailFields.tags.textContent = formatTags(client.tags);
 }
 
-function getClientArea(client) {
-  const area = String(client?.area || "").trim().toLowerCase();
-  return VALID_CLIENT_AREA_BY_KEY.get(area) || "-";
+function getClientLocation(client) {
+  return String(client?.location || client?.area || client?.town || client?.county || "").trim() || "-";
 }
 
 function getClientCareType(client) {
@@ -368,31 +360,6 @@ function renderStatusFilters() {
   clientStatusFilters.appendChild(allBtn);
 }
 
-function renderAreaFilter() {
-  if (!areaFilterSelect) {
-    return;
-  }
-
-  const availableAreas = new Set(
-    allClients
-      .map((client) => VALID_CLIENT_AREA_BY_KEY.get(String(client?.area || "").trim().toLowerCase()))
-      .filter(Boolean)
-  );
-  const options = VALID_CLIENT_AREAS.filter((area) => availableAreas.has(area));
-  const currentArea = String(areaFilterSelect.value || selectedArea || "all");
-
-  areaFilterSelect.innerHTML = '<option value="all">All areas</option>';
-  for (const area of options) {
-    const option = document.createElement("option");
-    option.value = area;
-    option.textContent = area;
-    areaFilterSelect.appendChild(option);
-  }
-
-  selectedArea = options.includes(currentArea) ? currentArea : "all";
-  areaFilterSelect.value = selectedArea;
-}
-
 function renderBulkTagOptions() {
   if (!bulkTagSelect) {
     return;
@@ -438,17 +405,12 @@ function getFilteredClients() {
     if (!passesStatusFilter(client.status)) {
       return false;
     }
-    const area = getClientArea(client);
-    if (selectedArea !== "all" && area !== selectedArea) {
-      return false;
-    }
     if (!query) {
       return true;
     }
     return (
       String(client.id || "").toLowerCase().includes(query) ||
       String(client.name || "").toLowerCase().includes(query) ||
-      area.toLowerCase().includes(query) ||
       String(client.postcode || "").toLowerCase().includes(query) ||
       formatStatusLabel(client.status).toLowerCase().includes(query) ||
       formatTags(client.tags).toLowerCase().includes(query)
@@ -609,7 +571,6 @@ async function refreshClientsData() {
   warningState.hidden = warnings.length === 0;
   warningState.textContent = warnings.join(" ");
   renderStatusFilters();
-  renderAreaFilter();
   setStatus(`Loaded ${allClients.length} client(s).`);
   renderClients();
 }
@@ -987,7 +948,7 @@ function renderClients() {
       <td class="selection-cell"></td>
       <td>${escapeHtml(client.id)}</td>
       <td>${escapeHtml(client.name)}</td>
-      <td>${escapeHtml(getClientArea(client))}</td>
+      <td>${escapeHtml(getClientLocation(client))}</td>
       <td>${escapeHtml(getClientCareType(client))}</td>
       <td>${escapeHtml(formatStatusLabel(client.status))}</td>
       <td>${escapeHtml(client.postcode || "-")}</td>
@@ -1078,11 +1039,6 @@ async function init() {
 }
 
 searchInput?.addEventListener("input", () => {
-  renderClients();
-});
-
-areaFilterSelect?.addEventListener("change", () => {
-  selectedArea = String(areaFilterSelect.value || "all");
   renderClients();
 });
 

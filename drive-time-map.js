@@ -77,7 +77,7 @@ const AREA_COLORS = [
   { stroke: "#2f6b2a", fill: "#89c46b" },
 ];
 const AREA_COLOR_LABELS = ["Brand Cyan", "Brand Pink", "Brand Mint", "Warm Sand", "Soft Indigo", "Leaf Green"];
-const CLIENT_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
+const CLIENT_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "WA"];
 
 const OFFICE = {
   name: String(FRONTEND_CONFIG.mapOffice?.name || "Canterbury Office"),

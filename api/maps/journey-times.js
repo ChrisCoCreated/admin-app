@@ -95,7 +95,7 @@ function metersToMiles(distanceMeters) {
 }
 
 function getClientArea(client) {
-  return normalizeText(client?.area || "");
+  return normalizeText(client?.area || client?.location || "");
 }
 
 function getCarerArea(carer) {
