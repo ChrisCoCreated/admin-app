@@ -19,6 +19,13 @@ const clientSearchStatus = document.getElementById("clientSearchStatus");
 const addClientBtn = document.getElementById("addClientBtn");
 const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
+const journeyOriginInput = document.getElementById("journeyOriginInput");
+const journeyAreaSelect = document.getElementById("journeyAreaSelect");
+const calculateJourneyTimesBtn = document.getElementById("calculateJourneyTimesBtn");
+const journeyTimesStatus = document.getElementById("journeyTimesStatus");
+const journeyTimesResults = document.getElementById("journeyTimesResults");
+const journeyTimesSummary = document.getElementById("journeyTimesSummary");
+const journeyTimesBody = document.getElementById("journeyTimesBody");
 const runDateInput = document.getElementById("runDateInput");
 const runStartTimeInput = document.getElementById("runStartTimeInput");
 const visitDurationInput = document.getElementById("visitDurationInput");
@@ -42,6 +49,7 @@ const mapsDirectionsLink = document.getElementById("mapsDirectionsLink");
 
 const API_BASE_URL = (FRONTEND_CONFIG.apiBaseUrl || "").replace(/\/+$/, "");
 const RUN_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/routes/run` : "/api/routes/run";
+const JOURNEY_TIMES_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/maps/journey-times` : "/api/maps/journey-times";
 
 const selectedClientStops = [];
 let allClients = [];
@@ -114,6 +122,26 @@ function setCarerSearchStatus(message, isError = false) {
   }
   carerSearchStatus.textContent = message;
   carerSearchStatus.classList.toggle("error", isError);
+}
+
+function setJourneyTimesStatus(message, isError = false) {
+  if (!journeyTimesStatus) {
+    return;
+  }
+  journeyTimesStatus.textContent = message;
+  journeyTimesStatus.classList.toggle("error", isError);
+}
+
+function setJourneyTimesBusy(isBusy) {
+  if (calculateJourneyTimesBtn) {
+    calculateJourneyTimesBtn.disabled = isBusy;
+  }
+  if (journeyOriginInput) {
+    journeyOriginInput.disabled = isBusy;
+  }
+  if (journeyAreaSelect) {
+    journeyAreaSelect.disabled = isBusy;
+  }
 }
 
 function updateSavedRunsStatus() {
@@ -453,6 +481,67 @@ function getAreaOptions() {
   return ["ALL", ...ordered];
 }
 
+function getJourneyAreaOptions() {
+  const optionsByKey = new Map();
+  const addArea = (area) => {
+    const label = normalizeLocationQuery(area);
+    if (!label) {
+      return;
+    }
+    const fixed = FIXED_AREAS.find((item) => item.toLowerCase() === label.toLowerCase());
+    optionsByKey.set(label.toLowerCase(), fixed || label);
+  };
+
+  FIXED_AREAS.forEach(addArea);
+  for (const client of allClients) {
+    if (passesStatusFilter(client?.status, DEFAULT_STATUS_FILTERS)) {
+      addArea(getClientArea(client));
+    }
+  }
+  for (const carer of allCarers) {
+    if (passesStatusFilter(carer?.status, DEFAULT_STATUS_FILTERS)) {
+      addArea(carer?.area || "");
+    }
+  }
+
+  const found = Array.from(optionsByKey.values());
+  const fixed = FIXED_AREAS.filter((area) => found.some((item) => item.toLowerCase() === area.toLowerCase()));
+  const remaining = found
+    .filter((area) => !fixed.some((item) => item.toLowerCase() === area.toLowerCase()))
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  return [...fixed, ...remaining];
+}
+
+function renderJourneyAreaOptions() {
+  if (!journeyAreaSelect) {
+    return;
+  }
+
+  const current = String(journeyAreaSelect.value || "");
+  const options = getJourneyAreaOptions();
+  journeyAreaSelect.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = options.length ? "Select area" : "No active/pending areas";
+  journeyAreaSelect.appendChild(placeholder);
+
+  for (const area of options) {
+    const option = document.createElement("option");
+    option.value = area;
+    option.textContent = area;
+    journeyAreaSelect.appendChild(option);
+  }
+
+  if (options.includes(current)) {
+    journeyAreaSelect.value = current;
+  } else if (options.length === 1) {
+    journeyAreaSelect.value = options[0];
+  } else {
+    journeyAreaSelect.value = "";
+  }
+}
+
 function renderAreaFilters() {
   if (!areaFilters) {
     return;
@@ -665,6 +754,49 @@ function renderClientSearchResults() {
     li.append(info, addBtn);
     clientSearchResults.appendChild(li);
   }
+}
+
+function formatJourneyResultType(type) {
+  return type === "associate" ? "Associate" : "Client";
+}
+
+function renderJourneyTimes(data) {
+  if (!journeyTimesResults || !journeyTimesBody) {
+    return;
+  }
+
+  const results = Array.isArray(data?.results) ? data.results : [];
+  journeyTimesBody.innerHTML = "";
+
+  if (!results.length) {
+    journeyTimesResults.hidden = true;
+    setJourneyTimesStatus("No active or pending clients or associates found in that area.");
+    return;
+  }
+
+  const counts = data?.counts || {};
+  const withTravel = Number(counts.withTravel || 0);
+  const total = Number(counts.total || results.length);
+  if (journeyTimesSummary) {
+    journeyTimesSummary.textContent = `${withTravel} of ${total} result(s) have journey times from ${data?.origin?.formattedAddress || data?.origin?.query || "the postcode"}.`;
+  }
+
+  for (const item of results) {
+    const travel = item.travel || null;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(formatJourneyResultType(item.type))}</td>
+      <td>${escapeHtml(String(item.name || ""))}${item.id ? `<br /><span class="muted">${escapeHtml(String(item.id))}</span>` : ""}</td>
+      <td>${escapeHtml(formatStatusLabel(item.status))}</td>
+      <td>${escapeHtml(String(item.postcode || "-"))}</td>
+      <td>${travel ? escapeHtml(String(travel.durationText || "")) : `<span class="muted">${escapeHtml(String(item.reason || "Unavailable"))}</span>`}</td>
+      <td>${travel ? `${escapeHtml(String(travel.distanceMiles || 0))} mi` : "-"}</td>
+    `;
+    journeyTimesBody.appendChild(tr);
+  }
+
+  journeyTimesResults.hidden = false;
+  setJourneyTimesStatus(`Journey times loaded for ${data?.area || "selected area"}.`);
 }
 
 function buildMapsDirectionsUrl(origin, destination, waypoints) {
@@ -1221,6 +1353,63 @@ async function calculateRun() {
   }
 }
 
+async function calculateJourneyTimes() {
+  const origin = normalizeLocationQuery(journeyOriginInput?.value || "");
+  const area = normalizeLocationQuery(journeyAreaSelect?.value || "");
+  if (!origin) {
+    setJourneyTimesStatus("Enter a postcode before calculating journey times.", true);
+    journeyOriginInput?.focus();
+    return;
+  }
+  if (!area) {
+    setJourneyTimesStatus("Choose an area before calculating journey times.", true);
+    journeyAreaSelect?.focus();
+    return;
+  }
+
+  if (journeyTimesResults) {
+    journeyTimesResults.hidden = true;
+  }
+  if (journeyTimesBody) {
+    journeyTimesBody.innerHTML = "";
+  }
+  setJourneyTimesBusy(true);
+  setJourneyTimesStatus("Calculating journey times...");
+
+  try {
+    const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
+    const response = await fetch(JOURNEY_TIMES_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        origin,
+        area,
+        departureTime: buildDepartureTimeIso(),
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 403) {
+        redirectToUnauthorized("mapping");
+        return;
+      }
+      throw new Error(data?.detail || data?.error || `Journey time request failed (${response.status}).`);
+    }
+
+    renderJourneyTimes(data);
+  } catch (error) {
+    console.error(error);
+    setJourneyTimesStatus(error?.message || "Could not calculate journey times.", true);
+  } finally {
+    setJourneyTimesBusy(false);
+  }
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
@@ -1260,6 +1449,7 @@ async function init() {
     renderAssociateFilters();
     renderClientStatusFilters();
     renderCarerSearchResults();
+    renderJourneyAreaOptions();
     renderAreaFilters();
     renderClientSearchResults();
   } catch (error) {
@@ -1314,6 +1504,17 @@ calculateRunBtn?.addEventListener("click", () => {
   void calculateRun();
 });
 
+calculateJourneyTimesBtn?.addEventListener("click", () => {
+  void calculateJourneyTimes();
+});
+
+journeyOriginInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void calculateJourneyTimes();
+  }
+});
+
 saveRunBtn?.addEventListener("click", () => {
   saveCurrentRunForExport();
 });
@@ -1343,16 +1544,27 @@ clearRunBtn?.addEventListener("click", () => {
   if (clientSearchInput) {
     clientSearchInput.value = "";
   }
+  if (journeyOriginInput) {
+    journeyOriginInput.value = "";
+  }
+  if (journeyTimesResults) {
+    journeyTimesResults.hidden = true;
+  }
+  if (journeyTimesBody) {
+    journeyTimesBody.innerHTML = "";
+  }
   selectedArea = "ALL";
   selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
   selectedClientStops.length = 0;
   renderAssociateFilters();
   renderClientStatusFilters();
   renderCarerSearchResults();
+  renderJourneyAreaOptions();
   renderClientPostcodes();
   renderAreaFilters();
   renderClientSearchResults();
   hideRun();
+  setJourneyTimesStatus("Enter a postcode and choose an area.");
   setStatus("Cleared.");
 });
 

@@ -44,6 +44,7 @@ const tasksTaskSetsHandler = require("./api/tasks/task-sets");
 const tasksCreateBatchHandler = require("./api/tasks/create-batch");
 const mapsDriveTimeHandler = require("./api/maps/drive-time");
 const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
+const mapsJourneyTimesHandler = require("./api/maps/journey-times");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 const consultantReportDocxHandler = require("./api/consultant/report-docx");
 const wellbeingIntakeParseHandler = require("./api/wellbeing-intake/parse");
@@ -495,6 +496,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await mapsGeocodeBatchHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/maps/journey-times") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await mapsJourneyTimesHandler(apiReq, apiRes);
     return true;
   }
 

@@ -38,6 +38,44 @@
         <p>Build a driving run from a staff start location through clients and back to the start.</p>
       </section>
 
+      <section class="panel" aria-labelledby="journeyTimesHeading">
+        <h2 id="journeyTimesHeading">Journey Time to Location</h2>
+        <div class="mapping-form-grid">
+          <label class="field" for="journeyOriginInput">
+            Start postcode
+            <input id="journeyOriginInput" type="text" placeholder="e.g. CT1 2AA" autocomplete="postal-code" />
+          </label>
+          <label class="field" for="journeyAreaSelect">
+            Area
+            <select id="journeyAreaSelect">
+              <option value="">Loading areas...</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <button id="calculateJourneyTimesBtn" type="button">Show journey times</button>
+        </div>
+        <p id="journeyTimesStatus" class="muted">Enter a postcode and choose an area.</p>
+        <div id="journeyTimesResults" hidden>
+          <p id="journeyTimesSummary" class="muted"></p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Postcode</th>
+                  <th>Journey time</th>
+                  <th>Distance</th>
+                </tr>
+              </thead>
+              <tbody id="journeyTimesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="mapping-grid">
         <article class="panel staff-panel">
           <h2>Staff Start Point</h2>
