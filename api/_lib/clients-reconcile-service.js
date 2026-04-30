@@ -214,6 +214,7 @@ function summarizeClient(client) {
     oneTouchId: normalizeText(client?.oneTouchId),
     name: normalizeText(client?.name),
     dateOfBirth: normalizeText(client?.dateOfBirth),
+    area: normalizeText(client?.area),
     postcode: normalizeText(client?.postcode),
     email: normalizeText(client?.email),
     phone: normalizeText(client?.phone),

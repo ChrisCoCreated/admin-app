@@ -34,6 +34,22 @@ function normalizeString(value) {
   return String(value || "").trim();
 }
 
+const VALID_CLIENT_AREAS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
+const UNASSIGNED_AREA = "Unassigned";
+const normalizedClientAreas = new Map(VALID_CLIENT_AREAS.map((area) => [area.toLowerCase(), area]));
+
+function normalizeClientArea(value) {
+  const normalized = normalizeString(value).toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  return normalizedClientAreas.get(normalized) || "";
+}
+
+function resolveClientArea(oneTouchArea, sharePointArea) {
+  return normalizeClientArea(oneTouchArea) || normalizeClientArea(sharePointArea) || UNASSIGNED_AREA;
+}
+
 function normalizeJoinId(value) {
   return normalizeString(value).toLowerCase();
 }
@@ -99,6 +115,7 @@ async function readLocalClients() {
     id: normalizeString(item.id),
     oneTouchId: normalizeString(item.oneTouchId || item.onetouchId || item.one_touch_id),
     name: normalizeString(item.name),
+    area: resolveClientArea(item.area, ""),
     location: normalizeString(item.location || item.area || item.town || item.county),
     careType: normalizeString(item.careType || item.care_type || item.service_type),
     address: normalizeString(item.address),
@@ -256,6 +273,7 @@ async function loadDirectoryData() {
       continue;
     }
     enrichmentById.set(oneTouchId, {
+      area: normalizeString(client?.area),
       xeroId: normalizeString(client?.xeroId),
       hasMandate: client?.hasMandate === true ? true : client?.hasMandate === false ? false : null,
       hasMarketingConsent:
@@ -267,6 +285,7 @@ async function loadDirectoryData() {
     const enrichment = enrichmentById.get(normalizeJoinId(client?.id));
     return {
       ...client,
+      area: resolveClientArea(client?.area, enrichment?.area),
       xeroId: enrichment?.xeroId || "",
       hasMandate: enrichment ? enrichment.hasMandate : null,
       hasMarketingConsent: enrichment ? enrichment.hasMarketingConsent : null,

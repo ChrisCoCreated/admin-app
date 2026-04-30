@@ -41,7 +41,13 @@
       <section class="panel">
         <label class="field" for="searchInput">
           Search
-          <input id="searchInput" type="search" placeholder="Search by name, id or postcode" autocomplete="off" />
+          <input id="searchInput" type="search" placeholder="Search by name, id, area or postcode" autocomplete="off" />
+        </label>
+        <label class="field" for="areaFilterSelect">
+          Area
+          <select id="areaFilterSelect">
+            <option value="all">All areas</option>
+          </select>
         </label>
         <div id="clientStatusFilters" class="status-filter-row"></div>
         <div id="bulkTagPanel" class="bulk-tag-panel">
@@ -173,7 +179,7 @@
                   <th>Select</th>
                   <th>ID</th>
                   <th>Name</th>
-                  <th>Location</th>
+                  <th>Area</th>
                   <th>Care Type</th>
                   <th>Status</th>
                   <th>Postcode</th>
@@ -198,6 +204,10 @@
             <div>
               <dt>Name</dt>
               <dd data-field="name">Select a client</dd>
+            </div>
+            <div>
+              <dt>Area</dt>
+              <dd data-field="area">-</dd>
             </div>
             <div>
               <dt>Postcode</dt>

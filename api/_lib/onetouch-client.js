@@ -860,6 +860,7 @@ function normalizeClient(record) {
     dateOfBirth: parseDateOfBirth(
       record?.date_of_birth || record?.dob || record?.birth_date || record?.birthdate
     ),
+    area: asString(record?.organisation?.area?.name || record?.area),
     location: resolveLocation(record),
     careType: resolveCareType(record),
     address: asString(record?.address || record?.address_1 || record?.address1),
