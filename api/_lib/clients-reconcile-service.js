@@ -19,6 +19,8 @@ const CORE_FIELDS = [
   "county",
 ];
 
+const VALID_CLIENT_AREAS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
+
 function normalizeText(value) {
   return String(value || "").trim();
 }
@@ -132,6 +134,14 @@ function fuzzyNameMatch(left, right) {
 
 function normalizeId(value) {
   return normalizeText(value).toLowerCase();
+}
+
+function normalizeAreaValue(value) {
+  const raw = normalizeText(value).toLowerCase();
+  if (!raw) {
+    return "";
+  }
+  return VALID_CLIENT_AREAS.find((area) => area.toLowerCase() === raw) || "";
 }
 
 function parseDateParts(value) {
@@ -506,9 +516,15 @@ async function applyReconciliationAction(body) {
 
   if (action === "add_missing") {
     const oneTouchClient = findOneTouchClientById(oneTouchClients, oneTouchClientId);
+    const selectedArea = normalizeAreaValue(body?.area);
     if (!oneTouchClient) {
       const error = new Error("Could not resolve OneTouch client.");
       error.status = 404;
+      throw error;
+    }
+    if (!selectedArea) {
+      const error = new Error("Choose a valid area before adding the SharePoint record.");
+      error.status = 400;
       throw error;
     }
     const alreadyExists = sharePointClients.some(
@@ -528,12 +544,16 @@ async function applyReconciliationAction(body) {
       error.status = 409;
       throw error;
     }
-    const created = await createSharePointClient(oneTouchToSharePointFields(oneTouchClient));
+    const created = await createSharePointClient({
+      ...oneTouchToSharePointFields(oneTouchClient),
+      area: selectedArea,
+    });
     return {
       action,
       updated: true,
       sharePointItemId: normalizeText(created?.itemId),
       oneTouchClientId: normalizeText(oneTouchClient.id),
+      area: selectedArea,
     };
   }
 

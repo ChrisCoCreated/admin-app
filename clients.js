@@ -49,6 +49,7 @@ const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
 const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
 const CLIENT_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance", "Unassigned"];
 const clientAreaByKey = new Map(CLIENT_AREA_OPTIONS.map((area) => [area.toLowerCase(), area]));
+const RECONCILIATION_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance"];
 
 let allClients = [];
 let selectedClientId = "";
@@ -682,31 +683,58 @@ function renderMissingCandidates(items) {
   }
   missingBody.innerHTML = "";
   if (!items.length) {
-    renderEmptyRow(missingBody, "No missing records.");
+    renderEmptyRow(missingBody, "No missing records.", 5);
     return;
   }
 
   for (const item of items) {
+    const suggestedArea = RECONCILIATION_AREA_OPTIONS.includes(String(item?.oneTouch?.area || "").trim())
+      ? String(item.oneTouch.area).trim()
+      : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(item?.oneTouch?.id || "-")}</td>
       <td>${escapeHtml(item?.oneTouch?.name || "-")}</td>
       <td>${escapeHtml(item?.oneTouch?.dateOfBirth || "-")}</td>
       <td></td>
+      <td></td>
     `;
-    const actionCell = tr.lastElementChild;
-    actionCell.appendChild(
-      createActionButton("Add", () =>
+    const areaCell = tr.children[3];
+    const actionCell = tr.children[4];
+
+    const select = document.createElement("select");
+    select.className = "recon-select";
+    select.innerHTML = '<option value="">Select area</option>';
+    for (const area of RECONCILIATION_AREA_OPTIONS) {
+      const option = document.createElement("option");
+      option.value = area;
+      option.textContent = area;
+      if (area === suggestedArea) {
+        option.selected = true;
+      }
+      select.appendChild(option);
+    }
+    areaCell.appendChild(select);
+
+    const addBtn = createActionButton(
+      "Add",
+      () =>
         applyReconcileAction(
           {
             action: "add_missing",
             oneTouchClientId: item?.oneTouch?.id || "",
+            area: select.value,
             expectedFingerprint: item?.expectedFingerprint || "",
           },
           "Missing SharePoint record added."
-        )
-      )
+        ),
+      !select.value
     );
+    select.addEventListener("change", () => {
+      addBtn.dataset.baseDisabled = select.value ? "0" : "1";
+      addBtn.disabled = reconcileBusy || !select.value;
+    });
+    actionCell.appendChild(addBtn);
     missingBody.appendChild(tr);
   }
 }

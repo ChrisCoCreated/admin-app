@@ -321,6 +321,7 @@ function toSharePointFields(logicalFields, fieldMap) {
   setIfPresent("name", logicalFields.name);
   setIfPresent("oneTouchId", logicalFields.oneTouchId);
   setIfPresent("dateOfBirth", logicalFields.dateOfBirth);
+  setIfPresent("area", logicalFields.area);
   setIfPresent("postcode", logicalFields.postcode);
   setIfPresent("email", logicalFields.email);
   setIfPresent("phone", logicalFields.phone);
