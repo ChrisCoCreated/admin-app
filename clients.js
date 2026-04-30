@@ -1048,14 +1048,24 @@ async function init() {
     }
     renderTopNavigation({ role });
 
-    await Promise.all([refreshClientsData(), loadTagCatalog()]);
-
     if (reconcilePanel) {
       reconcilePanel.hidden = !canManageReconciliation();
       if (canManageReconciliation()) {
         setReconcileCollapsed(true);
-        await loadReconcilePreview();
       }
+    }
+
+    await refreshClientsData();
+
+    try {
+      await loadTagCatalog();
+    } catch (error) {
+      console.error(error);
+      setBulkTagStatus(error?.message || "Could not load tag catalog.", true);
+    }
+
+    if (canManageReconciliation()) {
+      await loadReconcilePreview();
     }
   } catch (error) {
     if (error?.status === 403) {
