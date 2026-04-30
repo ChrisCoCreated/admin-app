@@ -315,10 +315,117 @@ async function resolveListId(token, siteId, listName) {
   return list.id;
 }
 
+async function resolveColumns(token, siteId, listId) {
+  const columns = [];
+  let nextUrl =
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}` +
+    `/columns?$select=name,displayName&$top=200`;
+
+  while (nextUrl) {
+    const payload = await fetchJson(nextUrl, { headers: graphHeaders(token) });
+    columns.push(...(Array.isArray(payload?.value) ? payload.value : []));
+    nextUrl = String(payload?.["@odata.nextLink"] || "");
+  }
+
+  return columns;
+}
+
 function normalizeToken(value) {
   return String(value || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
+}
+
+function buildFieldMap(columns) {
+  const byNameToken = new Map();
+  const byDisplayToken = new Map();
+
+  for (const column of columns) {
+    const name = String(column?.name || "").trim();
+    const displayName = String(column?.displayName || "").trim();
+    if (!name) {
+      continue;
+    }
+    const nameToken = normalizeToken(name);
+    const displayToken = normalizeToken(displayName);
+    if (nameToken && !byNameToken.has(nameToken)) {
+      byNameToken.set(nameToken, name);
+    }
+    if (displayToken && !byDisplayToken.has(displayToken)) {
+      byDisplayToken.set(displayToken, name);
+    }
+  }
+
+  function findField(candidates, fallback = "") {
+    for (const candidate of candidates) {
+      const token = normalizeToken(candidate);
+      const found = byDisplayToken.get(token) || byNameToken.get(token);
+      if (found) {
+        return found;
+      }
+    }
+    return fallback;
+  }
+
+  return {
+    name: findField(["Title", "Client", "ClientName"], "Title"),
+    oneTouchId: findField(["OnetouchID", "OneTouchID", "OneTouchClientId", "OneTouchClientID", "OneTouch_Id"]),
+    dateOfBirth: findField(["DateOfBirth", "DOB", "BirthDate", "Date_Of_Birth"]),
+    area: findField(["Area", "Location", "Patch", "Zone"]),
+    status: findField(["Status", "ClientStatus", "State", "CurrentStatus"]),
+    address: findField([
+      "Address",
+      "AddressLine1",
+      "Address1",
+      "StreetAddress",
+      "Line1",
+      "Address_x0020_Line_x0020_1",
+    ]),
+    town: findField(["Town", "City", "Suburb", "Town_x0020_City"]),
+    county: findField(["County", "Region", "State"]),
+    postcode: findField(["PostCode", "Postcode", "PostalCode", "ZipCode", "Post_x0020_Code"]),
+    email: findField(["Email", "EmailAddress", "ClientEmail"]),
+  };
+}
+
+const listConfigCache = {
+  key: "",
+  siteId: "",
+  listId: "",
+  fieldMap: null,
+  expiresAt: 0,
+};
+
+async function resolveListConfig(token) {
+  const { hostName, sitePath, clientsListName } = requireSharePointConfig();
+  const key = `${hostName}|${sitePath}|${clientsListName}`;
+
+  if (
+    listConfigCache.key === key &&
+    listConfigCache.siteId &&
+    listConfigCache.listId &&
+    listConfigCache.fieldMap &&
+    listConfigCache.expiresAt > Date.now()
+  ) {
+    return {
+      siteId: listConfigCache.siteId,
+      listId: listConfigCache.listId,
+      fieldMap: listConfigCache.fieldMap,
+    };
+  }
+
+  const siteId = await resolveSiteId(token, hostName, sitePath);
+  const listId = await resolveListId(token, siteId, clientsListName);
+  const columns = await resolveColumns(token, siteId, listId);
+  const fieldMap = buildFieldMap(columns);
+
+  listConfigCache.key = key;
+  listConfigCache.siteId = siteId;
+  listConfigCache.listId = listId;
+  listConfigCache.fieldMap = fieldMap;
+  listConfigCache.expiresAt = Date.now() + 5 * 60 * 1000;
+
+  return { siteId, listId, fieldMap };
 }
 
 function pickTokenValue(byToken, tokenCandidates) {
@@ -340,12 +447,14 @@ function pickTokenByPredicate(byToken, predicate) {
   return "";
 }
 
-function mapGraphItemToClient(item) {
+function mapGraphItemToClient(item, fieldMap = {}) {
   const fields = item?.fields || {};
   const graphId = fields.ID || item?.id;
-  const name = fields.Title || fields.Client || fields.ClientName || "";
+  const name =
+    extractLookupText(fieldMap.name ? fields[fieldMap.name] : "") ||
+    extractLookupText(fields.Title || fields.Client || fields.ClientName);
   const entries = Object.entries(fields)
-    .map(([key, value]) => [String(key || ""), String(value || "").trim()])
+    .map(([key, value]) => [String(key || ""), extractLookupText(value)])
     .filter(([, value]) => Boolean(value));
 
   const byToken = new Map();
@@ -356,7 +465,13 @@ function mapGraphItemToClient(item) {
     }
   }
 
-  function pickFieldValue(candidates) {
+  function pickFieldValue(candidates, directField = "") {
+    if (directField) {
+      const directValue = extractLookupText(fields[directField]);
+      if (directValue) {
+        return directValue;
+      }
+    }
     for (const candidate of candidates) {
       const match = byToken.get(normalizeToken(candidate));
       if (match) {
@@ -401,19 +516,19 @@ function mapGraphItemToClient(item) {
       "StreetAddress",
       "Line1",
       "Address_x0020_Line_x0020_1",
-    ]) || inferAddressLikeValue();
-  const area = pickFieldValue(["Area", "Location", "Patch", "Zone"]);
-  const status = pickFieldValue(["Status", "ClientStatus", "State", "CurrentStatus"]);
-  const town = pickFieldValue(["Town", "City", "Suburb", "Town_x0020_City"]);
-  const county = pickFieldValue(["County", "Region", "State"]);
+    ], fieldMap.address) || inferAddressLikeValue();
+  const area = pickFieldValue(["Area", "Location", "Patch", "Zone"], fieldMap.area);
+  const status = pickFieldValue(["Status", "ClientStatus", "State", "CurrentStatus"], fieldMap.status);
+  const town = pickFieldValue(["Town", "City", "Suburb", "Town_x0020_City"], fieldMap.town);
+  const county = pickFieldValue(["County", "Region", "State"], fieldMap.county);
   const postcode = pickFieldValue([
     "PostCode",
     "Postcode",
     "PostalCode",
     "ZipCode",
     "Post_x0020_Code",
-  ]);
-  const email = fields.Email || fields.EmailAddress || fields.ClientEmail || "";
+  ], fieldMap.postcode);
+  const email = pickFieldValue(["Email", "EmailAddress", "ClientEmail"], fieldMap.email);
   const xeroId =
     pickTokenValue(byToken, [
       "XeroId",
@@ -474,9 +589,7 @@ function mapGraphItemToClient(item) {
 
 async function loadClientsFromGraph() {
   const token = await getGraphAccessToken();
-  const { hostName, sitePath, clientsListName } = requireSharePointConfig();
-  const siteId = await resolveSiteId(token, hostName, sitePath);
-  const listId = await resolveListId(token, siteId, clientsListName);
+  const { siteId, listId, fieldMap } = await resolveListConfig(token);
 
   const clients = [];
   let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?$expand=fields&$top=200`;
@@ -486,7 +599,7 @@ async function loadClientsFromGraph() {
     const items = Array.isArray(data?.value) ? data.value : [];
 
     for (const item of items) {
-      const client = mapGraphItemToClient(item);
+      const client = mapGraphItemToClient(item, fieldMap);
       if (client.id && client.name) {
         clients.push(client);
       }
