@@ -8,6 +8,8 @@ const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSu
 const DEFAULT_LIST_NAME = "Associate Recruitment";
 const DEFAULT_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency/Lists/Associate%20Recruitment/Active.aspx?env=WebViewList";
+const DEFAULT_COLLEAGUES_SITE_URL = "https://planwithcare.sharepoint.com/sites/SupportTeam";
+const DEFAULT_COLLEAGUES_LIST_NAME = "Colleagues";
 const ONETOUCH_CARER_PROFILE_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerSummaryProfile.php";
 const DEFAULT_EXTERNAL_ID_PREFIX = "thrive-recruitment";
 
@@ -31,19 +33,15 @@ function toBoolean(value) {
   return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "y";
 }
 
-function parseSiteConfig() {
-  const siteUrlValue = normalizeText(process.env.SHAREPOINT_RECRUITMENT_SITE_URL || DEFAULT_SITE_URL);
-  const listName = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_NAME || DEFAULT_LIST_NAME);
-  const listWebUrl = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_WEB_URL || DEFAULT_LIST_WEB_URL);
-
+function parseSharePointListConfig(siteUrlValue, listName, missingConfigMessage) {
   if (!siteUrlValue || !listName) {
-    throw new Error("Missing SHAREPOINT_RECRUITMENT_SITE_URL or SHAREPOINT_RECRUITMENT_LIST_NAME.");
+    throw new Error(missingConfigMessage);
   }
 
   const siteUrl = new URL(siteUrlValue);
   const sitePath = siteUrl.pathname.replace(/\/$/, "");
   if (!sitePath) {
-    throw new Error("SHAREPOINT_RECRUITMENT_SITE_URL must include a site path.");
+    throw new Error("Configured SharePoint site URL must include a site path.");
   }
 
   return {
@@ -51,8 +49,31 @@ function parseSiteConfig() {
     siteBaseUrl: `${siteUrl.protocol}//${siteUrl.host}${sitePath}`,
     sitePath,
     listName,
+  };
+}
+
+function parseSiteConfig() {
+  const siteUrlValue = normalizeText(process.env.SHAREPOINT_RECRUITMENT_SITE_URL || DEFAULT_SITE_URL);
+  const listName = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_NAME || DEFAULT_LIST_NAME);
+  const listWebUrl = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_WEB_URL || DEFAULT_LIST_WEB_URL);
+  return {
+    ...parseSharePointListConfig(
+      siteUrlValue,
+      listName,
+      "Missing SHAREPOINT_RECRUITMENT_SITE_URL or SHAREPOINT_RECRUITMENT_LIST_NAME."
+    ),
     listWebUrl,
   };
+}
+
+function parseColleaguesConfig() {
+  const siteUrlValue = normalizeText(process.env.SHAREPOINT_COLLEAGUES_SITE_URL || DEFAULT_COLLEAGUES_SITE_URL);
+  const listName = normalizeText(process.env.SHAREPOINT_COLLEAGUES_LIST_NAME || DEFAULT_COLLEAGUES_LIST_NAME);
+  return parseSharePointListConfig(
+    siteUrlValue,
+    listName,
+    "Missing SHAREPOINT_COLLEAGUES_SITE_URL or SHAREPOINT_COLLEAGUES_LIST_NAME."
+  );
 }
 
 function quoteODataString(value) {
@@ -90,8 +111,8 @@ async function resolveList(graphClient, siteId, listName) {
   };
 }
 
-async function resolveOneTouchLinkFieldName(graphClient, siteId, listId) {
-  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=name,displayName&$top=200`;
+async function resolveListColumns(graphClient, siteId, listId, select = "name,displayName") {
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$select=${select}&$top=200`;
   const columns = [];
   while (nextUrl) {
     const payload = await graphClient.fetchJson(nextUrl);
@@ -99,6 +120,42 @@ async function resolveOneTouchLinkFieldName(graphClient, siteId, listId) {
     columns.push(...values);
     nextUrl = String(payload?.["@odata.nextLink"] || "");
   }
+  return columns;
+}
+
+function findColumnInternalName(columns, candidates, fallback = "") {
+  const byNameToken = new Map();
+  const byDisplayToken = new Map();
+
+  for (const column of Array.isArray(columns) ? columns : []) {
+    const name = normalizeText(column?.name);
+    const displayName = normalizeText(column?.displayName);
+    if (!name) {
+      continue;
+    }
+    const nameToken = normalizeToken(name);
+    const displayToken = normalizeToken(displayName);
+    if (nameToken && !byNameToken.has(nameToken)) {
+      byNameToken.set(nameToken, name);
+    }
+    if (displayToken && !byDisplayToken.has(displayToken)) {
+      byDisplayToken.set(displayToken, name);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const token = normalizeToken(candidate);
+    const match = byDisplayToken.get(token) || byNameToken.get(token);
+    if (match) {
+      return match;
+    }
+  }
+
+  return fallback;
+}
+
+async function resolveOneTouchLinkFieldName(graphClient, siteId, listId) {
+  const columns = await resolveListColumns(graphClient, siteId, listId);
 
   const candidates = [];
   for (const column of columns) {
@@ -368,6 +425,58 @@ async function patchRecruitmentOneTouchLink(graphClient, config, siteId, listId,
   });
 }
 
+async function createColleagueListItem(graphClient, candidate, oneTouchId) {
+  const config = parseColleaguesConfig();
+  const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
+  const list = await resolveList(graphClient, siteId, config.listName);
+  const columns = await resolveListColumns(graphClient, siteId, list.id);
+  const fieldMap = {
+    title: findColumnInternalName(columns, ["Title", "Name"], "Title"),
+    oneTouchId: findColumnInternalName(columns, ["OnetouchID", "OneTouchID", "OneTouch Id"], "OnetouchID"),
+    archived: findColumnInternalName(columns, ["Archived"], "Archived"),
+    lineManager: findColumnInternalName(columns, ["Line Manager", "LineManager"]),
+  };
+
+  if (!fieldMap.oneTouchId) {
+    throw new Error("Could not find the Colleagues OnetouchID field.");
+  }
+
+  const fields = {
+    [fieldMap.title]: normalizeText(candidate?.candidateName) || `OneTouch ${normalizeText(oneTouchId)}`,
+    [fieldMap.oneTouchId]: normalizeText(oneTouchId),
+  };
+
+  if (fieldMap.archived) {
+    fields[fieldMap.archived] = false;
+  }
+
+  const lineManager = normalizeText(candidate?.currentOwner);
+  if (fieldMap.lineManager && lineManager) {
+    fields[fieldMap.lineManager] = lineManager;
+  }
+
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${list.id}/items`;
+  await graphClient.fetchJson(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fields }),
+  });
+}
+
+function appendWarning(existingWarning, nextWarning) {
+  const current = normalizeText(existingWarning);
+  const next = normalizeText(nextWarning);
+  if (!next) {
+    return current;
+  }
+  if (!current) {
+    return next;
+  }
+  return `${current} ${next}`;
+}
+
 function buildOneTouchCreatePayload(candidate, overrides = {}) {
   return {
     external_id: buildRecruitmentExternalId(candidate.id),
@@ -472,6 +581,7 @@ module.exports = async (req, res) => {
       );
       const oneTouchProfileUrl = buildOneTouchProfileUrl(createResult.id);
       let sharePointLinkPatched = false;
+      let colleagueCreated = false;
       let warning = "";
       try {
         await patchRecruitmentOneTouchLink(
@@ -492,6 +602,19 @@ module.exports = async (req, res) => {
           message: warning,
         });
       }
+      try {
+        await createColleagueListItem(graphClient, candidate, createResult.id);
+        colleagueCreated = true;
+      } catch (error) {
+        const colleaguesWarning =
+          error?.message || "Created in OneTouch, but could not add the colleague to the Colleagues list.";
+        warning = appendWarning(warning, colleaguesWarning);
+        console.warn("[recruitment] OneTouch create succeeded but Colleagues list create failed", {
+          itemId,
+          oneTouchId: createResult.id,
+          message: colleaguesWarning,
+        });
+      }
 
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json({
@@ -500,6 +623,7 @@ module.exports = async (req, res) => {
         oneTouchId: createResult.id,
         oneTouchLink: oneTouchProfileUrl,
         sharePointLinkPatched,
+        colleagueCreated,
         warning,
       });
       return;
