@@ -14,7 +14,6 @@ const incomeRateInput = document.getElementById("incomeRateInput");
 const contractedRateInput = document.getElementById("contractedRateInput");
 const taxOnCostInput = document.getElementById("taxOnCostInput");
 const pensionOnCostInput = document.getElementById("pensionOnCostInput");
-const carerSelect = document.getElementById("carerSelect");
 const exportReportBtn = document.getElementById("exportReportBtn");
 const uploadStatusMessage = document.getElementById("uploadStatusMessage");
 const reportOutputPanel = document.getElementById("reportOutputPanel");
@@ -24,11 +23,12 @@ const areaSummaryBody = document.getElementById("areaSummaryBody");
 const carerSummaryBody = document.getElementById("carerSummaryBody");
 const selectedTotalMessage = document.getElementById("selectedTotalMessage");
 const selectedTotalGrid = document.getElementById("selectedTotalGrid");
+const selectAllCarersBtn = document.getElementById("selectAllCarersBtn");
+const clearSelectedCarersBtn = document.getElementById("clearSelectedCarersBtn");
 
 const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
 const PAYROLL_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carerPayroll.php";
 const ASSUMPTIONS_STORAGE_KEY = "thrive.carerProfitability.assumptions.v1";
-const ALL_CARERS_VALUE = "__all__";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -40,6 +40,12 @@ let carerHoursRows = [];
 let payrollRows = [];
 let latestReport = null;
 let reportPeriod = null;
+let selectedCarerKeys = new Set();
+let hasManualSelection = false;
+const tableSortState = {
+  area: { key: "", direction: "desc" },
+  carer: { key: "", direction: "desc" },
+};
 
 const currencyFormatter = new Intl.NumberFormat("en-GB", {
   style: "currency",
@@ -262,6 +268,11 @@ function parseCurrency(value) {
   return isNegative ? -number : number;
 }
 
+function parseSortNumber(value) {
+  const number = Number(String(value || "").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(number) ? number : null;
+}
+
 function hasCarerIdentity({ id, firstName, surname, fallbackName }) {
   return Boolean(cleanCell(id) || cleanCell(firstName) || cleanCell(surname) || cleanCell(fallbackName));
 }
@@ -409,6 +420,7 @@ function buildReport() {
   const carers = Array.from(carersByKey.values())
     .map((row) => ({
       ...row,
+      idNumber: parseSortNumber(row.id),
       contractedHours: Math.max(row.contractedHours, row.payrollTotalHours),
     }))
     .map((row) => calculateFinancials(row, assumptions))
@@ -491,6 +503,64 @@ function renderKpiSet(container, total) {
   );
 }
 
+function buildTotalFromCarers(carers, assumptions) {
+  return calculateFinancials(
+    carers.reduce(
+      (total, carer) => ({
+        confirmedHours: total.confirmedHours + carer.confirmedHours,
+        contractedHours: total.contractedHours + carer.contractedHours,
+        payrollTotalHours: total.payrollTotalHours + carer.payrollTotalHours,
+        travelExpense: total.travelExpense + carer.travelExpense,
+        carerCount: total.carerCount + 1,
+      }),
+      { confirmedHours: 0, contractedHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
+    ),
+    assumptions
+  );
+}
+
+function numericSortValue(row, key) {
+  const value = row?.[key];
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function sortedRows(rows, tableKey) {
+  const sort = tableSortState[tableKey];
+  if (!sort?.key) {
+    return rows;
+  }
+
+  const direction = sort.direction === "asc" ? 1 : -1;
+  return [...rows].sort((left, right) => {
+    const leftValue = numericSortValue(left, sort.key);
+    const rightValue = numericSortValue(right, sort.key);
+
+    if (leftValue === null && rightValue === null) {
+      return 0;
+    }
+    if (leftValue === null) {
+      return 1;
+    }
+    if (rightValue === null) {
+      return -1;
+    }
+    return (leftValue - rightValue) * direction;
+  });
+}
+
+function updateSortButtons() {
+  document.querySelectorAll("[data-sort-table][data-sort-key]").forEach((button) => {
+    const table = button.getAttribute("data-sort-table");
+    const key = button.getAttribute("data-sort-key");
+    const sort = tableSortState[table];
+    const isActive = sort?.key === key;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    button.dataset.sortDirection = isActive ? sort.direction : "";
+  });
+}
+
 function appendCell(row, value) {
   const cell = document.createElement("td");
   cell.textContent = value;
@@ -499,7 +569,7 @@ function appendCell(row, value) {
 
 function renderAreaRows(rows) {
   areaSummaryBody.innerHTML = "";
-  rows.forEach((area) => {
+  sortedRows(rows, "area").forEach((area) => {
     const tr = document.createElement("tr");
     appendCell(tr, area.area);
     appendCell(tr, String(area.carerCount));
@@ -516,8 +586,17 @@ function renderAreaRows(rows) {
 
 function renderCarerRows(rows) {
   carerSummaryBody.innerHTML = "";
-  rows.forEach((carer) => {
+  sortedRows(rows, "carer").forEach((carer) => {
     const tr = document.createElement("tr");
+    const selectCell = document.createElement("td");
+    selectCell.className = "selection-cell";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = selectedCarerKeys.has(carer.key);
+    checkbox.dataset.carerKey = carer.key;
+    checkbox.setAttribute("aria-label", `Include ${carer.name} in selected totals`);
+    selectCell.appendChild(checkbox);
+    tr.appendChild(selectCell);
     appendCell(tr, carer.area);
     appendCell(tr, carer.id || "");
     appendCell(tr, carer.name);
@@ -530,29 +609,20 @@ function renderCarerRows(rows) {
   });
 }
 
-function renderCarerSelect(carers) {
-  if (!carerSelect) {
-    return;
+function syncSelectedCarers(carers) {
+  const validKeys = new Set(carers.map((carer) => carer.key));
+  selectedCarerKeys = new Set(Array.from(selectedCarerKeys).filter((key) => validKeys.has(key)));
+
+  if (!hasManualSelection) {
+    selectedCarerKeys = new Set(validKeys);
   }
 
-  const previousValue = carerSelect.value || ALL_CARERS_VALUE;
-  carerSelect.innerHTML = "";
-
-  const allOption = document.createElement("option");
-  allOption.value = ALL_CARERS_VALUE;
-  allOption.textContent = "All carers";
-  carerSelect.appendChild(allOption);
-
-  carers.forEach((carer) => {
-    const option = document.createElement("option");
-    option.value = carer.key;
-    option.textContent = carer.id ? `${carer.name} (${carer.id})` : carer.name;
-    carerSelect.appendChild(option);
-  });
-
-  const values = new Set([ALL_CARERS_VALUE, ...carers.map((carer) => carer.key)]);
-  carerSelect.value = values.has(previousValue) ? previousValue : ALL_CARERS_VALUE;
-  carerSelect.disabled = !carers.length;
+  if (selectAllCarersBtn) {
+    selectAllCarersBtn.disabled = !carers.length || selectedCarerKeys.size === carers.length;
+  }
+  if (clearSelectedCarersBtn) {
+    clearSelectedCarersBtn.disabled = !carers.length || selectedCarerKeys.size === 0;
+  }
 }
 
 function renderSelectedTotals(report) {
@@ -560,14 +630,16 @@ function renderSelectedTotals(report) {
     return;
   }
 
-  const selectedValue = carerSelect?.value || ALL_CARERS_VALUE;
-  const selectedCarer = selectedValue === ALL_CARERS_VALUE ? null : report.carers.find((carer) => carer.key === selectedValue);
-  const total = selectedCarer || report.grandTotal;
-  const label = selectedCarer
-    ? `${selectedCarer.name}${selectedCarer.id ? ` (${selectedCarer.id})` : ""}`
-    : "All carers";
+  const selectedCarers = report.carers.filter((carer) => selectedCarerKeys.has(carer.key));
+  const total = buildTotalFromCarers(selectedCarers, report.assumptions);
+  const label =
+    selectedCarers.length === report.carers.length
+      ? "all carers"
+      : `${selectedCarers.length} selected carer${selectedCarers.length === 1 ? "" : "s"}`;
 
-  selectedTotalMessage.textContent = `Totals for ${label}.`;
+  selectedTotalMessage.textContent = selectedCarers.length
+    ? `Totals for ${label}.`
+    : "No carers selected.";
   renderKpiSet(selectedTotalGrid, total);
 }
 
@@ -577,7 +649,7 @@ function renderReport() {
   if (!report) {
     reportOutputPanel.hidden = true;
     exportReportBtn.disabled = true;
-    renderCarerSelect([]);
+    syncSelectedCarers([]);
     if (selectedTotalGrid) {
       selectedTotalGrid.innerHTML = "";
     }
@@ -588,10 +660,11 @@ function renderReport() {
   }
 
   renderKpiSet(grandTotalGrid, report.grandTotal);
-  renderCarerSelect(report.carers);
+  syncSelectedCarers(report.carers);
   renderAreaRows(report.areas);
   renderCarerRows(report.carers);
   renderSelectedTotals(report);
+  updateSortButtons();
   reportSummaryMessage.textContent = `${report.carers.length} carer row(s), ${report.areas.length} area(s). Payroll hours replace contracted hours where higher; central contracted hours are ignored.`;
   reportOutputPanel.hidden = false;
   exportReportBtn.disabled = false;
@@ -613,6 +686,8 @@ async function handleCarerHoursUpload() {
   try {
     const parsed = await handleCsvUpload(carerHoursCsvInput.files?.[0], "Carer hours CSV");
     carerHoursRows = parsed.rows;
+    hasManualSelection = false;
+    selectedCarerKeys = new Set();
     renderReport();
     const warning = parsed.errors.length ? ` ${parsed.errors[0]}` : "";
     setUploadStatus(`Loaded ${carerHoursRows.length} carer hours row(s).${warning}`);
@@ -767,10 +842,67 @@ payrollCsvInput?.addEventListener("change", () => {
   });
 });
 
-carerSelect?.addEventListener("change", () => {
+carerSummaryBody?.addEventListener("change", (event) => {
+  const checkbox = event.target?.closest?.('input[type="checkbox"][data-carer-key]');
+  if (!checkbox || !carerSummaryBody.contains(checkbox)) {
+    return;
+  }
+
+  hasManualSelection = true;
+  const key = checkbox.dataset.carerKey;
+  if (checkbox.checked) {
+    selectedCarerKeys.add(key);
+  } else {
+    selectedCarerKeys.delete(key);
+  }
+
   if (latestReport) {
+    syncSelectedCarers(latestReport.carers);
     renderSelectedTotals(latestReport);
   }
+});
+
+selectAllCarersBtn?.addEventListener("click", () => {
+  if (!latestReport) {
+    return;
+  }
+  hasManualSelection = true;
+  selectedCarerKeys = new Set(latestReport.carers.map((carer) => carer.key));
+  renderReport();
+});
+
+clearSelectedCarersBtn?.addEventListener("click", () => {
+  hasManualSelection = true;
+  selectedCarerKeys = new Set();
+  if (latestReport) {
+    renderReport();
+  }
+});
+
+document.querySelectorAll("[data-sort-table][data-sort-key]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const table = button.getAttribute("data-sort-table");
+    const key = button.getAttribute("data-sort-key");
+    if (!tableSortState[table]) {
+      return;
+    }
+
+    const current = tableSortState[table];
+    tableSortState[table] = {
+      key,
+      direction: current.key === key && current.direction === "desc" ? "asc" : "desc",
+    };
+
+    if (latestReport) {
+      if (table === "area") {
+        renderAreaRows(latestReport.areas);
+      }
+      if (table === "carer") {
+        renderCarerRows(latestReport.carers);
+      }
+    }
+    updateSortButtons();
+  });
 });
 
 exportReportBtn?.addEventListener("click", exportReport);

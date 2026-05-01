@@ -116,15 +116,6 @@
           </label>
         </div>
 
-        <div class="profitability-selector-row">
-          <label class="field" for="carerSelect">
-            Carer totals
-            <select id="carerSelect" disabled>
-              <option value="__all__">All carers</option>
-            </select>
-          </label>
-        </div>
-
         <p id="uploadStatusMessage" class="muted row-note">Upload the carer hours CSV to begin.</p>
       </section>
 
@@ -144,33 +135,40 @@
             <thead>
               <tr>
                 <th>Area</th>
-                <th>Carers</th>
-                <th>Confirmed Hours</th>
-                <th>Contracted Hours</th>
-                <th>Utilisation</th>
-                <th>Revenue</th>
-                <th>Labour + On-Cost</th>
-                <th>Travel</th>
-                <th>Profit</th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="carerCount">Carers</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="confirmedHours">Confirmed Hours</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="contractedHours">Contracted Hours</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="utilisation">Utilisation</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="revenue">Revenue</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="labourWithOnCost">Labour + On-Cost</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="travelExpense">Travel</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="profit">Profit</button></th>
               </tr>
             </thead>
             <tbody id="areaSummaryBody"></tbody>
           </table>
         </div>
 
-        <h2 class="profitability-section-heading">By Carer</h2>
+        <div class="profitability-section-bar">
+          <h2 class="profitability-section-heading">By Carer</h2>
+          <div class="profitability-table-actions">
+            <button id="selectAllCarersBtn" class="secondary" type="button">Select all</button>
+            <button id="clearSelectedCarersBtn" class="secondary" type="button">Clear selected</button>
+          </div>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Select</th>
                 <th>Area</th>
-                <th>No.</th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="idNumber">No.</button></th>
                 <th>Carer</th>
-                <th>Confirmed Hours</th>
-                <th>Contracted Hours</th>
-                <th>Utilisation</th>
-                <th>Travel</th>
-                <th>Profit</th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="confirmedHours">Confirmed Hours</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="contractedHours">Contracted Hours</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="utilisation">Utilisation</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="travelExpense">Travel</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="profit">Profit</button></th>
               </tr>
             </thead>
             <tbody id="carerSummaryBody"></tbody>

@@ -2463,11 +2463,6 @@ dd {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
-.profitability-selector-row {
-  margin-top: 14px;
-  max-width: 420px;
-}
-
 .profitability-kpi-grid {
   margin-top: 14px;
   display: grid;
@@ -2497,6 +2492,63 @@ dd {
 
 .profitability-section-heading {
   margin-top: 20px;
+}
+
+.profitability-section-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profitability-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.profitability-table-actions button {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+  box-shadow: none;
+}
+
+.table-sort-button::after {
+  content: "";
+  min-width: 0.8em;
+}
+
+.table-sort-button.active[data-sort-direction="asc"]::after {
+  content: "asc";
+}
+
+.table-sort-button.active[data-sort-direction="desc"]::after {
+  content: "desc";
+}
+
+.table-sort-button:hover,
+.table-sort-button:focus-visible {
+  color: #173f8f;
+  outline: none;
 }
 
 .suppliers-main {
