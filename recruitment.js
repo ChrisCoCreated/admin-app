@@ -2324,7 +2324,12 @@ async function addCandidateToOneTouch(itemId) {
     }
     renderCandidates();
     closeOneTouchPicker();
-    setStatus(`Candidate added to OneTouch (ID: ${cleanText(result?.oneTouchId) || "-"})`, false, { subtle: true });
+    const warning = cleanText(result?.warning);
+    const suffix = warning ? `. ${warning}` : "";
+    setStatus(`Candidate added to OneTouch (ID: ${cleanText(result?.oneTouchId) || "-"})${suffix}`, false, {
+      subtle: true,
+      autoClear: !warning,
+    });
   } catch (error) {
     console.error(error);
     setOneTouchPickerError(error?.message || "Could not add candidate to OneTouch.");

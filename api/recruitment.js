@@ -2,6 +2,7 @@ const { requireGraphAuth } = require("./_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("./_lib/tasks/graph-delegated-client");
 const { createCarer } = require("./_lib/onetouch-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("./_lib/recruitment-access");
+const { patchSharePointUrlField } = require("./_lib/sharepoint-url-field");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -47,6 +48,7 @@ function parseSiteConfig() {
 
   return {
     hostName: siteUrl.hostname,
+    siteBaseUrl: `${siteUrl.protocol}//${siteUrl.host}${sitePath}`,
     sitePath,
     listName,
     listWebUrl,
@@ -322,7 +324,7 @@ async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {
   return normalizeRecruitmentItem(payload);
 }
 
-async function patchRecruitmentOneTouchLink(graphClient, siteId, listId, itemId, oneTouchProfileUrl) {
+async function patchRecruitmentOneTouchLink(graphClient, config, siteId, listId, itemId, oneTouchProfileUrl, incomingToken) {
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
   const fieldName = await resolveOneTouchLinkFieldName(graphClient, siteId, listId);
   const link = normalizeText(oneTouchProfileUrl);
@@ -354,7 +356,16 @@ async function patchRecruitmentOneTouchLink(graphClient, siteId, listId, itemId,
     }
   }
 
-  throw lastError || new Error("Could not patch SharePoint OnetouchLink field.");
+  await patchSharePointUrlField({
+    incomingToken,
+    siteBaseUrl: config.siteBaseUrl,
+    hostName: config.hostName,
+    listName: config.listName,
+    itemId,
+    fieldInternalName: fieldName,
+    urlValue: link,
+    description: "OneTouch",
+  });
 }
 
 function buildOneTouchCreatePayload(candidate, overrides = {}) {
@@ -460,7 +471,27 @@ module.exports = async (req, res) => {
         })
       );
       const oneTouchProfileUrl = buildOneTouchProfileUrl(createResult.id);
-      await patchRecruitmentOneTouchLink(graphClient, siteId, list.id, itemId, oneTouchProfileUrl);
+      let sharePointLinkPatched = false;
+      let warning = "";
+      try {
+        await patchRecruitmentOneTouchLink(
+          graphClient,
+          config,
+          siteId,
+          list.id,
+          itemId,
+          oneTouchProfileUrl,
+          req.authUser?.graphAccessToken
+        );
+        sharePointLinkPatched = true;
+      } catch (error) {
+        warning = error?.message || "Created in OneTouch, but could not update the recruitment list link.";
+        console.warn("[recruitment] OneTouch create succeeded but SharePoint link patch failed", {
+          itemId,
+          oneTouchId: createResult.id,
+          message: warning,
+        });
+      }
 
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json({
@@ -468,6 +499,8 @@ module.exports = async (req, res) => {
         itemId,
         oneTouchId: createResult.id,
         oneTouchLink: oneTouchProfileUrl,
+        sharePointLinkPatched,
+        warning,
       });
       return;
     }
