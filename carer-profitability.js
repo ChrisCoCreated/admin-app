@@ -42,6 +42,7 @@ let latestReport = null;
 let reportPeriod = null;
 let selectedCarerKeys = new Set();
 let hasManualSelection = false;
+let contractedHourOverrides = new Map();
 const tableSortState = {
   area: { key: "", direction: "desc" },
   carer: { key: "", direction: "desc" },
@@ -273,6 +274,11 @@ function parseSortNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function parseEditableHours(value) {
+  const hours = parseHours(value);
+  return Number.isFinite(hours) ? Math.max(0, hours) : 0;
+}
+
 function hasCarerIdentity({ id, firstName, surname, fallbackName }) {
   return Boolean(cleanCell(id) || cleanCell(firstName) || cleanCell(surname) || cleanCell(fallbackName));
 }
@@ -418,11 +424,17 @@ function buildReport() {
   });
 
   const carers = Array.from(carersByKey.values())
-    .map((row) => ({
-      ...row,
-      idNumber: parseSortNumber(row.id),
-      contractedHours: Math.max(row.contractedHours, row.payrollTotalHours),
-    }))
+    .map((row) => {
+      const defaultContractedHours = Math.max(row.contractedHours, row.payrollTotalHours);
+      const override = contractedHourOverrides.get(row.key);
+      return {
+        ...row,
+        idNumber: parseSortNumber(row.id),
+        defaultContractedHours,
+        contractedHours: override ?? defaultContractedHours,
+        contractedHoursOverridden: override !== undefined,
+      };
+    })
     .map((row) => calculateFinancials(row, assumptions))
     .sort((left, right) => left.area.localeCompare(right.area) || left.name.localeCompare(right.name));
 
@@ -567,6 +579,23 @@ function appendCell(row, value) {
   row.appendChild(cell);
 }
 
+function appendContractedHoursCell(row, carer) {
+  const cell = document.createElement("td");
+  const input = document.createElement("input");
+  input.className = "profitability-hours-input";
+  input.type = "number";
+  input.min = "0";
+  input.step = "0.25";
+  input.value = Number(carer.contractedHours || 0).toFixed(2);
+  input.dataset.carerKey = carer.key;
+  input.setAttribute("aria-label", `Contracted hours for ${carer.name}`);
+  if (carer.contractedHoursOverridden) {
+    input.classList.add("is-overridden");
+  }
+  cell.appendChild(input);
+  row.appendChild(cell);
+}
+
 function renderAreaRows(rows) {
   areaSummaryBody.innerHTML = "";
   sortedRows(rows, "area").forEach((area) => {
@@ -601,7 +630,7 @@ function renderCarerRows(rows) {
     appendCell(tr, carer.id || "");
     appendCell(tr, carer.name);
     appendCell(tr, formatHours(carer.confirmedHours));
-    appendCell(tr, formatHours(carer.contractedHours));
+    appendContractedHoursCell(tr, carer);
     appendCell(tr, formatPercent(carer.utilisation));
     appendCell(tr, formatCurrency(carer.travelExpense));
     appendCell(tr, formatCurrency(carer.profit));
@@ -688,6 +717,7 @@ async function handleCarerHoursUpload() {
     carerHoursRows = parsed.rows;
     hasManualSelection = false;
     selectedCarerKeys = new Set();
+    contractedHourOverrides = new Map();
     renderReport();
     const warning = parsed.errors.length ? ` ${parsed.errors[0]}` : "";
     setUploadStatus(`Loaded ${carerHoursRows.length} carer hours row(s).${warning}`);
@@ -859,6 +889,21 @@ carerSummaryBody?.addEventListener("change", (event) => {
   if (latestReport) {
     syncSelectedCarers(latestReport.carers);
     renderSelectedTotals(latestReport);
+  }
+});
+
+carerSummaryBody?.addEventListener("change", (event) => {
+  const input = event.target?.closest?.(".profitability-hours-input[data-carer-key]");
+  if (!input || !carerSummaryBody.contains(input)) {
+    return;
+  }
+
+  const key = input.dataset.carerKey;
+  const value = parseEditableHours(input.value);
+  contractedHourOverrides.set(key, value);
+
+  if (latestReport) {
+    renderReport();
   }
 });
 

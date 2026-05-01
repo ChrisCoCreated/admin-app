@@ -2514,6 +2514,20 @@ dd {
   padding: 8px 12px;
 }
 
+.profitability-hours-input {
+  width: 96px;
+  height: 36px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  font-size: 0.92rem;
+}
+
+.profitability-hours-input.is-overridden {
+  border-color: rgba(49, 183, 200, 0.74);
+  background: #f0fbfd;
+  box-shadow: 0 0 0 2px rgba(49, 183, 200, 0.12);
+}
+
 .table-sort-button {
   display: inline-flex;
   align-items: center;
