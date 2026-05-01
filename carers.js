@@ -19,6 +19,7 @@ const carersTableBody = document.getElementById("carersTableBody");
 const emptyState = document.getElementById("emptyState");
 const warningState = document.getElementById("warningState");
 const detailRoot = document.getElementById("carerDetail");
+const addCarerToSharePointBtn = document.getElementById("addCarerToSharePointBtn");
 
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
@@ -31,6 +32,7 @@ const detailFields = {
   postcode: detailRoot?.querySelector('[data-field="postcode"]'),
   email: detailRoot?.querySelector('[data-field="email"]'),
   phone: detailRoot?.querySelector('[data-field="phone"]'),
+  sharePointStatus: detailRoot?.querySelector('[data-field="sharePointStatus"]'),
 };
 
 let allCarers = [];
@@ -38,6 +40,7 @@ let selectedCarerId = "";
 let selectedCarerIds = new Set();
 let availableTags = [];
 let bulkTagBusy = false;
+let addToSharePointBusy = false;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -109,6 +112,47 @@ function formatHours(value) {
   return numeric % 1 === 0 ? String(numeric) : numeric.toFixed(1);
 }
 
+function getSelectedCarer() {
+  return allCarers.find((carer) => carer.id === selectedCarerId) || null;
+}
+
+function getSharePointStatusLabel(carer) {
+  const state = normalizeValue(carer?.sharePointState).toLowerCase();
+  if (state === "present") {
+    return "In SharePoint";
+  }
+  if (state === "missing") {
+    return "Not in SharePoint";
+  }
+  return "Unknown";
+}
+
+function syncSharePointButton(carer) {
+  if (!addCarerToSharePointBtn) {
+    return;
+  }
+
+  const showButton = Boolean(carer && normalizeValue(carer.sharePointState).toLowerCase() === "missing");
+  addCarerToSharePointBtn.hidden = !showButton;
+  addCarerToSharePointBtn.disabled = addToSharePointBusy;
+  addCarerToSharePointBtn.textContent = addToSharePointBusy ? "Adding..." : "Add to SharePoint";
+}
+
+function patchCarer(carerId, updates = {}) {
+  const targetId = normalizeValue(carerId);
+  if (!targetId) {
+    return;
+  }
+  const index = allCarers.findIndex((carer) => carer.id === targetId);
+  if (index < 0) {
+    return;
+  }
+  allCarers[index] = {
+    ...allCarers[index],
+    ...updates,
+  };
+}
+
 function renderBulkTagOptions() {
   if (!bulkTagSelect) {
     return;
@@ -160,6 +204,8 @@ function setDetail(carer) {
     detailFields.postcode.textContent = "-";
     detailFields.email.textContent = "-";
     detailFields.phone.textContent = "-";
+    detailFields.sharePointStatus.textContent = "-";
+    syncSharePointButton(null);
     return;
   }
 
@@ -173,6 +219,8 @@ function setDetail(carer) {
   detailFields.postcode.textContent = normalizeValue(carer.postcode) || "-";
   detailFields.email.textContent = normalizeValue(carer.email) || "-";
   detailFields.phone.textContent = normalizeValue(carer.phone) || "-";
+  detailFields.sharePointStatus.textContent = getSharePointStatusLabel(carer);
+  syncSharePointButton(carer);
 }
 
 function renderFilterOptions() {
@@ -432,6 +480,39 @@ signOutBtn?.addEventListener("click", async () => {
     await authController.signOut();
   } finally {
     window.location.href = "./index.html";
+  }
+});
+
+addCarerToSharePointBtn?.addEventListener("click", async () => {
+  const selectedCarer = getSelectedCarer();
+  if (!selectedCarer || normalizeValue(selectedCarer.sharePointState).toLowerCase() !== "missing") {
+    return;
+  }
+
+  addToSharePointBusy = true;
+  syncSharePointButton(selectedCarer);
+  setStatus(`Adding ${normalizeValue(selectedCarer.name) || "carer"} to SharePoint...`);
+  try {
+    const result = await directoryApi.addCarerToSharePoint({
+      carerId: selectedCarer.id,
+    });
+    patchCarer(selectedCarer.id, {
+      inSharePoint: true,
+      sharePointState: "present",
+      sharePointItemId: normalizeValue(result?.sharePointItemId),
+    });
+    renderCarers();
+    setStatus(
+      result?.alreadyExists
+        ? `${normalizeValue(selectedCarer.name) || "Carer"} is already in SharePoint.`
+        : `${normalizeValue(selectedCarer.name) || "Carer"} added to SharePoint.`
+    );
+  } catch (error) {
+    console.error(error);
+    setStatus(error?.message || "Could not add carer to SharePoint.", true);
+  } finally {
+    addToSharePointBusy = false;
+    syncSharePointButton(getSelectedCarer());
   }
 });
 

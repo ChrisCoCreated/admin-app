@@ -395,6 +395,20 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async addCarerToSharePoint(payload = {}) {
+      const response = await authFetch(endpoint("/api/carers/sharepoint"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Carer SharePoint create request failed");
+      }
+      return response.json();
+    },
+
     async listTimesheets(query = {}) {
       const response = await authFetch(buildUrl("/api/timesheets", query));
       if (!response.ok) {

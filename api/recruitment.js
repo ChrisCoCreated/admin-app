@@ -3,13 +3,12 @@ const { createGraphDelegatedClient } = require("./_lib/tasks/graph-delegated-cli
 const { createCarer } = require("./_lib/onetouch-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("./_lib/recruitment-access");
 const { patchSharePointUrlField } = require("./_lib/sharepoint-url-field");
+const { createSharePointColleague } = require("./_lib/colleagues-source");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
 const DEFAULT_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency/Lists/Associate%20Recruitment/Active.aspx?env=WebViewList";
-const DEFAULT_COLLEAGUES_SITE_URL = "https://planwithcare.sharepoint.com/sites/SupportTeam";
-const DEFAULT_COLLEAGUES_LIST_NAME = "Colleagues";
 const ONETOUCH_CARER_PROFILE_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerSummaryProfile.php";
 const DEFAULT_EXTERNAL_ID_PREFIX = "thrive-recruitment";
 
@@ -64,16 +63,6 @@ function parseSiteConfig() {
     ),
     listWebUrl,
   };
-}
-
-function parseColleaguesConfig() {
-  const siteUrlValue = normalizeText(process.env.SHAREPOINT_COLLEAGUES_SITE_URL || DEFAULT_COLLEAGUES_SITE_URL);
-  const listName = normalizeText(process.env.SHAREPOINT_COLLEAGUES_LIST_NAME || DEFAULT_COLLEAGUES_LIST_NAME);
-  return parseSharePointListConfig(
-    siteUrlValue,
-    listName,
-    "Missing SHAREPOINT_COLLEAGUES_SITE_URL or SHAREPOINT_COLLEAGUES_LIST_NAME."
-  );
 }
 
 function quoteODataString(value) {
@@ -425,46 +414,6 @@ async function patchRecruitmentOneTouchLink(graphClient, config, siteId, listId,
   });
 }
 
-async function createColleagueListItem(graphClient, candidate, oneTouchId) {
-  const config = parseColleaguesConfig();
-  const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
-  const list = await resolveList(graphClient, siteId, config.listName);
-  const columns = await resolveListColumns(graphClient, siteId, list.id);
-  const fieldMap = {
-    title: findColumnInternalName(columns, ["Title", "Name"], "Title"),
-    oneTouchId: findColumnInternalName(columns, ["OnetouchID", "OneTouchID", "OneTouch Id"], "OnetouchID"),
-    archived: findColumnInternalName(columns, ["Archived"], "Archived"),
-    lineManager: findColumnInternalName(columns, ["Line Manager", "LineManager"]),
-  };
-
-  if (!fieldMap.oneTouchId) {
-    throw new Error("Could not find the Colleagues OnetouchID field.");
-  }
-
-  const fields = {
-    [fieldMap.title]: normalizeText(candidate?.candidateName) || `OneTouch ${normalizeText(oneTouchId)}`,
-    [fieldMap.oneTouchId]: normalizeText(oneTouchId),
-  };
-
-  if (fieldMap.archived) {
-    fields[fieldMap.archived] = false;
-  }
-
-  const lineManager = normalizeText(candidate?.currentOwner);
-  if (fieldMap.lineManager && lineManager) {
-    fields[fieldMap.lineManager] = lineManager;
-  }
-
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${list.id}/items`;
-  await graphClient.fetchJson(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ fields }),
-  });
-}
-
 function appendWarning(existingWarning, nextWarning) {
   const current = normalizeText(existingWarning);
   const next = normalizeText(nextWarning);
@@ -603,7 +552,11 @@ module.exports = async (req, res) => {
         });
       }
       try {
-        await createColleagueListItem(graphClient, candidate, createResult.id);
+        await createSharePointColleague({
+          name: candidate.candidateName,
+          oneTouchId: createResult.id,
+          archived: false,
+        });
         colleagueCreated = true;
       } catch (error) {
         const colleaguesWarning =

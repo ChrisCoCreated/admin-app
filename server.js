@@ -10,6 +10,7 @@ const clientsReconcilePreviewHandler = require("./api/clients/reconcile/preview"
 const clientsReconcileApplyHandler = require("./api/clients/reconcile/apply");
 const clientsTagsBulkHandler = require("./api/clients/tags/bulk");
 const carersIndexHandler = require("./api/carers/index");
+const carersSharePointHandler = require("./api/carers/sharepoint");
 const carersTagsBulkHandler = require("./api/carers/tags/bulk");
 const oneTouchClientsHandler = require("./api/onetouch/clients");
 const oneTouchTagsHandler = require("./api/onetouch/tags");
@@ -252,6 +253,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await carersTagsBulkHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/carers/sharepoint") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await carersSharePointHandler(apiReq, apiRes);
     return true;
   }
 
