@@ -1,0 +1,695 @@
+import { createAuthController } from "./auth-common.js";
+import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { createDirectoryApi } from "./directory-api.js";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260427";
+
+const signOutBtn = document.getElementById("signOutBtn");
+const statusMessage = document.getElementById("statusMessage");
+const dateRangeMessage = document.getElementById("dateRangeMessage");
+const carerHoursReportLink = document.getElementById("carerHoursReportLink");
+const payrollReportLink = document.getElementById("payrollReportLink");
+const carerHoursCsvInput = document.getElementById("carerHoursCsvInput");
+const payrollCsvInput = document.getElementById("payrollCsvInput");
+const incomeRateInput = document.getElementById("incomeRateInput");
+const contractedRateInput = document.getElementById("contractedRateInput");
+const taxOnCostInput = document.getElementById("taxOnCostInput");
+const pensionOnCostInput = document.getElementById("pensionOnCostInput");
+const exportReportBtn = document.getElementById("exportReportBtn");
+const uploadStatusMessage = document.getElementById("uploadStatusMessage");
+const reportOutputPanel = document.getElementById("reportOutputPanel");
+const reportSummaryMessage = document.getElementById("reportSummaryMessage");
+const grandTotalGrid = document.getElementById("grandTotalGrid");
+const areaSummaryBody = document.getElementById("areaSummaryBody");
+const carerSummaryBody = document.getElementById("carerSummaryBody");
+
+const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
+const PAYROLL_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carerPayroll.php";
+const ASSUMPTIONS_STORAGE_KEY = "thrive.carerProfitability.assumptions.v1";
+
+const authController = createAuthController({
+  tenantId: FRONTEND_CONFIG.tenantId,
+  clientId: FRONTEND_CONFIG.spaClientId,
+});
+const directoryApi = createDirectoryApi(authController);
+
+let carerHoursRows = [];
+let payrollRows = [];
+let latestReport = null;
+let reportPeriod = null;
+
+const currencyFormatter = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const decimalFormatter = new Intl.NumberFormat("en-GB", {
+  maximumFractionDigits: 2,
+});
+
+function setStatus(message, isError = false) {
+  statusMessage.textContent = message;
+  statusMessage.classList.toggle("error", isError);
+}
+
+function setUploadStatus(message, isError = false) {
+  uploadStatusMessage.textContent = message;
+  uploadStatusMessage.classList.toggle("error", isError);
+}
+
+function redirectToUnauthorized(pageKey) {
+  const page = encodeURIComponent(String(pageKey || "reports").trim().toLowerCase());
+  window.location.href = `./unauthorized.html?page=${page}`;
+}
+
+function formatDateParam(date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+function formatMonthStamp(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function getLastMonthRange() {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const end = new Date(today.getFullYear(), today.getMonth(), 0);
+  return { start, end };
+}
+
+function buildCarerHoursUrl(start, end) {
+  const url = new URL(CARER_HOURS_BASE_URL);
+  url.searchParams.set("jobtype", "All");
+  url.searchParams.set("start", formatDateParam(start));
+  url.searchParams.set("finish", formatDateParam(end));
+  return url.toString();
+}
+
+function buildPayrollUrl(start, end) {
+  const url = new URL(PAYROLL_BASE_URL);
+  url.searchParams.set("dateStart", formatDateParam(start));
+  url.searchParams.set("dateFinish", formatDateParam(end));
+  url.searchParams.set("carers_id", "All");
+  url.searchParams.set("searchpayrollCycle", "");
+  url.searchParams.set("holidayOption", "true");
+  url.searchParams.set("searchJobType", "All");
+  url.searchParams.set("calBill", "true");
+  return url.toString();
+}
+
+function updateReportLinks() {
+  reportPeriod = getLastMonthRange();
+  const { start, end } = reportPeriod;
+  const startText = formatDateParam(start);
+  const endText = formatDateParam(end);
+
+  if (dateRangeMessage) {
+    dateRangeMessage.textContent = `Last month: ${startText} to ${endText}`;
+  }
+  if (carerHoursReportLink) {
+    carerHoursReportLink.href = buildCarerHoursUrl(start, end);
+  }
+  if (payrollReportLink) {
+    payrollReportLink.href = buildPayrollUrl(start, end);
+  }
+}
+
+function cleanCell(value) {
+  return String(value || "").replace(/\r/g, "").trim();
+}
+
+function normalizeHeader(value) {
+  return cleanCell(value)
+    .replace(/^\uFEFF/, "")
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function normalizeName(value) {
+  return cleanCell(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getField(row, candidates) {
+  const normalizedCandidates = candidates.map(normalizeHeader);
+  for (const [header, value] of Object.entries(row || {})) {
+    if (normalizedCandidates.includes(normalizeHeader(header))) {
+      return cleanCell(value);
+    }
+  }
+  return "";
+}
+
+function parseCsvText(text) {
+  const raw = String(text || "").replace(/^\uFEFF/, "");
+  const rows = [];
+  let row = [];
+  let value = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+    const next = raw[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      row.push(value);
+      value = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && next === "\n") {
+        index += 1;
+      }
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+      continue;
+    }
+
+    value += char;
+  }
+
+  if (value.length || row.length) {
+    row.push(value);
+    rows.push(row);
+  }
+
+  const nonEmptyRows = rows.filter((candidate) => candidate.some((cell) => cleanCell(cell)));
+  if (!nonEmptyRows.length) {
+    return { headers: [], rows: [], errors: ["CSV file is empty."] };
+  }
+
+  const headers = nonEmptyRows[0].map((header) => cleanCell(header));
+  const records = [];
+  const errors = [];
+
+  for (let rowIndex = 1; rowIndex < nonEmptyRows.length; rowIndex += 1) {
+    const source = nonEmptyRows[rowIndex];
+    const record = {};
+    for (let columnIndex = 0; columnIndex < headers.length; columnIndex += 1) {
+      record[headers[columnIndex]] = cleanCell(source[columnIndex] || "");
+    }
+    if (source.length !== headers.length) {
+      errors.push(`Row ${rowIndex + 1} has ${source.length} values; expected ${headers.length}.`);
+    }
+    records.push(record);
+  }
+
+  return { headers, rows: records, errors };
+}
+
+function readFileText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(reader.error || new Error("Could not read file.")));
+    reader.readAsText(file);
+  });
+}
+
+function parseHours(value) {
+  const raw = cleanCell(value).replace(",", ".");
+  if (!raw) {
+    return 0;
+  }
+  const timeMatch = raw.match(/^(-?\d+):(\d{1,2})$/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    const minutes = Number(timeMatch[2]);
+    return Number.isFinite(hours) && Number.isFinite(minutes) ? hours + minutes / 60 : 0;
+  }
+  const number = Number(raw.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(number) ? number : 0;
+}
+
+function parseCurrency(value) {
+  const raw = cleanCell(value);
+  const isNegative = /^\(.*\)$/.test(raw);
+  const number = Number(raw.replace(/[£,\s()]/g, ""));
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+  return isNegative ? -number : number;
+}
+
+function getAssumptions() {
+  return {
+    incomeRate: Math.max(0, Number(incomeRateInput?.value || 0) || 0),
+    contractedRate: Math.max(0, Number(contractedRateInput?.value || 0) || 0),
+    taxPercent: Math.max(0, Number(taxOnCostInput?.value || 0) || 0),
+    pensionPercent: Math.max(0, Number(pensionOnCostInput?.value || 0) || 0),
+  };
+}
+
+function saveAssumptions() {
+  try {
+    localStorage.setItem(ASSUMPTIONS_STORAGE_KEY, JSON.stringify(getAssumptions()));
+  } catch (error) {
+    console.warn("Could not save carer profitability assumptions.", error);
+  }
+}
+
+function loadAssumptions() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(ASSUMPTIONS_STORAGE_KEY) || "{}");
+    if (Number.isFinite(Number(stored.incomeRate)) && incomeRateInput) {
+      incomeRateInput.value = String(stored.incomeRate);
+    }
+    if (Number.isFinite(Number(stored.contractedRate)) && contractedRateInput) {
+      contractedRateInput.value = String(stored.contractedRate);
+    }
+    if (Number.isFinite(Number(stored.taxPercent)) && taxOnCostInput) {
+      taxOnCostInput.value = String(stored.taxPercent);
+    }
+    if (Number.isFinite(Number(stored.pensionPercent)) && pensionOnCostInput) {
+      pensionOnCostInput.value = String(stored.pensionPercent);
+    }
+  } catch (error) {
+    console.warn("Could not load carer profitability assumptions.", error);
+  }
+}
+
+function calculateFinancials(row, assumptions) {
+  const revenue = row.confirmedHours * assumptions.incomeRate;
+  const baseLabourCost = row.contractedHours * assumptions.contractedRate;
+  const onCost = baseLabourCost * ((assumptions.taxPercent + assumptions.pensionPercent) / 100);
+  const labourWithOnCost = baseLabourCost + onCost;
+  const totalCost = labourWithOnCost + row.travelExpense;
+  const profit = revenue - totalCost;
+  const utilisation = row.contractedHours > 0 ? (row.confirmedHours / row.contractedHours) * 100 : null;
+
+  return {
+    ...row,
+    revenue,
+    baseLabourCost,
+    onCost,
+    labourWithOnCost,
+    totalCost,
+    profit,
+    utilisation,
+  };
+}
+
+function buildReport() {
+  if (!carerHoursRows.length) {
+    latestReport = null;
+    return null;
+  }
+
+  const assumptions = getAssumptions();
+  const carersByKey = new Map();
+  const carersById = new Map();
+  const carersByName = new Map();
+
+  carerHoursRows.forEach((row, index) => {
+    const id = getField(row, ["No.", "No", "Carer ID", "ID"]);
+    const firstName = getField(row, ["First Name", "Forename"]);
+    const surname = getField(row, ["Surname", "Last Name"]);
+    const fallbackName = getField(row, ["Carer Name", "Name"]);
+    const name = cleanCell(`${firstName} ${surname}`) || fallbackName || `Carer ${index + 1}`;
+    const area = getField(row, ["Area", "Care Area", "Region"]) || "Unassigned";
+    const confirmedHours = parseHours(getField(row, ["Confirmed (HH:MM)", "Confirmed", "Confirmed Hrs", "Confirmed Hours"]));
+    const contractedHours = parseHours(getField(row, ["Contracted Hrs", "Contracted Hours", "Contracted"]));
+    const key = id ? `id:${id}` : `name:${normalizeName(name) || index}`;
+    const existing = carersByKey.get(key) || {
+      id,
+      name,
+      area,
+      confirmedHours: 0,
+      contractedHours: 0,
+      travelExpense: 0,
+    };
+
+    existing.confirmedHours += confirmedHours;
+    existing.contractedHours += contractedHours;
+    carersByKey.set(key, existing);
+  });
+
+  for (const [key, carer] of carersByKey.entries()) {
+    if (carer.id) {
+      carersById.set(carer.id, key);
+    }
+    const normalized = normalizeName(carer.name);
+    if (normalized) {
+      carersByName.set(normalized, key);
+    }
+  }
+
+  payrollRows.forEach((row, index) => {
+    const id = getField(row, ["Carer ID", "No.", "No", "ID"]);
+    const name = getField(row, ["Carer Name", "Name"]);
+    const travelExpense = parseCurrency(getField(row, ["Total Travel", "Travel Total", "Travel Expenses", "Travel"]));
+    const key = (id && carersById.get(id)) || carersByName.get(normalizeName(name));
+
+    if (key && carersByKey.has(key)) {
+      carersByKey.get(key).travelExpense += travelExpense;
+      return;
+    }
+
+    if (travelExpense !== 0) {
+      const payrollOnlyKey = id ? `payroll-id:${id}` : `payroll-name:${normalizeName(name) || index}`;
+      carersByKey.set(payrollOnlyKey, {
+        id,
+        name: name || `Payroll row ${index + 1}`,
+        area: "Payroll only",
+        confirmedHours: 0,
+        contractedHours: 0,
+        travelExpense,
+      });
+    }
+  });
+
+  const carers = Array.from(carersByKey.values())
+    .map((row) => calculateFinancials(row, assumptions))
+    .sort((left, right) => left.area.localeCompare(right.area) || left.name.localeCompare(right.name));
+
+  const areasByName = new Map();
+  carers.forEach((carer) => {
+    const area = areasByName.get(carer.area) || {
+      area: carer.area,
+      carerCount: 0,
+      confirmedHours: 0,
+      contractedHours: 0,
+      travelExpense: 0,
+    };
+    area.carerCount += 1;
+    area.confirmedHours += carer.confirmedHours;
+    area.contractedHours += carer.contractedHours;
+    area.travelExpense += carer.travelExpense;
+    areasByName.set(carer.area, area);
+  });
+
+  const areas = Array.from(areasByName.values())
+    .map((row) => calculateFinancials(row, assumptions))
+    .sort((left, right) => left.area.localeCompare(right.area));
+
+  const grandTotal = calculateFinancials(
+    carers.reduce(
+      (total, carer) => ({
+        confirmedHours: total.confirmedHours + carer.confirmedHours,
+        contractedHours: total.contractedHours + carer.contractedHours,
+        travelExpense: total.travelExpense + carer.travelExpense,
+        carerCount: total.carerCount + 1,
+      }),
+      { confirmedHours: 0, contractedHours: 0, travelExpense: 0, carerCount: 0 }
+    ),
+    assumptions
+  );
+
+  latestReport = { assumptions, carers, areas, grandTotal };
+  return latestReport;
+}
+
+function formatHours(value) {
+  return decimalFormatter.format(Number(value || 0));
+}
+
+function formatCurrency(value) {
+  return currencyFormatter.format(Number(value || 0));
+}
+
+function formatPercent(value) {
+  return value === null || value === undefined ? "n/a" : `${decimalFormatter.format(value)}%`;
+}
+
+function renderKpiCard(label, value) {
+  const card = document.createElement("article");
+  card.className = "profitability-kpi-card";
+  const title = document.createElement("h3");
+  title.textContent = label;
+  const amount = document.createElement("p");
+  amount.className = "profitability-kpi-value";
+  amount.textContent = value;
+  card.append(title, amount);
+  return card;
+}
+
+function appendCell(row, value) {
+  const cell = document.createElement("td");
+  cell.textContent = value;
+  row.appendChild(cell);
+}
+
+function renderAreaRows(rows) {
+  areaSummaryBody.innerHTML = "";
+  rows.forEach((area) => {
+    const tr = document.createElement("tr");
+    appendCell(tr, area.area);
+    appendCell(tr, String(area.carerCount));
+    appendCell(tr, formatHours(area.confirmedHours));
+    appendCell(tr, formatHours(area.contractedHours));
+    appendCell(tr, formatPercent(area.utilisation));
+    appendCell(tr, formatCurrency(area.revenue));
+    appendCell(tr, formatCurrency(area.labourWithOnCost));
+    appendCell(tr, formatCurrency(area.travelExpense));
+    appendCell(tr, formatCurrency(area.profit));
+    areaSummaryBody.appendChild(tr);
+  });
+}
+
+function renderCarerRows(rows) {
+  carerSummaryBody.innerHTML = "";
+  rows.forEach((carer) => {
+    const tr = document.createElement("tr");
+    appendCell(tr, carer.area);
+    appendCell(tr, carer.id || "");
+    appendCell(tr, carer.name);
+    appendCell(tr, formatHours(carer.confirmedHours));
+    appendCell(tr, formatHours(carer.contractedHours));
+    appendCell(tr, formatPercent(carer.utilisation));
+    appendCell(tr, formatCurrency(carer.travelExpense));
+    appendCell(tr, formatCurrency(carer.profit));
+    carerSummaryBody.appendChild(tr);
+  });
+}
+
+function renderReport() {
+  const report = buildReport();
+
+  if (!report) {
+    reportOutputPanel.hidden = true;
+    exportReportBtn.disabled = true;
+    return;
+  }
+
+  grandTotalGrid.innerHTML = "";
+  grandTotalGrid.append(
+    renderKpiCard("Confirmed Hours", formatHours(report.grandTotal.confirmedHours)),
+    renderKpiCard("Contracted Hours", formatHours(report.grandTotal.contractedHours)),
+    renderKpiCard("Utilisation", formatPercent(report.grandTotal.utilisation)),
+    renderKpiCard("Revenue", formatCurrency(report.grandTotal.revenue)),
+    renderKpiCard("Labour + On-Cost", formatCurrency(report.grandTotal.labourWithOnCost)),
+    renderKpiCard("Travel", formatCurrency(report.grandTotal.travelExpense)),
+    renderKpiCard("Estimated Profit", formatCurrency(report.grandTotal.profit))
+  );
+
+  renderAreaRows(report.areas);
+  renderCarerRows(report.carers);
+  reportSummaryMessage.textContent = `${report.carers.length} carer row(s), ${report.areas.length} area(s). Travel is matched by carer ID first, then by name.`;
+  reportOutputPanel.hidden = false;
+  exportReportBtn.disabled = false;
+}
+
+async function handleCsvUpload(file, label) {
+  if (!file) {
+    return { rows: [], errors: [] };
+  }
+  const text = await readFileText(file);
+  const parsed = parseCsvText(text);
+  if (!parsed.rows.length) {
+    throw new Error(`${label} did not contain any data rows.`);
+  }
+  return parsed;
+}
+
+async function handleCarerHoursUpload() {
+  try {
+    const parsed = await handleCsvUpload(carerHoursCsvInput.files?.[0], "Carer hours CSV");
+    carerHoursRows = parsed.rows;
+    renderReport();
+    const warning = parsed.errors.length ? ` ${parsed.errors[0]}` : "";
+    setUploadStatus(`Loaded ${carerHoursRows.length} carer hours row(s).${warning}`);
+  } catch (error) {
+    carerHoursRows = [];
+    renderReport();
+    setUploadStatus(error?.message || "Could not load the carer hours CSV.", true);
+  }
+}
+
+async function handlePayrollUpload() {
+  try {
+    const parsed = await handleCsvUpload(payrollCsvInput.files?.[0], "Payroll CSV");
+    payrollRows = parsed.rows;
+    renderReport();
+    const warning = parsed.errors.length ? ` ${parsed.errors[0]}` : "";
+    setUploadStatus(`Loaded ${payrollRows.length} payroll row(s).${warning}`);
+  } catch (error) {
+    payrollRows = [];
+    renderReport();
+    setUploadStatus(error?.message || "Could not load the payroll CSV.", true);
+  }
+}
+
+function escapeCsvValue(value) {
+  const text = String(value ?? "");
+  if (!/[",\n]/.test(text)) {
+    return text;
+  }
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function toCsvNumber(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function buildExportRows() {
+  if (!latestReport) {
+    return [];
+  }
+
+  const rows = [];
+  const addRow = (level, row) => {
+    rows.push({
+      Level: level,
+      Area: row.area || "",
+      "Carer ID": row.id || "",
+      Carer: row.name || row.carer || "",
+      "Carer Count": row.carerCount || "",
+      "Confirmed Hours": toCsvNumber(row.confirmedHours),
+      "Contracted Hours": toCsvNumber(row.contractedHours),
+      "Utilisation %": row.utilisation === null || row.utilisation === undefined ? "" : toCsvNumber(row.utilisation),
+      Revenue: toCsvNumber(row.revenue),
+      "Base Labour Cost": toCsvNumber(row.baseLabourCost),
+      "On Cost": toCsvNumber(row.onCost),
+      "Travel Expense": toCsvNumber(row.travelExpense),
+      "Estimated Profit": toCsvNumber(row.profit),
+      "Confirmed Hour Income": toCsvNumber(latestReport.assumptions.incomeRate),
+      "Contracted Hour Cost": toCsvNumber(latestReport.assumptions.contractedRate),
+      "Employer Tax/On-Cost %": toCsvNumber(latestReport.assumptions.taxPercent),
+      "Pension %": toCsvNumber(latestReport.assumptions.pensionPercent),
+    });
+  };
+
+  addRow("Grand Total", { ...latestReport.grandTotal, carer: "Grand Total" });
+  latestReport.areas.forEach((area) => addRow("Area", area));
+  latestReport.carers.forEach((carer) => addRow("Carer", carer));
+  return rows;
+}
+
+function downloadCsv(filename, csvText) {
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportReport() {
+  const rows = buildExportRows();
+  if (!rows.length) {
+    setUploadStatus("Upload the carer hours CSV before exporting.", true);
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+  const lines = [headers.map(escapeCsvValue).join(",")];
+  rows.forEach((row) => {
+    lines.push(headers.map((header) => escapeCsvValue(row[header])).join(","));
+  });
+
+  const stamp = reportPeriod?.start ? formatMonthStamp(reportPeriod.start) : formatMonthStamp(new Date());
+  downloadCsv(`carer-profitability-${stamp}.csv`, `\uFEFF${lines.join("\n")}`);
+  setUploadStatus("Report CSV exported.");
+}
+
+async function fetchCurrentUser() {
+  return directoryApi.getCurrentUser();
+}
+
+async function init() {
+  try {
+    const account = await authController.restoreSession();
+    if (!account) {
+      window.location.href = "./index.html";
+      return;
+    }
+
+    const profile = await fetchCurrentUser();
+    const role = String(profile?.role || "").trim().toLowerCase();
+
+    if (!canAccessPage(role, "reports")) {
+      redirectToUnauthorized("reports");
+      return;
+    }
+
+    renderTopNavigation({ role });
+    loadAssumptions();
+    updateReportLinks();
+
+    const email = String(profile?.email || "").trim();
+    setStatus(email ? `Signed in as ${email}` : "Signed in");
+  } catch (error) {
+    if (error?.status === 403) {
+      redirectToUnauthorized("reports");
+      return;
+    }
+    console.error(error);
+    setStatus(error?.message || "Could not initialize authentication.", true);
+  } finally {
+    document.body.classList.remove("auth-pending");
+  }
+}
+
+carerHoursCsvInput?.addEventListener("change", () => {
+  void handleCarerHoursUpload();
+});
+
+payrollCsvInput?.addEventListener("change", () => {
+  void handlePayrollUpload();
+});
+
+[incomeRateInput, contractedRateInput, taxOnCostInput, pensionOnCostInput].forEach((input) => {
+  input?.addEventListener("input", () => {
+    saveAssumptions();
+    renderReport();
+  });
+});
+
+exportReportBtn?.addEventListener("click", exportReport);
+
+signOutBtn?.addEventListener("click", async () => {
+  try {
+    signOutBtn.disabled = true;
+    await authController.signOut();
+  } finally {
+    window.location.href = "./index.html";
+  }
+});
+
+void init();

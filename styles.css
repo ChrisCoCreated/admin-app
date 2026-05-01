@@ -2406,6 +2406,94 @@ dd {
   font-size: 1.05rem;
 }
 
+.subtle-link {
+  min-height: 34px;
+  padding: 7px 12px;
+  background: #e7ebf4;
+  color: #1c2433;
+}
+
+.profitability-process-head {
+  align-items: center;
+}
+
+.profitability-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.profitability-steps {
+  margin: 16px 0 0;
+  padding-left: 22px;
+  color: #24314a;
+  font-weight: 650;
+}
+
+.profitability-steps li + li {
+  margin-top: 10px;
+}
+
+.column-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.column-chip-list span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid #d5deed;
+  border-radius: 999px;
+  background: #f6f9ff;
+  color: #1d2a42;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.profitability-upload-grid,
+.profitability-assumption-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.profitability-kpi-grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.profitability-kpi-card {
+  border: 1px solid #d8e0ee;
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #fbfdff, #f4f8ff);
+}
+
+.profitability-kpi-card h3 {
+  margin: 0;
+  color: #4a566d;
+  font-size: 0.86rem;
+}
+
+.profitability-kpi-value {
+  margin-top: 8px;
+  color: #183153;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.profitability-section-heading {
+  margin-top: 20px;
+}
+
 .suppliers-main {
   padding-bottom: 40px;
 }

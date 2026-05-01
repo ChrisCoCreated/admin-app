@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Carer Profitability</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260501" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <p class="row-note">
+          <a class="button-link subtle-link" href="./reports.html">Back to Reports</a>
+        </p>
+        <h1>Carer Profitability</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head profitability-process-head">
+          <div>
+            <h2>Build The Report</h2>
+            <p id="dateRangeMessage" class="muted">Preparing last month&apos;s OneTouch links...</p>
+          </div>
+          <div class="profitability-link-actions">
+            <a id="carerHoursReportLink" class="button-link-one-touch" href="#" target="_blank" rel="noopener noreferrer"
+              >Open Carer Hours</a
+            >
+            <a id="payrollReportLink" class="button-link-one-touch" href="#" target="_blank" rel="noopener noreferrer"
+              >Open Payroll</a
+            >
+          </div>
+        </div>
+
+        <ol class="profitability-steps">
+          <li>
+            Open the carer hours report for last month, using the OneTouch link above.
+          </li>
+          <li>
+            Make these columns visible before exporting:
+            <span class="column-chip-list">
+              <span>No.</span>
+              <span>Surname</span>
+              <span>First Name</span>
+              <span>Area</span>
+              <span>Confirmed (HH:MM)</span>
+              <span>Contracted Hrs</span>
+            </span>
+          </li>
+          <li>Export the carer hours report as CSV.</li>
+          <li>Export payroll for the same month as CSV, then upload both files below.</li>
+        </ol>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Upload &amp; Assumptions</h2>
+            <p class="muted">The calculation updates automatically when files or defaults change.</p>
+          </div>
+          <button id="exportReportBtn" type="button" disabled>Export Report CSV</button>
+        </div>
+
+        <div class="profitability-upload-grid">
+          <label class="field" for="carerHoursCsvInput">
+            Carer hours CSV
+            <input id="carerHoursCsvInput" type="file" accept=".csv,text/csv" />
+          </label>
+          <label class="field" for="payrollCsvInput">
+            Payroll CSV
+            <input id="payrollCsvInput" type="file" accept=".csv,text/csv" />
+          </label>
+        </div>
+
+        <div class="profitability-assumption-grid">
+          <label class="field" for="incomeRateInput">
+            Confirmed hour income
+            <input id="incomeRateInput" type="number" min="0" step="0.01" value="35" />
+          </label>
+          <label class="field" for="contractedRateInput">
+            Contracted hour cost
+            <input id="contractedRateInput" type="number" min="0" step="0.01" value="13.50" />
+          </label>
+          <label class="field" for="taxOnCostInput">
+            Employer tax/on-cost %
+            <input id="taxOnCostInput" type="number" min="0" step="0.1" value="13.8" />
+          </label>
+          <label class="field" for="pensionOnCostInput">
+            Pension %
+            <input id="pensionOnCostInput" type="number" min="0" step="0.1" value="3" />
+          </label>
+        </div>
+
+        <p id="uploadStatusMessage" class="muted row-note">Upload the carer hours CSV to begin.</p>
+      </section>
+
+      <section id="reportOutputPanel" class="panel" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Report</h2>
+            <p id="reportSummaryMessage" class="muted"></p>
+          </div>
+        </div>
+
+        <div id="grandTotalGrid" class="profitability-kpi-grid" aria-label="Grand total"></div>
+
+        <h2 class="profitability-section-heading">By Area</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Carers</th>
+                <th>Confirmed Hours</th>
+                <th>Contracted Hours</th>
+                <th>Utilisation</th>
+                <th>Revenue</th>
+                <th>Labour + On-Cost</th>
+                <th>Travel</th>
+                <th>Profit</th>
+              </tr>
+            </thead>
+            <tbody id="areaSummaryBody"></tbody>
+          </table>
+        </div>
+
+        <h2 class="profitability-section-heading">By Carer</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>No.</th>
+                <th>Carer</th>
+                <th>Confirmed Hours</th>
+                <th>Contracted Hours</th>
+                <th>Utilisation</th>
+                <th>Travel</th>
+                <th>Profit</th>
+              </tr>
+            </thead>
+            <tbody id="carerSummaryBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./carer-profitability.js?v=20260501"></script>
+  </body>
+</html>
