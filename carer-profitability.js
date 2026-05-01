@@ -14,6 +14,7 @@ const incomeRateInput = document.getElementById("incomeRateInput");
 const contractedRateInput = document.getElementById("contractedRateInput");
 const taxOnCostInput = document.getElementById("taxOnCostInput");
 const pensionOnCostInput = document.getElementById("pensionOnCostInput");
+const carerSelect = document.getElementById("carerSelect");
 const exportReportBtn = document.getElementById("exportReportBtn");
 const uploadStatusMessage = document.getElementById("uploadStatusMessage");
 const reportOutputPanel = document.getElementById("reportOutputPanel");
@@ -21,10 +22,13 @@ const reportSummaryMessage = document.getElementById("reportSummaryMessage");
 const grandTotalGrid = document.getElementById("grandTotalGrid");
 const areaSummaryBody = document.getElementById("areaSummaryBody");
 const carerSummaryBody = document.getElementById("carerSummaryBody");
+const selectedTotalMessage = document.getElementById("selectedTotalMessage");
+const selectedTotalGrid = document.getElementById("selectedTotalGrid");
 
 const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
 const PAYROLL_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carerPayroll.php";
 const ASSUMPTIONS_STORAGE_KEY = "thrive.carerProfitability.assumptions.v1";
+const ALL_CARERS_VALUE = "__all__";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -138,6 +142,10 @@ function normalizeName(value) {
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isCentralRole(area) {
+  return normalizeName(area) === "central";
 }
 
 function getField(row, candidates) {
@@ -254,6 +262,10 @@ function parseCurrency(value) {
   return isNegative ? -number : number;
 }
 
+function hasCarerIdentity({ id, firstName, surname, fallbackName }) {
+  return Boolean(cleanCell(id) || cleanCell(firstName) || cleanCell(surname) || cleanCell(fallbackName));
+}
+
 function getAssumptions() {
   return {
     incomeRate: Math.max(0, Number(incomeRateInput?.value || 0) || 0),
@@ -323,22 +335,30 @@ function buildReport() {
   const carersById = new Map();
   const carersByName = new Map();
 
-  carerHoursRows.forEach((row, index) => {
+  carerHoursRows.forEach((row) => {
     const id = getField(row, ["No.", "No", "Carer ID", "ID"]);
     const firstName = getField(row, ["First Name", "Forename"]);
     const surname = getField(row, ["Surname", "Last Name"]);
     const fallbackName = getField(row, ["Carer Name", "Name"]);
-    const name = cleanCell(`${firstName} ${surname}`) || fallbackName || `Carer ${index + 1}`;
+
+    if (!hasCarerIdentity({ id, firstName, surname, fallbackName })) {
+      return;
+    }
+
+    const name = cleanCell(`${firstName} ${surname}`) || fallbackName;
     const area = getField(row, ["Area", "Care Area", "Region"]) || "Unassigned";
     const confirmedHours = parseHours(getField(row, ["Confirmed (HH:MM)", "Confirmed", "Confirmed Hrs", "Confirmed Hours"]));
-    const contractedHours = parseHours(getField(row, ["Contracted Hrs", "Contracted Hours", "Contracted"]));
-    const key = id ? `id:${id}` : `name:${normalizeName(name) || index}`;
+    const sourceContractedHours = parseHours(getField(row, ["Contracted Hrs", "Contracted Hours", "Contracted"]));
+    const contractedHours = isCentralRole(area) ? 0 : sourceContractedHours;
+    const key = id ? `id:${id}` : `name:${normalizeName(name)}`;
     const existing = carersByKey.get(key) || {
+      key,
       id,
       name,
       area,
       confirmedHours: 0,
       contractedHours: 0,
+      payrollTotalHours: 0,
       travelExpense: 0,
     };
 
@@ -360,28 +380,37 @@ function buildReport() {
   payrollRows.forEach((row, index) => {
     const id = getField(row, ["Carer ID", "No.", "No", "ID"]);
     const name = getField(row, ["Carer Name", "Name"]);
+    const payrollTotalHours = parseHours(getField(row, ["Total Hrs (Decimal)", "Total Hrs", "Total Hours", "Hours"]));
     const travelExpense = parseCurrency(getField(row, ["Total Travel", "Travel Total", "Travel Expenses", "Travel"]));
     const key = (id && carersById.get(id)) || carersByName.get(normalizeName(name));
 
     if (key && carersByKey.has(key)) {
-      carersByKey.get(key).travelExpense += travelExpense;
+      const carer = carersByKey.get(key);
+      carer.payrollTotalHours += payrollTotalHours;
+      carer.travelExpense += travelExpense;
       return;
     }
 
-    if (travelExpense !== 0) {
+    if (travelExpense !== 0 || payrollTotalHours !== 0) {
       const payrollOnlyKey = id ? `payroll-id:${id}` : `payroll-name:${normalizeName(name) || index}`;
       carersByKey.set(payrollOnlyKey, {
+        key: payrollOnlyKey,
         id,
         name: name || `Payroll row ${index + 1}`,
         area: "Payroll only",
         confirmedHours: 0,
-        contractedHours: 0,
+        contractedHours: payrollTotalHours,
+        payrollTotalHours,
         travelExpense,
       });
     }
   });
 
   const carers = Array.from(carersByKey.values())
+    .map((row) => ({
+      ...row,
+      contractedHours: Math.max(row.contractedHours, row.payrollTotalHours),
+    }))
     .map((row) => calculateFinancials(row, assumptions))
     .sort((left, right) => left.area.localeCompare(right.area) || left.name.localeCompare(right.name));
 
@@ -392,11 +421,13 @@ function buildReport() {
       carerCount: 0,
       confirmedHours: 0,
       contractedHours: 0,
+      payrollTotalHours: 0,
       travelExpense: 0,
     };
     area.carerCount += 1;
     area.confirmedHours += carer.confirmedHours;
     area.contractedHours += carer.contractedHours;
+    area.payrollTotalHours += carer.payrollTotalHours;
     area.travelExpense += carer.travelExpense;
     areasByName.set(carer.area, area);
   });
@@ -410,10 +441,11 @@ function buildReport() {
       (total, carer) => ({
         confirmedHours: total.confirmedHours + carer.confirmedHours,
         contractedHours: total.contractedHours + carer.contractedHours,
+        payrollTotalHours: total.payrollTotalHours + carer.payrollTotalHours,
         travelExpense: total.travelExpense + carer.travelExpense,
         carerCount: total.carerCount + 1,
       }),
-      { confirmedHours: 0, contractedHours: 0, travelExpense: 0, carerCount: 0 }
+      { confirmedHours: 0, contractedHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
     ),
     assumptions
   );
@@ -444,6 +476,19 @@ function renderKpiCard(label, value) {
   amount.textContent = value;
   card.append(title, amount);
   return card;
+}
+
+function renderKpiSet(container, total) {
+  container.innerHTML = "";
+  container.append(
+    renderKpiCard("Confirmed Hours", formatHours(total.confirmedHours)),
+    renderKpiCard("Contracted Hours", formatHours(total.contractedHours)),
+    renderKpiCard("Utilisation", formatPercent(total.utilisation)),
+    renderKpiCard("Revenue", formatCurrency(total.revenue)),
+    renderKpiCard("Labour + On-Cost", formatCurrency(total.labourWithOnCost)),
+    renderKpiCard("Travel", formatCurrency(total.travelExpense)),
+    renderKpiCard("Estimated Profit", formatCurrency(total.profit))
+  );
 }
 
 function appendCell(row, value) {
@@ -485,29 +530,69 @@ function renderCarerRows(rows) {
   });
 }
 
+function renderCarerSelect(carers) {
+  if (!carerSelect) {
+    return;
+  }
+
+  const previousValue = carerSelect.value || ALL_CARERS_VALUE;
+  carerSelect.innerHTML = "";
+
+  const allOption = document.createElement("option");
+  allOption.value = ALL_CARERS_VALUE;
+  allOption.textContent = "All carers";
+  carerSelect.appendChild(allOption);
+
+  carers.forEach((carer) => {
+    const option = document.createElement("option");
+    option.value = carer.key;
+    option.textContent = carer.id ? `${carer.name} (${carer.id})` : carer.name;
+    carerSelect.appendChild(option);
+  });
+
+  const values = new Set([ALL_CARERS_VALUE, ...carers.map((carer) => carer.key)]);
+  carerSelect.value = values.has(previousValue) ? previousValue : ALL_CARERS_VALUE;
+  carerSelect.disabled = !carers.length;
+}
+
+function renderSelectedTotals(report) {
+  if (!selectedTotalGrid || !selectedTotalMessage) {
+    return;
+  }
+
+  const selectedValue = carerSelect?.value || ALL_CARERS_VALUE;
+  const selectedCarer = selectedValue === ALL_CARERS_VALUE ? null : report.carers.find((carer) => carer.key === selectedValue);
+  const total = selectedCarer || report.grandTotal;
+  const label = selectedCarer
+    ? `${selectedCarer.name}${selectedCarer.id ? ` (${selectedCarer.id})` : ""}`
+    : "All carers";
+
+  selectedTotalMessage.textContent = `Totals for ${label}.`;
+  renderKpiSet(selectedTotalGrid, total);
+}
+
 function renderReport() {
   const report = buildReport();
 
   if (!report) {
     reportOutputPanel.hidden = true;
     exportReportBtn.disabled = true;
+    renderCarerSelect([]);
+    if (selectedTotalGrid) {
+      selectedTotalGrid.innerHTML = "";
+    }
+    if (selectedTotalMessage) {
+      selectedTotalMessage.textContent = "";
+    }
     return;
   }
 
-  grandTotalGrid.innerHTML = "";
-  grandTotalGrid.append(
-    renderKpiCard("Confirmed Hours", formatHours(report.grandTotal.confirmedHours)),
-    renderKpiCard("Contracted Hours", formatHours(report.grandTotal.contractedHours)),
-    renderKpiCard("Utilisation", formatPercent(report.grandTotal.utilisation)),
-    renderKpiCard("Revenue", formatCurrency(report.grandTotal.revenue)),
-    renderKpiCard("Labour + On-Cost", formatCurrency(report.grandTotal.labourWithOnCost)),
-    renderKpiCard("Travel", formatCurrency(report.grandTotal.travelExpense)),
-    renderKpiCard("Estimated Profit", formatCurrency(report.grandTotal.profit))
-  );
-
+  renderKpiSet(grandTotalGrid, report.grandTotal);
+  renderCarerSelect(report.carers);
   renderAreaRows(report.areas);
   renderCarerRows(report.carers);
-  reportSummaryMessage.textContent = `${report.carers.length} carer row(s), ${report.areas.length} area(s). Travel is matched by carer ID first, then by name.`;
+  renderSelectedTotals(report);
+  reportSummaryMessage.textContent = `${report.carers.length} carer row(s), ${report.areas.length} area(s). Payroll hours replace contracted hours where higher; central contracted hours are ignored.`;
   reportOutputPanel.hidden = false;
   exportReportBtn.disabled = false;
 }
@@ -579,6 +664,7 @@ function buildExportRows() {
       "Carer Count": row.carerCount || "",
       "Confirmed Hours": toCsvNumber(row.confirmedHours),
       "Contracted Hours": toCsvNumber(row.contractedHours),
+      "Payroll Total Hours": toCsvNumber(row.payrollTotalHours),
       "Utilisation %": row.utilisation === null || row.utilisation === undefined ? "" : toCsvNumber(row.utilisation),
       Revenue: toCsvNumber(row.revenue),
       "Base Labour Cost": toCsvNumber(row.baseLabourCost),
@@ -679,6 +765,12 @@ payrollCsvInput?.addEventListener("change", () => {
     saveAssumptions();
     renderReport();
   });
+});
+
+carerSelect?.addEventListener("change", () => {
+  if (latestReport) {
+    renderSelectedTotals(latestReport);
+  }
 });
 
 exportReportBtn?.addEventListener("click", exportReport);

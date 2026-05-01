@@ -2463,6 +2463,11 @@ dd {
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+.profitability-selector-row {
+  margin-top: 14px;
+  max-width: 420px;
+}
+
 .profitability-kpi-grid {
   margin-top: 14px;
   display: grid;

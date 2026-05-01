@@ -116,6 +116,15 @@
           </label>
         </div>
 
+        <div class="profitability-selector-row">
+          <label class="field" for="carerSelect">
+            Carer totals
+            <select id="carerSelect" disabled>
+              <option value="__all__">All carers</option>
+            </select>
+          </label>
+        </div>
+
         <p id="uploadStatusMessage" class="muted row-note">Upload the carer hours CSV to begin.</p>
       </section>
 
@@ -167,6 +176,10 @@
             <tbody id="carerSummaryBody"></tbody>
           </table>
         </div>
+
+        <h2 class="profitability-section-heading">Selected Totals</h2>
+        <p id="selectedTotalMessage" class="muted row-note"></p>
+        <div id="selectedTotalGrid" class="profitability-kpi-grid" aria-label="Selected carer totals"></div>
       </section>
     </main>
 
