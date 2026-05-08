@@ -46,6 +46,10 @@ function normalizeClientName(value) {
   return String(value || "").trim() || "Unassigned";
 }
 
+function isMarketingPermitted(photo) {
+  return photo?.consented === true || photo?.hasMarketingConsent === true;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
     res.status(405).json({ error: "Method Not Allowed" });
@@ -60,10 +64,16 @@ module.exports = async (req, res) => {
     const payload = await getPhotosWithCache();
     const clientsOnly = String(req.query.clientsOnly || "").trim().toLowerCase();
     const clientFilter = String(req.query.client || "").trim();
+    const marketingPermissionOnly = ["1", "true", "yes"].includes(
+      String(req.query.marketingPermissionOnly || "").trim().toLowerCase()
+    );
+    const sourcePhotos = marketingPermissionOnly
+      ? payload.photos.filter((photo) => isMarketingPermitted(photo))
+      : payload.photos;
 
     if (clientsOnly === "1" || clientsOnly === "true") {
       const counts = new Map();
-      for (const photo of payload.photos) {
+      for (const photo of sourcePhotos) {
         const clientName = normalizeClientName(photo?.client);
         counts.set(clientName, (counts.get(clientName) || 0) + 1);
       }
@@ -81,7 +91,7 @@ module.exports = async (req, res) => {
 
     if (clientFilter) {
       const normalizedClient = normalizeClientName(clientFilter);
-      const photos = payload.photos.filter((photo) => normalizeClientName(photo?.client) === normalizedClient);
+      const photos = sourcePhotos.filter((photo) => normalizeClientName(photo?.client) === normalizedClient);
       res.setHeader("Cache-Control", "private, max-age=30");
       res.status(200).json({
         photos,
@@ -93,7 +103,15 @@ module.exports = async (req, res) => {
     }
 
     res.setHeader("Cache-Control", "private, max-age=30");
-    res.status(200).json(payload);
+    res.status(200).json(
+      marketingPermissionOnly
+        ? {
+            ...payload,
+            photos: sourcePhotos,
+            total: sourcePhotos.length,
+          }
+        : payload
+    );
   } catch (error) {
     res.status(500).json({
       error: "Server error",

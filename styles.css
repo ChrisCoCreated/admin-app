@@ -3178,7 +3178,19 @@ body.lightbox-open {
 .photo-layout-controls {
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(220px, 320px);
+  align-items: end;
+  grid-template-columns: minmax(220px, 320px) max-content max-content;
+}
+
+.photo-layout-marketing-toggle {
+  min-height: 44px;
+  padding-bottom: 4px;
+}
+
+@media (max-width: 720px) {
+  .photo-layout-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .layout-image-grid {

@@ -274,6 +274,7 @@ const LAYOUTS = [
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientSelect = document.getElementById("clientSelect");
+const hasMarketingPermissionInput = document.getElementById("hasMarketingPermission");
 const showCompanyAssetsRow = document.getElementById("showCompanyAssetsRow");
 const showCompanyAssetsInput = document.getElementById("showCompanyAssets");
 const imagesStatus = document.getElementById("imagesStatus");
@@ -322,6 +323,7 @@ let selectedImages = [];
 let selectedSlotIndex = -1;
 let activeLayoutId = LAYOUTS[0].id;
 let currentRole = "";
+let hasMarketingPermission = false;
 let showCompanyAssets = false;
 let showAllLayouts = false;
 let dragState = null;
@@ -340,10 +342,23 @@ const previewImageMetaCache = new Map();
 const exportImageCache = new Map();
 const clientPhotoCache = new Map();
 
+function getClientListCacheKey() {
+  return hasMarketingPermission ? `${CLIENT_LIST_CACHE_KEY}:marketing-permission` : CLIENT_LIST_CACHE_KEY;
+}
+
+function getPhotoCacheKey(clientKey) {
+  return `${hasMarketingPermission ? "marketing-permission" : "all"}:${clientKey}`;
+}
+
+function getMarketingPermissionQuery() {
+  return hasMarketingPermission ? { marketingPermissionOnly: 1 } : {};
+}
+
 function loadCachedClientList() {
   try {
+    const cacheKey = getClientListCacheKey();
     const raw =
-      localStorage.getItem(CLIENT_LIST_CACHE_KEY) || sessionStorage.getItem(CLIENT_LIST_CACHE_KEY);
+      localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
     if (!raw) {
       return [];
     }
@@ -365,17 +380,18 @@ function loadCachedClientList() {
 }
 
 function saveCachedClientList(clients) {
+  const cacheKey = getClientListCacheKey();
   const payload = {
     clients: Array.isArray(clients) ? clients : [],
     cachedAt: Date.now(),
   };
   try {
-    localStorage.setItem(CLIENT_LIST_CACHE_KEY, JSON.stringify(payload));
+    localStorage.setItem(cacheKey, JSON.stringify(payload));
   } catch {
     // ignore local cache errors
   }
   try {
-    sessionStorage.setItem(CLIENT_LIST_CACHE_KEY, JSON.stringify(payload));
+    sessionStorage.setItem(cacheKey, JSON.stringify(payload));
   } catch {
     // ignore session cache errors
   }
@@ -508,7 +524,7 @@ function getClientPhotos() {
 }
 
 function canUseCompanyAssets() {
-  return currentRole === "admin" || currentRole === "marketing";
+  return true;
 }
 
 function getLogoOverlayAssets() {
@@ -1620,6 +1636,9 @@ async function saveOutput() {
 }
 
 function renderAll() {
+  if (hasMarketingPermissionInput) {
+    hasMarketingPermissionInput.checked = hasMarketingPermission;
+  }
   syncCompanyAssetsVisibility();
   renderLogoOverlayPicker();
   renderImagesGrid();
@@ -1656,7 +1675,10 @@ async function loadPhotos() {
 }
 
 async function refreshClientListFromApi() {
-  const clientsPayload = await directoryApi.listMarketingPhotos({ clientsOnly: 1 });
+  const clientsPayload = await directoryApi.listMarketingPhotos({
+    clientsOnly: 1,
+    ...getMarketingPermissionQuery(),
+  });
   const clients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
   cachedClients = clients
     .map((item) => normalizeClientName(item?.name))
@@ -1676,7 +1698,7 @@ async function loadPhotosForClient(clientName) {
   }
   const isAllClients = requestedClient === ALL_CLIENTS_VALUE;
   const normalizedClient = isAllClients ? "All clients" : normalizeClientName(requestedClient);
-  const cacheKey = isAllClients ? ALL_CLIENTS_VALUE : normalizedClient;
+  const cacheKey = getPhotoCacheKey(isAllClients ? ALL_CLIENTS_VALUE : normalizedClient);
 
   setImagesStatus(`Loading images for ${normalizedClient}...`);
 
@@ -1694,8 +1716,8 @@ async function loadPhotosForClient(clientName) {
   }
 
   const payload = isAllClients
-    ? await directoryApi.listMarketingPhotos()
-    : await directoryApi.listMarketingPhotos({ client: normalizedClient });
+    ? await directoryApi.listMarketingPhotos(getMarketingPermissionQuery())
+    : await directoryApi.listMarketingPhotos({ client: normalizedClient, ...getMarketingPermissionQuery() });
   const photos = Array.isArray(payload?.photos) ? payload.photos : [];
   allPhotos = sortPhotosNewestFirst(photos);
   console.log("[Photo Layout Debug] First 5 photo records:", allPhotos.slice(0, 5));
@@ -1742,6 +1764,18 @@ async function init() {
 clientSelect?.addEventListener("change", () => {
   selectedClient = String(clientSelect.value || "").trim();
   void loadPhotosForClient(selectedClient);
+});
+
+hasMarketingPermissionInput?.addEventListener("change", () => {
+  hasMarketingPermission = Boolean(hasMarketingPermissionInput.checked);
+  selectedClient = "";
+  selectedImages = selectedImages.filter((item) => Boolean(item?.localObjectUrl));
+  selectedSlotIndex = selectedImages.length ? 0 : -1;
+  clientPhotoPool = [];
+  updateClientOptions();
+  invalidateOutput();
+  renderAll();
+  void loadPhotos();
 });
 
 showCompanyAssetsInput?.addEventListener("change", () => {
