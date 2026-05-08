@@ -3177,9 +3177,23 @@ body.lightbox-open {
 
 .photo-layout-controls {
   display: grid;
-  gap: 10px;
+  column-gap: 18px;
+  row-gap: 10px;
   align-items: end;
-  grid-template-columns: minmax(220px, 320px) max-content max-content;
+  grid-template-columns: minmax(240px, 360px) max-content max-content;
+}
+
+.photo-layout-controls .checkbox-row {
+  min-height: 44px;
+  align-items: center;
+  padding-bottom: 5px;
+  white-space: nowrap;
+}
+
+.photo-layout-controls input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
 }
 
 .photo-layout-marketing-toggle {
@@ -3190,6 +3204,11 @@ body.lightbox-open {
 @media (max-width: 720px) {
   .photo-layout-controls {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .photo-layout-controls .checkbox-row {
+    min-height: auto;
+    padding-bottom: 0;
   }
 }
 

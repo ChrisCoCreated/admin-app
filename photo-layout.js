@@ -760,13 +760,13 @@ function addLocalImages(files = []) {
 
 function renderImagesGrid() {
   imagesGrid.innerHTML = "";
-  if (!selectedClient) {
+  if (!selectedClient && !showCompanyAssets) {
     setImagesStatus("Select a client to load images.");
     return;
   }
   const photos = getClientPhotos();
   if (!photos.length) {
-    setImagesStatus("No images found for this client.");
+    setImagesStatus(showCompanyAssets ? "No company assets or client images found." : "No images found for this client.");
     return;
   }
   const selectedSet = new Set(selectedImages.map((item) => item.id));
@@ -1780,7 +1780,7 @@ hasMarketingPermissionInput?.addEventListener("change", () => {
 
 showCompanyAssetsInput?.addEventListener("change", () => {
   showCompanyAssets = Boolean(showCompanyAssetsInput.checked);
-  renderImagesGrid();
+  renderAll();
 });
 
 showAllLayoutsInput?.addEventListener("change", () => {
