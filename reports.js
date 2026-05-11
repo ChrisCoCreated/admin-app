@@ -13,6 +13,7 @@ const clientHoursLink = document.getElementById("clientHoursLink");
 const carerHoursLink = document.getElementById("carerHoursLink");
 const associateHoursLink = document.getElementById("associateHoursLink");
 const financialAnalysisLink = document.getElementById("financialAnalysisLink");
+const profitabilityInvoiceReviewLink = document.getElementById("profitabilityInvoiceReviewLink");
 const payrollLink = document.getElementById("payrollLink");
 const dateRangeMessage = document.getElementById("dateRangeMessage");
 const wallchartQuickPicker = document.getElementById("wallchartQuickPicker");
@@ -25,6 +26,7 @@ const AREA_CAPACITY_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/are
 const CLIENT_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/clientsHoursRpt.php";
 const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
 const FINANCIAL_ANALYSIS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/timesheet_analysis_newscale_getPay.php";
+const PROFITABILITY_INVOICE_REVIEW_BASE_URL = "https://care2.onetouchhealth.net/cm/in/clientInvoice_v2_c2.php";
 const PAYROLL_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carerPayroll.php";
 const CARER_WALLCHART_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carer/carerWallchart_V2.php";
 
@@ -219,6 +221,19 @@ function buildFinancialAnalysisUrl(start, end) {
   return url.toString();
 }
 
+function buildProfitabilityInvoiceReviewUrl(start, end) {
+  const startDate = formatDateParam(start);
+  const endDate = formatDateParam(end);
+
+  const url = new URL(PROFITABILITY_INVOICE_REVIEW_BASE_URL);
+  url.searchParams.set("select_date", "1");
+  url.searchParams.set("dateStart", startDate);
+  url.searchParams.set("dateFinish", endDate);
+  url.searchParams.set("invoiceNo", "");
+  url.searchParams.set("client", "All");
+  return url.toString();
+}
+
 function buildPayrollUrl(start, end) {
   const startDate = formatDateParam(start);
   const endDate = formatDateParam(end);
@@ -260,6 +275,9 @@ function updateCapacityLinks() {
   }
   if (financialAnalysisLink) {
     financialAnalysisLink.href = buildFinancialAnalysisUrl(start, end);
+  }
+  if (profitabilityInvoiceReviewLink) {
+    profitabilityInvoiceReviewLink.href = buildProfitabilityInvoiceReviewUrl(start, end);
   }
   if (payrollLink) {
     payrollLink.href = buildPayrollUrl(start, end);
