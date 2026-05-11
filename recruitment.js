@@ -2491,7 +2491,11 @@ async function saveCandidateDetails() {
     }
     renderFilterOptions();
     renderCandidates();
-    setStatus("Candidate details saved.", false, { subtle: true });
+    setStatus(
+      savedIndeedUrl ? "Candidate details saved. Indeed URL saved." : "Candidate details saved.",
+      false,
+      { subtle: true }
+    );
   } catch (error) {
     console.error(error);
     setStatus(error?.message || "Could not save candidate details.", true, { autoClear: false });

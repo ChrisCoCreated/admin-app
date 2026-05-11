@@ -693,7 +693,8 @@ async function saveInitialScreen(event) {
     if (cleanText(result?.warning)) {
       setStatus(`Initial screening notes saved. Indeed URL was not saved: ${cleanText(result.warning)}`, true);
     } else {
-      setStatus("Initial screening notes saved.");
+      const savedIndeedUrl = cleanText(result?.item?.responses?.indeedUrl);
+      setStatus(savedIndeedUrl ? "Initial screening notes saved. Indeed URL saved." : "Initial screening notes saved.");
     }
   } catch (error) {
     console.error(error);
