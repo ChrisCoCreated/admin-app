@@ -25,6 +25,7 @@ const selectedTotalMessage = document.getElementById("selectedTotalMessage");
 const selectedTotalGrid = document.getElementById("selectedTotalGrid");
 const selectAllCarersBtn = document.getElementById("selectAllCarersBtn");
 const clearSelectedCarersBtn = document.getElementById("clearSelectedCarersBtn");
+const bringActualUpBtn = document.getElementById("bringActualUpBtn");
 
 const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
 const PAYROLL_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carerPayroll.php";
@@ -42,7 +43,7 @@ let latestReport = null;
 let reportPeriod = null;
 let selectedCarerKeys = new Set();
 let hasManualSelection = false;
-let contractedHourOverrides = new Map();
+let actualHourOverrides = new Map();
 const tableSortState = {
   area: { key: "", direction: "desc" },
   carer: { key: "", direction: "desc" },
@@ -322,12 +323,13 @@ function loadAssumptions() {
 
 function calculateFinancials(row, assumptions) {
   const revenue = row.confirmedHours * assumptions.incomeRate;
-  const baseLabourCost = row.contractedHours * assumptions.contractedRate;
+  const actualHours = Number(row.actualHours || 0);
+  const baseLabourCost = actualHours * assumptions.contractedRate;
   const onCost = baseLabourCost * ((assumptions.taxPercent + assumptions.pensionPercent) / 100);
   const labourWithOnCost = baseLabourCost + onCost;
   const totalCost = labourWithOnCost + row.travelExpense;
   const profit = revenue - totalCost;
-  const utilisation = row.contractedHours > 0 ? (row.confirmedHours / row.contractedHours) * 100 : null;
+  const utilisation = actualHours > 0 ? (row.confirmedHours / actualHours) * 100 : null;
 
   return {
     ...row,
@@ -375,6 +377,7 @@ function buildReport() {
       area,
       confirmedHours: 0,
       contractedHours: 0,
+      actualHours: 0,
       payrollTotalHours: 0,
       travelExpense: 0,
     };
@@ -416,7 +419,8 @@ function buildReport() {
         name: name || `Payroll row ${index + 1}`,
         area: "Payroll only",
         confirmedHours: 0,
-        contractedHours: payrollTotalHours,
+        contractedHours: 0,
+        actualHours: payrollTotalHours,
         payrollTotalHours,
         travelExpense,
       });
@@ -425,14 +429,14 @@ function buildReport() {
 
   const carers = Array.from(carersByKey.values())
     .map((row) => {
-      const defaultContractedHours = Math.max(row.contractedHours, row.payrollTotalHours);
-      const override = contractedHourOverrides.get(row.key);
+      const defaultActualHours = Math.max(row.contractedHours, row.payrollTotalHours);
+      const override = actualHourOverrides.get(row.key);
       return {
         ...row,
         idNumber: parseSortNumber(row.id),
-        defaultContractedHours,
-        contractedHours: override ?? defaultContractedHours,
-        contractedHoursOverridden: override !== undefined,
+        defaultActualHours,
+        actualHours: override ?? defaultActualHours,
+        actualHoursOverridden: override !== undefined,
       };
     })
     .map((row) => calculateFinancials(row, assumptions))
@@ -445,12 +449,14 @@ function buildReport() {
       carerCount: 0,
       confirmedHours: 0,
       contractedHours: 0,
+      actualHours: 0,
       payrollTotalHours: 0,
       travelExpense: 0,
     };
     area.carerCount += 1;
     area.confirmedHours += carer.confirmedHours;
     area.contractedHours += carer.contractedHours;
+    area.actualHours += carer.actualHours;
     area.payrollTotalHours += carer.payrollTotalHours;
     area.travelExpense += carer.travelExpense;
     areasByName.set(carer.area, area);
@@ -465,11 +471,12 @@ function buildReport() {
       (total, carer) => ({
         confirmedHours: total.confirmedHours + carer.confirmedHours,
         contractedHours: total.contractedHours + carer.contractedHours,
+        actualHours: total.actualHours + carer.actualHours,
         payrollTotalHours: total.payrollTotalHours + carer.payrollTotalHours,
         travelExpense: total.travelExpense + carer.travelExpense,
         carerCount: total.carerCount + 1,
       }),
-      { confirmedHours: 0, contractedHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
+      { confirmedHours: 0, contractedHours: 0, actualHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
     ),
     assumptions
   );
@@ -486,17 +493,25 @@ function formatCurrency(value) {
   return currencyFormatter.format(Number(value || 0));
 }
 
+function formatProfitCurrency(value) {
+  const amount = Number(value || 0);
+  return amount < 0 ? `(${formatCurrency(Math.abs(amount))})` : formatCurrency(amount);
+}
+
 function formatPercent(value) {
   return value === null || value === undefined ? "n/a" : `${decimalFormatter.format(value)}%`;
 }
 
-function renderKpiCard(label, value) {
+function renderKpiCard(label, value, options = {}) {
   const card = document.createElement("article");
   card.className = "profitability-kpi-card";
   const title = document.createElement("h3");
   title.textContent = label;
   const amount = document.createElement("p");
   amount.className = "profitability-kpi-value";
+  if (options.isNegativeProfit) {
+    amount.classList.add("is-negative-profit");
+  }
   amount.textContent = value;
   card.append(title, amount);
   return card;
@@ -507,11 +522,12 @@ function renderKpiSet(container, total) {
   container.append(
     renderKpiCard("Confirmed Hours", formatHours(total.confirmedHours)),
     renderKpiCard("Contracted Hours", formatHours(total.contractedHours)),
+    renderKpiCard("Actual Hours", formatHours(total.actualHours)),
     renderKpiCard("Utilisation", formatPercent(total.utilisation)),
     renderKpiCard("Revenue", formatCurrency(total.revenue)),
     renderKpiCard("Labour + On-Cost", formatCurrency(total.labourWithOnCost)),
     renderKpiCard("Travel", formatCurrency(total.travelExpense)),
-    renderKpiCard("Estimated Profit", formatCurrency(total.profit))
+    renderKpiCard("Estimated Profit", formatProfitCurrency(total.profit), { isNegativeProfit: total.profit < 0 })
   );
 }
 
@@ -521,11 +537,12 @@ function buildTotalFromCarers(carers, assumptions) {
       (total, carer) => ({
         confirmedHours: total.confirmedHours + carer.confirmedHours,
         contractedHours: total.contractedHours + carer.contractedHours,
+        actualHours: total.actualHours + carer.actualHours,
         payrollTotalHours: total.payrollTotalHours + carer.payrollTotalHours,
         travelExpense: total.travelExpense + carer.travelExpense,
         carerCount: total.carerCount + 1,
       }),
-      { confirmedHours: 0, contractedHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
+      { confirmedHours: 0, contractedHours: 0, actualHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
     ),
     assumptions
   );
@@ -579,17 +596,26 @@ function appendCell(row, value) {
   row.appendChild(cell);
 }
 
-function appendContractedHoursCell(row, carer) {
+function appendProfitCell(row, value) {
+  const cell = document.createElement("td");
+  cell.textContent = formatProfitCurrency(value);
+  if (Number(value || 0) < 0) {
+    cell.classList.add("is-negative-profit");
+  }
+  row.appendChild(cell);
+}
+
+function appendActualHoursCell(row, carer) {
   const cell = document.createElement("td");
   const input = document.createElement("input");
   input.className = "profitability-hours-input";
   input.type = "number";
   input.min = "0";
   input.step = "0.25";
-  input.value = Number(carer.contractedHours || 0).toFixed(2);
+  input.value = Number(carer.actualHours || 0).toFixed(2);
   input.dataset.carerKey = carer.key;
-  input.setAttribute("aria-label", `Contracted hours for ${carer.name}`);
-  if (carer.contractedHoursOverridden) {
+  input.setAttribute("aria-label", `Actual hours for ${carer.name}`);
+  if (carer.actualHoursOverridden) {
     input.classList.add("is-overridden");
   }
   cell.appendChild(input);
@@ -604,11 +630,12 @@ function renderAreaRows(rows) {
     appendCell(tr, String(area.carerCount));
     appendCell(tr, formatHours(area.confirmedHours));
     appendCell(tr, formatHours(area.contractedHours));
+    appendCell(tr, formatHours(area.actualHours));
     appendCell(tr, formatPercent(area.utilisation));
     appendCell(tr, formatCurrency(area.revenue));
     appendCell(tr, formatCurrency(area.labourWithOnCost));
     appendCell(tr, formatCurrency(area.travelExpense));
-    appendCell(tr, formatCurrency(area.profit));
+    appendProfitCell(tr, area.profit);
     areaSummaryBody.appendChild(tr);
   });
 }
@@ -630,10 +657,11 @@ function renderCarerRows(rows) {
     appendCell(tr, carer.id || "");
     appendCell(tr, carer.name);
     appendCell(tr, formatHours(carer.confirmedHours));
-    appendContractedHoursCell(tr, carer);
+    appendCell(tr, formatHours(carer.contractedHours));
+    appendActualHoursCell(tr, carer);
     appendCell(tr, formatPercent(carer.utilisation));
     appendCell(tr, formatCurrency(carer.travelExpense));
-    appendCell(tr, formatCurrency(carer.profit));
+    appendProfitCell(tr, carer.profit);
     carerSummaryBody.appendChild(tr);
   });
 }
@@ -651,6 +679,9 @@ function syncSelectedCarers(carers) {
   }
   if (clearSelectedCarersBtn) {
     clearSelectedCarersBtn.disabled = !carers.length || selectedCarerKeys.size === 0;
+  }
+  if (bringActualUpBtn) {
+    bringActualUpBtn.disabled = !carers.length;
   }
 }
 
@@ -694,7 +725,7 @@ function renderReport() {
   renderCarerRows(report.carers);
   renderSelectedTotals(report);
   updateSortButtons();
-  reportSummaryMessage.textContent = `${report.carers.length} carer row(s), ${report.areas.length} area(s). Payroll hours replace contracted hours where higher; central contracted hours are ignored.`;
+  reportSummaryMessage.textContent = `${report.carers.length} carer row(s), ${report.areas.length} area(s). Actual hours drive utilisation and cost. Payroll hours replace contracted hours where higher; central contracted hours are ignored.`;
   reportOutputPanel.hidden = false;
   exportReportBtn.disabled = false;
 }
@@ -717,7 +748,7 @@ async function handleCarerHoursUpload() {
     carerHoursRows = parsed.rows;
     hasManualSelection = false;
     selectedCarerKeys = new Set();
-    contractedHourOverrides = new Map();
+    actualHourOverrides = new Map();
     renderReport();
     const warning = parsed.errors.length ? ` ${parsed.errors[0]}` : "";
     setUploadStatus(`Loaded ${carerHoursRows.length} carer hours row(s).${warning}`);
@@ -769,6 +800,7 @@ function buildExportRows() {
       "Carer Count": row.carerCount || "",
       "Confirmed Hours": toCsvNumber(row.confirmedHours),
       "Contracted Hours": toCsvNumber(row.contractedHours),
+      "Actual Hours": toCsvNumber(row.actualHours),
       "Payroll Total Hours": toCsvNumber(row.payrollTotalHours),
       "Utilisation %": row.utilisation === null || row.utilisation === undefined ? "" : toCsvNumber(row.utilisation),
       Revenue: toCsvNumber(row.revenue),
@@ -900,11 +932,24 @@ carerSummaryBody?.addEventListener("change", (event) => {
 
   const key = input.dataset.carerKey;
   const value = parseEditableHours(input.value);
-  contractedHourOverrides.set(key, value);
+  actualHourOverrides.set(key, value);
 
   if (latestReport) {
     renderReport();
   }
+});
+
+bringActualUpBtn?.addEventListener("click", () => {
+  if (!latestReport) {
+    return;
+  }
+
+  latestReport.carers.forEach((carer) => {
+    if (carer.actualHours < carer.confirmedHours) {
+      actualHourOverrides.set(carer.key, carer.confirmedHours);
+    }
+  });
+  renderReport();
 });
 
 selectAllCarersBtn?.addEventListener("click", () => {

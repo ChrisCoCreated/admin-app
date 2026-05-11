@@ -2490,6 +2490,11 @@ dd {
   font-weight: 800;
 }
 
+.is-negative-profit {
+  color: #b4232c;
+  font-weight: 800;
+}
+
 .profitability-section-heading {
   margin-top: 20px;
 }
