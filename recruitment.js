@@ -2472,15 +2472,16 @@ async function saveCandidateDetails() {
   setDetailFormEnabled(false);
 
   try {
-    await directoryApi.updateRecruitmentDetails(payload);
+    const result = await directoryApi.updateRecruitmentDetails(payload);
     const candidate = allCandidates.find((item) => item.id === selectedCandidateId);
+    const savedIndeedUrl = cleanText(result?.indeedUrl);
     if (candidate) {
       candidate.candidateName = payload.candidateName;
       candidate.location = payload.location;
       candidate.source = payload.source;
       candidate.phoneNumber = payload.phoneNumber;
       candidate.email = payload.email;
-      candidate.indeedProfileUrl = payload.indeedUrl;
+      candidate.indeedProfileUrl = savedIndeedUrl || payload.indeedUrl;
       candidate.livesIn = payload.livesIn;
       candidate.earmarkedFor = payload.earmarkedFor;
       candidate.keepInMind = payload.keepInMind;

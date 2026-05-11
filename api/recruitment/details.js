@@ -1,6 +1,7 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
+const { normalizeIndeedUrl } = require("../_lib/recruitment-indeed-url");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -84,6 +85,7 @@ module.exports = async (req, res) => {
   }
 
   try {
+    const indeedUrl = normalizeIndeedUrl(req.body?.indeedUrl);
     const config = parseSiteConfig();
     const graphClient = createGraphDelegatedClient(req.authUser?.graphAccessToken);
     const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
@@ -101,7 +103,7 @@ module.exports = async (req, res) => {
         Source: normalizeText(req.body?.source),
         PhoneNumber: normalizeText(req.body?.phoneNumber),
         Email: normalizeText(req.body?.email),
-        IndeedURL: normalizeText(req.body?.indeedUrl),
+        IndeedURL: indeedUrl,
         LivesIn: normalizeText(req.body?.livesIn),
         EarmarkedFor: normalizeText(req.body?.earmarkedFor),
         KeepinMind: req.body?.keepInMind === true,
@@ -114,6 +116,7 @@ module.exports = async (req, res) => {
     res.status(200).json({
       success: true,
       itemId,
+      indeedUrl,
     });
   } catch (error) {
     res.status(Number(error?.status) || 502).json({

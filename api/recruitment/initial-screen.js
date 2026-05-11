@@ -1,6 +1,7 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
+const { normalizeIndeedUrl } = require("../_lib/recruitment-indeed-url");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -176,7 +177,7 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
-    IndeedURL: normalizeText(input.indeedUrl),
+    IndeedURL: normalizeIndeedUrl(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,
   };
