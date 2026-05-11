@@ -73,7 +73,8 @@
             </span>
           </li>
           <li>Export the carer hours report as CSV.</li>
-          <li>Export payroll for the same month as CSV, then upload both files below.</li>
+          <li>For projections, export the scheduled carer report with scheduled hours, contracted hours, and position.</li>
+          <li>Export payroll for the same month as CSV, then upload the files below.</li>
         </ol>
       </section>
 
@@ -88,8 +89,12 @@
 
         <div class="profitability-upload-grid">
           <label class="field" for="carerHoursCsvInput">
-            Carer hours CSV
+            Actual carer hours CSV
             <input id="carerHoursCsvInput" type="file" accept=".csv,text/csv" />
+          </label>
+          <label class="field" for="projectedHoursCsvInput">
+            Projected carer hours CSV
+            <input id="projectedHoursCsvInput" type="file" accept=".csv,text/csv" />
           </label>
           <label class="field" for="payrollCsvInput">
             Payroll CSV
@@ -116,7 +121,7 @@
           </label>
         </div>
 
-        <p id="uploadStatusMessage" class="muted row-note">Upload the carer hours CSV to begin.</p>
+        <p id="uploadStatusMessage" class="muted row-note">Upload an actual or projected carer hours CSV to begin.</p>
       </section>
 
       <section id="reportOutputPanel" class="panel" hidden>
@@ -134,16 +139,19 @@
           <table>
             <thead>
               <tr>
-                <th>Area</th>
+                <th>Area / Role</th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="carerCount">Carers</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="confirmedHours">Confirmed Hours</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="contractedHours">Contracted Hours</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="actualHours">Actual Hours</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="utilisation">Utilisation</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedScheduledHours">Projected Scheduled</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedContractedHours">Projected Contracted</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="revenue">Revenue</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="labourWithOnCost">Labour + On-Cost</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="travelExpense">Travel</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="profit">Profit</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="profit">Actual Profit</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedProfit">Projected Profit</button></th>
               </tr>
             </thead>
             <tbody id="areaSummaryBody"></tbody>
@@ -163,15 +171,18 @@
             <thead>
               <tr>
                 <th>Select</th>
-                <th>Area</th>
+                <th>Area / Role</th>
                 <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="idNumber">No.</button></th>
                 <th>Carer</th>
                 <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="confirmedHours">Confirmed Hours</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="contractedHours">Contracted Hours</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="actualHours">Actual Hours</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="utilisation">Utilisation</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedScheduledHours">Projected Scheduled</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedContractedHours">Projected Contracted</button></th>
                 <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="travelExpense">Travel</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="profit">Profit</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="profit">Actual Profit</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedProfit">Projected Profit</button></th>
               </tr>
             </thead>
             <tbody id="carerSummaryBody"></tbody>

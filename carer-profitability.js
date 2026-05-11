@@ -9,6 +9,7 @@ const dateRangeMessage = document.getElementById("dateRangeMessage");
 const carerHoursReportLink = document.getElementById("carerHoursReportLink");
 const payrollReportLink = document.getElementById("payrollReportLink");
 const carerHoursCsvInput = document.getElementById("carerHoursCsvInput");
+const projectedHoursCsvInput = document.getElementById("projectedHoursCsvInput");
 const payrollCsvInput = document.getElementById("payrollCsvInput");
 const incomeRateInput = document.getElementById("incomeRateInput");
 const contractedRateInput = document.getElementById("contractedRateInput");
@@ -38,6 +39,7 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 
 let carerHoursRows = [];
+let projectedHoursRows = [];
 let payrollRows = [];
 let latestReport = null;
 let reportPeriod = null;
@@ -322,14 +324,25 @@ function loadAssumptions() {
 }
 
 function calculateFinancials(row, assumptions) {
+  const onCostRate = (assumptions.taxPercent + assumptions.pensionPercent) / 100;
   const revenue = row.confirmedHours * assumptions.incomeRate;
   const actualHours = Number(row.actualHours || 0);
   const baseLabourCost = actualHours * assumptions.contractedRate;
-  const onCost = baseLabourCost * ((assumptions.taxPercent + assumptions.pensionPercent) / 100);
+  const onCost = baseLabourCost * onCostRate;
   const labourWithOnCost = baseLabourCost + onCost;
   const totalCost = labourWithOnCost + row.travelExpense;
   const profit = revenue - totalCost;
   const utilisation = actualHours > 0 ? (row.confirmedHours / actualHours) * 100 : null;
+  const projectedScheduledHours = Number(row.projectedScheduledHours || 0);
+  const projectedContractedHours = Number(row.projectedContractedHours || 0);
+  const projectedRevenue = projectedScheduledHours * assumptions.incomeRate;
+  const projectedBaseLabourCost = projectedContractedHours * assumptions.contractedRate;
+  const projectedOnCost = projectedBaseLabourCost * onCostRate;
+  const projectedLabourWithOnCost = projectedBaseLabourCost + projectedOnCost;
+  const projectedProfit = projectedRevenue - projectedLabourWithOnCost;
+  const projectedUtilisation =
+    projectedContractedHours > 0 ? (projectedScheduledHours / projectedContractedHours) * 100 : null;
+  const hasProjection = Boolean(row.hasProjection || projectedScheduledHours || projectedContractedHours);
 
   return {
     ...row,
@@ -340,11 +353,20 @@ function calculateFinancials(row, assumptions) {
     totalCost,
     profit,
     utilisation,
+    hasProjection,
+    projectedScheduledHours,
+    projectedContractedHours,
+    projectedRevenue,
+    projectedBaseLabourCost,
+    projectedOnCost,
+    projectedLabourWithOnCost,
+    projectedProfit,
+    projectedUtilisation,
   };
 }
 
 function buildReport() {
-  if (!carerHoursRows.length) {
+  if (!carerHoursRows.length && !projectedHoursRows.length) {
     latestReport = null;
     return null;
   }
@@ -380,6 +402,9 @@ function buildReport() {
       actualHours: 0,
       payrollTotalHours: 0,
       travelExpense: 0,
+      projectedScheduledHours: 0,
+      projectedContractedHours: 0,
+      hasProjection: false,
     };
 
     existing.confirmedHours += confirmedHours;
@@ -396,6 +421,51 @@ function buildReport() {
       carersByName.set(normalized, key);
     }
   }
+
+  projectedHoursRows.forEach((row, index) => {
+    const id = getField(row, ["No.", "No", "Carer ID", "ID"]);
+    const firstName = getField(row, ["First Name", "Forename"]);
+    const surname = getField(row, ["Surname", "Last Name"]);
+    const fallbackName = getField(row, ["Carer Name", "Name"]);
+
+    if (!hasCarerIdentity({ id, firstName, surname, fallbackName })) {
+      return;
+    }
+
+    const name = cleanCell(`${firstName} ${surname}`) || fallbackName;
+    const position = getField(row, ["Position", "Role", "Job Role"]);
+    const key = (id && carersById.get(id)) || carersByName.get(normalizeName(name)) || (id ? `id:${id}` : `name:${normalizeName(name) || index}`);
+    const existing = carersByKey.get(key) || {
+      key,
+      id,
+      name,
+      area: position || "Projected only",
+      confirmedHours: 0,
+      contractedHours: 0,
+      actualHours: 0,
+      payrollTotalHours: 0,
+      travelExpense: 0,
+      projectedScheduledHours: 0,
+      projectedContractedHours: 0,
+      hasProjection: false,
+    };
+
+    existing.projectedScheduledHours += parseHours(
+      getField(row, ["Scheduled Hrs (HH:MM)", "Scheduled (Hrs)", "Scheduled Hrs", "Scheduled Hours"])
+    );
+    existing.projectedContractedHours += parseHours(
+      getField(row, ["Contracted Hrs (HH:MM)", "Contracted Hrs", "Contracted Hours", "Contracted"])
+    );
+    existing.hasProjection = true;
+    carersByKey.set(key, existing);
+    if (existing.id) {
+      carersById.set(existing.id, key);
+    }
+    const normalized = normalizeName(existing.name);
+    if (normalized) {
+      carersByName.set(normalized, key);
+    }
+  });
 
   payrollRows.forEach((row, index) => {
     const id = getField(row, ["Carer ID", "No.", "No", "ID"]);
@@ -423,6 +493,9 @@ function buildReport() {
         actualHours: payrollTotalHours,
         payrollTotalHours,
         travelExpense,
+        projectedScheduledHours: 0,
+        projectedContractedHours: 0,
+        hasProjection: false,
       });
     }
   });
@@ -452,6 +525,9 @@ function buildReport() {
       actualHours: 0,
       payrollTotalHours: 0,
       travelExpense: 0,
+      projectedScheduledHours: 0,
+      projectedContractedHours: 0,
+      hasProjection: false,
     };
     area.carerCount += 1;
     area.confirmedHours += carer.confirmedHours;
@@ -459,6 +535,9 @@ function buildReport() {
     area.actualHours += carer.actualHours;
     area.payrollTotalHours += carer.payrollTotalHours;
     area.travelExpense += carer.travelExpense;
+    area.projectedScheduledHours += carer.projectedScheduledHours;
+    area.projectedContractedHours += carer.projectedContractedHours;
+    area.hasProjection = area.hasProjection || carer.hasProjection;
     areasByName.set(carer.area, area);
   });
 
@@ -474,9 +553,22 @@ function buildReport() {
         actualHours: total.actualHours + carer.actualHours,
         payrollTotalHours: total.payrollTotalHours + carer.payrollTotalHours,
         travelExpense: total.travelExpense + carer.travelExpense,
+        projectedScheduledHours: total.projectedScheduledHours + carer.projectedScheduledHours,
+        projectedContractedHours: total.projectedContractedHours + carer.projectedContractedHours,
+        hasProjection: total.hasProjection || carer.hasProjection,
         carerCount: total.carerCount + 1,
       }),
-      { confirmedHours: 0, contractedHours: 0, actualHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
+      {
+        confirmedHours: 0,
+        contractedHours: 0,
+        actualHours: 0,
+        payrollTotalHours: 0,
+        travelExpense: 0,
+        projectedScheduledHours: 0,
+        projectedContractedHours: 0,
+        hasProjection: false,
+        carerCount: 0,
+      }
     ),
     assumptions
   );
@@ -524,10 +616,15 @@ function renderKpiSet(container, total) {
     renderKpiCard("Contracted Hours", formatHours(total.contractedHours)),
     renderKpiCard("Actual Hours", formatHours(total.actualHours)),
     renderKpiCard("Utilisation", formatPercent(total.utilisation)),
+    renderKpiCard("Projected Scheduled", formatHours(total.projectedScheduledHours)),
+    renderKpiCard("Projected Contracted", formatHours(total.projectedContractedHours)),
     renderKpiCard("Revenue", formatCurrency(total.revenue)),
     renderKpiCard("Labour + On-Cost", formatCurrency(total.labourWithOnCost)),
     renderKpiCard("Travel", formatCurrency(total.travelExpense)),
-    renderKpiCard("Estimated Profit", formatProfitCurrency(total.profit), { isNegativeProfit: total.profit < 0 })
+    renderKpiCard("Actual Profit", formatProfitCurrency(total.profit), { isNegativeProfit: total.profit < 0 }),
+    renderKpiCard("Projected Profit", formatProfitCurrency(total.projectedProfit), {
+      isNegativeProfit: total.projectedProfit < 0,
+    })
   );
 }
 
@@ -540,9 +637,22 @@ function buildTotalFromCarers(carers, assumptions) {
         actualHours: total.actualHours + carer.actualHours,
         payrollTotalHours: total.payrollTotalHours + carer.payrollTotalHours,
         travelExpense: total.travelExpense + carer.travelExpense,
+        projectedScheduledHours: total.projectedScheduledHours + carer.projectedScheduledHours,
+        projectedContractedHours: total.projectedContractedHours + carer.projectedContractedHours,
+        hasProjection: total.hasProjection || carer.hasProjection,
         carerCount: total.carerCount + 1,
       }),
-      { confirmedHours: 0, contractedHours: 0, actualHours: 0, payrollTotalHours: 0, travelExpense: 0, carerCount: 0 }
+      {
+        confirmedHours: 0,
+        contractedHours: 0,
+        actualHours: 0,
+        payrollTotalHours: 0,
+        travelExpense: 0,
+        projectedScheduledHours: 0,
+        projectedContractedHours: 0,
+        hasProjection: false,
+        carerCount: 0,
+      }
     ),
     assumptions
   );
@@ -632,10 +742,13 @@ function renderAreaRows(rows) {
     appendCell(tr, formatHours(area.contractedHours));
     appendCell(tr, formatHours(area.actualHours));
     appendCell(tr, formatPercent(area.utilisation));
+    appendCell(tr, formatHours(area.projectedScheduledHours));
+    appendCell(tr, formatHours(area.projectedContractedHours));
     appendCell(tr, formatCurrency(area.revenue));
     appendCell(tr, formatCurrency(area.labourWithOnCost));
     appendCell(tr, formatCurrency(area.travelExpense));
     appendProfitCell(tr, area.profit);
+    appendProfitCell(tr, area.projectedProfit);
     areaSummaryBody.appendChild(tr);
   });
 }
@@ -660,8 +773,11 @@ function renderCarerRows(rows) {
     appendCell(tr, formatHours(carer.contractedHours));
     appendActualHoursCell(tr, carer);
     appendCell(tr, formatPercent(carer.utilisation));
+    appendCell(tr, formatHours(carer.projectedScheduledHours));
+    appendCell(tr, formatHours(carer.projectedContractedHours));
     appendCell(tr, formatCurrency(carer.travelExpense));
     appendProfitCell(tr, carer.profit);
+    appendProfitCell(tr, carer.projectedProfit);
     carerSummaryBody.appendChild(tr);
   });
 }
@@ -759,6 +875,20 @@ async function handleCarerHoursUpload() {
   }
 }
 
+async function handleProjectedHoursUpload() {
+  try {
+    const parsed = await handleCsvUpload(projectedHoursCsvInput.files?.[0], "Projected carer hours CSV");
+    projectedHoursRows = parsed.rows;
+    renderReport();
+    const warning = parsed.errors.length ? ` ${parsed.errors[0]}` : "";
+    setUploadStatus(`Loaded ${projectedHoursRows.length} projected carer row(s).${warning}`);
+  } catch (error) {
+    projectedHoursRows = [];
+    renderReport();
+    setUploadStatus(error?.message || "Could not load the projected carer hours CSV.", true);
+  }
+}
+
 async function handlePayrollUpload() {
   try {
     const parsed = await handleCsvUpload(payrollCsvInput.files?.[0], "Payroll CSV");
@@ -802,12 +932,21 @@ function buildExportRows() {
       "Contracted Hours": toCsvNumber(row.contractedHours),
       "Actual Hours": toCsvNumber(row.actualHours),
       "Payroll Total Hours": toCsvNumber(row.payrollTotalHours),
+      "Projected Scheduled Hours": toCsvNumber(row.projectedScheduledHours),
+      "Projected Contracted Hours": toCsvNumber(row.projectedContractedHours),
       "Utilisation %": row.utilisation === null || row.utilisation === undefined ? "" : toCsvNumber(row.utilisation),
+      "Projected Utilisation %":
+        row.projectedUtilisation === null || row.projectedUtilisation === undefined
+          ? ""
+          : toCsvNumber(row.projectedUtilisation),
       Revenue: toCsvNumber(row.revenue),
       "Base Labour Cost": toCsvNumber(row.baseLabourCost),
       "On Cost": toCsvNumber(row.onCost),
       "Travel Expense": toCsvNumber(row.travelExpense),
-      "Estimated Profit": toCsvNumber(row.profit),
+      "Actual Profit": toCsvNumber(row.profit),
+      "Projected Revenue": toCsvNumber(row.projectedRevenue),
+      "Projected Labour Cost": toCsvNumber(row.projectedLabourWithOnCost),
+      "Projected Profit": toCsvNumber(row.projectedProfit),
       "Confirmed Hour Income": toCsvNumber(latestReport.assumptions.incomeRate),
       "Contracted Hour Cost": toCsvNumber(latestReport.assumptions.contractedRate),
       "Employer Tax/On-Cost %": toCsvNumber(latestReport.assumptions.taxPercent),
@@ -891,6 +1030,10 @@ async function init() {
 
 carerHoursCsvInput?.addEventListener("change", () => {
   void handleCarerHoursUpload();
+});
+
+projectedHoursCsvInput?.addEventListener("change", () => {
+  void handleProjectedHoursUpload();
 });
 
 payrollCsvInput?.addEventListener("change", () => {
