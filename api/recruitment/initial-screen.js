@@ -1,7 +1,6 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
-const { patchSharePointUrlField } = require("../_lib/sharepoint-url-field");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -80,24 +79,6 @@ function extractIndeedProfileUrl(notes) {
   return matched ? normalizeText(matched[1]) : "";
 }
 
-function parseHyperlink(value) {
-  if (value && typeof value === "object") {
-    const fromObject = normalizeText(value.Url || value.url || value.Description || value.description);
-    if (fromObject) {
-      return fromObject;
-    }
-  }
-  const text = normalizeText(value);
-  if (!text) {
-    return "";
-  }
-  const commaIndex = text.indexOf(",");
-  if (commaIndex <= 0) {
-    return text;
-  }
-  return text.slice(0, commaIndex).trim();
-}
-
 function parseSiteConfig() {
   const siteUrlValue = normalizeText(process.env.SHAREPOINT_RECRUITMENT_SITE_URL || DEFAULT_SITE_URL);
   const listName = normalizeText(process.env.SHAREPOINT_RECRUITMENT_LIST_NAME || DEFAULT_LIST_NAME);
@@ -111,7 +92,6 @@ function parseSiteConfig() {
   }
   return {
     hostName: siteUrl.hostname,
-    siteBaseUrl: `${siteUrl.protocol}//${siteUrl.host}${sitePath}`,
     sitePath,
     listName,
   };
@@ -150,7 +130,7 @@ function mapInitialScreenItem(item) {
     location: normalizeText(fields.Location),
     phoneNumber: normalizeText(fields.PhoneNumber),
     email: normalizeText(fields.Email),
-    indeedProfileUrl: parseHyperlink(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
+    indeedProfileUrl: normalizeText(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
     active: toBoolean(fields.Active),
     responses: {
       q1NotesAvailability: normalizeText(fields.Q1_Notes_Availability),
@@ -170,7 +150,7 @@ function mapInitialScreenItem(item) {
       initialCallSummary: normalizeText(fields.InitialCallSummary),
       screenOutcome: normalizeText(fields.ScreenOutcome),
       screenNextSteps: normalizeText(fields.ScreenNextSteps),
-      indeedUrl: parseHyperlink(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
+      indeedUrl: normalizeText(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
       tags: normalizeText(fields.Tags),
       keepInMind: toBoolean(fields.KeepinMind),
     },
@@ -196,6 +176,7 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
+    IndeedURL: normalizeText(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,
   };
@@ -243,32 +224,11 @@ module.exports = async (req, res) => {
         },
         body: JSON.stringify(buildPatchBody(req.body?.responses)),
       });
-      let warning = "";
-      try {
-        await patchSharePointUrlField({
-          incomingToken: req.authUser?.graphAccessToken,
-          siteBaseUrl: config.siteBaseUrl,
-          hostName: config.hostName,
-          listName: config.listName,
-          itemId,
-          fieldInternalName: "IndeedURL",
-          urlValue: normalizeText(req.body?.responses?.indeedUrl),
-          description: "Indeed",
-        });
-      } catch (error) {
-        warning = error?.message || "Could not save Indeed URL.";
-        console.warn("[initial-screen] IndeedURL patch failed after main save succeeded", {
-          itemId,
-          indeedUrl: normalizeText(req.body?.responses?.indeedUrl),
-          message: warning,
-        });
-      }
       const updatedItem = mapInitialScreenItem(await graphClient.fetchJson(itemUrl));
       res.setHeader("Cache-Control", "no-store");
       res.status(200).json({
         success: true,
         item: updatedItem,
-        warning,
       });
       return;
     }
