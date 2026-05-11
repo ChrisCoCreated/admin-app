@@ -925,7 +925,7 @@ function normalizePhoneForActions(phoneNumber) {
 
 function getWhatsAppMessage(candidateName) {
   const firstName = cleanText(candidateName).split(/\s+/)[0] || "there";
-  return `Hi ${firstName}, thanks for applying to Thrive Homecare. Are you available for a quick initial chat? Chris`;
+  return `Hi ${firstName}, thanks for applying to Thrive Homecare. Are you available today for a quick initial chat? Chris`;
 }
 
 function getWhatsAppUrl(phoneNumber, candidateName) {
