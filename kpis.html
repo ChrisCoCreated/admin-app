@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Weekly KPIs</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260512" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container kpi-main">
+      <section class="hero compact kpi-page-head">
+        <div>
+          <p class="kpi-kicker">Weekly KPI snapshot</p>
+          <h1>Business KPIs</h1>
+          <p id="kpiStatusMessage" class="muted">Checking access...</p>
+        </div>
+        <div class="kpi-head-actions">
+          <a id="kpiListLink" class="secondary button-link" href="#" target="_blank" rel="noopener noreferrer" hidden>
+            Open KPI list
+          </a>
+          <button id="refreshKpisBtn" class="secondary" type="button">Refresh</button>
+        </div>
+      </section>
+
+      <section class="kpi-summary-strip" aria-label="Data freshness">
+        <div>
+          <span class="kpi-summary-label">Latest week</span>
+          <strong id="latestWeekLabel">-</strong>
+        </div>
+        <div>
+          <span class="kpi-summary-label">Refreshed</span>
+          <strong id="refreshedAtLabel">-</strong>
+        </div>
+        <div>
+          <span class="kpi-summary-label">Source rows</span>
+          <strong id="sourceRowCount">-</strong>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Delivery</h2>
+            <p class="muted">Delivered hours and the current dropped-hours detail.</p>
+          </div>
+        </div>
+        <div id="deliveryKpis" class="kpi-card-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Business Development</h2>
+            <p class="muted">Current hours, won/lost movement, pending work, and the quarter trend.</p>
+          </div>
+        </div>
+        <div id="businessKpis" class="kpi-card-grid"></div>
+        <div id="businessTrendKpis" class="kpi-trend-grid" aria-label="Quarter trends"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Recruitment</h2>
+            <p class="muted">Interview volume and accepted candidates currently onboarding.</p>
+          </div>
+        </div>
+        <div id="recruitmentKpis" class="kpi-card-grid"></div>
+      </section>
+
+      <section class="kpi-two-column">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Training</h2>
+              <p class="muted">Training matrix completion.</p>
+            </div>
+          </div>
+          <div id="trainingKpis" class="kpi-card-grid kpi-card-grid-single"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>CQC</h2>
+              <p class="muted">Readiness note from the KPI list.</p>
+            </div>
+          </div>
+          <div id="cqcKpis" class="kpi-card-grid kpi-card-grid-single"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="./kpis.js"></script>
+  </body>
+</html>

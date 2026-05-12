@@ -141,6 +141,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async getKpis(query = {}) {
+      const response = await authFetch(buildUrl("/api/kpis", query));
+      if (!response.ok) {
+        await parseError(response, "KPI request failed");
+      }
+      return response.json();
+    },
+
     async listAgendas(query = {}) {
       const response = await authFetch(buildUrl("/api/agendas", query));
       if (!response.ok) {

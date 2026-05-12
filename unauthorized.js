@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { renderTopNavigation } from "./navigation.js?v=20260427";
+import { renderTopNavigation } from "./navigation.js?v=20260512";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const deniedMessage = document.getElementById("deniedMessage");
@@ -18,6 +18,7 @@ const directoryApi = createDirectoryApi(authController);
 const PAGE_LABELS = {
   clients: "Clients",
   recruitment: "Recruitment",
+  kpis: "Weekly KPIs",
   problems: "Problems to Solve",
   mapping: "Time Mapping",
   drivetime: "Our Geography",

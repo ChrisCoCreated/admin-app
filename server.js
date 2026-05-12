@@ -51,6 +51,7 @@ const consultantReportDocxHandler = require("./api/consultant/report-docx");
 const wellbeingIntakeParseHandler = require("./api/wellbeing-intake/parse");
 const scorecardHandler = require("./api/scorecard");
 const scorecardDefinitionsHandler = require("./api/scorecard/definitions");
+const kpisHandler = require("./api/kpis");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -416,6 +417,11 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await scorecardDefinitionsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/kpis") {
+    await kpisHandler(apiReq, apiRes);
     return true;
   }
 

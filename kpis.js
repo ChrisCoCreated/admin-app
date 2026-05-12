@@ -1,0 +1,468 @@
+import { createAuthController } from "./auth-common.js";
+import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { createDirectoryApi } from "./directory-api.js";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260512";
+
+const signOutBtn = document.getElementById("signOutBtn");
+const statusMessage = document.getElementById("kpiStatusMessage");
+const refreshKpisBtn = document.getElementById("refreshKpisBtn");
+const kpiListLink = document.getElementById("kpiListLink");
+const latestWeekLabel = document.getElementById("latestWeekLabel");
+const refreshedAtLabel = document.getElementById("refreshedAtLabel");
+const sourceRowCount = document.getElementById("sourceRowCount");
+const deliveryKpis = document.getElementById("deliveryKpis");
+const businessKpis = document.getElementById("businessKpis");
+const businessTrendKpis = document.getElementById("businessTrendKpis");
+const recruitmentKpis = document.getElementById("recruitmentKpis");
+const trainingKpis = document.getElementById("trainingKpis");
+const cqcKpis = document.getElementById("cqcKpis");
+
+const authController = createAuthController({
+  tenantId: FRONTEND_CONFIG.tenantId,
+  clientId: FRONTEND_CONFIG.spaClientId,
+});
+const directoryApi = createDirectoryApi(authController);
+
+let loadingKpis = false;
+
+function cleanText(value) {
+  return String(value ?? "").trim();
+}
+
+function escapeHtml(value) {
+  return cleanText(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function parseNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  const text = cleanText(value).replace(/,/g, "");
+  if (!text) {
+    return null;
+  }
+  const match = text.match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+  const number = Number(match[0]);
+  return Number.isFinite(number) ? number : null;
+}
+
+function parsePercent(value) {
+  const number = parseNumber(value);
+  if (number === null) {
+    return null;
+  }
+  if (typeof value === "number" && number > 0 && number <= 1) {
+    return number * 100;
+  }
+  return number;
+}
+
+function formatNumber(value, decimals = 0) {
+  const number = parseNumber(value);
+  if (number === null) {
+    return "-";
+  }
+  return new Intl.NumberFormat("en-GB", {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
+  }).format(number);
+}
+
+function formatHours(value) {
+  const number = parseNumber(value);
+  if (number === null) {
+    return "-";
+  }
+  const decimals = Number.isInteger(number) ? 0 : 1;
+  return `${formatNumber(number, decimals)}h`;
+}
+
+function formatPercent(value) {
+  const percent = parsePercent(value);
+  if (percent === null) {
+    return "-";
+  }
+  const decimals = Number.isInteger(percent) ? 0 : 1;
+  return `${formatNumber(percent, decimals)}%`;
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function setStatus(message, isError = false) {
+  statusMessage.textContent = message;
+  statusMessage.classList.toggle("error", isError);
+}
+
+function setLoading(isLoading) {
+  loadingKpis = isLoading;
+  if (refreshKpisBtn) {
+    refreshKpisBtn.disabled = isLoading;
+    refreshKpisBtn.textContent = isLoading ? "Refreshing..." : "Refresh";
+  }
+}
+
+function staleLabel(metric) {
+  if (!metric?.stale) {
+    return "";
+  }
+  return metric.sourceWeekLabel ? `Stale, from ${metric.sourceWeekLabel}` : "Stale data";
+}
+
+function sourceLabel(metric, latestWeekLabelText) {
+  if (metric?.sourceLabel) {
+    return metric.sourceLabel;
+  }
+  if (!metric?.sourceWeekLabel) {
+    return latestWeekLabelText ? `No value found through ${latestWeekLabelText}` : "No value found";
+  }
+  if (metric.stale) {
+    return `Using most recent filled row: ${metric.sourceWeekLabel}`;
+  }
+  return `From latest row: ${metric.sourceWeekLabel}`;
+}
+
+export function createKpiMetricCard({
+  title,
+  value,
+  metric,
+  detail = "",
+  tone = "default",
+  latestWeekLabelText = "",
+  wide = false,
+}) {
+  const card = document.createElement("article");
+  card.className = `kpi-card kpi-card-${tone}${wide ? " kpi-card-wide" : ""}`;
+
+  const stale = staleLabel(metric);
+  const detailText = cleanText(detail);
+  card.innerHTML = `
+    <div class="kpi-card-topline">
+      <h3>${escapeHtml(title)}</h3>
+      ${stale ? `<span class="kpi-stale-pill">${escapeHtml(stale)}</span>` : ""}
+    </div>
+    <div class="kpi-card-value">${escapeHtml(value)}</div>
+    ${detailText ? `<p class="kpi-card-detail">${escapeHtml(detailText)}</p>` : ""}
+    <p class="kpi-card-source">${escapeHtml(sourceLabel(metric, latestWeekLabelText))}</p>
+  `;
+  return card;
+}
+
+export function createKpiNoteCard({ title, metric, emptyLabel = "No detail recorded", latestWeekLabelText = "" }) {
+  const value = cleanText(metric?.value);
+  const card = createKpiMetricCard({
+    title,
+    value: value || emptyLabel,
+    metric,
+    latestWeekLabelText,
+    wide: true,
+  });
+  card.classList.add("kpi-note-card");
+  return card;
+}
+
+function getTrendValues(series, field) {
+  return (Array.isArray(series) ? series : [])
+    .map((row) => ({
+      weekLabel: row.weekLabel,
+      value: parseNumber(row[field]),
+    }))
+    .filter((point) => point.value !== null);
+}
+
+function trendDeltaLabel(points, formatter) {
+  if (points.length < 2) {
+    return "Not enough data";
+  }
+  const first = points[0].value;
+  const latest = points[points.length - 1].value;
+  const delta = latest - first;
+  const sign = delta > 0 ? "+" : "";
+  return `${sign}${formatter(delta)} over quarter`;
+}
+
+function buildSparkline(points) {
+  if (!points.length) {
+    return '<div class="kpi-sparkline-empty">No trend data</div>';
+  }
+  const values = points.map((point) => point.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const width = 160;
+  const height = 48;
+  const step = points.length > 1 ? width / (points.length - 1) : width;
+  const coords = points.map((point, index) => {
+    const x = points.length > 1 ? index * step : width / 2;
+    const y = height - ((point.value - min) / range) * (height - 8) - 4;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return `
+    <svg class="kpi-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="Quarter trend">
+      <polyline points="${coords.join(" ")}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    </svg>
+  `;
+}
+
+export function createKpiTrendCard({ title, series, field, formatter = formatNumber }) {
+  const points = getTrendValues(series, field);
+  const latest = points.length ? points[points.length - 1] : null;
+  const card = document.createElement("article");
+  card.className = "kpi-trend-card";
+  card.innerHTML = `
+    <div>
+      <h3>${escapeHtml(title)}</h3>
+      <p class="kpi-trend-value">${latest ? escapeHtml(formatter(latest.value)) : "-"}</p>
+      <p class="kpi-card-source">${escapeHtml(latest?.weekLabel || "No trend data")}</p>
+    </div>
+    <div class="kpi-trend-visual">
+      ${buildSparkline(points)}
+      <span>${escapeHtml(trendDeltaLabel(points, formatter))}</span>
+    </div>
+  `;
+  return card;
+}
+
+function appendChildren(parent, children) {
+  if (!parent) {
+    return;
+  }
+  parent.innerHTML = "";
+  for (const child of children) {
+    parent.appendChild(child);
+  }
+}
+
+function metricValue(payload, key) {
+  return payload?.values?.[key] || null;
+}
+
+function renderSummary(payload) {
+  latestWeekLabel.textContent = payload?.latestWeekLabel || "-";
+  refreshedAtLabel.textContent = formatDateTime(payload?.refreshedAt);
+  sourceRowCount.textContent = Number.isFinite(Number(payload?.rowCount)) ? String(payload.rowCount) : "-";
+  if (kpiListLink && payload?.listUrl) {
+    kpiListLink.href = payload.listUrl;
+    kpiListLink.hidden = false;
+  }
+}
+
+function renderDelivery(payload) {
+  const latestLabel = payload?.latestWeekLabel || "";
+  appendChildren(deliveryKpis, [
+    createKpiMetricCard({
+      title: "Hours Delivered %",
+      value: formatPercent(metricValue(payload, "hoursDeliveredPercent")?.value),
+      metric: metricValue(payload, "hoursDeliveredPercent"),
+      detail: `${formatHours(metricValue(payload, "hoursDelivered")?.value)} delivered against ${formatHours(
+        metricValue(payload, "activeContractedHours")?.value
+      )} contracted`,
+      tone: "delivery",
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiNoteCard({
+      title: "Dropped Hours Detail",
+      metric: metricValue(payload, "droppedHoursReasons"),
+      emptyLabel: "No dropped-hours reason recorded",
+      latestWeekLabelText: latestLabel,
+    }),
+  ]);
+}
+
+function renderBusiness(payload) {
+  const latestLabel = payload?.latestWeekLabel || "";
+  appendChildren(businessKpis, [
+    createKpiMetricCard({
+      title: "Total Hours",
+      value: formatHours(metricValue(payload, "totalHours")?.value),
+      detail: `${formatHours(metricValue(payload, "hoursDelivered")?.value)} delivered + ${formatHours(
+        metricValue(payload, "subscriptionHours")?.value
+      )} subscription`,
+      metric: metricValue(payload, "totalHours"),
+      tone: "business",
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiMetricCard({
+      title: "Hours Won",
+      value: formatHours(metricValue(payload, "hoursWon")?.value),
+      metric: metricValue(payload, "hoursWon"),
+      tone: "positive",
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiMetricCard({
+      title: "Hours Lost",
+      value: formatHours(metricValue(payload, "hoursLost")?.value),
+      metric: metricValue(payload, "hoursLost"),
+      tone: "risk",
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiMetricCard({
+      title: "Pending Hours",
+      value: formatHours(metricValue(payload, "pendingHours")?.value),
+      metric: metricValue(payload, "pendingHours"),
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiNoteCard({
+      title: "Pending Hours Detail",
+      metric: metricValue(payload, "pendingHoursDetail"),
+      emptyLabel: "No pending-hours detail recorded",
+      latestWeekLabelText: latestLabel,
+    }),
+  ]);
+
+  appendChildren(businessTrendKpis, [
+    createKpiTrendCard({
+      title: "Total Hours Trend",
+      series: payload?.trendSeries,
+      field: "totalHours",
+      formatter: formatHours,
+    }),
+    createKpiTrendCard({
+      title: "Hours Won Trend",
+      series: payload?.trendSeries,
+      field: "hoursWon",
+      formatter: formatHours,
+    }),
+    createKpiTrendCard({
+      title: "Hours Lost Trend",
+      series: payload?.trendSeries,
+      field: "hoursLost",
+      formatter: formatHours,
+    }),
+    createKpiTrendCard({
+      title: "Pending Hours Trend",
+      series: payload?.trendSeries,
+      field: "pendingHours",
+      formatter: formatHours,
+    }),
+  ]);
+}
+
+function renderRecruitment(payload) {
+  const latestLabel = payload?.latestWeekLabel || "";
+  const onboarding = payload?.onboarding || {};
+  const firstNames = Array.isArray(onboarding.firstNames) ? onboarding.firstNames : [];
+  appendChildren(recruitmentKpis, [
+    createKpiMetricCard({
+      title: "1st Round Interviews",
+      value: formatNumber(metricValue(payload, "firstRoundInterviews")?.value),
+      metric: metricValue(payload, "firstRoundInterviews"),
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiMetricCard({
+      title: "Currently Onboarding",
+      value: formatNumber(onboarding.count),
+      detail: firstNames.length ? firstNames.join(", ") : "No accepted candidates listed",
+      metric: { sourceLabel: "From recruitment section: status Accepted", stale: false },
+      tone: "recruitment",
+      latestWeekLabelText: latestLabel,
+    }),
+  ]);
+}
+
+function renderTraining(payload) {
+  appendChildren(trainingKpis, [
+    createKpiMetricCard({
+      title: "Training Completion",
+      value: formatPercent(metricValue(payload, "trainingCompletion")?.value),
+      metric: metricValue(payload, "trainingCompletion"),
+      tone: "training",
+      latestWeekLabelText: payload?.latestWeekLabel || "",
+    }),
+  ]);
+}
+
+function renderCqc(payload) {
+  appendChildren(cqcKpis, [
+    createKpiNoteCard({
+      title: "CQC Readiness",
+      metric: metricValue(payload, "cqcReadiness"),
+      emptyLabel: "No readiness note recorded",
+      latestWeekLabelText: payload?.latestWeekLabel || "",
+    }),
+  ]);
+}
+
+function renderKpis(payload) {
+  renderSummary(payload);
+  renderDelivery(payload);
+  renderBusiness(payload);
+  renderRecruitment(payload);
+  renderTraining(payload);
+  renderCqc(payload);
+}
+
+async function loadKpis() {
+  if (loadingKpis) {
+    return;
+  }
+  setLoading(true);
+  setStatus("Loading KPI snapshot...");
+  try {
+    const payload = await directoryApi.getKpis();
+    renderKpis(payload);
+    setStatus(payload.latestWeekLabel ? `Showing latest week: ${payload.latestWeekLabel}` : "KPI snapshot loaded.");
+  } catch (error) {
+    console.error("[kpis] Load failed", error);
+    setStatus(error?.message || "Could not load KPI snapshot.", true);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function init() {
+  try {
+    const account = await authController.restoreSession();
+    if (!account) {
+      window.location.href = "./index.html";
+      return;
+    }
+
+    const profile = await directoryApi.getCurrentUser();
+    const role = cleanText(profile?.role).toLowerCase();
+    if (!canAccessPage(role, "kpis")) {
+      window.location.href = "./unauthorized.html?page=kpis";
+      return;
+    }
+
+    renderTopNavigation({ role });
+    await loadKpis();
+  } catch (error) {
+    console.error("[kpis] Init failed", error);
+    setStatus(error?.message || "Could not initialize KPIs.", true);
+  } finally {
+    document.body.classList.remove("auth-pending");
+  }
+}
+
+refreshKpisBtn?.addEventListener("click", () => {
+  void loadKpis();
+});
+
+signOutBtn?.addEventListener("click", async () => {
+  try {
+    signOutBtn.disabled = true;
+    await authController.signOut();
+  } finally {
+    window.location.href = "./index.html";
+  }
+});
+
+void init();

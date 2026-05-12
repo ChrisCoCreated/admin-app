@@ -104,6 +104,7 @@ const PAGE_META = {
   enquiries: { href: "./enquiries.html", label: "Enquiries" },
   agendas: { href: "./agendas.html", label: "Agendas" },
   problems: { href: "./problems.html", label: "Problems to Solve" },
+  kpis: { href: "./kpis.html", label: "Weekly KPIs" },
   scorecard: { href: "./scorecard.html", label: "Performance Scorecard" },
   scorecarddefinitions: { href: "./scorecard-definitions.html", label: "Scorecard Setup" },
   scorecardgoals: { href: "./scorecard-goals.html", label: "Goal Setup" },
@@ -122,7 +123,7 @@ const PAGE_META = {
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
 };
 
-const ADMIN_HOME_PAGES = ["finance", "reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
+const ADMIN_HOME_PAGES = ["kpis", "finance", "reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
 const MAX_STANDARD_ROLE_HOME_PAGES = 8;
 const MENU_GROUPS = [
   {
@@ -139,7 +140,7 @@ const MENU_GROUPS = [
   },
   {
     title: "Performance",
-    pages: ["reports", "finance", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
+    pages: ["kpis", "reports", "finance", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
   },
   {
     title: "Marketing & Content",
@@ -185,10 +186,13 @@ export function getAccessiblePages(role) {
   if (!Array.isArray(pages)) {
     return [];
   }
-  if (pages.includes("drivetime")) {
-    return pages;
+  const accessiblePages = [...pages];
+  for (const sharedPage of ["drivetime", "kpis"]) {
+    if (!accessiblePages.includes(sharedPage)) {
+      accessiblePages.push(sharedPage);
+    }
   }
-  return [...pages, "drivetime"];
+  return accessiblePages;
 }
 
 export function canAccessPage(role, pageKey) {

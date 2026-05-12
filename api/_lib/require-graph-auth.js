@@ -96,10 +96,13 @@ function getAccessiblePages(role) {
   if (!Array.isArray(pages)) {
     return [];
   }
-  if (pages.includes("drivetime")) {
-    return pages;
+  const accessiblePages = [...pages];
+  for (const sharedPage of ["drivetime", "kpis"]) {
+    if (!accessiblePages.includes(sharedPage)) {
+      accessiblePages.push(sharedPage);
+    }
   }
-  return [...pages, "drivetime"];
+  return accessiblePages;
 }
 
 function roleMatchesAllowedRoles(role, allowedRoles) {
