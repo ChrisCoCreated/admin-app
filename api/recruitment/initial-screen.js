@@ -36,6 +36,7 @@ const SCREEN_FIELDS = [
   "InitialCallSummary",
   "ScreenOutcome",
   "ScreenNextSteps",
+  "_x0031_stInterviewDate",
 ];
 
 function normalizeText(value) {
@@ -69,6 +70,11 @@ function normalizeScore(value) {
     return "Red";
   }
   return "";
+}
+
+function normalizeDateOnly(value) {
+  const normalized = normalizeText(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
 function extractIndeedProfileUrl(notes) {
@@ -151,6 +157,7 @@ function mapInitialScreenItem(item) {
       initialCallSummary: normalizeText(fields.InitialCallSummary),
       screenOutcome: normalizeText(fields.ScreenOutcome),
       screenNextSteps: normalizeText(fields.ScreenNextSteps),
+      firstInterviewDate: normalizeDateOnly(fields._x0031_stInterviewDate),
       indeedUrl: normalizeText(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
       tags: normalizeText(fields.Tags),
       keepInMind: toBoolean(fields.KeepinMind),
@@ -177,6 +184,7 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
+    _x0031_stInterviewDate: normalizeDateOnly(input.firstInterviewDate),
     IndeedURL: normalizeIndeedUrl(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,

@@ -29,6 +29,7 @@ const screenSummaryTitle = document.getElementById("screenSummaryTitle");
 const screenSummaryContact = document.getElementById("screenSummaryContact");
 const screenSummaryTags = document.getElementById("screenSummaryTags");
 const screenTagsPreview = document.getElementById("screenTagsPreview");
+const screenFirstInterviewDateField = document.getElementById("screenFirstInterviewDateField");
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
 const fieldRefs = {
@@ -48,6 +49,7 @@ const fieldRefs = {
   q7Score: document.getElementById("q7Score"),
   initialCallSummary: document.getElementById("initialCallSummary"),
   screenOutcome: document.getElementById("screenOutcome"),
+  firstInterviewDate: document.getElementById("firstInterviewDateInput"),
   screenNextSteps: document.getElementById("screenNextSteps"),
   indeedUrl: document.getElementById("screenIndeedUrlInput"),
   tags: document.getElementById("screenTagsInput"),
@@ -62,6 +64,7 @@ const directoryApi = createDirectoryApi(authController);
 
 let currentItemId = "";
 let currentCandidateItem = null;
+let savedFirstInterviewDate = "";
 let saveBusy = false;
 let copyFeedbackTimer = 0;
 let restoreDocumentTitle = document.title;
@@ -361,6 +364,16 @@ function syncScoreChipGroup(fieldId, value) {
   }
 }
 
+function syncFirstInterviewDateVisibility() {
+  if (!screenFirstInterviewDateField || !fieldRefs.firstInterviewDate) {
+    return;
+  }
+  const screenOutcome = cleanText(fieldRefs.screenOutcome?.value).toLowerCase();
+  const hasSavedDate = Boolean(savedFirstInterviewDate);
+  const hasEnteredDate = Boolean(cleanText(fieldRefs.firstInterviewDate.value));
+  screenFirstInterviewDateField.hidden = !(screenOutcome === "progress" && (!hasSavedDate || hasEnteredDate));
+}
+
 function fillForm(responses = {}) {
   fieldRefs.q1NotesAvailability.value = cleanText(responses.q1NotesAvailability);
   fieldRefs.q1Score.value = cleanText(responses.q1Score);
@@ -378,6 +391,7 @@ function fillForm(responses = {}) {
   fieldRefs.q7Score.value = cleanText(responses.q7Score);
   fieldRefs.initialCallSummary.value = cleanText(responses.initialCallSummary);
   fieldRefs.screenOutcome.value = cleanText(responses.screenOutcome);
+  fieldRefs.firstInterviewDate.value = cleanText(responses.firstInterviewDate);
   fieldRefs.screenNextSteps.value = cleanText(responses.screenNextSteps);
   fieldRefs.indeedUrl.value = cleanText(responses.indeedUrl);
   fieldRefs.tags.value = normalizeTagString(responses.tags);
@@ -389,6 +403,7 @@ function fillForm(responses = {}) {
   syncScoreChipGroup("q5Score", fieldRefs.q5Score.value);
   syncScoreChipGroup("q6Score", fieldRefs.q6Score.value);
   syncScoreChipGroup("q7Score", fieldRefs.q7Score.value);
+  syncFirstInterviewDateVisibility();
   renderScoreSummary();
 }
 
@@ -410,6 +425,7 @@ function readForm() {
     q7Score: fieldRefs.q7Score.value,
     initialCallSummary: fieldRefs.initialCallSummary.value,
     screenOutcome: fieldRefs.screenOutcome.value,
+    firstInterviewDate: cleanText(fieldRefs.firstInterviewDate.value),
     screenNextSteps: fieldRefs.screenNextSteps.value,
     indeedUrl: cleanText(fieldRefs.indeedUrl.value),
     tags: normalizeTagString(fieldRefs.tags.value),
@@ -660,6 +676,7 @@ async function loadInitialScreen() {
   }
 
   renderCandidateHeader(item);
+  savedFirstInterviewDate = cleanText(item?.responses?.firstInterviewDate);
   fillForm(item.responses || {});
   const localDraft = loadLocalDraft(currentItemId);
   if (localDraft?.responses && typeof localDraft.responses === "object") {
@@ -688,6 +705,7 @@ async function saveInitialScreen(event) {
     if (result?.item) {
       renderCandidateHeader(result.item);
     }
+    savedFirstInterviewDate = cleanText(result?.item?.responses?.firstInterviewDate) || cleanText(fieldRefs.firstInterviewDate?.value);
     fillForm(result?.item?.responses || {});
     clearLocalDraft(currentItemId);
     if (cleanText(result?.warning)) {
@@ -760,10 +778,12 @@ for (const field of Object.values(fieldRefs)) {
     continue;
   }
   field.addEventListener("input", () => {
+    syncFirstInterviewDateVisibility();
     renderScoreSummary();
     saveLocalDraft();
   });
   field.addEventListener("change", () => {
+    syncFirstInterviewDateVisibility();
     renderScoreSummary();
     saveLocalDraft();
   });
