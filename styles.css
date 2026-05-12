@@ -1629,6 +1629,20 @@ dd {
   background: linear-gradient(135deg, rgba(255, 239, 241, 0.96), rgba(255, 247, 248, 0.98));
 }
 
+.recruitment-stage-card-attention {
+  border-color: rgba(49, 183, 200, 0.55);
+  background: linear-gradient(135deg, rgba(219, 245, 250, 0.98), rgba(240, 250, 253, 0.99));
+  box-shadow:
+    0 0 0 2px rgba(49, 183, 200, 0.16),
+    0 12px 26px rgba(26, 91, 115, 0.12);
+}
+
+.recruitment-stage-card-attention .recruitment-stage-label,
+.recruitment-stage-card-attention .recruitment-stage-outcome,
+.recruitment-stage-card-attention .recruitment-stage-summary-meta {
+  color: #184f67;
+}
+
 .recruitment-stage-label {
   font-size: 0.71rem;
   font-weight: 800;

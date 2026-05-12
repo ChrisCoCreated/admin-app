@@ -193,6 +193,7 @@ const ONBOARDING_STAGE_STATUSES = new Set([
   "Start Date Agreed",
   "Started",
 ]);
+const INITIAL_SCREEN_ACTION_REQUIRED_STATUSES = new Set(["Organise 2nd Interview", "2nd Interview", ...ONBOARDING_STAGE_STATUSES]);
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
@@ -462,6 +463,7 @@ function getStageTone(value) {
 
 function renderStageSummary(candidate) {
   const firstInterviewDate = cleanText(candidate?.firstInterviewDate);
+  const candidateStatus = cleanText(candidate?.status);
   const stages = [
     {
       key: "initial_screen",
@@ -494,11 +496,17 @@ function renderStageSummary(candidate) {
           const nextSteps = stage.nextSteps || "";
           const shouldShowFirstInterviewDate =
             stage.key === "initial_screen" && stage.outcome === "Progress" && !cleanText(stage.firstInterviewDate);
+          const needsAttentionHighlight =
+            stage.key === "initial_screen" &&
+            !cleanText(stage.firstInterviewDate) &&
+            INITIAL_SCREEN_ACTION_REQUIRED_STATUSES.has(candidateStatus);
           const busyKey = `${cleanText(candidate?.id)}:${stage.key}`;
           const isBusy = stageUpdateBusyKey === busyKey;
           const openKey = `${cleanText(candidate?.id)}:${stage.key}`;
           return `
-            <details class="recruitment-stage-card recruitment-stage-card-${tone}${isEmpty ? " recruitment-stage-card-empty" : ""}" data-item-id="${escapeHtml(
+            <details class="recruitment-stage-card recruitment-stage-card-${tone}${isEmpty ? " recruitment-stage-card-empty" : ""}${
+              needsAttentionHighlight ? " recruitment-stage-card-attention" : ""
+            }" data-item-id="${escapeHtml(
               cleanText(candidate?.id)
             )}" data-stage-key="${escapeHtml(stage.key)}"${openStageKeys.has(openKey) ? " open" : ""}>
               <summary class="recruitment-stage-summary">
