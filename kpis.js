@@ -191,6 +191,28 @@ function getTrendValues(series, field) {
     .filter((point) => point.value !== null);
 }
 
+function summarizeTrend(points) {
+  if (!points.length) {
+    return {
+      min: null,
+      max: null,
+      average: null,
+      maxPoint: null,
+      minPoint: null,
+    };
+  }
+  const values = points.map((point) => point.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  return {
+    min,
+    max,
+    average: values.reduce((sum, value) => sum + value, 0) / values.length,
+    maxPoint: points.find((point) => point.value === max) || null,
+    minPoint: points.find((point) => point.value === min) || null,
+  };
+}
+
 function trendDeltaLabel(points, formatter) {
   if (points.length < 2) {
     return "Not enough data";
@@ -228,20 +250,141 @@ function buildSparkline(points) {
 export function createKpiTrendCard({ title, series, field, formatter = formatNumber }) {
   const points = getTrendValues(series, field);
   const latest = points.length ? points[points.length - 1] : null;
-  const card = document.createElement("article");
+  const summary = summarizeTrend(points);
+  const card = document.createElement("button");
+  card.type = "button";
   card.className = "kpi-trend-card";
+  card.setAttribute("aria-label", `Open detailed ${title}`);
   card.innerHTML = `
     <div>
       <h3>${escapeHtml(title)}</h3>
       <p class="kpi-trend-value">${latest ? escapeHtml(formatter(latest.value)) : "-"}</p>
       <p class="kpi-card-source">${escapeHtml(latest?.weekLabel || "No trend data")}</p>
     </div>
+    <dl class="kpi-trend-stats">
+      <div>
+        <dt>Max</dt>
+        <dd>${summary.max === null ? "-" : escapeHtml(formatter(summary.max))}</dd>
+      </div>
+      <div>
+        <dt>Avg</dt>
+        <dd>${summary.average === null ? "-" : escapeHtml(formatter(summary.average))}</dd>
+      </div>
+      <div>
+        <dt>Min</dt>
+        <dd>${summary.min === null ? "-" : escapeHtml(formatter(summary.min))}</dd>
+      </div>
+    </dl>
     <div class="kpi-trend-visual">
       ${buildSparkline(points)}
-      <span>${escapeHtml(trendDeltaLabel(points, formatter))}</span>
+      <span>${escapeHtml(trendDeltaLabel(points, formatter))}${
+        summary.maxPoint ? ` | Max ${escapeHtml(formatter(summary.max))} on ${escapeHtml(summary.maxPoint.weekLabel)}` : ""
+      }</span>
     </div>
   `;
+  card.addEventListener("click", () => {
+    openTrendModal({ title, points, formatter, summary });
+  });
   return card;
+}
+
+function ensureTrendModal() {
+  let modal = document.getElementById("kpiTrendModal");
+  if (modal) {
+    return modal;
+  }
+
+  modal = document.createElement("div");
+  modal.id = "kpiTrendModal";
+  modal.className = "kpi-modal";
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="kpi-modal-backdrop" data-kpi-modal-close></div>
+    <section class="kpi-modal-panel" role="dialog" aria-modal="true" aria-labelledby="kpiTrendModalTitle">
+      <div class="kpi-modal-head">
+        <div>
+          <p class="kpi-kicker">Quarter detail</p>
+          <h2 id="kpiTrendModalTitle"></h2>
+        </div>
+        <button class="secondary kpi-modal-close" type="button" data-kpi-modal-close>Close</button>
+      </div>
+      <div id="kpiTrendModalStats" class="kpi-modal-stats"></div>
+      <div id="kpiTrendModalChart" class="kpi-modal-chart"></div>
+      <div id="kpiTrendModalRows" class="kpi-modal-rows"></div>
+    </section>
+  `;
+  modal.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest("[data-kpi-modal-close]")) {
+      closeTrendModal();
+    }
+  });
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function closeTrendModal() {
+  const modal = document.getElementById("kpiTrendModal");
+  if (!modal) {
+    return;
+  }
+  modal.hidden = true;
+  document.body.classList.remove("kpi-modal-open");
+}
+
+function buildModalBars(points, formatter) {
+  if (!points.length) {
+    return '<p class="muted">No trend data available.</p>';
+  }
+  const values = points.map((point) => point.value);
+  const max = Math.max(...values) || 1;
+  return points
+    .map((point) => {
+      const width = max > 0 ? Math.max(point.value === 0 ? 0 : 2, (point.value / max) * 100) : 0;
+      return `
+        <div class="kpi-modal-bar-row">
+          <span>${escapeHtml(point.weekLabel)}</span>
+          <div class="kpi-modal-bar-track">
+            <div class="kpi-modal-bar" style="width: ${width}%"></div>
+          </div>
+          <strong>${escapeHtml(formatter(point.value))}</strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function openTrendModal({ title, points, formatter, summary }) {
+  const modal = ensureTrendModal();
+  const titleNode = modal.querySelector("#kpiTrendModalTitle");
+  const statsNode = modal.querySelector("#kpiTrendModalStats");
+  const chartNode = modal.querySelector("#kpiTrendModalChart");
+  const rowsNode = modal.querySelector("#kpiTrendModalRows");
+
+  if (titleNode) {
+    titleNode.textContent = title;
+  }
+  if (statsNode) {
+    statsNode.innerHTML = `
+      <div><span>Latest</span><strong>${points.length ? escapeHtml(formatter(points[points.length - 1].value)) : "-"}</strong></div>
+      <div><span>Max</span><strong>${summary.max === null ? "-" : escapeHtml(formatter(summary.max))}</strong><small>${escapeHtml(
+        summary.maxPoint?.weekLabel || ""
+      )}</small></div>
+      <div><span>Average</span><strong>${summary.average === null ? "-" : escapeHtml(formatter(summary.average))}</strong></div>
+      <div><span>Min</span><strong>${summary.min === null ? "-" : escapeHtml(formatter(summary.min))}</strong><small>${escapeHtml(
+        summary.minPoint?.weekLabel || ""
+      )}</small></div>
+    `;
+  }
+  if (chartNode) {
+    chartNode.innerHTML = buildSparkline(points);
+  }
+  if (rowsNode) {
+    rowsNode.innerHTML = buildModalBars(points, formatter);
+  }
+
+  modal.hidden = false;
+  document.body.classList.add("kpi-modal-open");
+  modal.querySelector(".kpi-modal-close")?.focus();
 }
 
 function appendChildren(parent, children) {
@@ -458,6 +601,12 @@ async function init() {
 
 refreshKpisBtn?.addEventListener("click", () => {
   void loadKpis();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeTrendModal();
+  }
 });
 
 signOutBtn?.addEventListener("click", async () => {
