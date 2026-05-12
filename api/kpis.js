@@ -63,13 +63,15 @@ function parseSharePointListConfig(siteUrlValue, listName, missingConfigMessage)
 }
 
 function parseKpiConfig() {
+  const listWebUrl = cleanText(process.env.SHAREPOINT_KPI_LIST_WEB_URL || DEFAULT_KPI_LIST_WEB_URL);
   return {
     ...parseSharePointListConfig(
       cleanText(process.env.SHAREPOINT_KPI_SITE_URL || DEFAULT_KPI_SITE_URL),
       cleanText(process.env.SHAREPOINT_KPI_LIST_NAME || DEFAULT_KPI_LIST_NAME),
       "Missing SHAREPOINT_KPI_SITE_URL or SHAREPOINT_KPI_LIST_NAME."
     ),
-    listWebUrl: cleanText(process.env.SHAREPOINT_KPI_LIST_WEB_URL || DEFAULT_KPI_LIST_WEB_URL),
+    listWebUrl,
+    listPath: parseListPathFromWebUrl(listWebUrl),
   };
 }
 
@@ -85,6 +87,33 @@ function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+function normalizeSharePointPath(value) {
+  const text = cleanText(value);
+  if (!text) {
+    return "";
+  }
+  try {
+    return decodeURIComponent(text).replace(/\/+/g, "/").replace(/\/$/, "").toLowerCase();
+  } catch {
+    return text.replace(/\/+/g, "/").replace(/\/$/, "").toLowerCase();
+  }
+}
+
+function parseListPathFromWebUrl(webUrl) {
+  const text = cleanText(webUrl);
+  if (!text) {
+    return "";
+  }
+  try {
+    const url = new URL(text);
+    const path = normalizeSharePointPath(url.pathname);
+    const allItemsIndex = path.toLowerCase().lastIndexOf("/allitems.aspx");
+    return allItemsIndex >= 0 ? path.slice(0, allItemsIndex) : path;
+  } catch {
+    return "";
+  }
+}
+
 async function resolveSiteId(graphClient, hostName, sitePath) {
   const url = `https://graph.microsoft.com/v1.0/sites/${hostName}:${sitePath}?$select=id`;
   const payload = await graphClient.fetchJson(url);
@@ -94,7 +123,38 @@ async function resolveSiteId(graphClient, hostName, sitePath) {
   return payload.id;
 }
 
-async function resolveList(graphClient, siteId, listName) {
+async function findListByWebUrlPath(graphClient, siteId, listPath) {
+  const targetPath = normalizeSharePointPath(listPath);
+  if (!targetPath) {
+    return null;
+  }
+
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?$select=id,displayName,webUrl&$top=200`;
+  while (nextUrl) {
+    const payload = await graphClient.fetchJson(nextUrl);
+    const lists = Array.isArray(payload?.value) ? payload.value : [];
+    const match = lists.find((list) => {
+      const webUrl = cleanText(list?.webUrl);
+      if (!webUrl) {
+        return false;
+      }
+      try {
+        const path = normalizeSharePointPath(new URL(webUrl).pathname);
+        return path === targetPath || path.endsWith(targetPath);
+      } catch {
+        return false;
+      }
+    });
+    if (match?.id) {
+      return match;
+    }
+    nextUrl = cleanText(payload?.["@odata.nextLink"]);
+  }
+
+  return null;
+}
+
+async function resolveList(graphClient, siteId, listName, options = {}) {
   const params = new URLSearchParams({
     $select: "id,displayName,webUrl",
     $filter: `displayName eq ${quoteODataString(listName)}`,
@@ -102,9 +162,14 @@ async function resolveList(graphClient, siteId, listName) {
   });
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists?${params.toString()}`;
   const payload = await graphClient.fetchJson(url);
-  const list = Array.isArray(payload?.value) ? payload.value[0] : null;
+  let list = Array.isArray(payload?.value) ? payload.value[0] : null;
   if (!list?.id) {
-    throw new Error(`Could not find SharePoint list '${listName}'.`);
+    list = await findListByWebUrlPath(graphClient, siteId, options.listPath);
+  }
+  if (!list?.id) {
+    const listPath = cleanText(options.listPath);
+    const suffix = listPath ? ` or path '${listPath}'` : "";
+    throw new Error(`Could not find SharePoint list '${listName}'${suffix}.`);
   }
   return {
     id: String(list.id),
@@ -330,7 +395,7 @@ function buildTrendSeries(rows) {
 
 async function fetchKpiRows(graphClient, config) {
   const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
-  const list = await resolveList(graphClient, siteId, config.listName);
+  const list = await resolveList(graphClient, siteId, config.listName, { listPath: config.listPath });
   const columns = await resolveListColumns(graphClient, siteId, list.id);
   const fieldMap = createFieldMap(columns, KPI_FIELD_DEFINITIONS);
   const selectFields = uniqueFieldNames(fieldMap);
