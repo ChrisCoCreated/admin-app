@@ -1674,6 +1674,43 @@ dd {
   min-width: 0;
 }
 
+.recruitment-stage-summary-inline-date {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.recruitment-stage-summary-inline-date-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6a7d94;
+}
+
+.recruitment-stage-summary-inline-date-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recruitment-stage-summary-inline-date-controls input {
+  min-height: 34px;
+  min-width: 152px;
+  padding: 7px 10px;
+  border: 1px solid #cfd9e7;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.recruitment-stage-inline-save-btn {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
 .recruitment-stage-summary-meta {
   font-size: 0.74rem;
   font-weight: 700;

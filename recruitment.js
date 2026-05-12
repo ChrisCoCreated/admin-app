@@ -505,6 +505,19 @@ function renderStageSummary(candidate) {
                 <span class="recruitment-stage-summary-main">
                   <span class="recruitment-stage-label">${escapeHtml(stage.label)}</span>
                   <span class="recruitment-stage-outcome">${escapeHtml(outcome)}</span>
+                  ${
+                    shouldShowFirstInterviewDate
+                      ? `<span class="recruitment-stage-summary-inline-date">
+                          <span class="recruitment-stage-summary-inline-date-label">1st interview date</span>
+                          <span class="recruitment-stage-summary-inline-date-controls">
+                            <input data-stage-first-interview-date type="date" value="${escapeHtml(cleanText(stage.firstInterviewDate))}" />
+                            <button type="button" class="secondary recruitment-stage-inline-save-btn" data-stage-inline-save${
+                              isBusy ? " disabled" : ""
+                            }>${isBusy ? "Saving..." : "Save"}</button>
+                          </span>
+                        </span>`
+                      : ""
+                  }
                 </span>
                 <span class="recruitment-stage-summary-meta">${isEmpty ? "Add" : nextSteps ? "Notes" : "View"}</span>
               </summary>
@@ -522,14 +535,6 @@ function renderStageSummary(candidate) {
                   Next Steps
                   <textarea data-stage-next-steps placeholder="Add notes or next steps...">${escapeHtml(nextSteps)}</textarea>
                 </label>
-                ${
-                  shouldShowFirstInterviewDate
-                    ? `<label class="field compact-field recruitment-stage-inline-date">
-                        1st Interview Date
-                        <input data-stage-first-interview-date type="date" value="${escapeHtml(cleanText(stage.firstInterviewDate))}" />
-                      </label>`
-                    : ""
-                }
                 <div class="recruitment-stage-editor-actions">
                   <button type="button" class="secondary recruitment-stage-save-btn" data-stage-save${isBusy ? " disabled" : ""}>${
                     isBusy ? "Saving..." : "Save"
@@ -2801,6 +2806,23 @@ candidateDetailEditForm?.addEventListener("submit", async (event) => {
   await saveCandidateDetails();
 });
 recruitmentTableBody?.addEventListener("click", async (event) => {
+  const inlineSaveButton = event.target instanceof Element ? event.target.closest("[data-stage-inline-save]") : null;
+  if (inlineSaveButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const card = inlineSaveButton.closest(".recruitment-stage-card");
+    if (!card) {
+      return;
+    }
+    const itemId = cleanText(card.getAttribute("data-item-id"));
+    const stageKey = cleanText(card.getAttribute("data-stage-key"));
+    const outcome = cleanText(card.querySelector("[data-stage-outcome]")?.value) || cleanText(card.querySelector(".recruitment-stage-outcome")?.textContent);
+    const nextSteps = cleanText(card.querySelector("[data-stage-next-steps]")?.value);
+    const firstInterviewDate = cleanText(card.querySelector("[data-stage-first-interview-date]")?.value);
+    await saveRecruitmentStage(itemId, stageKey, outcome, nextSteps, firstInterviewDate);
+    return;
+  }
+
   const saveButton = event.target instanceof Element ? event.target.closest("[data-stage-save]") : null;
   if (saveButton) {
     event.stopPropagation();
@@ -2819,6 +2841,10 @@ recruitmentTableBody?.addEventListener("click", async (event) => {
 
   const stageCard = event.target instanceof Element ? event.target.closest(".recruitment-stage-card") : null;
   if (stageCard) {
+    const inlineControl = event.target.closest?.(".recruitment-stage-summary-inline-date");
+    if (inlineControl) {
+      event.preventDefault();
+    }
     event.stopPropagation();
   }
 }, true);
