@@ -140,18 +140,18 @@
             <thead>
               <tr>
                 <th>Area / Role</th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="carerCount">Carers</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="confirmedHours">Confirmed Hours</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="contractedHours">Contracted Hours</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="actualHours">Actual Hours</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="utilisation">Utilisation</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedScheduledHours">Projected Scheduled</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedContractedHours">Projected Contracted</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="revenue">Revenue</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="labourWithOnCost">Labour + On-Cost</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="travelExpense">Travel</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="profit">Actual Profit</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedProfit">Projected Profit</button></th>
+                <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="carerCount">Associates</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="confirmedHours">Confirmed Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="contractedHours">Contracted Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="actualHours">Actual Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="utilisation">Utilisation</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedScheduledHours">Projected Scheduled</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedContractedHours">Projected Contracted</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="revenue">Revenue</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="labourWithOnCost">Labour + On-Cost</button></th>
+                <th data-column="travel"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="travelExpense">Travel</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="profit">Actual Profit</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="projectedProfit">Projected Profit</button></th>
               </tr>
             </thead>
             <tbody id="areaSummaryBody"></tbody>
@@ -159,30 +159,30 @@
         </div>
 
         <div class="profitability-section-bar">
-          <h2 class="profitability-section-heading">By Carer</h2>
+          <h2 class="profitability-section-heading">By Associate</h2>
           <div class="profitability-table-actions">
             <button id="selectAllCarersBtn" class="secondary" type="button">Select all</button>
             <button id="clearSelectedCarersBtn" class="secondary" type="button">Clear selected</button>
-            <button id="bringActualUpBtn" class="secondary" type="button">Bring actual up to confirmed</button>
+            <button id="bringActualUpBtn" class="secondary" data-column="actual" type="button">Bring actual up to confirmed</button>
           </div>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th class="profitability-sticky-column">Associate</th>
                 <th>Select</th>
                 <th>Area / Role</th>
                 <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="idNumber">No.</button></th>
-                <th>Carer</th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="confirmedHours">Confirmed Hours</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="contractedHours">Contracted Hours</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="actualHours">Actual Hours</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="utilisation">Utilisation</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedScheduledHours">Projected Scheduled</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedContractedHours">Projected Contracted</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="travelExpense">Travel</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="profit">Actual Profit</button></th>
-                <th><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedProfit">Projected Profit</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="confirmedHours">Confirmed Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="contractedHours">Contracted Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="actualHours">Actual Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="utilisation">Utilisation</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedScheduledHours">Projected Scheduled</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedContractedHours">Projected Contracted</button></th>
+                <th data-column="travel"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="travelExpense">Travel</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="profit">Actual Profit</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="carer" data-sort-key="projectedProfit">Projected Profit</button></th>
               </tr>
             </thead>
             <tbody id="carerSummaryBody"></tbody>

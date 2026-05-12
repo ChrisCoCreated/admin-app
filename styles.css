@@ -660,6 +660,10 @@ button.is-generating::after {
   border-radius: 12px;
 }
 
+.is-hidden-column {
+  display: none;
+}
+
 .bulk-tag-panel {
   margin-top: 14px;
   display: grid;
@@ -2493,6 +2497,25 @@ dd {
 .is-negative-profit {
   color: #b4232c;
   font-weight: 800;
+}
+
+.profitability-sticky-column {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 190px;
+  background: #fff;
+  box-shadow: 1px 0 0 #e7ebf4;
+  font-weight: 800;
+}
+
+thead .profitability-sticky-column {
+  z-index: 4;
+  background: #f7f9fc;
+}
+
+tbody tr:hover .profitability-sticky-column {
+  background: #f4f8ff;
 }
 
 .profitability-section-heading {

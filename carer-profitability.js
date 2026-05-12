@@ -334,7 +334,7 @@ function calculateFinancials(row, assumptions) {
   const profit = revenue - totalCost;
   const utilisation = actualHours > 0 ? (row.confirmedHours / actualHours) * 100 : null;
   const projectedScheduledHours = Number(row.projectedScheduledHours || 0);
-  const projectedContractedHours = Number(row.projectedContractedHours || 0);
+  const projectedContractedHours = Math.max(Number(row.projectedContractedHours || 0), projectedScheduledHours);
   const projectedRevenue = projectedScheduledHours * assumptions.incomeRate;
   const projectedBaseLabourCost = projectedContractedHours * assumptions.contractedRate;
   const projectedOnCost = projectedBaseLabourCost * onCostRate;
@@ -372,6 +372,11 @@ function buildReport() {
   }
 
   const assumptions = getAssumptions();
+  const flags = {
+    hasActual: carerHoursRows.length > 0,
+    hasProjected: projectedHoursRows.length > 0,
+    hasPayroll: payrollRows.length > 0,
+  };
   const carersByKey = new Map();
   const carersById = new Map();
   const carersByName = new Map();
@@ -573,7 +578,7 @@ function buildReport() {
     assumptions
   );
 
-  latestReport = { assumptions, carers, areas, grandTotal };
+  latestReport = { assumptions, flags, carers, areas, grandTotal };
   return latestReport;
 }
 
@@ -609,23 +614,33 @@ function renderKpiCard(label, value, options = {}) {
   return card;
 }
 
-function renderKpiSet(container, total) {
+function renderKpiSet(container, total, flags = {}) {
   container.innerHTML = "";
-  container.append(
-    renderKpiCard("Confirmed Hours", formatHours(total.confirmedHours)),
-    renderKpiCard("Contracted Hours", formatHours(total.contractedHours)),
-    renderKpiCard("Actual Hours", formatHours(total.actualHours)),
-    renderKpiCard("Utilisation", formatPercent(total.utilisation)),
-    renderKpiCard("Projected Scheduled", formatHours(total.projectedScheduledHours)),
-    renderKpiCard("Projected Contracted", formatHours(total.projectedContractedHours)),
-    renderKpiCard("Revenue", formatCurrency(total.revenue)),
-    renderKpiCard("Labour + On-Cost", formatCurrency(total.labourWithOnCost)),
-    renderKpiCard("Travel", formatCurrency(total.travelExpense)),
-    renderKpiCard("Actual Profit", formatProfitCurrency(total.profit), { isNegativeProfit: total.profit < 0 }),
-    renderKpiCard("Projected Profit", formatProfitCurrency(total.projectedProfit), {
-      isNegativeProfit: total.projectedProfit < 0,
-    })
-  );
+  const cards = [];
+  if (flags.hasActual) {
+    cards.push(
+      renderKpiCard("Confirmed Hours", formatHours(total.confirmedHours)),
+      renderKpiCard("Contracted Hours", formatHours(total.contractedHours)),
+      renderKpiCard("Actual Hours", formatHours(total.actualHours)),
+      renderKpiCard("Utilisation", formatPercent(total.utilisation)),
+      renderKpiCard("Revenue", formatCurrency(total.revenue)),
+      renderKpiCard("Labour + On-Cost", formatCurrency(total.labourWithOnCost)),
+      renderKpiCard("Actual Profit", formatProfitCurrency(total.profit), { isNegativeProfit: total.profit < 0 })
+    );
+  }
+  if (flags.hasPayroll) {
+    cards.push(renderKpiCard("Travel", formatCurrency(total.travelExpense)));
+  }
+  if (flags.hasProjected) {
+    cards.push(
+      renderKpiCard("Projected Scheduled", formatHours(total.projectedScheduledHours)),
+      renderKpiCard("Projected Contracted", formatHours(total.projectedContractedHours)),
+      renderKpiCard("Projected Profit", formatProfitCurrency(total.projectedProfit), {
+        isNegativeProfit: total.projectedProfit < 0,
+      })
+    );
+  }
+  container.append(...cards);
 }
 
 function buildTotalFromCarers(carers, assumptions) {
@@ -706,6 +721,12 @@ function appendCell(row, value) {
   row.appendChild(cell);
 }
 
+function appendOptionalCell(row, value, column, flags) {
+  if (isColumnVisible(column, flags)) {
+    appendCell(row, value);
+  }
+}
+
 function appendProfitCell(row, value) {
   const cell = document.createElement("td");
   cell.textContent = formatProfitCurrency(value);
@@ -713,6 +734,12 @@ function appendProfitCell(row, value) {
     cell.classList.add("is-negative-profit");
   }
   row.appendChild(cell);
+}
+
+function appendOptionalProfitCell(row, value, column, flags) {
+  if (isColumnVisible(column, flags)) {
+    appendProfitCell(row, value);
+  }
 }
 
 function appendActualHoursCell(row, carer) {
@@ -732,31 +759,60 @@ function appendActualHoursCell(row, carer) {
   row.appendChild(cell);
 }
 
-function renderAreaRows(rows) {
+function appendOptionalActualHoursCell(row, carer, flags) {
+  if (isColumnVisible("actual", flags)) {
+    appendActualHoursCell(row, carer);
+  }
+}
+
+function isColumnVisible(column, flags = {}) {
+  if (column === "actual") {
+    return Boolean(flags.hasActual);
+  }
+  if (column === "projected") {
+    return Boolean(flags.hasProjected);
+  }
+  if (column === "travel") {
+    return Boolean(flags.hasPayroll);
+  }
+  return true;
+}
+
+function updateColumnVisibility(flags) {
+  document.querySelectorAll("[data-column]").forEach((element) => {
+    element.classList.toggle("is-hidden-column", !isColumnVisible(element.dataset.column, flags));
+  });
+}
+
+function renderAreaRows(rows, flags = latestReport?.flags || {}) {
   areaSummaryBody.innerHTML = "";
   sortedRows(rows, "area").forEach((area) => {
     const tr = document.createElement("tr");
     appendCell(tr, area.area);
     appendCell(tr, String(area.carerCount));
-    appendCell(tr, formatHours(area.confirmedHours));
-    appendCell(tr, formatHours(area.contractedHours));
-    appendCell(tr, formatHours(area.actualHours));
-    appendCell(tr, formatPercent(area.utilisation));
-    appendCell(tr, formatHours(area.projectedScheduledHours));
-    appendCell(tr, formatHours(area.projectedContractedHours));
-    appendCell(tr, formatCurrency(area.revenue));
-    appendCell(tr, formatCurrency(area.labourWithOnCost));
-    appendCell(tr, formatCurrency(area.travelExpense));
-    appendProfitCell(tr, area.profit);
-    appendProfitCell(tr, area.projectedProfit);
+    appendOptionalCell(tr, formatHours(area.confirmedHours), "actual", flags);
+    appendOptionalCell(tr, formatHours(area.contractedHours), "actual", flags);
+    appendOptionalCell(tr, formatHours(area.actualHours), "actual", flags);
+    appendOptionalCell(tr, formatPercent(area.utilisation), "actual", flags);
+    appendOptionalCell(tr, formatHours(area.projectedScheduledHours), "projected", flags);
+    appendOptionalCell(tr, formatHours(area.projectedContractedHours), "projected", flags);
+    appendOptionalCell(tr, formatCurrency(area.revenue), "actual", flags);
+    appendOptionalCell(tr, formatCurrency(area.labourWithOnCost), "actual", flags);
+    appendOptionalCell(tr, formatCurrency(area.travelExpense), "travel", flags);
+    appendOptionalProfitCell(tr, area.profit, "actual", flags);
+    appendOptionalProfitCell(tr, area.projectedProfit, "projected", flags);
     areaSummaryBody.appendChild(tr);
   });
 }
 
-function renderCarerRows(rows) {
+function renderCarerRows(rows, flags = latestReport?.flags || {}) {
   carerSummaryBody.innerHTML = "";
   sortedRows(rows, "carer").forEach((carer) => {
     const tr = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    nameCell.className = "profitability-sticky-column";
+    nameCell.textContent = carer.name;
+    tr.appendChild(nameCell);
     const selectCell = document.createElement("td");
     selectCell.className = "selection-cell";
     const checkbox = document.createElement("input");
@@ -768,16 +824,15 @@ function renderCarerRows(rows) {
     tr.appendChild(selectCell);
     appendCell(tr, carer.area);
     appendCell(tr, carer.id || "");
-    appendCell(tr, carer.name);
-    appendCell(tr, formatHours(carer.confirmedHours));
-    appendCell(tr, formatHours(carer.contractedHours));
-    appendActualHoursCell(tr, carer);
-    appendCell(tr, formatPercent(carer.utilisation));
-    appendCell(tr, formatHours(carer.projectedScheduledHours));
-    appendCell(tr, formatHours(carer.projectedContractedHours));
-    appendCell(tr, formatCurrency(carer.travelExpense));
-    appendProfitCell(tr, carer.profit);
-    appendProfitCell(tr, carer.projectedProfit);
+    appendOptionalCell(tr, formatHours(carer.confirmedHours), "actual", flags);
+    appendOptionalCell(tr, formatHours(carer.contractedHours), "actual", flags);
+    appendOptionalActualHoursCell(tr, carer, flags);
+    appendOptionalCell(tr, formatPercent(carer.utilisation), "actual", flags);
+    appendOptionalCell(tr, formatHours(carer.projectedScheduledHours), "projected", flags);
+    appendOptionalCell(tr, formatHours(carer.projectedContractedHours), "projected", flags);
+    appendOptionalCell(tr, formatCurrency(carer.travelExpense), "travel", flags);
+    appendOptionalProfitCell(tr, carer.profit, "actual", flags);
+    appendOptionalProfitCell(tr, carer.projectedProfit, "projected", flags);
     carerSummaryBody.appendChild(tr);
   });
 }
@@ -797,7 +852,7 @@ function syncSelectedCarers(carers) {
     clearSelectedCarersBtn.disabled = !carers.length || selectedCarerKeys.size === 0;
   }
   if (bringActualUpBtn) {
-    bringActualUpBtn.disabled = !carers.length;
+    bringActualUpBtn.disabled = !carers.length || !latestReport?.flags?.hasActual;
   }
 }
 
@@ -810,13 +865,13 @@ function renderSelectedTotals(report) {
   const total = buildTotalFromCarers(selectedCarers, report.assumptions);
   const label =
     selectedCarers.length === report.carers.length
-      ? "all carers"
-      : `${selectedCarers.length} selected carer${selectedCarers.length === 1 ? "" : "s"}`;
+      ? "all associates"
+      : `${selectedCarers.length} selected associate${selectedCarers.length === 1 ? "" : "s"}`;
 
   selectedTotalMessage.textContent = selectedCarers.length
     ? `Totals for ${label}.`
-    : "No carers selected.";
-  renderKpiSet(selectedTotalGrid, total);
+    : "No associates selected.";
+  renderKpiSet(selectedTotalGrid, total, report.flags);
 }
 
 function renderReport() {
@@ -835,13 +890,14 @@ function renderReport() {
     return;
   }
 
-  renderKpiSet(grandTotalGrid, report.grandTotal);
+  updateColumnVisibility(report.flags);
+  renderKpiSet(grandTotalGrid, report.grandTotal, report.flags);
   syncSelectedCarers(report.carers);
-  renderAreaRows(report.areas);
-  renderCarerRows(report.carers);
+  renderAreaRows(report.areas, report.flags);
+  renderCarerRows(report.carers, report.flags);
   renderSelectedTotals(report);
   updateSortButtons();
-  reportSummaryMessage.textContent = `${report.carers.length} carer row(s), ${report.areas.length} area(s). Actual hours drive utilisation and cost. Payroll hours replace contracted hours where higher; central contracted hours are ignored.`;
+  reportSummaryMessage.textContent = `${report.carers.length} associate row(s), ${report.areas.length} area/role group(s). Actual hours drive actual profitability. Projected contracted hours are raised to projected scheduled hours where scheduled is higher.`;
   reportOutputPanel.hidden = false;
   exportReportBtn.disabled = false;
 }
@@ -881,7 +937,7 @@ async function handleProjectedHoursUpload() {
     projectedHoursRows = parsed.rows;
     renderReport();
     const warning = parsed.errors.length ? ` ${parsed.errors[0]}` : "";
-    setUploadStatus(`Loaded ${projectedHoursRows.length} projected carer row(s).${warning}`);
+    setUploadStatus(`Loaded ${projectedHoursRows.length} projected associate row(s).${warning}`);
   } catch (error) {
     projectedHoursRows = [];
     renderReport();
@@ -925,9 +981,9 @@ function buildExportRows() {
     rows.push({
       Level: level,
       Area: row.area || "",
-      "Carer ID": row.id || "",
-      Carer: row.name || row.carer || "",
-      "Carer Count": row.carerCount || "",
+      "Associate ID": row.id || "",
+      Associate: row.name || row.carer || "",
+      "Associate Count": row.carerCount || "",
       "Confirmed Hours": toCsvNumber(row.confirmedHours),
       "Contracted Hours": toCsvNumber(row.contractedHours),
       "Actual Hours": toCsvNumber(row.actualHours),
@@ -956,7 +1012,39 @@ function buildExportRows() {
 
   addRow("Grand Total", { ...latestReport.grandTotal, carer: "Grand Total" });
   latestReport.areas.forEach((area) => addRow("Area", area));
-  latestReport.carers.forEach((carer) => addRow("Carer", carer));
+  latestReport.carers.forEach((carer) => addRow("Associate", carer));
+  rows.forEach((row) => {
+    if (!latestReport.flags.hasActual) {
+      [
+        "Confirmed Hours",
+        "Contracted Hours",
+        "Actual Hours",
+        "Utilisation %",
+        "Revenue",
+        "Base Labour Cost",
+        "On Cost",
+        "Actual Profit",
+      ].forEach((header) => {
+        delete row[header];
+      });
+    }
+    if (!latestReport.flags.hasProjected) {
+      [
+        "Projected Scheduled Hours",
+        "Projected Contracted Hours",
+        "Projected Utilisation %",
+        "Projected Revenue",
+        "Projected Labour Cost",
+        "Projected Profit",
+      ].forEach((header) => {
+        delete row[header];
+      });
+    }
+    if (!latestReport.flags.hasPayroll) {
+      delete row["Travel Expense"];
+      delete row["Payroll Total Hours"];
+    }
+  });
   return rows;
 }
 
@@ -1083,7 +1171,7 @@ carerSummaryBody?.addEventListener("change", (event) => {
 });
 
 bringActualUpBtn?.addEventListener("click", () => {
-  if (!latestReport) {
+  if (!latestReport?.flags?.hasActual) {
     return;
   }
 
@@ -1128,10 +1216,10 @@ document.querySelectorAll("[data-sort-table][data-sort-key]").forEach((button) =
 
     if (latestReport) {
       if (table === "area") {
-        renderAreaRows(latestReport.areas);
+        renderAreaRows(latestReport.areas, latestReport.flags);
       }
       if (table === "carer") {
-        renderCarerRows(latestReport.carers);
+        renderCarerRows(latestReport.carers, latestReport.flags);
       }
     }
     updateSortButtons();
