@@ -177,7 +177,8 @@ function renderHomeQuickLinks(role) {
     return;
   }
 
-  const isAdmin = String(role || "").trim().toLowerCase() === "admin";
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  const isAdmin = normalizedRole === "admin" || normalizedRole === "administrator";
   if (homeQuickLinksMessage) {
     homeQuickLinksMessage.textContent = isAdmin
       ? "Common admin destinations are pinned here for quicker access."

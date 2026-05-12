@@ -11,6 +11,7 @@ const STAGE_FIELD_MAP = {
   initial_screen: {
     outcome: "ScreenOutcome",
     nextSteps: "ScreenNextSteps",
+    firstInterviewDate: "_x0031_stInterviewDate",
   },
   first_interview: {
     outcome: "FirstInterviewOutcome",
@@ -24,6 +25,11 @@ const STAGE_FIELD_MAP = {
 
 function normalizeText(value) {
   return String(value || "").trim();
+}
+
+function normalizeDateOnly(value) {
+  const normalized = normalizeText(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
 function quoteODataString(value) {
@@ -115,6 +121,11 @@ module.exports = async (req, res) => {
       body: JSON.stringify({
         [fieldMap.outcome]: normalizeText(req.body?.outcome),
         [fieldMap.nextSteps]: normalizeText(req.body?.nextSteps),
+        ...(fieldMap.firstInterviewDate
+          ? {
+              [fieldMap.firstInterviewDate]: normalizeDateOnly(req.body?.firstInterviewDate),
+            }
+          : {}),
       }),
     });
 
@@ -125,6 +136,7 @@ module.exports = async (req, res) => {
       stageKey,
       outcome: normalizeText(req.body?.outcome),
       nextSteps: normalizeText(req.body?.nextSteps),
+      firstInterviewDate: normalizeDateOnly(req.body?.firstInterviewDate),
     });
   } catch (error) {
     res.status(Number(error?.status) || 502).json({

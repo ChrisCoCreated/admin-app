@@ -149,7 +149,11 @@ const MENU_GROUPS = [
 ];
 
 function normalizeRole(role) {
-  return String(role || "").trim().toLowerCase();
+  const normalized = String(role || "").trim().toLowerCase();
+  if (normalized === "administrator") {
+    return "admin";
+  }
+  return normalized;
 }
 
 function getDynamicAccessiblePages(role) {

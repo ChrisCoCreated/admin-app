@@ -1506,6 +1506,10 @@ dd {
   resize: vertical;
 }
 
+.recruitment-stage-inline-date input {
+  min-height: 38px;
+}
+
 .recruitment-stage-editor-actions {
   display: flex;
   justify-content: flex-end;

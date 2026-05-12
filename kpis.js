@@ -106,6 +106,10 @@ function formatDateTime(value) {
   }).format(date);
 }
 
+function removeYearFromDateLabel(value) {
+  return cleanText(value).replace(/\s+\d{4}$/, "");
+}
+
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
   statusMessage.classList.toggle("error", isError);
@@ -123,7 +127,7 @@ function staleLabel(metric) {
   if (!metric?.stale) {
     return "";
   }
-  return metric.sourceWeekLabel ? `Stale, from ${metric.sourceWeekLabel}` : "Stale data";
+  return metric.sourceWeekLabel ? `Stale, from ${removeYearFromDateLabel(metric.sourceWeekLabel)}` : "Stale data";
 }
 
 function sourceLabel(metric, latestWeekLabelText) {

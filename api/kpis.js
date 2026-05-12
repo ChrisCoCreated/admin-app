@@ -40,6 +40,7 @@ function normalizeToken(value) {
   return cleanText(value)
     .toLowerCase()
     .replace(/&amp;/g, "and")
+    .replace(/%/g, "percent")
     .replace(/[^a-z0-9]/g, "");
 }
 

@@ -461,12 +461,14 @@ function getStageTone(value) {
 }
 
 function renderStageSummary(candidate) {
+  const firstInterviewDate = cleanText(candidate?.firstInterviewDate);
   const stages = [
     {
       key: "initial_screen",
       label: "Initial Screen",
       outcome: cleanText(candidate?.screenOutcome),
       nextSteps: cleanText(candidate?.screenNextSteps),
+      firstInterviewDate,
     },
     {
       key: "first_interview",
@@ -490,6 +492,8 @@ function renderStageSummary(candidate) {
           const tone = getStageTone(stage.outcome);
           const isEmpty = !stage.outcome && !stage.nextSteps;
           const nextSteps = stage.nextSteps || "";
+          const shouldShowFirstInterviewDate =
+            stage.key === "initial_screen" && stage.outcome === "Progress" && !cleanText(stage.firstInterviewDate);
           const busyKey = `${cleanText(candidate?.id)}:${stage.key}`;
           const isBusy = stageUpdateBusyKey === busyKey;
           const openKey = `${cleanText(candidate?.id)}:${stage.key}`;
@@ -518,6 +522,14 @@ function renderStageSummary(candidate) {
                   Next Steps
                   <textarea data-stage-next-steps placeholder="Add notes or next steps...">${escapeHtml(nextSteps)}</textarea>
                 </label>
+                ${
+                  shouldShowFirstInterviewDate
+                    ? `<label class="field compact-field recruitment-stage-inline-date">
+                        1st Interview Date
+                        <input data-stage-first-interview-date type="date" value="${escapeHtml(cleanText(stage.firstInterviewDate))}" />
+                      </label>`
+                    : ""
+                }
                 <div class="recruitment-stage-editor-actions">
                   <button type="button" class="secondary recruitment-stage-save-btn" data-stage-save${isBusy ? " disabled" : ""}>${
                     isBusy ? "Saving..." : "Save"
@@ -590,13 +602,16 @@ function setStatus(message, isError = false, options = {}) {
   }
 }
 
-function applyStageUpdateToCandidate(candidate, stageKey, outcome, nextSteps) {
+function applyStageUpdateToCandidate(candidate, stageKey, outcome, nextSteps, firstInterviewDate = "") {
   if (!candidate) {
     return;
   }
   if (stageKey === "initial_screen") {
     candidate.screenOutcome = outcome;
     candidate.screenNextSteps = nextSteps;
+    if (cleanText(firstInterviewDate)) {
+      candidate.firstInterviewDate = cleanText(firstInterviewDate);
+    }
     return;
   }
   if (stageKey === "first_interview") {
@@ -2167,9 +2182,10 @@ async function previewImportRows(rows) {
   }
 }
 
-async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps) {
+async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps, firstInterviewDate = "") {
   const cleanItemId = cleanText(itemId);
   const cleanStageKey = cleanText(stageKey);
+  const cleanFirstInterviewDate = cleanText(firstInterviewDate);
   if (!cleanItemId || !cleanStageKey) {
     return;
   }
@@ -2178,13 +2194,14 @@ async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps) {
     ? {
         screenOutcome: candidate.screenOutcome,
         screenNextSteps: candidate.screenNextSteps,
+        firstInterviewDate: candidate.firstInterviewDate,
         firstInterviewOutcome: candidate.firstInterviewOutcome,
         firstInterviewNextSteps: candidate.firstInterviewNextSteps,
         secondInterviewOutcome: candidate.secondInterviewOutcome,
         secondInterviewNextSteps: candidate.secondInterviewNextSteps,
       }
     : null;
-  applyStageUpdateToCandidate(candidate, cleanStageKey, cleanText(outcome), cleanText(nextSteps));
+  applyStageUpdateToCandidate(candidate, cleanStageKey, cleanText(outcome), cleanText(nextSteps), cleanFirstInterviewDate);
   openStageKeys.add(`${cleanItemId}:${cleanStageKey}`);
   stageUpdateBusyKey = `${cleanItemId}:${cleanStageKey}`;
   renderCandidates();
@@ -2194,6 +2211,7 @@ async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps) {
       stageKey: cleanStageKey,
       outcome: cleanText(outcome),
       nextSteps: cleanText(nextSteps),
+      firstInterviewDate: cleanFirstInterviewDate,
     });
     renderCandidates();
     setStatus("Stage notes saved.", false, { subtle: true });
@@ -2794,7 +2812,8 @@ recruitmentTableBody?.addEventListener("click", async (event) => {
     const stageKey = cleanText(card.getAttribute("data-stage-key"));
     const outcome = cleanText(card.querySelector("[data-stage-outcome]")?.value);
     const nextSteps = cleanText(card.querySelector("[data-stage-next-steps]")?.value);
-    await saveRecruitmentStage(itemId, stageKey, outcome, nextSteps);
+    const firstInterviewDate = cleanText(card.querySelector("[data-stage-first-interview-date]")?.value);
+    await saveRecruitmentStage(itemId, stageKey, outcome, nextSteps, firstInterviewDate);
     return;
   }
 
