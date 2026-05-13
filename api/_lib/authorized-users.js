@@ -2,6 +2,7 @@ const ACCESS_ENV_KEYS = [
   "ACCESS_FULL_EMAILS",
   "ACCESS_DIRECTOR_EMAILS",
   "ACCESS_MARKETING_EMAILS",
+  "ACCESS_OPERATIONS_EMAILS",
   "ACCESS_PHOTO_LAYOUT_EMAILS",
   "ACCESS_FINANCE_EMAILS",
   "ACCESS_TIME_EMAILS",
@@ -14,7 +15,7 @@ const ACCESS_ENV_KEYS = [
 const ROLE_BY_PAGE_KEY = new Map(
   [
     ["clients,carers,whiteboard,simpletasks,tasks,mapping,drivetime,reports,marketing,photolayout", "admin"],
-    ["marketing,photolayout", "marketing"],
+    ["marketing,photolayout,reports", "marketing"],
     ["photolayout", "photo_layout"],
     ["finance", "finance"],
     ["mapping,drivetime", "time_only"],
@@ -65,9 +66,13 @@ function resolveRoleFromFlags(flags) {
     return "director";
   }
 
+  if (flags.operations) {
+    return "operations";
+  }
+
   const pages = [];
   if (flags.marketing) {
-    pages.push("marketing", "photolayout");
+    pages.push("marketing", "photolayout", "reports");
   }
   if (flags.photoLayout) {
     pages.push("photolayout");
@@ -104,6 +109,7 @@ function buildAuthorizedUsersFromEnv() {
         full: false,
         director: false,
         marketing: false,
+        operations: false,
         photoLayout: false,
         finance: false,
         time: false,
@@ -120,6 +126,7 @@ function buildAuthorizedUsersFromEnv() {
   mark(parseEmailList(process.env.ACCESS_FULL_EMAILS), "full");
   mark(parseEmailList(process.env.ACCESS_DIRECTOR_EMAILS), "director");
   mark(parseEmailList(process.env.ACCESS_MARKETING_EMAILS), "marketing");
+  mark(parseEmailList(process.env.ACCESS_OPERATIONS_EMAILS), "operations");
   mark(parseEmailList(process.env.ACCESS_PHOTO_LAYOUT_EMAILS), "photoLayout");
   mark(parseEmailList(process.env.ACCESS_FINANCE_EMAILS), "finance");
   mark(parseEmailList(process.env.ACCESS_TIME_EMAILS), "time");
