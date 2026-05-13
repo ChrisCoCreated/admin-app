@@ -386,6 +386,7 @@ function buildTrendSeries(rows) {
     .map((row) => ({
       weekCommencing: row.weekCommencing,
       weekLabel: row.weekLabel,
+      hoursDeliveredPercent: parseNumber(deriveHoursDeliveredPercent(row)),
       totalHours: parseNumber(deriveTotalHours(row)),
       hoursWon: parseNumber(getFieldValue(row, "hoursWon")),
       hoursLost: parseNumber(getFieldValue(row, "hoursLost")),

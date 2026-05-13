@@ -6,6 +6,7 @@ import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260512";
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("kpiStatusMessage");
 const refreshKpisBtn = document.getElementById("refreshKpisBtn");
+const generateKpiPdfBtn = document.getElementById("generateKpiPdfBtn");
 const kpiListLink = document.getElementById("kpiListLink");
 const latestWeekLabel = document.getElementById("latestWeekLabel");
 const refreshedAtLabel = document.getElementById("refreshedAtLabel");
@@ -424,6 +425,12 @@ function renderDelivery(payload) {
       tone: "delivery",
       latestWeekLabelText: latestLabel,
     }),
+    createKpiTrendCard({
+      title: "Delivery % Trend",
+      series: payload?.trendSeries,
+      field: "hoursDeliveredPercent",
+      formatter: formatPercent,
+    }),
     createKpiNoteCard({
       title: "Dropped Hours Detail",
       metric: metricValue(payload, "droppedHoursReasons"),
@@ -437,7 +444,7 @@ function renderBusiness(payload) {
   const latestLabel = payload?.latestWeekLabel || "";
   appendChildren(businessKpis, [
     createKpiMetricCard({
-      title: "Total Hours",
+      title: "Total Contracted Hours",
       value: formatHours(metricValue(payload, "totalHours")?.value),
       detail: `${formatHours(metricValue(payload, "hoursDelivered")?.value)} delivered + ${formatHours(
         metricValue(payload, "subscriptionHours")?.value
@@ -476,7 +483,7 @@ function renderBusiness(payload) {
 
   appendChildren(businessTrendKpis, [
     createKpiTrendCard({
-      title: "Total Hours Trend",
+      title: "Total Contracted Hours Trend",
       series: payload?.trendSeries,
       field: "totalHours",
       formatter: formatHours,
@@ -601,6 +608,11 @@ async function init() {
 
 refreshKpisBtn?.addEventListener("click", () => {
   void loadKpis();
+});
+
+generateKpiPdfBtn?.addEventListener("click", () => {
+  closeTrendModal();
+  window.print();
 });
 
 document.addEventListener("keydown", (event) => {

@@ -2691,6 +2691,8 @@ dd {
   .topbar,
   #signOutBtn,
   #primaryNav,
+  .kpi-head-actions,
+  .kpi-modal,
   .screen-header-actions,
   .screen-contact-actions,
   .screen-actions,
@@ -2708,6 +2710,8 @@ dd {
   }
 
   .panel,
+  .kpi-card,
+  .kpi-trend-card,
   .screen-question-card,
   .screen-score-summary,
   .screen-print-summary {
@@ -2757,6 +2761,31 @@ dd {
   .score-chip-group.has-selection .score-chip:not(.is-active),
   .score-pill-neutral {
     filter: none !important;
+  }
+
+  .kpi-main {
+    padding-bottom: 0;
+  }
+
+  .kpi-page-head,
+  .panel,
+  .kpi-summary-strip > div,
+  .kpi-card,
+  .kpi-trend-card {
+    box-shadow: none !important;
+  }
+
+  .kpi-card-grid,
+  .kpi-trend-grid,
+  .kpi-two-column,
+  .kpi-summary-strip {
+    break-inside: avoid;
+  }
+
+  .kpi-card,
+  .kpi-trend-card,
+  .panel {
+    break-inside: avoid;
   }
 }
 
