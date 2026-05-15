@@ -48,10 +48,12 @@ const mapsGeocodeBatchHandler = require("./api/maps/geocode-batch");
 const mapsJourneyTimesHandler = require("./api/maps/journey-times");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 const consultantReportDocxHandler = require("./api/consultant/report-docx");
+const aiChatHandler = require("./api/ai/chat");
 const wellbeingIntakeParseHandler = require("./api/wellbeing-intake/parse");
 const scorecardHandler = require("./api/scorecard");
 const scorecardDefinitionsHandler = require("./api/scorecard/definitions");
 const kpisHandler = require("./api/kpis");
+const pseudonymiserHandler = require("./api/pseudonymiser");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -538,11 +540,29 @@ async function handleApi(req, res, reqUrl) {
     return true;
   }
 
+  if (reqUrl.pathname === "/api/ai/chat") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await aiChatHandler(apiReq, apiRes);
+    return true;
+  }
+
   if (reqUrl.pathname === "/api/wellbeing-intake/parse") {
     if (req.method === "POST") {
       apiReq.body = await readJsonBody(req);
     }
     await wellbeingIntakeParseHandler(apiReq, apiRes);
+    return true;
+  }
+
+  const pseudonymiserMatch = /^\/api\/pseudonymiser\/([^/]+)$/.exec(reqUrl.pathname);
+  if (pseudonymiserMatch) {
+    apiReq.query.action = decodeURIComponent(pseudonymiserMatch[1]);
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await pseudonymiserHandler(apiReq, apiRes);
     return true;
   }
 

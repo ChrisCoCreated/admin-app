@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Client Data</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260324" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container client-data-main">
+      <section class="hero compact">
+        <h1>Client Data</h1>
+        <p>Pseudonymise care notes before LLM use, then restore placeholder output locally.</p>
+      </section>
+
+      <section class="panel client-data-status-panel">
+        <div class="client-data-status">
+          <span id="riskBadge" class="risk-badge risk-badge-low">Ready</span>
+          <p id="statusMessage" class="muted">Paste a note to begin.</p>
+        </div>
+        <button id="clearBtn" class="secondary" type="button">Clear</button>
+      </section>
+
+      <section class="client-data-grid" aria-label="Pseudonymiser workspace">
+        <article class="panel client-data-pane">
+          <div class="panel-head">
+            <div>
+              <h2>Original Text</h2>
+              <p id="inputCount" class="muted">0 characters</p>
+            </div>
+            <button id="exampleBtn" class="secondary" type="button">Example</button>
+          </div>
+          <textarea id="sourceText" class="client-data-textarea" spellcheck="false" aria-label="Original client note"></textarea>
+          <div class="row wrap-row">
+            <button id="pseudonymiseBtn" type="button">Pseudonymise</button>
+          </div>
+        </article>
+
+        <article class="panel client-data-pane">
+          <div class="panel-head">
+            <div>
+              <h2>Pseudonymised Text</h2>
+              <p id="outputCount" class="muted">0 characters</p>
+            </div>
+            <button id="copyLlmBtn" class="secondary" type="button" disabled>Copy for LLM</button>
+          </div>
+          <textarea id="reviewText" class="client-data-textarea" spellcheck="false" aria-label="Pseudonymised client note" placeholder="Pseudonymised output will appear here."></textarea>
+          <div class="manual-identifier-grid">
+            <label class="field" for="manualIdentifierText">
+              Missed text
+              <input id="manualIdentifierText" type="text" autocomplete="off" />
+            </label>
+            <label class="field" for="manualIdentifierCategory">
+              Placeholder
+              <select id="manualIdentifierCategory"></select>
+            </label>
+            <button id="addManualIdentifierBtn" class="secondary" type="button" disabled>Add identifier</button>
+          </div>
+          <label class="field" for="preferredNameInput">
+            Preferred client name
+            <input id="preferredNameInput" type="text" autocomplete="off" />
+          </label>
+        </article>
+      </section>
+
+      <section class="panel" id="summaryPanel" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Detection Summary</h2>
+            <p id="summaryMessage" class="muted">Review any residual identifiers before copying.</p>
+          </div>
+        </div>
+        <div id="countGrid" class="client-data-count-grid"></div>
+        <div class="client-data-summary-grid">
+          <div>
+            <h3 class="subheading">Residual Review</h3>
+            <div id="residualList" class="client-data-list"></div>
+          </div>
+          <div>
+            <h3 class="subheading">Local Restoration Map</h3>
+            <div id="mappingList" class="client-data-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Restore</h2>
+            <p id="restoreStatus" class="muted">Paste placeholder-bearing output to restore with the local map.</p>
+          </div>
+          <button id="copyRestoredBtn" class="secondary" type="button" disabled>Copy restored</button>
+        </div>
+        <div class="client-data-grid client-data-grid-restore">
+          <label class="field" for="placeholderText">
+            Text with placeholders
+            <textarea id="placeholderText" class="client-data-textarea restore-textarea" spellcheck="false"></textarea>
+          </label>
+          <label class="field" for="restoredText">
+            Restored text
+            <textarea id="restoredText" class="client-data-textarea restore-textarea" readonly spellcheck="false"></textarea>
+          </label>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./client-data.js"></script>
+  </body>
+</html>

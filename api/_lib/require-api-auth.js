@@ -8,6 +8,7 @@ const API_AUTH_DEBUG = process.env.API_AUTH_DEBUG === "1";
 const ROLE_PAGES = {
   admin: [
     "clients",
+    "clientdata",
     "carers",
     "timesheets",
     "recruitment",
@@ -34,6 +35,7 @@ const ROLE_PAGES = {
   ],
   care_manager: [
     "clients",
+    "clientdata",
     "carers",
     "timesheets",
     "recruitment",
@@ -52,6 +54,7 @@ const ROLE_PAGES = {
   ],
   operations: [
     "clients",
+    "clientdata",
     "carers",
     "timesheets",
     "recruitment",
@@ -75,12 +78,12 @@ const ROLE_PAGES = {
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
   hr_only: ["carers", "timesheets", "recruitment", "agendas"],
-  clients_only: ["clients", "agendas"],
+  clients_only: ["clients", "clientdata", "agendas"],
   enquiries_only: ["enquiries", "agendas"],
-  hr_clients: ["clients", "carers", "timesheets", "recruitment", "agendas"],
-  time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
+  hr_clients: ["clients", "clientdata", "carers", "timesheets", "recruitment", "agendas"],
+  time_clients: ["clients", "clientdata", "timesheets", "mapping", "drivetime", "agendas"],
   time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
-  time_hr_clients: ["clients", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
+  time_hr_clients: ["clients", "clientdata", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
   logged_in: ["drivetime"],
 };
 const ACCESS_PAGE_EXPANSIONS = {
@@ -90,7 +93,7 @@ const ACCESS_PAGE_EXPANSIONS = {
   mapping: ["timesheets", "mapping", "drivetime", "agendas"],
   drivetime: ["timesheets", "mapping", "drivetime", "agendas"],
   carers: ["carers", "timesheets", "recruitment", "agendas"],
-  clients: ["clients", "agendas"],
+  clients: ["clients", "clientdata", "agendas"],
   enquiries: ["enquiries", "agendas"],
   consultant: ["consultant", "agendas"],
 };

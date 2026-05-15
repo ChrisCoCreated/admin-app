@@ -7,6 +7,7 @@ import {
 const ROLE_PAGES = {
   admin: [
     "clients",
+    "clientdata",
     "carers",
     "timesheets",
     "recruitment",
@@ -33,6 +34,7 @@ const ROLE_PAGES = {
   ],
   care_manager: [
     "clients",
+    "clientdata",
     "carers",
     "timesheets",
     "recruitment",
@@ -51,6 +53,7 @@ const ROLE_PAGES = {
   ],
   operations: [
     "clients",
+    "clientdata",
     "carers",
     "timesheets",
     "recruitment",
@@ -74,12 +77,12 @@ const ROLE_PAGES = {
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
   hr_only: ["carers", "timesheets", "recruitment", "agendas"],
-  clients_only: ["clients", "agendas"],
+  clients_only: ["clients", "clientdata", "agendas"],
   enquiries_only: ["enquiries", "agendas"],
-  hr_clients: ["clients", "carers", "timesheets", "recruitment", "agendas"],
-  time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
+  hr_clients: ["clients", "clientdata", "carers", "timesheets", "recruitment", "agendas"],
+  time_clients: ["clients", "clientdata", "timesheets", "mapping", "drivetime", "agendas"],
   time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
-  time_hr_clients: ["clients", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
+  time_hr_clients: ["clients", "clientdata", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
   logged_in: ["drivetime"],
 };
 
@@ -90,13 +93,14 @@ const ACCESS_PAGE_EXPANSIONS = {
   mapping: ["timesheets", "mapping", "drivetime", "agendas"],
   drivetime: ["timesheets", "mapping", "drivetime", "agendas"],
   carers: ["carers", "timesheets", "recruitment", "agendas"],
-  clients: ["clients", "agendas"],
+  clients: ["clients", "clientdata", "agendas"],
   enquiries: ["enquiries", "agendas"],
   consultant: ["consultant", "agendas"],
 };
 
 const PAGE_META = {
   clients: { href: "./clients.html", label: "Clients" },
+  clientdata: { href: "./client-data.html", label: "Client Data" },
   carers: { href: "./carers.html", label: "Carers" },
   timesheets: { href: "./timesheets.html", label: "Timesheets" },
   recruitment: { href: "./recruitment.html", label: "Recruitment" },
@@ -128,7 +132,7 @@ const MAX_STANDARD_ROLE_HOME_PAGES = 8;
 const MENU_GROUPS = [
   {
     title: "People",
-    pages: ["clients", "carers", "recruitment", "wellbeingintake", "enquiries", "suppliers", "consultant"],
+    pages: ["clients", "clientdata", "carers", "recruitment", "wellbeingintake", "enquiries", "suppliers", "consultant"],
   },
   {
     title: "Planning",

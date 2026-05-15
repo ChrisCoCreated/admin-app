@@ -331,6 +331,20 @@ export function createDirectoryApi(authController) {
       return response.blob();
     },
 
+    async createAiChatCompletion(payload = {}) {
+      const response = await authFetch(endpoint("/api/ai/chat"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "AI chat request failed");
+      }
+      return response.json();
+    },
+
     async parseWellbeingIntake(payload = {}) {
       const response = await authFetch(endpoint("/api/wellbeing-intake/parse"), {
         method: "POST",

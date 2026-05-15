@@ -17,6 +17,7 @@ const directoryApi = createDirectoryApi(authController);
 
 const PAGE_LABELS = {
   clients: "Clients",
+  clientdata: "Client Data",
   recruitment: "Recruitment",
   kpis: "Weekly KPIs",
   problems: "Problems to Solve",

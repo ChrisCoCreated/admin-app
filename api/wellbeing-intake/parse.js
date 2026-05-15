@@ -1,7 +1,8 @@
 const { requireApiAuth } = require("../_lib/require-api-auth");
+const { createChatCompletion } = require("../_lib/deepseek-client");
 
 const ALLOWED_TYPES = new Set(["Text", "Note", "Choice", "MultiChoice", "Boolean", "DateTime", "Number", "Currency", "URL"]);
-const DEFAULT_MODEL = "deepseek-chat";
+const DEFAULT_MODEL = "deepseek-v4-flash";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -97,24 +98,6 @@ function buildPrompt({ sourceText, fields }) {
     "Pasted text:",
     sourceText,
   ].join("\n");
-}
-
-function extractResponseText(payload) {
-  if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
-    return payload.output_text.trim();
-  }
-
-  const outputs = Array.isArray(payload?.output) ? payload.output : [];
-  for (const output of outputs) {
-    const content = Array.isArray(output?.content) ? output.content : [];
-    for (const item of content) {
-      if (typeof item?.text === "string" && item.text.trim()) {
-        return item.text.trim();
-      }
-    }
-  }
-
-  return "";
 }
 
 function parseJsonContent(content) {
@@ -504,50 +487,27 @@ function applyHeuristics({ values, fields, sourceText }) {
 }
 
 async function callDeepSeek({ fields, sourceText }) {
-  const apiKey = normalizeText(process.env.DEEPSEEK_API_KEY);
-  if (!apiKey) {
-    const error = new Error("Server missing DEEPSEEK_API_KEY for AI extraction.");
-    error.status = 500;
-    throw error;
-  }
-
-  const model = normalizeText(process.env.DEEPSEEK_MODEL || DEFAULT_MODEL);
-  const response = await fetch("https://api.deepseek.com/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+  const completion = await createChatCompletion({
+    model: normalizeText(process.env.DEEPSEEK_MODEL || DEFAULT_MODEL),
+    thinking: "disabled",
+    maxTokens: 1200,
+    responseFormat: {
+      type: "json_object",
     },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You extract structured list-entry drafts from free text. Return valid json only and match the requested object shape.",
-        },
-        {
-          role: "user",
-          content: buildPrompt({ sourceText, fields }),
-        },
-      ],
-      response_format: {
-        type: "json_object",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You extract structured list-entry drafts from free text. Return valid json only and match the requested object shape.",
       },
-      max_tokens: 1200,
-    }),
+      {
+        role: "user",
+        content: buildPrompt({ sourceText, fields }),
+      },
+    ],
   });
 
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const detail = payload?.error?.message || `DeepSeek request failed (${response.status}).`;
-    const error = new Error(detail);
-    error.status = response.status;
-    throw error;
-  }
-
-  const content = normalizeText(payload?.choices?.[0]?.message?.content) || extractResponseText(payload);
-  return parseJsonContent(content);
+  return parseJsonContent(normalizeText(completion.content) || normalizeText(completion.text));
 }
 
 module.exports = async (req, res) => {
