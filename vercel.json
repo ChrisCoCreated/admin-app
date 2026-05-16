@@ -2,6 +2,9 @@
   "functions": {
     "api/pseudonymiser/*.js": {
       "includeFiles": "api/_lib/pseudonymiser/**"
+    },
+    "api/pseudonymiser/*.py": {
+      "includeFiles": "api/_lib/pseudonymiser/**"
     }
   }
 }
