@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/pseudonymiser/*.js": {
+      "includeFiles": "api/_lib/pseudonymiser/**"
+    }
+  }
+}

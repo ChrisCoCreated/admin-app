@@ -10,6 +10,17 @@ function normalizeAction(value) {
   return String(value || "").replace(/^\/+|\/+$/g, "");
 }
 
+function getRouteAction(req) {
+  const queryAction = normalizeAction(req.query?.action);
+  if (queryAction) {
+    return queryAction;
+  }
+
+  const pathname = String(req.url || "").split("?")[0] || "";
+  const matched = /\/api\/pseudonymiser\/([^/]+)\/?$/.exec(pathname);
+  return normalizeAction(matched?.[1]);
+}
+
 function validateText(value) {
   if (typeof value !== "string" || !value.trim()) {
     return "Text is required.";
@@ -63,7 +74,7 @@ function runPseudonymiser(action, payload = {}) {
 }
 
 module.exports = async function pseudonymiserHandler(req, res) {
-  const action = normalizeAction(req.query.action);
+  const action = getRouteAction(req);
 
   if (action === "health") {
     res.status(200).json(await runPseudonymiser("health"));
