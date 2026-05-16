@@ -1156,6 +1156,39 @@ button.is-generating::after {
   gap: 18px;
 }
 
+.client-data-summary-panel {
+  padding: 0;
+}
+
+.client-data-summary-panel details {
+  padding: 18px;
+}
+
+.client-data-summary-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.client-data-summary-toggle h2,
+.client-data-summary-toggle p {
+  margin: 0;
+}
+
+.client-data-summary-toggle h2 {
+  margin-bottom: 4px;
+}
+
+.client-data-summary-toggle::marker {
+  color: #5f6b7a;
+}
+
+.client-data-summary-panel details:not([open]) .client-data-summary-toggle {
+  margin-bottom: 0;
+}
+
 .client-data-list {
   display: grid;
   gap: 8px;

@@ -88,24 +88,26 @@
         </article>
       </section>
 
-      <section class="panel" id="summaryPanel" hidden>
-        <div class="panel-head">
-          <div>
-            <h2>Detection Summary</h2>
-            <p id="summaryMessage" class="muted">Review any residual identifiers before copying.</p>
+      <section class="panel client-data-summary-panel" id="summaryPanel" hidden>
+        <details id="summaryDetails">
+          <summary class="client-data-summary-toggle">
+            <div>
+              <h2>Replacement Summary</h2>
+              <p id="summaryMessage" class="muted">Review any residual identifiers before copying.</p>
+            </div>
+          </summary>
+          <div id="countGrid" class="client-data-count-grid"></div>
+          <div class="client-data-summary-grid">
+            <div>
+              <h3 class="subheading">Residual Review</h3>
+              <div id="residualList" class="client-data-list"></div>
+            </div>
+            <div>
+              <h3 class="subheading">Local Restoration Map</h3>
+              <div id="mappingList" class="client-data-list"></div>
+            </div>
           </div>
-        </div>
-        <div id="countGrid" class="client-data-count-grid"></div>
-        <div class="client-data-summary-grid">
-          <div>
-            <h3 class="subheading">Residual Review</h3>
-            <div id="residualList" class="client-data-list"></div>
-          </div>
-          <div>
-            <h3 class="subheading">Local Restoration Map</h3>
-            <div id="mappingList" class="client-data-list"></div>
-          </div>
-        </div>
+        </details>
       </section>
 
       <section class="panel">

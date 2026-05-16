@@ -54,6 +54,7 @@ const riskBadge = document.getElementById("riskBadge");
 const inputCount = document.getElementById("inputCount");
 const outputCount = document.getElementById("outputCount");
 const summaryPanel = document.getElementById("summaryPanel");
+const summaryDetails = document.getElementById("summaryDetails");
 const summaryMessage = document.getElementById("summaryMessage");
 const countGrid = document.getElementById("countGrid");
 const residualList = document.getElementById("residualList");
@@ -182,6 +183,10 @@ function clearAll() {
   manualIdentifierText.value = "";
   result = null;
   manualMapping = {};
+  if (summaryDetails) {
+    delete summaryDetails.dataset.userOpened;
+    summaryDetails.open = false;
+  }
   setRiskBadge(null);
   setStatus("Paste a note to begin.");
   renderSummary();
@@ -205,6 +210,10 @@ async function pseudonymise() {
   try {
     result = await apiPost("/api/pseudonymiser/pseudonymise", { text });
     manualMapping = {};
+    if (summaryDetails) {
+      delete summaryDetails.dataset.userOpened;
+      summaryDetails.open = false;
+    }
     reviewText.value = result.pseudonymised_text || "";
     if (!preferredNameInput.value.trim()) {
       preferredNameInput.value = defaultPreferredName(result.mapping || {});
@@ -396,6 +405,9 @@ function updateRestore() {
 
 function renderSummary() {
   summaryPanel.hidden = !result;
+  if (result && summaryDetails && !summaryDetails.dataset.userOpened) {
+    summaryDetails.open = false;
+  }
   countGrid.innerHTML = "";
   residualList.innerHTML = "";
   mappingList.innerHTML = "";
@@ -529,6 +541,11 @@ copyRestoredBtn.addEventListener("click", () => {
   void copyRestored();
 });
 addManualIdentifierBtn.addEventListener("click", addManualIdentifier);
+summaryDetails?.addEventListener("toggle", () => {
+  if (summaryDetails.open) {
+    summaryDetails.dataset.userOpened = "true";
+  }
+});
 signOutBtn?.addEventListener("click", () => {
   authController.signOut({ redirectUri: `${window.location.origin}/index.html` }).catch(() => {});
 });
