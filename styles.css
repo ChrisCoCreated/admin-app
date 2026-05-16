@@ -1199,6 +1199,18 @@ button.is-generating::after {
   gap: 10px;
 }
 
+.client-data-report-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.client-data-report-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) auto;
+  align-items: end;
+  gap: 10px;
+}
+
 .client-data-count-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -7306,7 +7318,8 @@ body.lightbox-open {
 
   .client-data-grid,
   .client-data-summary-grid,
-  .manual-identifier-grid {
+  .manual-identifier-grid,
+  .client-data-report-controls {
     grid-template-columns: 1fr;
   }
 
@@ -7322,7 +7335,8 @@ body.lightbox-open {
 
   .client-data-status-panel > *,
   .client-data-list-row > *,
-  .manual-identifier-grid button {
+  .manual-identifier-grid button,
+  .client-data-report-controls button {
     width: 100%;
   }
 

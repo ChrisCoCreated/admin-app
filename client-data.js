@@ -35,6 +35,21 @@ const PLACEHOLDER_CATEGORY_OPTIONS = [
   "IDENTIFIER",
 ];
 
+const REPORT_MODES = {
+  "simple-summary": {
+    label: "Simple summary report",
+    instructions: [
+      "Report instructions:",
+      "Write a simple summary report from the pseudonymised text.",
+      "Use clear, professional language suitable for an internal care/admin note.",
+      "Summarise only information present in the text.",
+      "Do not add clinical facts, names, dates, locations, actions, risks, or opinions that are not in the text.",
+      "Keep all bracketed placeholders exactly as written.",
+      "Return only the report text, with no preamble.",
+    ].join("\n"),
+  },
+};
+
 const sourceText = document.getElementById("sourceText");
 const reviewOutput = document.getElementById("reviewOutput");
 const placeholderText = document.getElementById("placeholderText");
@@ -60,12 +75,16 @@ const countGrid = document.getElementById("countGrid");
 const residualList = document.getElementById("residualList");
 const mappingList = document.getElementById("mappingList");
 const restoreStatus = document.getElementById("restoreStatus");
+const reportStatus = document.getElementById("reportStatus");
+const reportModeSelect = document.getElementById("reportModeSelect");
+const generateReportBtn = document.getElementById("generateReportBtn");
 
 let account = null;
 let result = null;
 let reviewTextValue = "";
 let manualMapping = {};
 let busy = false;
+let reportBusy = false;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -105,6 +124,23 @@ function setBusy(nextBusy) {
   busy = Boolean(nextBusy);
   pseudonymiseBtn.disabled = busy || !sourceText.value.trim();
   pseudonymiseBtn.textContent = busy ? "Pseudonymising..." : "Pseudonymise";
+  updateReportControls();
+}
+
+function setReportStatus(message, isError = false) {
+  if (!reportStatus) {
+    return;
+  }
+  reportStatus.textContent = message;
+  reportStatus.classList.toggle("error", isError);
+}
+
+function setReportBusy(nextBusy) {
+  reportBusy = Boolean(nextBusy);
+  if (generateReportBtn) {
+    generateReportBtn.textContent = reportBusy ? "Generating..." : "Generate report";
+  }
+  updateReportControls();
 }
 
 async function apiPost(pathname, payload) {
@@ -167,12 +203,20 @@ function updateCounts() {
   copyLlmBtn.disabled = !reviewTextValue.trim();
   pseudonymiseBtn.disabled = busy || !sourceText.value.trim();
   updateManualControls();
+  updateReportControls();
   updateRestore();
 }
 
 function updateManualControls() {
   const value = manualIdentifierText.value.trim();
   addManualIdentifierBtn.disabled = !value || !reviewTextValue.includes(value);
+}
+
+function updateReportControls() {
+  if (!generateReportBtn) {
+    return;
+  }
+  generateReportBtn.disabled = reportBusy || busy || !reviewTextValue.trim();
 }
 
 function setReviewText(nextText) {
@@ -201,6 +245,7 @@ function clearAll() {
   }
   setRiskBadge(null);
   setStatus("Paste a note to begin.");
+  setReportStatus("Generate a placeholder-preserving report from the pseudonymised text.");
   renderReviewOutput();
   renderSummary();
   updateCounts();
@@ -236,6 +281,7 @@ async function pseudonymise() {
     updateRestore();
     setRiskBadge(result.findings);
     setStatus("Pseudonymised. Review highlighted residuals before copying.");
+    setReportStatus("Ready to generate a report from the pseudonymised text.");
   } catch (error) {
     setStatus(error?.message || "Could not pseudonymise note.", true);
   } finally {
@@ -258,6 +304,53 @@ async function copyRestored() {
   }
   await copyTextToClipboard(restoredText.value);
   setStatus("Copied restored text.");
+}
+
+function buildReportPrompt() {
+  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES["simple-summary"];
+  return `${LLM_COPY_PREFIX}\n${reviewTextValue}\n\n${mode.instructions}`;
+}
+
+async function generateReport() {
+  if (!reviewTextValue.trim() || reportBusy) {
+    return;
+  }
+
+  setReportBusy(true);
+  setReportStatus("Generating report...");
+  try {
+    const response = await directoryApi.createAiChatCompletion({
+      thinking: "disabled",
+      maxTokens: 1200,
+      temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content: [
+            "You generate concise care/admin reports from pseudonymised notes.",
+            "You must preserve every bracketed placeholder exactly.",
+            "Do not use or infer any raw personal data.",
+          ].join("\n"),
+        },
+        {
+          role: "user",
+          content: buildReportPrompt(),
+        },
+      ],
+    });
+    const content = String(response?.content || "").trim();
+    if (!content) {
+      throw new Error("AI returned an empty report.");
+    }
+    placeholderText.value = content;
+    updateRestore();
+    setReportStatus("Report generated into the restore box.");
+    setStatus("Generated report. Restored text updated.");
+  } catch (error) {
+    setReportStatus(error?.message || "Could not generate report.", true);
+  } finally {
+    setReportBusy(false);
+  }
 }
 
 function addManualIdentifier() {
@@ -789,6 +882,13 @@ copyLlmBtn.addEventListener("click", () => {
 });
 copyRestoredBtn.addEventListener("click", () => {
   void copyRestored();
+});
+generateReportBtn?.addEventListener("click", () => {
+  void generateReport();
+});
+reportModeSelect?.addEventListener("change", () => {
+  const mode = REPORT_MODES[reportModeSelect.value] || REPORT_MODES["simple-summary"];
+  setReportStatus(`${mode.label} selected.`);
 });
 addManualIdentifierBtn.addEventListener("click", addManualIdentifier);
 summaryDetails?.addEventListener("toggle", () => {
