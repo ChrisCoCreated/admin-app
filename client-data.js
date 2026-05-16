@@ -78,6 +78,10 @@ const restoreStatus = document.getElementById("restoreStatus");
 const reportStatus = document.getElementById("reportStatus");
 const reportModeSelect = document.getElementById("reportModeSelect");
 const generateReportBtn = document.getElementById("generateReportBtn");
+const exportStatus = document.getElementById("exportStatus");
+const exportPdfBtn = document.getElementById("exportPdfBtn");
+const exportWordBtn = document.getElementById("exportWordBtn");
+const printReportArea = document.getElementById("printReportArea");
 
 let account = null;
 let result = null;
@@ -143,6 +147,14 @@ function setReportBusy(nextBusy) {
   updateReportControls();
 }
 
+function setExportStatus(message, isError = false) {
+  if (!exportStatus) {
+    return;
+  }
+  exportStatus.textContent = message;
+  exportStatus.classList.toggle("error", isError);
+}
+
 async function apiPost(pathname, payload) {
   const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
   const response = await fetch(endpoint(pathname), {
@@ -204,6 +216,7 @@ function updateCounts() {
   pseudonymiseBtn.disabled = busy || !sourceText.value.trim();
   updateManualControls();
   updateReportControls();
+  updateExportControls();
   updateRestore();
 }
 
@@ -217,6 +230,16 @@ function updateReportControls() {
     return;
   }
   generateReportBtn.disabled = reportBusy || busy || !reviewTextValue.trim();
+}
+
+function updateExportControls() {
+  const hasRestoredText = Boolean(restoredText.value.trim());
+  if (exportPdfBtn) {
+    exportPdfBtn.disabled = !hasRestoredText;
+  }
+  if (exportWordBtn) {
+    exportWordBtn.disabled = !hasRestoredText;
+  }
 }
 
 function setReviewText(nextText) {
@@ -246,6 +269,7 @@ function clearAll() {
   setRiskBadge(null);
   setStatus("Paste a note to begin.");
   setReportStatus("Generate a placeholder-preserving report from the pseudonymised text.");
+  setExportStatus("Export the restored report text.");
   renderReviewOutput();
   renderSummary();
   updateCounts();
@@ -737,6 +761,7 @@ function updateRestore() {
   const restored = deanonymiseText(mapping, placeholderText.value);
   restoredText.value = restored.text;
   copyRestoredBtn.disabled = !restored.text.trim();
+  updateExportControls();
   if (!placeholderText.value.trim()) {
     restoreStatus.textContent = "Paste placeholder-bearing output to restore with the local map.";
     return;
@@ -744,6 +769,76 @@ function updateRestore() {
   restoreStatus.textContent = `${restored.restoredCount.toLocaleString()} restored${
     restored.unresolvedCount > 0 ? `, ${restored.unresolvedCount.toLocaleString()} unresolved` : ""
   }.`;
+}
+
+function buildExportTitle() {
+  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES["simple-summary"];
+  return mode.label || "Client data report";
+}
+
+function buildReportHtml(text) {
+  const paragraphs = String(text || "")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => `<p>${escapeHtml(block).replace(/\n/g, "<br>")}</p>`)
+    .join("\n");
+  return [
+    "<article>",
+    `<h1>${escapeHtml(buildExportTitle())}</h1>`,
+    paragraphs || "<p></p>",
+    "</article>",
+  ].join("\n");
+}
+
+function exportPdf() {
+  const text = restoredText.value.trim();
+  if (!text) {
+    setExportStatus("Restore text before exporting.", true);
+    updateExportControls();
+    return;
+  }
+
+  printReportArea.innerHTML = buildReportHtml(text);
+  window.print();
+  setExportStatus("PDF export opened in the browser print dialog.");
+}
+
+function exportWordDoc() {
+  const text = restoredText.value.trim();
+  if (!text) {
+    setExportStatus("Restore text before exporting.", true);
+    updateExportControls();
+    return;
+  }
+
+  const html = [
+    "<!doctype html>",
+    "<html>",
+    "<head>",
+    '<meta charset="utf-8">',
+    `<title>${escapeHtml(buildExportTitle())}</title>`,
+    "<style>",
+    "body{font-family:Arial,sans-serif;line-height:1.45;color:#1c2533;}",
+    "h1{font-size:20pt;margin:0 0 16pt;}",
+    "p{font-size:11pt;margin:0 0 10pt;}",
+    "</style>",
+    "</head>",
+    "<body>",
+    buildReportHtml(text),
+    "</body>",
+    "</html>",
+  ].join("\n");
+  const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "client-data-report.doc";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  setExportStatus("Word document exported.");
 }
 
 function renderSummary() {
@@ -883,6 +978,8 @@ copyLlmBtn.addEventListener("click", () => {
 copyRestoredBtn.addEventListener("click", () => {
   void copyRestored();
 });
+exportPdfBtn?.addEventListener("click", exportPdf);
+exportWordBtn?.addEventListener("click", exportWordDoc);
 generateReportBtn?.addEventListener("click", () => {
   void generateReport();
 });

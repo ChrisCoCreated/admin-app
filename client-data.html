@@ -155,6 +155,21 @@
           </label>
         </div>
       </section>
+
+      <section class="panel client-data-export-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Output</h2>
+            <p id="exportStatus" class="muted">Export the restored report text.</p>
+          </div>
+        </div>
+        <div class="client-data-export-actions">
+          <button id="exportPdfBtn" class="secondary" type="button" disabled>Output as PDF</button>
+          <button id="exportWordBtn" class="secondary" type="button" disabled>Output as Word doc</button>
+        </div>
+      </section>
+
+      <section id="printReportArea" class="client-data-print-report" aria-hidden="true"></section>
     </main>
 
     <script type="module" src="./client-data.js"></script>
