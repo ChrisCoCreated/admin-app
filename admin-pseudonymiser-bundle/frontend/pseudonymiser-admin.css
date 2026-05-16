@@ -1,0 +1,329 @@
+.admin-pseudonymiser {
+  min-height: 100%;
+  display: grid;
+  gap: 16px;
+  color: #18212f;
+}
+
+.admin-pseudonymiser *,
+.admin-pseudonymiser *::before,
+.admin-pseudonymiser *::after {
+  box-sizing: border-box;
+}
+
+.admin-pseudonymiser button,
+.admin-pseudonymiser textarea,
+.admin-pseudonymiser input,
+.admin-pseudonymiser select {
+  font: inherit;
+}
+
+.admin-pseudonymiser__topbar,
+.admin-pseudonymiser__section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-pseudonymiser h1,
+.admin-pseudonymiser h2,
+.admin-pseudonymiser p {
+  margin: 0;
+}
+
+.admin-pseudonymiser h1 {
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.admin-pseudonymiser h2 {
+  font-size: 15px;
+}
+
+.admin-pseudonymiser p,
+.admin-pseudonymiser__section-heading span,
+.admin-pseudonymiser__pane-header span,
+.admin-pseudonymiser__inline-heading span {
+  color: #5d6877;
+  font-size: 13px;
+}
+
+.admin-pseudonymiser__risk,
+.admin-pseudonymiser__error {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cfd6df;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  font-weight: 650;
+}
+
+.admin-pseudonymiser__risk {
+  max-width: min(520px, 100%);
+}
+
+.admin-pseudonymiser__risk--low {
+  color: #116149;
+  border-color: #9dd6c0;
+  background: #ecfaf4;
+}
+
+.admin-pseudonymiser__risk--medium {
+  color: #705512;
+  border-color: #e3ca77;
+  background: #fffaf0;
+}
+
+.admin-pseudonymiser__risk--high,
+.admin-pseudonymiser__error {
+  color: #8f2c19;
+  border-color: #e69b85;
+  background: #fff1ed;
+}
+
+.admin-pseudonymiser__grid {
+  min-height: 420px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.admin-pseudonymiser__grid--restore {
+  min-height: 300px;
+}
+
+.admin-pseudonymiser__pane {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-pseudonymiser__pane-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-pseudonymiser textarea,
+.admin-pseudonymiser__output {
+  flex: 1;
+  min-height: 360px;
+  width: 100%;
+  overflow: auto;
+  border: 1px solid #cfd6df;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+  color: #1c2533;
+  line-height: 1.5;
+}
+
+.admin-pseudonymiser textarea {
+  resize: vertical;
+}
+
+.admin-pseudonymiser__grid--restore textarea {
+  min-height: 260px;
+}
+
+.admin-pseudonymiser__output {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-pseudonymiser__output--placeholder {
+  color: #6b7583;
+}
+
+.admin-pseudonymiser__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-pseudonymiser__button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #bec7d2;
+  border-radius: 8px;
+  padding: 8px 13px;
+  cursor: pointer;
+  background: #ffffff;
+  color: #18212f;
+}
+
+.admin-pseudonymiser__button--primary {
+  color: #ffffff;
+  background: #0c6b58;
+  border-color: #0c6b58;
+  font-weight: 700;
+}
+
+.admin-pseudonymiser__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-pseudonymiser__manual,
+.admin-pseudonymiser__field {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-pseudonymiser__field {
+  color: #334155;
+  font-weight: 650;
+}
+
+.admin-pseudonymiser__inline-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-pseudonymiser__manual-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(132px, auto) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-pseudonymiser__manual-row input,
+.admin-pseudonymiser__manual-row select,
+.admin-pseudonymiser__field input {
+  min-height: 38px;
+  min-width: 0;
+  border: 1px solid #bec7d2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #18212f;
+}
+
+.admin-pseudonymiser__replacement {
+  display: inline-flex;
+  align-items: stretch;
+  margin-inline: 1px;
+  vertical-align: baseline;
+  gap: 0;
+}
+
+.admin-pseudonymiser__highlight {
+  display: inline;
+  border: 0;
+  border-radius: 4px;
+  padding: 1px 2px;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-pseudonymiser__highlight--replaced {
+  border-radius: 4px 0 0 4px;
+  outline: 1px solid #4b86c5;
+  background: #dcedff;
+  margin: 0;
+}
+
+.admin-pseudonymiser__highlight--likely {
+  outline: 1px solid #d26b23;
+  background: #ffe0c4;
+}
+
+.admin-pseudonymiser__highlight--possible {
+  outline: 1px solid #b28a0c;
+  background: #fff1b8;
+}
+
+.admin-pseudonymiser__replacement select {
+  width: 20px;
+  min-width: 20px;
+  border: 1px solid #4b86c5;
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+  margin: 0;
+  padding: 0;
+  background-color: #f8fbff;
+  color: #254563;
+  text-indent: 20px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.admin-pseudonymiser__summary,
+.admin-pseudonymiser__restore {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #dbe0e7;
+  padding-top: 14px;
+}
+
+.admin-pseudonymiser__counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.admin-pseudonymiser__count {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d5dce5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.admin-pseudonymiser__count span {
+  color: #536071;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.admin-pseudonymiser__count strong {
+  font-size: 20px;
+}
+
+.admin-pseudonymiser textarea:focus,
+.admin-pseudonymiser input:focus,
+.admin-pseudonymiser select:focus,
+.admin-pseudonymiser button:focus-visible,
+.admin-pseudonymiser__output:focus {
+  outline: 3px solid #a7d8cd;
+  outline-offset: 2px;
+}
+
+.admin-pseudonymiser__spin {
+  animation: admin-pseudonymiser-spin 0.9s linear infinite;
+}
+
+@keyframes admin-pseudonymiser-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 860px) {
+  .admin-pseudonymiser__topbar,
+  .admin-pseudonymiser__section-heading {
+    flex-direction: column;
+  }
+
+  .admin-pseudonymiser__grid,
+  .admin-pseudonymiser__manual-row {
+    grid-template-columns: 1fr;
+  }
+}

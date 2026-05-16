@@ -69,7 +69,15 @@
             </div>
             <button id="copyLlmBtn" class="secondary" type="button" disabled>Copy for LLM</button>
           </div>
-          <textarea id="reviewText" class="client-data-textarea" spellcheck="false" aria-label="Pseudonymised client note" placeholder="Pseudonymised output will appear here."></textarea>
+          <div
+            id="reviewOutput"
+            class="client-data-review-output"
+            role="textbox"
+            aria-label="Pseudonymised client note"
+            aria-readonly="true"
+          >
+            Pseudonymised output will appear here.
+          </div>
           <div class="manual-identifier-grid">
             <label class="field" for="manualIdentifierText">
               Missed text

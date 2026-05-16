@@ -36,7 +36,7 @@ const PLACEHOLDER_CATEGORY_OPTIONS = [
 ];
 
 const sourceText = document.getElementById("sourceText");
-const reviewText = document.getElementById("reviewText");
+const reviewOutput = document.getElementById("reviewOutput");
 const placeholderText = document.getElementById("placeholderText");
 const restoredText = document.getElementById("restoredText");
 const preferredNameInput = document.getElementById("preferredNameInput");
@@ -63,6 +63,7 @@ const restoreStatus = document.getElementById("restoreStatus");
 
 let account = null;
 let result = null;
+let reviewTextValue = "";
 let manualMapping = {};
 let busy = false;
 
@@ -162,8 +163,8 @@ function characterLabel(length) {
 
 function updateCounts() {
   inputCount.textContent = characterLabel(sourceText.value.length);
-  outputCount.textContent = characterLabel(reviewText.value.length);
-  copyLlmBtn.disabled = !reviewText.value.trim();
+  outputCount.textContent = characterLabel(reviewTextValue.length);
+  copyLlmBtn.disabled = !reviewTextValue.trim();
   pseudonymiseBtn.disabled = busy || !sourceText.value.trim();
   updateManualControls();
   updateRestore();
@@ -171,12 +172,23 @@ function updateCounts() {
 
 function updateManualControls() {
   const value = manualIdentifierText.value.trim();
-  addManualIdentifierBtn.disabled = !value || !reviewText.value.includes(value);
+  addManualIdentifierBtn.disabled = !value || !reviewTextValue.includes(value);
+}
+
+function setReviewText(nextText) {
+  reviewTextValue = String(nextText || "");
+  renderReviewOutput();
+  renderSummary();
+  updateCounts();
+}
+
+function replaceReviewRange(start, end, value) {
+  setReviewText(`${reviewTextValue.slice(0, start)}${value}${reviewTextValue.slice(end)}`);
 }
 
 function clearAll() {
   sourceText.value = "";
-  reviewText.value = "";
+  reviewTextValue = "";
   placeholderText.value = "";
   restoredText.value = "";
   preferredNameInput.value = "";
@@ -189,6 +201,7 @@ function clearAll() {
   }
   setRiskBadge(null);
   setStatus("Paste a note to begin.");
+  renderReviewOutput();
   renderSummary();
   updateCounts();
 }
@@ -214,13 +227,15 @@ async function pseudonymise() {
       delete summaryDetails.dataset.userOpened;
       summaryDetails.open = false;
     }
-    reviewText.value = result.pseudonymised_text || "";
+    setReviewText(result.pseudonymised_text || "");
     if (!preferredNameInput.value.trim()) {
       preferredNameInput.value = defaultPreferredName(result.mapping || {});
     }
+    renderReviewOutput();
+    renderSummary();
+    updateRestore();
     setRiskBadge(result.findings);
     setStatus("Pseudonymised. Review highlighted residuals before copying.");
-    renderSummary();
   } catch (error) {
     setStatus(error?.message || "Could not pseudonymise note.", true);
   } finally {
@@ -230,10 +245,10 @@ async function pseudonymise() {
 }
 
 async function copyForLlm() {
-  if (!reviewText.value.trim()) {
+  if (!reviewTextValue.trim()) {
     return;
   }
-  await copyTextToClipboard(`${LLM_COPY_PREFIX}\n${reviewText.value}`);
+  await copyTextToClipboard(`${LLM_COPY_PREFIX}\n${reviewTextValue}`);
   setStatus("Copied pseudonymised text and placeholder instructions.");
 }
 
@@ -247,7 +262,7 @@ async function copyRestored() {
 
 function addManualIdentifier() {
   const value = manualIdentifierText.value.trim();
-  if (!value || !reviewText.value.includes(value)) {
+  if (!value || !reviewTextValue.includes(value)) {
     updateManualControls();
     return;
   }
@@ -255,26 +270,205 @@ function addManualIdentifier() {
   const mapping = buildEffectiveMapping();
   const placeholder = nextManualPlaceholder(manualIdentifierCategory.value, mapping);
   manualMapping = { ...manualMapping, [placeholder]: value };
-  reviewText.value = reviewText.value.split(value).join(placeholder);
+  setReviewText(reviewTextValue.split(value).join(placeholder));
   manualIdentifierText.value = "";
   setStatus(`Added ${placeholder}.`);
-  renderSummary();
-  updateCounts();
 }
 
 function applyResidual(span) {
   const value = String(result?.pseudonymised_text || "").slice(span.start, span.end);
-  if (!value || !reviewText.value.includes(value)) {
+  if (!value || !reviewTextValue.includes(value)) {
     return;
   }
 
   const mapping = buildEffectiveMapping();
   const placeholder = nextManualPlaceholder(span.category || "IDENTIFIER", mapping);
   manualMapping = { ...manualMapping, [placeholder]: value };
-  reviewText.value = reviewText.value.split(value).join(placeholder);
+  setReviewText(reviewTextValue.split(value).join(placeholder));
   setStatus(`Replaced residual with ${placeholder}.`);
-  renderSummary();
-  updateCounts();
+}
+
+function getReviewMarks() {
+  const mapping = buildEffectiveMapping();
+  const residualSpans = normaliseResidualSpans(result?.findings?.residualSpans || [], String(result?.pseudonymised_text || "").length);
+  return buildReviewMarks(reviewTextValue, result?.pseudonymised_text || "", mapping, residualSpans);
+}
+
+function renderReviewOutput() {
+  reviewOutput.innerHTML = "";
+  if (!reviewTextValue) {
+    reviewOutput.classList.add("client-data-review-output-placeholder");
+    reviewOutput.textContent = "Pseudonymised output will appear here.";
+    return;
+  }
+
+  reviewOutput.classList.remove("client-data-review-output-placeholder");
+  const marks = getReviewMarks();
+  const identifierOptions = buildIdentifierOptions(buildEffectiveMapping());
+  let cursor = 0;
+
+  for (const mark of marks) {
+    if (mark.start > cursor) {
+      reviewOutput.appendChild(document.createTextNode(reviewTextValue.slice(cursor, mark.start)));
+    }
+    reviewOutput.appendChild(renderReviewMark(mark, identifierOptions));
+    cursor = mark.end;
+  }
+
+  if (cursor < reviewTextValue.length) {
+    reviewOutput.appendChild(document.createTextNode(reviewTextValue.slice(cursor)));
+  }
+}
+
+function renderReviewMark(mark, identifierOptions) {
+  const content = reviewTextValue.slice(mark.start, mark.end);
+  if (mark.kind === "replaced") {
+    const wrap = document.createElement("span");
+    wrap.className = "client-data-replacement";
+
+    const button = document.createElement("button");
+    button.className = "review-highlight replaced";
+    button.type = "button";
+    button.textContent = content;
+    button.title = `Revert: ${mark.original}`;
+    button.addEventListener("click", () => {
+      replaceReviewRange(mark.start, mark.end, mark.original);
+      setStatus(`Reverted ${mark.placeholder} for review.`);
+    });
+    wrap.appendChild(button);
+
+    const select = document.createElement("select");
+    select.className = "client-data-inline-select";
+    select.value = mark.placeholder;
+    select.setAttribute("aria-label", `Change identifier for ${mark.placeholder}`);
+    for (const optionValue of identifierOptions) {
+      const option = document.createElement("option");
+      option.value = optionValue;
+      option.textContent = identifierOptionLabel(optionValue);
+      select.appendChild(option);
+    }
+    select.addEventListener("click", (event) => event.stopPropagation());
+    select.addEventListener("change", (event) => {
+      onChooseReplacementIdentifier(mark, event.target.value);
+    });
+    wrap.appendChild(select);
+    return wrap;
+  }
+
+  const button = document.createElement("button");
+  button.className = `review-highlight ${mark.kind}`;
+  button.type = "button";
+  button.textContent = content;
+  button.title = `Pseudonymise: ${mark.reason}`;
+  button.addEventListener("click", () => {
+    onApplySuggestion(mark);
+  });
+  return button;
+}
+
+function onApplySuggestion(mark) {
+  const placeholder = mark.replacement || nextManualPlaceholder(mark.category, buildEffectiveMapping());
+  manualMapping = { ...manualMapping, [placeholder]: mark.value };
+  replaceReviewRange(mark.start, mark.end, placeholder);
+  setStatus(`Replaced ${mark.kind === "likely" ? "direct" : "possible"} identifier with ${placeholder}.`);
+}
+
+function onChooseReplacementIdentifier(mark, value) {
+  const placeholder = placeholderFromIdentifierOption(value, buildEffectiveMapping());
+  if (!placeholder || placeholder === mark.placeholder) {
+    return;
+  }
+
+  manualMapping = { ...manualMapping, [placeholder]: mark.original };
+  setReviewText(reviewTextValue.split(mark.placeholder).join(placeholder));
+  setStatus(`Changed ${mark.placeholder} to ${placeholder}.`);
+}
+
+function buildReviewMarks(text, originalPseudonymisedText, mapping, residualSpans) {
+  if (!text) {
+    return [];
+  }
+
+  const replacedMarks = Object.entries(mapping).flatMap(([placeholder, original]) =>
+    findAllOccurrences(text, placeholder).map((start) => ({
+      kind: "replaced",
+      start,
+      end: start + placeholder.length,
+      placeholder,
+      original,
+    }))
+  );
+  const revertedMarks = Object.entries(mapping).flatMap(([placeholder, original]) =>
+    findAllOccurrences(text, original).map((start) => ({
+      kind: "likely",
+      start,
+      end: start + original.length,
+      category: placeholderCategoryValue(placeholder),
+      reason: "Previously pseudonymised value was restored",
+      value: original,
+      replacement: placeholder,
+    }))
+  );
+  const suggestionMarks = residualSpans.flatMap((span) => {
+    const value = originalPseudonymisedText.slice(span.start, span.end);
+    if (!value || mapping[value]) {
+      return [];
+    }
+
+    return findAllOccurrences(text, value).map((start) => ({
+      kind: span.severity === "direct" ? "likely" : "possible",
+      start,
+      end: start + value.length,
+      category: span.category,
+      reason: span.reason,
+      value,
+    }));
+  });
+
+  return normaliseReviewMarks([...replacedMarks, ...revertedMarks, ...suggestionMarks], text.length);
+}
+
+function findAllOccurrences(text, value) {
+  const starts = [];
+  let cursor = 0;
+  while (value && cursor < text.length) {
+    const start = text.indexOf(value, cursor);
+    if (start === -1) {
+      break;
+    }
+    starts.push(start);
+    cursor = start + value.length;
+  }
+  return starts;
+}
+
+function normaliseReviewMarks(marks, textLength) {
+  const ordered = marks
+    .filter((mark) => mark.start >= 0 && mark.end <= textLength && mark.start < mark.end)
+    .sort(
+      (left, right) =>
+        left.start - right.start ||
+        reviewMarkRank(left.kind) - reviewMarkRank(right.kind) ||
+        right.end - left.end
+    );
+  const accepted = [];
+  let cursor = 0;
+
+  for (const mark of ordered) {
+    if (mark.start >= cursor) {
+      accepted.push(mark);
+      cursor = mark.end;
+    }
+  }
+
+  return accepted;
+}
+
+function reviewMarkRank(kind) {
+  if (kind === "replaced") {
+    return 0;
+  }
+  return kind === "likely" ? 1 : 2;
 }
 
 function buildEffectiveMapping() {
@@ -350,6 +544,62 @@ function nextManualPlaceholder(category, mapping) {
   return `[${cleanCategory}_${String(highest + 1).padStart(3, "0")}]`;
 }
 
+function buildIdentifierOptions(mapping) {
+  const existing = Object.keys(mapping || {}).filter(
+    (placeholder) =>
+      /^\[[A-Z_]+_\d{3}\]$/.test(placeholder) &&
+      !placeholder.includes("_PREFERRED_NAME_") &&
+      !placeholder.includes("_FIRST_NAME_") &&
+      !placeholder.includes("_SURNAME_")
+  );
+  const newOptions = PLACEHOLDER_CATEGORY_OPTIONS.map((category) => `${category}_NEW`);
+  return [...existing, ...newOptions].sort((left, right) =>
+    identifierOptionLabel(left).localeCompare(identifierOptionLabel(right))
+  );
+}
+
+function placeholderFromIdentifierOption(value, mapping) {
+  if (String(value || "").endsWith("_NEW")) {
+    return nextManualPlaceholder(String(value).slice(0, -4), mapping);
+  }
+  return String(value || "").startsWith("[") ? String(value) : null;
+}
+
+function identifierOptionLabel(value) {
+  return String(value || "").startsWith("[") ? String(value).slice(1, -1) : String(value || "");
+}
+
+function placeholderCategoryValue(placeholder) {
+  const match = String(placeholder || "").match(/^\[([A-Z_]+)_\d{3}\]$/);
+  return match?.[1] || "IDENTIFIER";
+}
+
+function normaliseResidualSpans(spans, textLength) {
+  const ordered = (Array.isArray(spans) ? spans : [])
+    .filter((span) => span.start >= 0 && span.end <= textLength && span.start < span.end)
+    .sort(
+      (left, right) =>
+        left.start - right.start ||
+        severityRank(left.severity) - severityRank(right.severity) ||
+        right.end - left.end
+    );
+  const accepted = [];
+  let cursor = 0;
+
+  for (const span of ordered) {
+    if (span.start >= cursor) {
+      accepted.push(span);
+      cursor = span.end;
+    }
+  }
+
+  return accepted;
+}
+
+function severityRank(severity) {
+  return severity === "direct" ? 0 : 1;
+}
+
 function deanonymiseText(mapping, text) {
   let restoredCount = 0;
   let unresolvedCount = 0;
@@ -423,33 +673,36 @@ function renderSummary() {
     countGrid.appendChild(card);
   }
 
-  const spans = (result.findings?.residualSpans || []).filter((span) => {
-    const value = String(result.pseudonymised_text || "").slice(span.start, span.end);
-    return value && reviewText.value.includes(value);
-  });
+  const marks = getReviewMarks();
+  const reviewMarks = marks.filter((mark) => mark.kind !== "replaced");
   summaryMessage.textContent =
-    spans.length > 0 ? "Review any residual identifiers before copying." : "No unresolved residual identifiers are currently visible.";
+    reviewMarks.length > 0 ? "Needs review: resolve orange and yellow identifiers before copying." : "Ready: only replacement tags remain.";
 
-  if (!spans.length) {
-    residualList.innerHTML = '<p class="muted">No visible residual identifiers.</p>';
+  if (!reviewMarks.length) {
+    residualList.innerHTML = '<p class="muted">Ready. No visible residual identifiers.</p>';
   } else {
-    for (const span of spans) {
-      const value = String(result.pseudonymised_text || "").slice(span.start, span.end);
+    for (const mark of reviewMarks.slice(0, 12)) {
       const row = document.createElement("div");
       row.className = "client-data-list-row";
       row.innerHTML = `
         <div>
-          <strong>${escapeHtml(value)}</strong>
-          <span>${escapeHtml(span.reason || "Residual identifier")} · ${escapeHtml(span.severity || "review")}</span>
+          <strong>${escapeHtml(mark.value)}</strong>
+          <span>${escapeHtml(mark.category || "IDENTIFIER")} · ${escapeHtml(mark.reason || "Residual identifier")} · ${mark.kind === "likely" ? "needs review" : "possible"}</span>
         </div>
       `;
       const button = document.createElement("button");
       button.className = "secondary";
       button.type = "button";
       button.textContent = "Replace";
-      button.addEventListener("click", () => applyResidual(span));
+      button.addEventListener("click", () => onApplySuggestion(mark));
       row.appendChild(button);
       residualList.appendChild(row);
+    }
+    if (reviewMarks.length > 12) {
+      const more = document.createElement("p");
+      more.className = "muted";
+      more.textContent = `${(reviewMarks.length - 12).toLocaleString()} more review item${reviewMarks.length - 12 === 1 ? "" : "s"} visible in the highlighted text.`;
+      residualList.appendChild(more);
     }
   }
 
@@ -519,12 +772,9 @@ for (const category of PLACEHOLDER_CATEGORY_OPTIONS) {
 manualIdentifierCategory.value = "PROFESSIONAL";
 
 sourceText.addEventListener("input", updateCounts);
-reviewText.addEventListener("input", () => {
-  renderSummary();
-  updateCounts();
-});
 placeholderText.addEventListener("input", updateRestore);
 preferredNameInput.addEventListener("input", () => {
+  renderReviewOutput();
   renderSummary();
   updateRestore();
 });
@@ -551,4 +801,5 @@ signOutBtn?.addEventListener("click", () => {
 });
 
 updateCounts();
+renderReviewOutput();
 void init();
