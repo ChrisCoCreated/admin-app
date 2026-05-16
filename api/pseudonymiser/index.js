@@ -52,6 +52,10 @@ function runPseudonymiser(action, payload = {}) {
       {
         cwd: path.dirname(RUNNER_PATH),
         encoding: "utf8",
+        env: {
+          ...process.env,
+          PYTHONDONTWRITEBYTECODE: "1",
+        },
         maxBuffer: 8 * 1024 * 1024,
         timeout: 15000,
       },
