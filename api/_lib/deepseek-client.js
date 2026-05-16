@@ -229,5 +229,9 @@ module.exports = {
   DEFAULT_CHAT_MODEL,
   createChatCompletion,
   extractResponseText,
+  normalizeMaxTokens,
+  normalizeMessages,
+  normalizeReasoningEffort,
   normalizeText,
+  normalizeThinking,
 };

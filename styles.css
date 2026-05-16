@@ -1222,10 +1222,6 @@ button.is-generating::after {
   gap: 10px;
 }
 
-.client-data-print-report {
-  display: none;
-}
-
 .client-data-count-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -7491,33 +7487,5 @@ body.lightbox-open {
 
   .problem-card-actions {
     justify-items: stretch;
-  }
-}
-
-@media print {
-  body > * {
-    display: none !important;
-  }
-
-  body {
-    background: #ffffff !important;
-  }
-
-  .client-data-print-report {
-    display: block !important;
-    padding: 24mm 20mm;
-    color: #111827;
-    font-family: Arial, sans-serif;
-    line-height: 1.45;
-  }
-
-  .client-data-print-report h1 {
-    margin: 0 0 16pt;
-    font-size: 20pt;
-  }
-
-  .client-data-print-report p {
-    margin: 0 0 10pt;
-    font-size: 11pt;
   }
 }

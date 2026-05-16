@@ -32,6 +32,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `POST /api/tasks/create-batch` (API auth + Graph app token; Planner test batch creation from direct payloads or SharePoint Task Sets)
   - `GET /api/tasks/task-sets` (API auth; live SharePoint Task Set rows for preview/testing)
   - `POST /api/consultant/report-docx` (admin + consultant; DOCX export from template)
+  - `POST /api/ai/chat` (API auth; provider-switched chat completions via DeepSeek or Azure OpenAI)
 - OneTouch source (`carers/all`, `clients/all`, `visits`) with relationships joined in-app
 - Optional local fallback client data (`data/clients.json`)
 - Clients reconciliation workflow on `clients.html` treats OneTouch as source of truth and writes changes into SharePoint
@@ -45,6 +46,12 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 
 ```bash
 npm start
+```
+
+Optional checks:
+
+```bash
+npm test
 ```
 
 3. Open:
@@ -87,8 +94,13 @@ Set values in `frontend-config.js`:
 - `ONETOUCH_CARERS_TIMEOUT_MS` (optional; default `12000`)
 - `ONETOUCH_VISITS_TIMEOUT_MS` (optional; default `6000`)
 - `ONETOUCH_CARER_DETAIL_CONCURRENCY` (optional; default `4`)
-- `DEEPSEEK_API_KEY` for the Wellbeing Intake AI extraction flow
-- `DEEPSEEK_MODEL` (optional; default `deepseek-chat`)
+- `AI_PROVIDER` (optional; default `deepseek`)
+- `DEEPSEEK_API_KEY` when `AI_PROVIDER=deepseek`
+- `DEEPSEEK_MODEL` (optional; default `deepseek-v4-flash`)
+- `AZURE_OPENAI_ENDPOINT` when `AI_PROVIDER=azure_openai`
+- `AZURE_OPENAI_API_KEY` when `AI_PROVIDER=azure_openai`
+- `AZURE_OPENAI_API_VERSION` when `AI_PROVIDER=azure_openai`
+- `AZURE_OPENAI_DEPLOYMENT_NAME` when `AI_PROVIDER=azure_openai`
 
 Optional fallback toggles:
 
@@ -109,6 +121,20 @@ Run costing vars (for Time Mapping):
 - `MAX_TIME` (minutes; used only if `MAX_DISTANCE` is empty)
 - `TRAVEL_PAY` (hourly rate for paid travel time)
 - `PER_MILE` (rate per paid mile)
+
+## AI provider notes
+
+The app defaults to DeepSeek. To switch the existing AI routes and the Wellbeing Intake AI extraction flow to Azure OpenAI, set:
+
+```bash
+AI_PROVIDER=azure_openai
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_API_VERSION=2024-10-21
+AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+```
+
+When Azure OpenAI is enabled, the server uses the configured deployment name for chat completions so the rest of the app does not need to know the public model name.
 
 ## App access roles
 

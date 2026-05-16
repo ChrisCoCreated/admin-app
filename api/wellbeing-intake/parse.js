@@ -1,5 +1,5 @@
 const { requireApiAuth } = require("../_lib/require-api-auth");
-const { createChatCompletion } = require("../_lib/deepseek-client");
+const { createChatCompletion } = require("../_lib/ai-client");
 
 const ALLOWED_TYPES = new Set(["Text", "Note", "Choice", "MultiChoice", "Boolean", "DateTime", "Number", "Currency", "URL"]);
 const DEFAULT_MODEL = "deepseek-v4-flash";

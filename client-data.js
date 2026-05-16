@@ -81,7 +81,6 @@ const generateReportBtn = document.getElementById("generateReportBtn");
 const exportStatus = document.getElementById("exportStatus");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportWordBtn = document.getElementById("exportWordBtn");
-const printReportArea = document.getElementById("printReportArea");
 
 let account = null;
 let result = null;
@@ -791,6 +790,139 @@ function buildReportHtml(text) {
   ].join("\n");
 }
 
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function normalizePdfText(value) {
+  return String(value || "")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[–—]/g, "-")
+    .replace(/…/g, "...")
+    .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
+}
+
+function escapePdfText(value) {
+  return normalizePdfText(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function wrapPdfLine(text, maxChars) {
+  const words = normalizePdfText(text).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+
+  for (const word of words) {
+    if (!line) {
+      line = word;
+      continue;
+    }
+    if (`${line} ${word}`.length <= maxChars) {
+      line = `${line} ${word}`;
+      continue;
+    }
+    lines.push(line);
+    line = word;
+  }
+
+  if (line) {
+    lines.push(line);
+  }
+  return lines.length ? lines : [""];
+}
+
+function buildPdfBlob({ title, text }) {
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 54;
+  const titleSize = 18;
+  const bodySize = 11;
+  const lineHeight = 15;
+  const maxLinesPerPage = Math.floor((pageHeight - margin * 2 - titleSize - 18) / lineHeight);
+  const bodyLines = [];
+
+  for (const block of normalizePdfText(text).split(/\n{2,}/)) {
+    const trimmed = block.trim();
+    if (!trimmed) {
+      continue;
+    }
+    for (const line of trimmed.split(/\n/)) {
+      bodyLines.push(...wrapPdfLine(line, 88));
+    }
+    bodyLines.push("");
+  }
+  if (bodyLines.at(-1) === "") {
+    bodyLines.pop();
+  }
+
+  const pages = [];
+  for (let index = 0; index < bodyLines.length || index === 0; index += maxLinesPerPage) {
+    pages.push(bodyLines.slice(index, index + maxLinesPerPage));
+  }
+
+  const objects = [];
+  const addObject = (content) => {
+    objects.push(content);
+    return objects.length;
+  };
+
+  const catalogId = addObject("<< /Type /Catalog /Pages 2 0 R >>");
+  const pagesId = addObject("");
+  const fontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const pageIds = [];
+
+  pages.forEach((lines) => {
+    const commands = [
+      "BT",
+      `/F1 ${titleSize} Tf`,
+      `${margin} ${pageHeight - margin} Td`,
+      `(${escapePdfText(title)}) Tj`,
+      `/F1 ${bodySize} Tf`,
+      `0 -${titleSize + 18} Td`,
+      `${lineHeight} TL`,
+    ];
+
+    lines.forEach((line, index) => {
+      if (index > 0) {
+        commands.push("T*");
+      }
+      commands.push(`(${escapePdfText(line)}) Tj`);
+    });
+    commands.push("ET");
+
+    const stream = commands.join("\n");
+    const contentId = addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+    const pageId = addObject(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`
+    );
+    pageIds.push(pageId);
+  });
+
+  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((content, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${content}\nendobj\n`;
+  });
+  const xrefOffset = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let index = 1; index < offsets.length; index += 1) {
+    pdf += `${String(offsets[index]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
 function exportPdf() {
   const text = restoredText.value.trim();
   if (!text) {
@@ -799,9 +931,8 @@ function exportPdf() {
     return;
   }
 
-  printReportArea.innerHTML = buildReportHtml(text);
-  window.print();
-  setExportStatus("PDF export opened in the browser print dialog.");
+  downloadBlob(buildPdfBlob({ title: buildExportTitle(), text }), "client-data-report.pdf");
+  setExportStatus("PDF exported.");
 }
 
 function exportWordDoc() {
@@ -830,14 +961,7 @@ function exportWordDoc() {
     "</html>",
   ].join("\n");
   const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "client-data-report.doc";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, "client-data-report.doc");
   setExportStatus("Word document exported.");
 }
 

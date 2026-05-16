@@ -3,6 +3,7 @@ const fsp = require("fs/promises");
 const http = require("http");
 const path = require("path");
 const { URL } = require("url");
+const { validateConfiguredAiProvider } = require("./api/_lib/ai-client");
 
 const sharePointClientsIndexHandler = require("./api/clients/index");
 const sharePointClientsByIdHandler = require("./api/clients/[id]");
@@ -92,6 +93,7 @@ function loadEnvFile(envPath) {
 }
 
 loadEnvFile(path.join(process.cwd(), ".env"));
+validateConfiguredAiProvider();
 
 const PORT = Number(process.env.PORT || 8081);
 const HOST = process.env.HOST || "127.0.0.1";

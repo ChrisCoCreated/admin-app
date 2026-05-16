@@ -1,5 +1,6 @@
 const { requireApiAuth } = require("../_lib/require-api-auth");
-const { createChatCompletion, normalizeText } = require("../_lib/deepseek-client");
+const { createChatCompletion } = require("../_lib/ai-client");
+const { normalizeText } = require("../_lib/deepseek-client");
 
 function toArray(value) {
   return Array.isArray(value) ? value : [];
