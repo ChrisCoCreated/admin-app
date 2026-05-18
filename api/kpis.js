@@ -17,6 +17,8 @@ const KPI_FIELD_DEFINITIONS = {
   droppedHoursReasons: ["dropped hours reasons", "Dropped Hours Reasons", "droppedhoursreasons"],
   subscriptionHours: ["Subscription 'Hours'", "Subscription Hours", "SubscriptionHours"],
   totalHours: ["Total Hours", "TotalHours"],
+  utilisationPercent: ["Utilisation%", "Utilisation %", "Utilisation", "Utilization%", "Utilization %", "Utilization"],
+  utilisationNotes: ["Utilisation Notes", "Utilisation Note", "Utilization Notes", "Utilization Note"],
   hoursWon: ["Hours won (mth)", "Hours Won", "Newweeklyhourswon"],
   hoursLost: ["Hours cancelled  (mth)", "Hours cancelled (mth)", "Hours lost", "Hourscancelled"],
   pendingHours: ["Pending Hours / wk", "Pending Hours", "PendingHours"],
@@ -373,6 +375,14 @@ function deriveEnquiriesTotal(row) {
   return (solicitor || 0) + (consumer || 0);
 }
 
+function deriveUtilisationPercent(row) {
+  const stored = getFieldValue(row, "utilisationPercent");
+  if (!hasValue(stored)) {
+    return "";
+  }
+  return parsePercent(stored);
+}
+
 function resolveMetrics(rows) {
   const latestRow = rows[0] || null;
   const metric = (key, derive) => deriveValue(rows, latestRow, key, derive);
@@ -386,6 +396,8 @@ function resolveMetrics(rows) {
       droppedHoursReasons: metric("droppedHoursReasons"),
       subscriptionHours: metric("subscriptionHours"),
       totalHours: metric("totalHours", deriveTotalHours),
+      utilisationPercent: metric("utilisationPercent", deriveUtilisationPercent),
+      utilisationNotes: metric("utilisationNotes"),
       hoursWon: metric("hoursWon"),
       hoursLost: metric("hoursLost"),
       pendingHours: metric("pendingHours"),
@@ -409,6 +421,7 @@ function buildTrendSeries(rows) {
       weekLabel: row.weekLabel,
       hoursDeliveredPercent: parseNumber(deriveHoursDeliveredPercent(row)),
       totalHours: parseNumber(deriveTotalHours(row)),
+      utilisationPercent: parseNumber(deriveUtilisationPercent(row)),
       hoursWon: parseNumber(getFieldValue(row, "hoursWon")),
       hoursLost: parseNumber(getFieldValue(row, "hoursLost")),
       pendingHours: parseNumber(getFieldValue(row, "pendingHours")),

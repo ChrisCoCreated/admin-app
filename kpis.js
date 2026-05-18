@@ -12,6 +12,7 @@ const latestWeekLabel = document.getElementById("latestWeekLabel");
 const refreshedAtLabel = document.getElementById("refreshedAtLabel");
 const sourceRowCount = document.getElementById("sourceRowCount");
 const deliveryKpis = document.getElementById("deliveryKpis");
+const utilisationKpis = document.getElementById("utilisationKpis");
 const businessKpis = document.getElementById("businessKpis");
 const businessTrendKpis = document.getElementById("businessTrendKpis");
 const enquiriesKpis = document.getElementById("enquiriesKpis");
@@ -442,6 +443,31 @@ function renderDelivery(payload) {
   ]);
 }
 
+function renderUtilisation(payload) {
+  const latestLabel = payload?.latestWeekLabel || "";
+  appendChildren(utilisationKpis, [
+    createKpiMetricCard({
+      title: "Utilisation %",
+      value: formatPercent(metricValue(payload, "utilisationPercent")?.value),
+      metric: metricValue(payload, "utilisationPercent"),
+      tone: "delivery",
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiTrendCard({
+      title: "Utilisation % Trend",
+      series: payload?.trendSeries,
+      field: "utilisationPercent",
+      formatter: formatPercent,
+    }),
+    createKpiNoteCard({
+      title: "Utilisation Notes",
+      metric: metricValue(payload, "utilisationNotes"),
+      emptyLabel: "No utilisation notes recorded",
+      latestWeekLabelText: latestLabel,
+    }),
+  ]);
+}
+
 function renderBusiness(payload) {
   const latestLabel = payload?.latestWeekLabel || "";
   appendChildren(businessKpis, [
@@ -616,6 +642,7 @@ function renderCqc(payload) {
 function renderKpis(payload) {
   renderSummary(payload);
   renderDelivery(payload);
+  renderUtilisation(payload);
   renderBusiness(payload);
   renderEnquiries(payload);
   renderRecruitment(payload);
