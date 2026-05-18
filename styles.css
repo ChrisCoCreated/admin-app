@@ -68,6 +68,10 @@ body.kpi-hide-trends .kpi-trend-card {
   display: none;
 }
 
+body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
+  display: none;
+}
+
 .kpi-summary-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

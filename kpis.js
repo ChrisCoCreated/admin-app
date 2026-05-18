@@ -202,9 +202,13 @@ export function createKpiMetricCard({
   tone = "default",
   latestWeekLabelText = "",
   wide = false,
+  trendCompanion = false,
 }) {
   const card = document.createElement("article");
   card.className = `kpi-card kpi-card-${tone}${wide ? " kpi-card-wide" : ""}`;
+  if (trendCompanion) {
+    card.classList.add("kpi-trend-companion-tile");
+  }
 
   const stale = staleLabel(metric);
   const detailText = cleanText(detail);
@@ -474,12 +478,21 @@ function renderDelivery(payload) {
       )} contracted`,
       tone: "delivery",
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiTrendCard({
       title: "Delivery % Trend",
       series: payload?.trendSeries,
       field: "hoursDeliveredPercent",
       formatter: formatPercent,
+    }),
+    createKpiMetricCard({
+      title: "Hours Delivered",
+      value: formatHours(metricValue(payload, "hoursDelivered")?.value),
+      metric: metricValue(payload, "hoursDelivered"),
+      detail: `${formatHours(metricValue(payload, "activeContractedHours")?.value)} contracted`,
+      tone: "delivery",
+      latestWeekLabelText: latestLabel,
     }),
     createKpiNoteCard({
       title: "Dropped Hours Detail",
@@ -499,6 +512,7 @@ function renderUtilisation(payload) {
       metric: metricValue(payload, "utilisationPercent"),
       tone: "delivery",
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiTrendCard({
       title: "Utilisation % Trend",
@@ -527,6 +541,7 @@ function renderBusiness(payload) {
       metric: metricValue(payload, "totalHours"),
       tone: "business",
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiMetricCard({
       title: "Hours Won",
@@ -534,6 +549,7 @@ function renderBusiness(payload) {
       metric: metricValue(payload, "hoursWon"),
       tone: "positive",
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiMetricCard({
       title: "Hours Lost",
@@ -541,12 +557,14 @@ function renderBusiness(payload) {
       metric: metricValue(payload, "hoursLost"),
       tone: "risk",
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiMetricCard({
       title: "Pending Hours",
       value: formatHours(metricValue(payload, "pendingHours")?.value),
       metric: metricValue(payload, "pendingHours"),
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiNoteCard({
       title: "Pending Hours Detail",
@@ -592,24 +610,28 @@ function renderEnquiries(payload) {
       value: formatNumber(metricValue(payload, "activeEnquiries")?.value),
       metric: metricValue(payload, "activeEnquiries"),
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiMetricCard({
       title: "Enquiries Total /wk",
       value: formatNumber(metricValue(payload, "enquiriesTotal")?.value),
       metric: metricValue(payload, "enquiriesTotal"),
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiMetricCard({
       title: "Solicitor Enquiries",
       value: formatNumber(metricValue(payload, "enquiriesSolicitor")?.value),
       metric: metricValue(payload, "enquiriesSolicitor"),
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
     createKpiMetricCard({
       title: "Consumer Enquiries",
       value: formatNumber(metricValue(payload, "enquiriesConsumer")?.value),
       metric: metricValue(payload, "enquiriesConsumer"),
       latestWeekLabelText: latestLabel,
+      trendCompanion: true,
     }),
   ]);
 
