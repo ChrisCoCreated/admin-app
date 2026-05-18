@@ -20,8 +20,7 @@ const businessTrendKpis = document.getElementById("businessTrendKpis");
 const enquiriesKpis = document.getElementById("enquiriesKpis");
 const enquiriesTrendKpis = document.getElementById("enquiriesTrendKpis");
 const recruitmentKpis = document.getElementById("recruitmentKpis");
-const trainingKpis = document.getElementById("trainingKpis");
-const cqcKpis = document.getElementById("cqcKpis");
+const cqcReadinessKpis = document.getElementById("cqcReadinessKpis");
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -686,8 +685,8 @@ function renderRecruitment(payload) {
   ]);
 }
 
-function renderTraining(payload) {
-  appendChildren(trainingKpis, [
+function renderCqcReadiness(payload) {
+  appendChildren(cqcReadinessKpis, [
     createKpiMetricCard({
       title: "Training Completion",
       value: formatPercent(metricValue(payload, "trainingCompletion")?.value),
@@ -695,11 +694,6 @@ function renderTraining(payload) {
       tone: "training",
       latestWeekLabelText: payload?.latestWeekLabel || "",
     }),
-  ]);
-}
-
-function renderCqc(payload) {
-  appendChildren(cqcKpis, [
     createKpiNoteCard({
       title: "CQC Readiness",
       metric: metricValue(payload, "cqcReadiness"),
@@ -716,8 +710,7 @@ function renderKpis(payload) {
   renderBusiness(payload);
   renderEnquiries(payload);
   renderRecruitment(payload);
-  renderTraining(payload);
-  renderCqc(payload);
+  renderCqcReadiness(payload);
 }
 
 async function loadKpis() {
