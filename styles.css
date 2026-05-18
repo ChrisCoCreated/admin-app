@@ -40,6 +40,34 @@
   gap: 10px;
 }
 
+.kpi-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #cbd6e7;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #26334a;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.kpi-view-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand-cyan);
+}
+
+body.kpi-hide-details .kpi-detail-tile,
+body.kpi-hide-trends .kpi-trend-card {
+  display: none;
+}
+
 .kpi-summary-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

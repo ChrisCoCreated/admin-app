@@ -7,6 +7,8 @@ const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("kpiStatusMessage");
 const refreshKpisBtn = document.getElementById("refreshKpisBtn");
 const generateKpiPdfBtn = document.getElementById("generateKpiPdfBtn");
+const showKpiDetailsInput = document.getElementById("showKpiDetailsInput");
+const showKpiTrendsInput = document.getElementById("showKpiTrendsInput");
 const kpiListLink = document.getElementById("kpiListLink");
 const latestWeekLabel = document.getElementById("latestWeekLabel");
 const refreshedAtLabel = document.getElementById("refreshedAtLabel");
@@ -28,9 +30,54 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 
 let loadingKpis = false;
+const KPI_VIEW_PREFS_KEY = "thrive.kpis.viewPrefs";
 
 function cleanText(value) {
   return String(value ?? "").trim();
+}
+
+function loadViewPrefs() {
+  try {
+    const raw = window.localStorage?.getItem(KPI_VIEW_PREFS_KEY);
+    const prefs = raw ? JSON.parse(raw) : null;
+    return {
+      showDetails: prefs?.showDetails !== false,
+      showTrends: prefs?.showTrends !== false,
+    };
+  } catch {
+    return {
+      showDetails: true,
+      showTrends: true,
+    };
+  }
+}
+
+function saveViewPrefs(prefs) {
+  try {
+    window.localStorage?.setItem(KPI_VIEW_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Local storage is optional; the switches still work for the current page load.
+  }
+}
+
+function readViewPrefsFromControls() {
+  return {
+    showDetails: showKpiDetailsInput ? showKpiDetailsInput.checked : true,
+    showTrends: showKpiTrendsInput ? showKpiTrendsInput.checked : true,
+  };
+}
+
+function applyViewPrefs(prefs) {
+  const nextPrefs = prefs || readViewPrefsFromControls();
+  if (showKpiDetailsInput) {
+    showKpiDetailsInput.checked = nextPrefs.showDetails;
+  }
+  if (showKpiTrendsInput) {
+    showKpiTrendsInput.checked = nextPrefs.showTrends;
+  }
+  document.body.classList.toggle("kpi-hide-details", !nextPrefs.showDetails);
+  document.body.classList.toggle("kpi-hide-trends", !nextPrefs.showTrends);
+  saveViewPrefs(nextPrefs);
 }
 
 function escapeHtml(value) {
@@ -182,7 +229,7 @@ export function createKpiNoteCard({ title, metric, emptyLabel = "No detail recor
     latestWeekLabelText,
     wide: true,
   });
-  card.classList.add("kpi-note-card");
+  card.classList.add("kpi-note-card", "kpi-detail-tile");
   return card;
 }
 
@@ -702,6 +749,14 @@ generateKpiPdfBtn?.addEventListener("click", () => {
   window.print();
 });
 
+showKpiDetailsInput?.addEventListener("change", () => {
+  applyViewPrefs();
+});
+
+showKpiTrendsInput?.addEventListener("change", () => {
+  applyViewPrefs();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeTrendModal();
@@ -717,4 +772,5 @@ signOutBtn?.addEventListener("click", async () => {
   }
 });
 
+applyViewPrefs(loadViewPrefs());
 void init();
