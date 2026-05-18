@@ -224,14 +224,14 @@ export function createKpiMetricCard({
   return card;
 }
 
-export function createKpiNoteCard({ title, metric, emptyLabel = "No detail recorded", latestWeekLabelText = "" }) {
+export function createKpiNoteCard({ title, metric, emptyLabel = "No detail recorded", latestWeekLabelText = "", wide = true }) {
   const value = cleanText(metric?.value);
   const card = createKpiMetricCard({
     title,
     value: value || emptyLabel,
     metric,
     latestWeekLabelText,
-    wide: true,
+    wide,
   });
   card.classList.add("kpi-note-card", "kpi-detail-tile");
   return card;
@@ -566,12 +566,6 @@ function renderBusiness(payload) {
       latestWeekLabelText: latestLabel,
       trendCompanion: true,
     }),
-    createKpiNoteCard({
-      title: "Pending Hours Detail",
-      metric: metricValue(payload, "pendingHoursDetail"),
-      emptyLabel: "No pending-hours detail recorded",
-      latestWeekLabelText: latestLabel,
-    }),
   ]);
 
   appendChildren(businessTrendKpis, [
@@ -598,6 +592,13 @@ function renderBusiness(payload) {
       series: payload?.trendSeries,
       field: "pendingHours",
       formatter: formatHours,
+    }),
+    createKpiNoteCard({
+      title: "Pending Hours Detail",
+      metric: metricValue(payload, "pendingHoursDetail"),
+      emptyLabel: "No pending-hours detail recorded",
+      latestWeekLabelText: latestLabel,
+      wide: false,
     }),
   ]);
 }
