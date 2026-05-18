@@ -10,6 +10,15 @@ function getBooleanFields(fields = {}) {
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => typeof value === "boolean"));
 }
 
+function getFieldTypes(fields = {}) {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [
+      key,
+      value === null ? "null" : Array.isArray(value) ? "array" : typeof value,
+    ])
+  );
+}
+
 function getPresence(fields = {}) {
   return Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value !== undefined && value !== null && value !== ""]));
 }
@@ -24,6 +33,7 @@ function logRecruitmentPatchFailure(endpoint, error, details = {}) {
     graphCode: error?.code || "",
     graphMessage: error?.message || "",
     fieldNames: Object.keys(fields),
+    fieldTypes: getFieldTypes(fields),
     textLengths: getTextLengths(fields),
     booleanFields: getBooleanFields(fields),
     present: getPresence(fields),

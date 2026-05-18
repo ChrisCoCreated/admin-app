@@ -77,6 +77,10 @@ function normalizeDateOnly(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
+function normalizeSharePointDateOnly(value) {
+  return normalizeDateOnly(value) || null;
+}
+
 function extractIndeedProfileUrl(notes) {
   const text = normalizeText(notes);
   if (!text) {
@@ -184,7 +188,7 @@ function buildPatchBody(input = {}) {
     InitialCallSummary: normalizeText(input.initialCallSummary),
     ScreenOutcome: normalizeText(input.screenOutcome),
     ScreenNextSteps: normalizeText(input.screenNextSteps),
-    _x0031_stInterviewDate: normalizeDateOnly(input.firstInterviewDate),
+    _x0031_stInterviewDate: normalizeSharePointDateOnly(input.firstInterviewDate),
     IndeedURL: normalizeText(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,

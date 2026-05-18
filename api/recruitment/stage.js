@@ -32,6 +32,10 @@ function normalizeDateOnly(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 }
 
+function normalizeSharePointDateOnly(value) {
+  return normalizeDateOnly(value) || null;
+}
+
 function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -123,7 +127,7 @@ module.exports = async (req, res) => {
         [fieldMap.nextSteps]: normalizeText(req.body?.nextSteps),
         ...(fieldMap.firstInterviewDate
           ? {
-              [fieldMap.firstInterviewDate]: normalizeDateOnly(req.body?.firstInterviewDate),
+              [fieldMap.firstInterviewDate]: normalizeSharePointDateOnly(req.body?.firstInterviewDate),
             }
           : {}),
       }),
