@@ -14,6 +14,8 @@ const sourceRowCount = document.getElementById("sourceRowCount");
 const deliveryKpis = document.getElementById("deliveryKpis");
 const businessKpis = document.getElementById("businessKpis");
 const businessTrendKpis = document.getElementById("businessTrendKpis");
+const enquiriesKpis = document.getElementById("enquiriesKpis");
+const enquiriesTrendKpis = document.getElementById("enquiriesTrendKpis");
 const recruitmentKpis = document.getElementById("recruitmentKpis");
 const trainingKpis = document.getElementById("trainingKpis");
 const cqcKpis = document.getElementById("cqcKpis");
@@ -509,6 +511,63 @@ function renderBusiness(payload) {
   ]);
 }
 
+function renderEnquiries(payload) {
+  const latestLabel = payload?.latestWeekLabel || "";
+  appendChildren(enquiriesKpis, [
+    createKpiMetricCard({
+      title: "Active Enquiries",
+      value: formatNumber(metricValue(payload, "activeEnquiries")?.value),
+      metric: metricValue(payload, "activeEnquiries"),
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiMetricCard({
+      title: "Enquiries Total /wk",
+      value: formatNumber(metricValue(payload, "enquiriesTotal")?.value),
+      metric: metricValue(payload, "enquiriesTotal"),
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiMetricCard({
+      title: "Solicitor Enquiries",
+      value: formatNumber(metricValue(payload, "enquiriesSolicitor")?.value),
+      metric: metricValue(payload, "enquiriesSolicitor"),
+      latestWeekLabelText: latestLabel,
+    }),
+    createKpiMetricCard({
+      title: "Consumer Enquiries",
+      value: formatNumber(metricValue(payload, "enquiriesConsumer")?.value),
+      metric: metricValue(payload, "enquiriesConsumer"),
+      latestWeekLabelText: latestLabel,
+    }),
+  ]);
+
+  appendChildren(enquiriesTrendKpis, [
+    createKpiTrendCard({
+      title: "Active Enquiries Trend",
+      series: payload?.trendSeries,
+      field: "activeEnquiries",
+      formatter: formatNumber,
+    }),
+    createKpiTrendCard({
+      title: "Total Enquiries Trend",
+      series: payload?.trendSeries,
+      field: "enquiriesTotal",
+      formatter: formatNumber,
+    }),
+    createKpiTrendCard({
+      title: "Solicitor Enquiries Trend",
+      series: payload?.trendSeries,
+      field: "enquiriesSolicitor",
+      formatter: formatNumber,
+    }),
+    createKpiTrendCard({
+      title: "Consumer Enquiries Trend",
+      series: payload?.trendSeries,
+      field: "enquiriesConsumer",
+      formatter: formatNumber,
+    }),
+  ]);
+}
+
 function renderRecruitment(payload) {
   const latestLabel = payload?.latestWeekLabel || "";
   const onboarding = payload?.onboarding || {};
@@ -558,6 +617,7 @@ function renderKpis(payload) {
   renderSummary(payload);
   renderDelivery(payload);
   renderBusiness(payload);
+  renderEnquiries(payload);
   renderRecruitment(payload);
   renderTraining(payload);
   renderCqc(payload);

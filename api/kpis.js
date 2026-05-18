@@ -21,6 +21,10 @@ const KPI_FIELD_DEFINITIONS = {
   hoursLost: ["Hours cancelled  (mth)", "Hours cancelled (mth)", "Hours lost", "Hourscancelled"],
   pendingHours: ["Pending Hours / wk", "Pending Hours", "PendingHours"],
   pendingHoursDetail: ["Pending Hours Detail", "PendingHoursDetail"],
+  activeEnquiries: ["Active Enquiries", "ActiveEnquiries"],
+  enquiriesTotal: ["Enquiries Total /wk", "Depreciated-Enquiries per week", "Enquiries per week", "Enquiriesperweek"],
+  enquiriesSolicitor: ["Enquiries - Solicitor", "Enquiries_x002d_Solicitor"],
+  enquiriesConsumer: ["Enquiries - Consumer", "Enquiries_x002d_Consumer"],
   firstRoundInterviews: ["1st Round Interviews", "_x0031_stRoundInterviews"],
   trainingCompletion: ["Training Completion", "TrainingCompletion"],
   cqcReadiness: ["CQC Readiness", "CQC Readiness ", "CQCReadiness"],
@@ -356,6 +360,19 @@ function deriveTotalHours(row) {
   return (delivered || 0) + (subscription || 0);
 }
 
+function deriveEnquiriesTotal(row) {
+  const stored = getFieldValue(row, "enquiriesTotal");
+  if (hasValue(stored)) {
+    return parseNumber(stored);
+  }
+  const solicitor = parseNumber(getFieldValue(row, "enquiriesSolicitor"));
+  const consumer = parseNumber(getFieldValue(row, "enquiriesConsumer"));
+  if (solicitor === null && consumer === null) {
+    return "";
+  }
+  return (solicitor || 0) + (consumer || 0);
+}
+
 function resolveMetrics(rows) {
   const latestRow = rows[0] || null;
   const metric = (key, derive) => deriveValue(rows, latestRow, key, derive);
@@ -373,6 +390,10 @@ function resolveMetrics(rows) {
       hoursLost: metric("hoursLost"),
       pendingHours: metric("pendingHours"),
       pendingHoursDetail: metric("pendingHoursDetail"),
+      activeEnquiries: metric("activeEnquiries"),
+      enquiriesTotal: metric("enquiriesTotal", deriveEnquiriesTotal),
+      enquiriesSolicitor: metric("enquiriesSolicitor"),
+      enquiriesConsumer: metric("enquiriesConsumer"),
       firstRoundInterviews: metric("firstRoundInterviews"),
       trainingCompletion: metric("trainingCompletion"),
       cqcReadiness: metric("cqcReadiness"),
@@ -391,6 +412,10 @@ function buildTrendSeries(rows) {
       hoursWon: parseNumber(getFieldValue(row, "hoursWon")),
       hoursLost: parseNumber(getFieldValue(row, "hoursLost")),
       pendingHours: parseNumber(getFieldValue(row, "pendingHours")),
+      activeEnquiries: parseNumber(getFieldValue(row, "activeEnquiries")),
+      enquiriesTotal: parseNumber(deriveEnquiriesTotal(row)),
+      enquiriesSolicitor: parseNumber(getFieldValue(row, "enquiriesSolicitor")),
+      enquiriesConsumer: parseNumber(getFieldValue(row, "enquiriesConsumer")),
     }))
     .reverse();
 }
