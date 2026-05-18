@@ -1,7 +1,7 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
-const { normalizeIndeedUrl } = require("../_lib/recruitment-indeed-url");
+const { logRecruitmentPatchFailure } = require("../_lib/recruitment-patch-diagnostics");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -177,7 +177,7 @@ module.exports = async (req, res) => {
   }
 
   const candidateName = normalizeText(req.body?.candidateName);
-  const indeedUrl = normalizeIndeedUrl(req.body?.indeedUrl);
+  const indeedUrl = normalizeText(req.body?.indeedUrl);
   if (!candidateName) {
     res.status(400).json({
       error: {
@@ -187,6 +187,10 @@ module.exports = async (req, res) => {
     });
     return;
   }
+
+  let writeFields = null;
+  let writeOperation = "";
+  let writeItemId = "";
 
   try {
     const config = parseSiteConfig();
@@ -212,6 +216,9 @@ module.exports = async (req, res) => {
           IndeedURL: indeedUrl || matched.indeedProfileUrl,
           Active: req.body?.active === undefined ? matched.active : toBoolean(req.body?.active),
         };
+        writeFields = patchFields;
+        writeOperation = "PATCH existing fields";
+        writeItemId = matched.id;
         const patchUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(matched.id)}/fields`;
         await graphClient.fetchJson(patchUrl, {
           method: "PATCH",
@@ -220,6 +227,7 @@ module.exports = async (req, res) => {
           },
           body: JSON.stringify(patchFields),
         });
+        writeFields = null;
         const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
           matched.id
         )}?$expand=fields`;
@@ -246,6 +254,8 @@ module.exports = async (req, res) => {
       IndeedURL: indeedUrl,
       Active: req.body?.active === undefined ? true : toBoolean(req.body?.active),
     };
+    writeFields = fields;
+    writeOperation = "POST create fields";
 
     const createUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`;
     const created = await graphClient.fetchJson(createUrl, {
@@ -255,6 +265,7 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({ fields }),
     });
+    writeFields = null;
 
     const itemUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(
       created?.id
@@ -268,6 +279,11 @@ module.exports = async (req, res) => {
       item: normalizeRecruitmentItem(fullItem),
     });
   } catch (error) {
+    logRecruitmentPatchFailure("recruitment-create", error, {
+      operation: writeOperation,
+      itemId: writeItemId,
+      fields: writeFields,
+    });
     res.status(Number(error?.status) || 502).json({
       error: {
         code: String(error?.code || "RECRUITMENT_CREATE_FAILED"),

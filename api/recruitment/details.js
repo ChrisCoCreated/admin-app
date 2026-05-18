@@ -1,7 +1,7 @@
 const { requireGraphAuth } = require("../_lib/require-graph-auth");
 const { createGraphDelegatedClient } = require("../_lib/tasks/graph-delegated-client");
 const { RECRUITMENT_ALLOWED_ROLES } = require("../_lib/recruitment-access");
-const { normalizeIndeedUrl } = require("../_lib/recruitment-indeed-url");
+const { logRecruitmentPatchFailure } = require("../_lib/recruitment-patch-diagnostics");
 
 const DEFAULT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_LIST_NAME = "Associate Recruitment";
@@ -84,41 +84,49 @@ module.exports = async (req, res) => {
     return;
   }
 
+  let patchFields = null;
+
   try {
-    const indeedUrl = normalizeIndeedUrl(req.body?.indeedUrl);
     const config = parseSiteConfig();
     const graphClient = createGraphDelegatedClient(req.authUser?.graphAccessToken);
     const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
     const listId = await resolveListId(graphClient, siteId, config.listName);
     const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
 
+    patchFields = {
+      Title: normalizeText(req.body?.candidateName),
+      Location: normalizeText(req.body?.location),
+      Source: normalizeText(req.body?.source),
+      PhoneNumber: normalizeText(req.body?.phoneNumber),
+      Email: normalizeText(req.body?.email),
+      IndeedURL: normalizeText(req.body?.indeedUrl),
+      LivesIn: normalizeText(req.body?.livesIn),
+      EarmarkedFor: normalizeText(req.body?.earmarkedFor),
+      KeepinMind: req.body?.keepInMind === true,
+      Tags: normalizeText(req.body?.tags),
+      Notes: normalizeText(req.body?.notes),
+    };
+
     await graphClient.fetchJson(url, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        Title: normalizeText(req.body?.candidateName),
-        Location: normalizeText(req.body?.location),
-        Source: normalizeText(req.body?.source),
-        PhoneNumber: normalizeText(req.body?.phoneNumber),
-        Email: normalizeText(req.body?.email),
-        IndeedURL: indeedUrl,
-        LivesIn: normalizeText(req.body?.livesIn),
-        EarmarkedFor: normalizeText(req.body?.earmarkedFor),
-        KeepinMind: req.body?.keepInMind === true,
-        Tags: normalizeText(req.body?.tags),
-        Notes: normalizeText(req.body?.notes),
-      }),
+      body: JSON.stringify(patchFields),
     });
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
       success: true,
       itemId,
-      indeedUrl,
+      indeedUrl: patchFields.IndeedURL,
     });
   } catch (error) {
+    logRecruitmentPatchFailure("recruitment-details", error, {
+      operation: "PATCH fields",
+      itemId,
+      fields: patchFields,
+    });
     res.status(Number(error?.status) || 502).json({
       error: {
         code: String(error?.code || "DETAILS_PATCH_FAILED"),
