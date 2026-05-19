@@ -15,6 +15,7 @@ const KPI_FIELD_DEFINITIONS = {
   hoursDelivered: ["Hours Delivered", "Targetaveraging500hoursperweekby"],
   hoursDeliveredPercent: ["Hours Delivered %", "Hours Delivered Percentage", "HoursDeliveredPercent"],
   droppedHoursReasons: ["dropped hours reasons", "Dropped Hours Reasons", "droppedhoursreasons"],
+  explanatoryNotes: ["Explanatory Notes", "ExplanatoryNotes"],
   subscriptionHours: ["Subscription 'Hours'", "Subscription Hours", "SubscriptionHours"],
   totalHours: ["Total Hours", "TotalHours"],
   utilisationPercent: ["Utilisation%", "Utilisation %", "Utilisation", "Utilization%", "Utilization %", "Utilization"],
@@ -27,6 +28,13 @@ const KPI_FIELD_DEFINITIONS = {
   enquiriesTotal: ["Enquiries Total /wk", "Depreciated-Enquiries per week", "Enquiries per week", "Enquiriesperweek"],
   enquiriesSolicitor: ["Enquiries - Solicitor", "Enquiries_x002d_Solicitor"],
   enquiriesConsumer: ["Enquiries - Consumer", "Enquiries_x002d_Consumer"],
+  enquiryConversion: ["Enquiry Conversion", "Enquiry Conversion %", "EnquiryConversion", "EnquiryConversionPercent"],
+  instagramFollowers: ["Instagram Followers", "InstagramFollowers"],
+  facebookFollowers: ["Facebook Followers", "FacebookFollowers"],
+  newsletterSubscribers: ["Thrive Newletter Subs", "Thrive Newsletter Subs", "ThriveNewletterSubs"],
+  webVisits: ["Web Visits", "WebVisits"],
+  domainAuthorityThrive: ["Domain Authority - Thrive", "DomainAuthority_x002d_Thrive"],
+  domainAuthorityPwc: ["Domain Authority - PWC", "DomainAuthority_x002d_PWC"],
   firstRoundInterviews: ["1st Round Interviews", "_x0031_stRoundInterviews"],
   trainingCompletion: ["Training Completion", "TrainingCompletion"],
   cqcReadiness: ["CQC Readiness", "CQC Readiness ", "CQCReadiness"],
@@ -383,6 +391,14 @@ function deriveUtilisationPercent(row) {
   return parsePercent(stored);
 }
 
+function deriveEnquiryConversion(row) {
+  const stored = getFieldValue(row, "enquiryConversion");
+  if (!hasValue(stored)) {
+    return "";
+  }
+  return parsePercent(stored);
+}
+
 function resolveMetrics(rows) {
   const latestRow = rows[0] || null;
   const metric = (key, derive) => deriveValue(rows, latestRow, key, derive);
@@ -394,6 +410,7 @@ function resolveMetrics(rows) {
       hoursDelivered: metric("hoursDelivered"),
       activeContractedHours: metric("activeContractedHours"),
       droppedHoursReasons: metric("droppedHoursReasons"),
+      explanatoryNotes: metric("explanatoryNotes"),
       subscriptionHours: metric("subscriptionHours"),
       totalHours: metric("totalHours", deriveTotalHours),
       utilisationPercent: metric("utilisationPercent", deriveUtilisationPercent),
@@ -406,6 +423,13 @@ function resolveMetrics(rows) {
       enquiriesTotal: metric("enquiriesTotal", deriveEnquiriesTotal),
       enquiriesSolicitor: metric("enquiriesSolicitor"),
       enquiriesConsumer: metric("enquiriesConsumer"),
+      enquiryConversion: metric("enquiryConversion", deriveEnquiryConversion),
+      instagramFollowers: metric("instagramFollowers"),
+      facebookFollowers: metric("facebookFollowers"),
+      newsletterSubscribers: metric("newsletterSubscribers"),
+      webVisits: metric("webVisits"),
+      domainAuthorityThrive: metric("domainAuthorityThrive"),
+      domainAuthorityPwc: metric("domainAuthorityPwc"),
       firstRoundInterviews: metric("firstRoundInterviews"),
       trainingCompletion: metric("trainingCompletion"),
       cqcReadiness: metric("cqcReadiness"),
@@ -429,6 +453,13 @@ function buildTrendSeries(rows) {
       enquiriesTotal: parseNumber(deriveEnquiriesTotal(row)),
       enquiriesSolicitor: parseNumber(getFieldValue(row, "enquiriesSolicitor")),
       enquiriesConsumer: parseNumber(getFieldValue(row, "enquiriesConsumer")),
+      enquiryConversion: parseNumber(deriveEnquiryConversion(row)),
+      instagramFollowers: parseNumber(getFieldValue(row, "instagramFollowers")),
+      facebookFollowers: parseNumber(getFieldValue(row, "facebookFollowers")),
+      newsletterSubscribers: parseNumber(getFieldValue(row, "newsletterSubscribers")),
+      webVisits: parseNumber(getFieldValue(row, "webVisits")),
+      domainAuthorityThrive: parseNumber(getFieldValue(row, "domainAuthorityThrive")),
+      domainAuthorityPwc: parseNumber(getFieldValue(row, "domainAuthorityPwc")),
     }))
     .reverse();
 }

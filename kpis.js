@@ -19,6 +19,8 @@ const businessKpis = document.getElementById("businessKpis");
 const businessTrendKpis = document.getElementById("businessTrendKpis");
 const enquiriesKpis = document.getElementById("enquiriesKpis");
 const enquiriesTrendKpis = document.getElementById("enquiriesTrendKpis");
+const marketingKpis = document.getElementById("marketingKpis");
+const marketingTrendKpis = document.getElementById("marketingTrendKpis");
 const recruitmentKpis = document.getElementById("recruitmentKpis");
 const cqcReadinessKpis = document.getElementById("cqcReadinessKpis");
 
@@ -498,6 +500,14 @@ function renderDelivery(payload) {
       metric: metricValue(payload, "droppedHoursReasons"),
       emptyLabel: "No dropped-hours reason recorded",
       latestWeekLabelText: latestLabel,
+      wide: false,
+    }),
+    createKpiNoteCard({
+      title: "Explanatory Notes",
+      metric: metricValue(payload, "explanatoryNotes"),
+      emptyLabel: "No explanatory notes recorded",
+      latestWeekLabelText: latestLabel,
+      wide: false,
     }),
   ]);
 }
@@ -597,7 +607,6 @@ function renderBusiness(payload) {
       metric: metricValue(payload, "pendingHoursDetail"),
       emptyLabel: "No pending-hours detail recorded",
       latestWeekLabelText: latestLabel,
-      wide: false,
     }),
   ]);
 }
@@ -633,6 +642,13 @@ function renderEnquiries(payload) {
       latestWeekLabelText: latestLabel,
       trendCompanion: true,
     }),
+    createKpiMetricCard({
+      title: "Enquiry Conversion",
+      value: formatPercent(metricValue(payload, "enquiryConversion")?.value),
+      metric: metricValue(payload, "enquiryConversion"),
+      latestWeekLabelText: latestLabel,
+      trendCompanion: true,
+    }),
   ]);
 
   appendChildren(enquiriesTrendKpis, [
@@ -660,7 +676,50 @@ function renderEnquiries(payload) {
       field: "enquiriesConsumer",
       formatter: formatNumber,
     }),
+    createKpiTrendCard({
+      title: "Enquiry Conversion Trend",
+      series: payload?.trendSeries,
+      field: "enquiryConversion",
+      formatter: formatPercent,
+    }),
   ]);
+}
+
+function renderMarketing(payload) {
+  const latestLabel = payload?.latestWeekLabel || "";
+  const marketingMetrics = [
+    ["Instagram Followers", "instagramFollowers"],
+    ["Facebook Followers", "facebookFollowers"],
+    ["Newsletter Subscribers", "newsletterSubscribers"],
+    ["Web Visits", "webVisits"],
+    ["Domain Authority - Thrive", "domainAuthorityThrive"],
+    ["Domain Authority - PWC", "domainAuthorityPwc"],
+  ];
+
+  appendChildren(
+    marketingKpis,
+    marketingMetrics.map(([title, key]) =>
+      createKpiMetricCard({
+        title,
+        value: formatNumber(metricValue(payload, key)?.value),
+        metric: metricValue(payload, key),
+        latestWeekLabelText: latestLabel,
+        trendCompanion: true,
+      })
+    )
+  );
+
+  appendChildren(
+    marketingTrendKpis,
+    marketingMetrics.map(([title, key]) =>
+      createKpiTrendCard({
+        title: `${title} Trend`,
+        series: payload?.trendSeries,
+        field: key,
+        formatter: formatNumber,
+      })
+    )
+  );
 }
 
 function renderRecruitment(payload) {
@@ -709,6 +768,7 @@ function renderKpis(payload) {
   renderUtilisation(payload);
   renderBusiness(payload);
   renderEnquiries(payload);
+  renderMarketing(payload);
   renderRecruitment(payload);
   renderCqcReadiness(payload);
 }
