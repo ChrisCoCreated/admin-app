@@ -36,13 +36,13 @@ const PLACEHOLDER_CATEGORY_OPTIONS = [
 ];
 
 const REPORT_MODES = {
-  simple_summary: {
-    label: "Simple summary report",
-    reportType: "simple_summary",
-  },
   wellbeing_assurance_visit: {
     label: "Wellbeing Assurance Visit Summary",
     reportType: "wellbeing_assurance_visit",
+  },
+  simple_summary: {
+    label: "Simple summary report",
+    reportType: "simple_summary",
   },
 };
 
@@ -169,6 +169,10 @@ function getSelectedReportProvider() {
 function getSelectedReportType() {
   const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES.wellbeing_assurance_visit;
   return mode.reportType || "wellbeing_assurance_visit";
+}
+
+function getGeneratedReportType() {
+  return structuredReport?.report_type || getSelectedReportType();
 }
 
 function syncReportThinkingControl() {
@@ -970,7 +974,7 @@ function updateRestore() {
 }
 
 function buildExportTitle() {
-  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES.wellbeing_assurance_visit;
+  const mode = REPORT_MODES[getGeneratedReportType()] || REPORT_MODES.wellbeing_assurance_visit;
   return mode.label || "Client data report";
 }
 
@@ -1156,7 +1160,8 @@ async function exportWordDoc() {
     updateExportControls();
     return;
   }
-  if (getSelectedReportType() === "simple_summary") {
+  const reportType = getGeneratedReportType();
+  if (reportType === "simple_summary") {
     const html = [
       "<!doctype html>",
       "<html>",
@@ -1189,7 +1194,7 @@ async function exportWordDoc() {
     setExportStatus("Generating Word document...");
     const restoredReport = restoreReportPlaceholders(structuredReport);
     const blob = await directoryApi.exportStructuredReportDocx({
-      reportType: getSelectedReportType(),
+      reportType,
       report: restoredReport,
     });
     downloadBlob(blob, "wellbeing-assurance-visit-summary.docx");
