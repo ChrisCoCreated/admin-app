@@ -15,8 +15,8 @@ def test_validates_nhs_checksum() -> None:
 
 def test_pseudonymises_sample_note_with_stable_role_placeholders() -> None:
     note = (
-        "Paulette Crawley feels safe at Lindau. Carrie is brilliant. "
-        "Discussed Martin Tyrell and selling her properties."
+        "Paul Jones feels safe at Mossbank. Claire is brilliant. "
+        "Discussed Brian Smith and selling her properties."
     )
 
     result = CareNoteAnonymiser().pseudonymise(note)
