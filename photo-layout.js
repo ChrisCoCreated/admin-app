@@ -161,6 +161,17 @@ const LAYOUTS = [
     ],
   },
   {
+    id: "landscape_four",
+    name: "Landscape Four",
+    aspect: 1.3333,
+    slots: [
+      { x: 0, y: 0, w: 0.5, h: 0.5 },
+      { x: 0.5, y: 0, w: 0.5, h: 0.5 },
+      { x: 0, y: 0.5, w: 0.5, h: 0.5 },
+      { x: 0.5, y: 0.5, w: 0.5, h: 0.5 },
+    ],
+  },
+  {
     id: "feature_four_left",
     name: "Feature Four Left",
     aspect: 1.4,
