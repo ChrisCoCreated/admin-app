@@ -25,6 +25,7 @@ module.exports = async (req, res) => {
 
   try {
     const completion = await createChatCompletion({
+      provider: body.provider,
       model: body.model,
       thinking: body.thinking,
       reasoningEffort: body.reasoningEffort || body.reasoning_effort,

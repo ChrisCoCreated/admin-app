@@ -185,6 +185,48 @@ test("routes Azure flash requests through the fast deployment env", async () => 
   assert.equal(result.content, "fast azure");
 });
 
+test("allows request provider to override AI_PROVIDER", async () => {
+  process.env.AI_PROVIDER = "deepseek";
+  process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";
+  process.env.AZURE_OPENAI_API_KEY = "azure-test-key";
+  process.env.AZURE_OPENAI_API_VERSION = "2024-10-21";
+  process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY = "ai-primary-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_FAST = "ai-fast-prod";
+
+  let capturedBody = null;
+  const stubClient = {
+    chat: {
+      completions: {
+        create(body) {
+          capturedBody = body;
+          return {
+            withResponse: async () => ({
+              data: {
+                choices: [{ message: { content: "selected azure" } }],
+                usage: { prompt_tokens: 1, completion_tokens: 1 },
+                model: "ai-primary-prod",
+              },
+              request_id: "req_provider_override",
+            }),
+          };
+        },
+      },
+    },
+  };
+
+  const { createChatCompletion } = loadAiClient();
+  const result = await createChatCompletion({
+    provider: "azure_openai",
+    model: "primary",
+    thinking: "disabled",
+    messages: [{ role: "user", content: "Hi" }],
+    clientFactory: () => stubClient,
+  });
+
+  assert.equal(capturedBody.model, "ai-primary-prod");
+  assert.equal(result.content, "selected azure");
+});
+
 test("maps Azure SDK errors to the existing internal error shape and logs request metadata only", async () => {
   process.env.AI_PROVIDER = "azure_openai";
   process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";

@@ -4,8 +4,16 @@ const { createChatCompletion: createAzureOpenAiChatCompletion } = require("./azu
 const DEFAULT_AI_PROVIDER = "deepseek";
 const SUPPORTED_AI_PROVIDERS = new Set(["deepseek", "azure_openai"]);
 
-function getConfiguredAiProvider() {
-  const provider = normalizeText(process.env.AI_PROVIDER).toLowerCase();
+function normalizeAiProvider(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "openai" || normalized === "azure") {
+    return "azure_openai";
+  }
+  return normalized;
+}
+
+function getConfiguredAiProvider(providerOverride) {
+  const provider = normalizeAiProvider(providerOverride) || normalizeAiProvider(process.env.AI_PROVIDER);
   return provider || DEFAULT_AI_PROVIDER;
 }
 
@@ -15,8 +23,8 @@ function createConfigError(message) {
   return error;
 }
 
-function validateConfiguredAiProvider() {
-  const provider = getConfiguredAiProvider();
+function validateConfiguredAiProvider(providerOverride) {
+  const provider = getConfiguredAiProvider(providerOverride);
   if (!SUPPORTED_AI_PROVIDERS.has(provider)) {
     throw createConfigError(`Unsupported AI_PROVIDER "${provider}". Use deepseek or azure_openai.`);
   }
@@ -94,7 +102,7 @@ function mapAzureOpenAiError(error) {
 }
 
 async function createChatCompletion(options = {}) {
-  const provider = validateConfiguredAiProvider();
+  const provider = validateConfiguredAiProvider(options.provider);
   if (provider === "azure_openai") {
     try {
       return await createAzureOpenAiChatCompletion(options);

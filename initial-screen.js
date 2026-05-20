@@ -55,6 +55,7 @@ const fieldRefs = {
   indeedUrl: document.getElementById("screenIndeedUrlInput"),
   tags: document.getElementById("screenTagsInput"),
   keepInMind: document.getElementById("screenKeepInMindInput"),
+  liveInMailingList: document.getElementById("screenLiveInMailingListInput"),
 };
 
 const authController = createAuthController({
@@ -455,6 +456,7 @@ function fillForm(responses = {}) {
   fieldRefs.indeedUrl.value = cleanText(responses.indeedUrl);
   fieldRefs.tags.value = normalizeTagString(responses.tags);
   fieldRefs.keepInMind.checked = responses.keepInMind === true;
+  fieldRefs.liveInMailingList.checked = responses.liveInMailingList === true;
   syncScoreChipGroup("q1Score", fieldRefs.q1Score.value);
   syncScoreChipGroup("q2Score", fieldRefs.q2Score.value);
   syncScoreChipGroup("q3Score", fieldRefs.q3Score.value);
@@ -489,6 +491,7 @@ function readForm() {
     indeedUrl: cleanText(fieldRefs.indeedUrl.value),
     tags: normalizeTagString(fieldRefs.tags.value),
     keepInMind: fieldRefs.keepInMind.checked === true,
+    liveInMailingList: fieldRefs.liveInMailingList.checked === true,
   };
 }
 

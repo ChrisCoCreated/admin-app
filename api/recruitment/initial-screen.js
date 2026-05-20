@@ -19,6 +19,7 @@ const SCREEN_FIELDS = [
   "IndeedURL",
   "Tags",
   "KeepinMind",
+  "Live_x002d_inmailinglist",
   "Q1_Notes_Availability",
   "Q1_Score",
   "Q2_Notes_ShortNotice",
@@ -191,6 +192,7 @@ function mapInitialScreenItem(item) {
       indeedUrl: normalizeText(fields.IndeedURL) || extractIndeedProfileUrl(fields.Notes),
       tags: normalizeText(fields.Tags),
       keepInMind: toBoolean(fields.KeepinMind),
+      liveInMailingList: toBoolean(fields.Live_x002d_inmailinglist),
     },
   };
 }
@@ -218,6 +220,7 @@ function buildPatchBody(input = {}) {
     IndeedURL: normalizeText(input.indeedUrl),
     Tags: normalizeText(input.tags),
     KeepinMind: input.keepInMind === true,
+    Live_x002d_inmailinglist: input.liveInMailingList === true,
   };
 }
 

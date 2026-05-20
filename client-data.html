@@ -126,6 +126,27 @@
           </div>
         </div>
         <div class="client-data-report-controls">
+          <label class="field" for="reportProviderSelect">
+            Platform
+            <select id="reportProviderSelect">
+              <option value="azure_openai">OpenAI</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+          </label>
+          <label class="field" for="reportModelSelect">
+            Model
+            <select id="reportModelSelect"></select>
+          </label>
+          <label class="field" for="reportThinkingSelect">
+            Thinking
+            <select id="reportThinkingSelect">
+              <option value="disabled">Off</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="max">Max</option>
+            </select>
+          </label>
           <label class="field" for="reportModeSelect">
             Mode
             <select id="reportModeSelect">

@@ -50,6 +50,17 @@ const REPORT_MODES = {
   },
 };
 
+const REPORT_MODEL_OPTIONS = {
+  azure_openai: [
+    { value: "primary", label: "OpenAI primary" },
+    { value: "fast", label: "OpenAI fast" },
+  ],
+  deepseek: [
+    { value: "deepseek-v4-flash", label: "DeepSeek V4 Flash" },
+    { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+  ],
+};
+
 const sourceText = document.getElementById("sourceText");
 const reviewOutput = document.getElementById("reviewOutput");
 const placeholderText = document.getElementById("placeholderText");
@@ -76,6 +87,9 @@ const residualList = document.getElementById("residualList");
 const mappingList = document.getElementById("mappingList");
 const restoreStatus = document.getElementById("restoreStatus");
 const reportStatus = document.getElementById("reportStatus");
+const reportProviderSelect = document.getElementById("reportProviderSelect");
+const reportModelSelect = document.getElementById("reportModelSelect");
+const reportThinkingSelect = document.getElementById("reportThinkingSelect");
 const reportModeSelect = document.getElementById("reportModeSelect");
 const generateReportBtn = document.getElementById("generateReportBtn");
 const exportStatus = document.getElementById("exportStatus");
@@ -144,6 +158,46 @@ function setReportBusy(nextBusy) {
     generateReportBtn.textContent = reportBusy ? "Generating..." : "Generate report";
   }
   updateReportControls();
+}
+
+function getSelectedReportProvider() {
+  return reportProviderSelect?.value || "azure_openai";
+}
+
+function getSelectedThinkingOptions() {
+  const value = reportThinkingSelect?.value || "disabled";
+  if (value === "disabled") {
+    return {
+      thinking: "disabled",
+      reasoningEffort: null,
+    };
+  }
+  return {
+    thinking: "enabled",
+    reasoningEffort: value,
+  };
+}
+
+function populateReportModels() {
+  if (!reportModelSelect) {
+    return;
+  }
+
+  const provider = getSelectedReportProvider();
+  const options = REPORT_MODEL_OPTIONS[provider] || REPORT_MODEL_OPTIONS.azure_openai;
+  const previousValue = reportModelSelect.value;
+  reportModelSelect.innerHTML = "";
+
+  for (const item of options) {
+    const option = document.createElement("option");
+    option.value = item.value;
+    option.textContent = item.label;
+    reportModelSelect.appendChild(option);
+  }
+
+  if (options.some((item) => item.value === previousValue)) {
+    reportModelSelect.value = previousValue;
+  }
 }
 
 function setExportStatus(message, isError = false) {
@@ -340,10 +394,14 @@ async function generateReport() {
   }
 
   setReportBusy(true);
+  const thinkingOptions = getSelectedThinkingOptions();
   setReportStatus("Generating report...");
   try {
     const response = await directoryApi.createAiChatCompletion({
-      thinking: "disabled",
+      provider: getSelectedReportProvider(),
+      model: reportModelSelect?.value,
+      thinking: thinkingOptions.thinking,
+      reasoningEffort: thinkingOptions.reasoningEffort,
       maxTokens: 1200,
       temperature: 0.2,
       messages: [
@@ -1107,6 +1165,16 @@ exportWordBtn?.addEventListener("click", exportWordDoc);
 generateReportBtn?.addEventListener("click", () => {
   void generateReport();
 });
+reportProviderSelect?.addEventListener("change", () => {
+  populateReportModels();
+  setReportStatus(`${reportProviderSelect.options[reportProviderSelect.selectedIndex]?.text || "Provider"} selected.`);
+});
+reportModelSelect?.addEventListener("change", () => {
+  setReportStatus(`${reportModelSelect.options[reportModelSelect.selectedIndex]?.text || "Model"} selected.`);
+});
+reportThinkingSelect?.addEventListener("change", () => {
+  setReportStatus(`${reportThinkingSelect.options[reportThinkingSelect.selectedIndex]?.text || "Thinking"} thinking selected.`);
+});
 reportModeSelect?.addEventListener("change", () => {
   const mode = REPORT_MODES[reportModeSelect.value] || REPORT_MODES["simple-summary"];
   setReportStatus(`${mode.label} selected.`);
@@ -1123,4 +1191,5 @@ signOutBtn?.addEventListener("click", () => {
 
 updateCounts();
 renderReviewOutput();
+populateReportModels();
 void init();
