@@ -89,6 +89,7 @@ const restoreStatus = document.getElementById("restoreStatus");
 const reportStatus = document.getElementById("reportStatus");
 const reportProviderSelect = document.getElementById("reportProviderSelect");
 const reportModelSelect = document.getElementById("reportModelSelect");
+const reportThinkingField = document.getElementById("reportThinkingField");
 const reportThinkingSelect = document.getElementById("reportThinkingSelect");
 const reportModeSelect = document.getElementById("reportModeSelect");
 const generateReportBtn = document.getElementById("generateReportBtn");
@@ -164,7 +165,24 @@ function getSelectedReportProvider() {
   return reportProviderSelect?.value || "azure_openai";
 }
 
+function syncReportThinkingControl() {
+  const isAzure = getSelectedReportProvider() === "azure_openai";
+  if (reportThinkingField) {
+    reportThinkingField.hidden = isAzure;
+  }
+  if (isAzure && reportThinkingSelect) {
+    reportThinkingSelect.value = "disabled";
+  }
+}
+
 function getSelectedThinkingOptions() {
+  if (getSelectedReportProvider() === "azure_openai") {
+    return {
+      thinking: "disabled",
+      reasoningEffort: null,
+    };
+  }
+
   const value = reportThinkingSelect?.value || "disabled";
   if (value === "disabled") {
     return {
@@ -1175,6 +1193,7 @@ generateReportBtn?.addEventListener("click", () => {
 });
 reportProviderSelect?.addEventListener("change", () => {
   populateReportModels();
+  syncReportThinkingControl();
   setReportStatus(`${reportProviderSelect.options[reportProviderSelect.selectedIndex]?.text || "Provider"} selected.`);
 });
 reportModelSelect?.addEventListener("change", () => {
@@ -1200,4 +1219,5 @@ signOutBtn?.addEventListener("click", () => {
 updateCounts();
 renderReviewOutput();
 populateReportModels();
+syncReportThinkingControl();
 void init();
