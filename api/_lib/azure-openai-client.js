@@ -26,6 +26,14 @@ function normalizeEndpoint(value) {
   return endpoint.replace(/\/+$/, "");
 }
 
+function endpointHost(endpoint) {
+  try {
+    return new URL(endpoint).host || null;
+  } catch (_error) {
+    return normalizeText(endpoint).replace(/^https?:\/\//i, "").split("/")[0] || null;
+  }
+}
+
 function normalizeApiVersion(value) {
   const apiVersion = normalizeText(value || process.env.AZURE_OPENAI_API_VERSION);
   if (!apiVersion) {
@@ -81,6 +89,28 @@ function resolveDeploymentName(options = {}) {
   return normalizeDeployment(options.deployment);
 }
 
+function buildAzureRouteMetadata({ endpoint, apiVersion, deployment, requestedModel }) {
+  return {
+    provider: "azure_openai",
+    requestedModel: normalizeText(requestedModel) || null,
+    deployment,
+    apiVersion,
+    endpointHost: endpointHost(endpoint),
+  };
+}
+
+function resolveAzureRouteMetadata(options = {}) {
+  const deployment = resolveDeploymentName(options);
+  const endpoint = normalizeEndpoint(options.endpoint);
+  const apiVersion = normalizeApiVersion(options.apiVersion || options.api_version);
+  return buildAzureRouteMetadata({
+    endpoint,
+    apiVersion,
+    deployment,
+    requestedModel: options.model,
+  });
+}
+
 function mapThinkingToReasoningEffort(thinking, effort) {
   if (thinking === "disabled") {
     return "none";
@@ -109,7 +139,8 @@ function buildClient(options = {}) {
 }
 
 async function createChatCompletion(options = {}) {
-  const deployment = resolveDeploymentName(options);
+  const aiRoute = resolveAzureRouteMetadata(options);
+  const deployment = aiRoute.deployment;
   const thinking = normalizeThinking(options.thinking, null);
   const body = {
     model: deployment,
@@ -148,13 +179,24 @@ async function createChatCompletion(options = {}) {
 
   const client = buildClient({
     ...options,
+    endpoint: options.endpoint,
+    apiVersion: aiRoute.apiVersion,
     deployment,
   });
-  const request = client.chat.completions.create(body, {
-    maxRetries: 0,
-    timeout: SDK_TIMEOUT_MS,
-  });
-  const { data: payload, request_id: requestId } = await request.withResponse();
+  let payload;
+  let requestId;
+  try {
+    const request = client.chat.completions.create(body, {
+      maxRetries: 0,
+      timeout: SDK_TIMEOUT_MS,
+    });
+    const response = await request.withResponse();
+    payload = response.data;
+    requestId = response.request_id;
+  } catch (error) {
+    error.aiRoute = aiRoute;
+    throw error;
+  }
 
   return {
     payload,
@@ -166,9 +208,11 @@ async function createChatCompletion(options = {}) {
     thinking: thinking || null,
     reasoningEffort: thinking ? body.reasoning_effort : null,
     requestId,
+    aiRoute,
   };
 }
 
 module.exports = {
   createChatCompletion,
+  resolveAzureRouteMetadata,
 };

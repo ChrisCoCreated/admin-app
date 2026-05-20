@@ -1,5 +1,8 @@
 const { createChatCompletion: createDeepSeekChatCompletion, normalizeText } = require("./deepseek-client");
-const { createChatCompletion: createAzureOpenAiChatCompletion } = require("./azure-openai-client");
+const {
+  createChatCompletion: createAzureOpenAiChatCompletion,
+  resolveAzureRouteMetadata,
+} = require("./azure-openai-client");
 
 const DEFAULT_AI_PROVIDER = "deepseek";
 const SUPPORTED_AI_PROVIDERS = new Set(["deepseek", "azure_openai"]);
@@ -56,13 +59,23 @@ function validateConfiguredAiProvider(providerOverride) {
   return provider;
 }
 
-function logAiProviderError(provider, error) {
+function logAiProviderError(provider, error, fallbackRoute = null) {
   const requestId = normalizeText(error?.requestId || error?.requestID);
+  const aiRoute =
+    error?.aiRoute && typeof error.aiRoute === "object"
+      ? error.aiRoute
+      : fallbackRoute && typeof fallbackRoute === "object"
+        ? fallbackRoute
+        : {};
   console.error("[ai-provider] request failed", {
     provider,
     requestId: requestId || null,
     status: Number(error?.status) || null,
     code: normalizeText(error?.code) || null,
+    requestedModel: normalizeText(aiRoute.requestedModel) || null,
+    deployment: normalizeText(aiRoute.deployment) || null,
+    apiVersion: normalizeText(aiRoute.apiVersion) || null,
+    endpointHost: normalizeText(aiRoute.endpointHost) || null,
   });
 }
 
@@ -72,6 +85,7 @@ function mapAzureOpenAiError(error) {
   mapped.status = status;
   mapped.requestId = normalizeText(error?.requestId || error?.requestID) || null;
   mapped.code = normalizeText(error?.code) || null;
+  mapped.aiRoute = error?.aiRoute || null;
 
   if (status === 400 || status === 422) {
     mapped.message = "Azure OpenAI rejected the AI request.";
@@ -104,10 +118,14 @@ function mapAzureOpenAiError(error) {
 async function createChatCompletion(options = {}) {
   const provider = validateConfiguredAiProvider(options.provider);
   if (provider === "azure_openai") {
+    const aiRoute = resolveAzureRouteMetadata(options);
     try {
       return await createAzureOpenAiChatCompletion(options);
     } catch (error) {
-      logAiProviderError(provider, error);
+      logAiProviderError(provider, error, aiRoute);
+      if (!error.aiRoute) {
+        error.aiRoute = aiRoute;
+      }
       throw mapAzureOpenAiError(error);
     }
   }

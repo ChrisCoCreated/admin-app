@@ -4,7 +4,7 @@ import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260512";
 
 const EXAMPLE_NOTE =
-  "Paulette Crawley feels safe at Lindau. Carrie is brilliant. Discussed Martin Tyrell and selling her properties.";
+  "Paul Jones feels safe at Mossbank. Claire is brilliant. Discussed Bob Smith and selling her properties.";
 
 const LLM_COPY_PREFIX = [
   "Instructions for the LLM:",
@@ -428,7 +428,15 @@ async function generateReport() {
     setReportStatus("Report generated into the restore box.");
     setStatus("Generated report. Restored text updated.");
   } catch (error) {
-    setReportStatus(error?.message || "Could not generate report.", true);
+    const message = error?.message || "Could not generate report.";
+    if (/Azure OpenAI deployment not found/i.test(message)) {
+      setReportStatus(
+        "Azure OpenAI deployment not found. Check the selected OpenAI model/deployment configuration.",
+        true
+      );
+    } else {
+      setReportStatus(message, true);
+    }
   } finally {
     setReportBusy(false);
   }

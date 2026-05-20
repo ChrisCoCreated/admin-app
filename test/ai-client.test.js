@@ -141,6 +141,13 @@ test("routes Azure requests through the configured deployment with a mocked Open
   assert.deepEqual(capturedBody.response_format, { type: "json_object" });
   assert.equal(result.content, "hello from azure");
   assert.equal(result.model, "ai-primary-prod");
+  assert.deepEqual(result.aiRoute, {
+    provider: "azure_openai",
+    requestedModel: "deepseek-v4-pro",
+    deployment: "ai-primary-prod",
+    apiVersion: "2024-10-21",
+    endpointHost: "example-resource.openai.azure.com",
+  });
 });
 
 test("routes Azure flash requests through the fast deployment env", async () => {
@@ -183,6 +190,13 @@ test("routes Azure flash requests through the fast deployment env", async () => 
   assert.equal(capturedBody.model, "ai-fast-prod");
   assert.equal(result.model, "ai-fast-prod");
   assert.equal(result.content, "fast azure");
+  assert.deepEqual(result.aiRoute, {
+    provider: "azure_openai",
+    requestedModel: "deepseek-v4-flash",
+    deployment: "ai-fast-prod",
+    apiVersion: "2024-10-21",
+    endpointHost: "example-resource.openai.azure.com",
+  });
 });
 
 test("allows request provider to override AI_PROVIDER", async () => {
@@ -280,5 +294,73 @@ test("maps Azure SDK errors to the existing internal error shape and logs reques
     requestId: "req_auth_401",
     status: 401,
     code: "unauthorized",
+    requestedModel: null,
+    deployment: "ai-primary-prod",
+    apiVersion: "2024-10-21",
+    endpointHost: "example-resource.openai.azure.com",
   });
+});
+
+test("maps Azure DeploymentNotFound and logs safe deployment routing metadata", async () => {
+  process.env.AI_PROVIDER = "azure_openai";
+  process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";
+  process.env.AZURE_OPENAI_API_KEY = "azure-test-key";
+  process.env.AZURE_OPENAI_API_VERSION = "2024-10-21";
+  process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY = "ai-primary-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_FAST = "ai-fast-prod";
+
+  const logged = [];
+  console.error = (...args) => {
+    logged.push(args);
+  };
+
+  const stubClient = {
+    chat: {
+      completions: {
+        create(body) {
+          assert.equal(body.model, "ai-fast-prod");
+          assert.equal(body.messages[0].content, "Sensitive prompt text");
+          return {
+            withResponse: async () => {
+              const error = new Error("Deployment missing");
+              error.status = 404;
+              error.code = "DeploymentNotFound";
+              throw error;
+            },
+          };
+        },
+      },
+    },
+  };
+
+  const { createChatCompletion } = loadAiClient();
+
+  await assert.rejects(
+    () =>
+      createChatCompletion({
+        provider: "azure_openai",
+        model: "fast",
+        messages: [{ role: "user", content: "Sensitive prompt text" }],
+        clientFactory: () => stubClient,
+      }),
+    (error) => {
+      assert.equal(error.message, "Azure OpenAI deployment not found.");
+      assert.equal(error.status, 404);
+      return true;
+    }
+  );
+
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0][0], "[ai-provider] request failed");
+  assert.deepEqual(logged[0][1], {
+    provider: "azure_openai",
+    requestId: null,
+    status: 404,
+    code: "DeploymentNotFound",
+    requestedModel: "fast",
+    deployment: "ai-fast-prod",
+    apiVersion: "2024-10-21",
+    endpointHost: "example-resource.openai.azure.com",
+  });
+  assert.equal(JSON.stringify(logged).includes("Sensitive prompt text"), false);
 });
