@@ -648,6 +648,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listCompanyMarketingAssets(query = {}) {
+      const response = await authFetch(buildUrl("/api/marketing/company-assets", query));
+      if (!response.ok) {
+        await parseError(response, "Company assets request failed");
+      }
+      return response.json();
+    },
+
     async getMarketingMedia(query = {}) {
       const response = await authFetch(buildUrl("/api/marketing/media", query));
       if (!response.ok) {

@@ -21,10 +21,10 @@ const LAYOUT_BACKGROUND_COLORS = new Set([
   "#3aceac",
   "#ffd23f",
 ]);
-const COMPANY_ASSETS = [
+const COMPANY_ASSETS_FALLBACK = [
   {
-    id: `${COMPANY_ASSET_PREFIX}_thrive_full`,
-    title: "Thrive Full Logo",
+    id: `${COMPANY_ASSET_PREFIX}_toucan_full_svg`,
+    title: "Toucan Full",
     client: "Company Assets",
     imageUrl: "./assets/company_marketing_assets/toucan-full.svg",
     mediaUrl: "./assets/company_marketing_assets/toucan-full.svg",
@@ -33,8 +33,8 @@ const COMPANY_ASSETS = [
     fileName: "toucan-full.svg",
   },
   {
-    id: `${COMPANY_ASSET_PREFIX}_thrive_app_icon`,
-    title: "Thrive App Icon",
+    id: `${COMPANY_ASSET_PREFIX}_app_icon_svg`,
+    title: "App Icon",
     client: "Company Assets",
     imageUrl: "./assets/company_marketing_assets/app-icon.svg",
     mediaUrl: "./assets/company_marketing_assets/app-icon.svg",
@@ -43,8 +43,8 @@ const COMPANY_ASSETS = [
     fileName: "app-icon.svg",
   },
   {
-    id: `${COMPANY_ASSET_PREFIX}_thrive_mascot`,
-    title: "Thrive Mascot",
+    id: `${COMPANY_ASSET_PREFIX}_thrive_mascot_rgb_svg`,
+    title: "Thrive Mascot RGB",
     client: "Company Assets",
     imageUrl: "./assets/company_marketing_assets/thrive-mascot-RGB.svg",
     mediaUrl: "./assets/company_marketing_assets/thrive-mascot-RGB.svg",
@@ -53,8 +53,8 @@ const COMPANY_ASSETS = [
     fileName: "thrive-mascot-RGB.svg",
   },
   {
-    id: `${COMPANY_ASSET_PREFIX}_pwc_colour_logo`,
-    title: "Plan with Care Colour Logo",
+    id: `${COMPANY_ASSET_PREFIX}_pwc_colour_logo_png`,
+    title: "Pwc Colour Logo",
     client: "Company Assets",
     imageUrl: "./assets/company_marketing_assets/PwC Colour Logo.png",
     mediaUrl: "./assets/company_marketing_assets/PwC Colour Logo.png",
@@ -63,8 +63,8 @@ const COMPANY_ASSETS = [
     fileName: "PwC Colour Logo.png",
   },
   {
-    id: `${COMPANY_ASSET_PREFIX}_pwc_white_logo`,
-    title: "Plan with Care White Logo",
+    id: `${COMPANY_ASSET_PREFIX}_pwc_white_logo_png`,
+    title: "Pwc White Logo",
     client: "Company Assets",
     imageUrl: "./assets/company_marketing_assets/PwC White Logo.png",
     mediaUrl: "./assets/company_marketing_assets/PwC White Logo.png",
@@ -73,7 +73,7 @@ const COMPANY_ASSETS = [
     fileName: "PwC White Logo.png",
   },
   {
-    id: `${COMPANY_ASSET_PREFIX}_thrive_team`,
+    id: `${COMPANY_ASSET_PREFIX}_the_thrive_homecare_team_jpg`,
     title: "The Thrive Homecare Team",
     client: "Company Assets",
     imageUrl: "./assets/company_marketing_assets/The Thrive Homecare team.jpg",
@@ -339,6 +339,7 @@ const directoryApi = createDirectoryApi(authController);
 let allPhotos = [];
 let clientPhotoPool = [];
 let cachedClients = [];
+let companyAssets = COMPANY_ASSETS_FALLBACK.slice();
 let selectedClient = "";
 let selectedImages = [];
 let selectedSlotIndex = -1;
@@ -539,7 +540,7 @@ function getImageAspectRatioMode() {
 
 function getClientPhotos() {
   if (showCompanyAssets) {
-    return [...COMPANY_ASSETS, ...clientPhotoPool];
+    return [...companyAssets, ...clientPhotoPool];
   }
   return clientPhotoPool;
 }
@@ -549,10 +550,24 @@ function canUseCompanyAssets() {
 }
 
 function getLogoOverlayAssets() {
-  return COMPANY_ASSETS.filter((asset) => {
+  return companyAssets.filter((asset) => {
     const fileName = String(asset?.fileName || "").toLowerCase();
     return !fileName.includes("app-icon");
   });
+}
+
+async function loadCompanyAssets() {
+  try {
+    const payload = await directoryApi.listCompanyMarketingAssets();
+    const assets = Array.isArray(payload?.assets) ? payload.assets : [];
+    if (assets.length) {
+      companyAssets = assets;
+      return;
+    }
+  } catch (error) {
+    console.error("[Photo Layout Debug] Company assets load failed.", error);
+  }
+  companyAssets = COMPANY_ASSETS_FALLBACK.slice();
 }
 
 function getActiveLogoOverlay() {
@@ -1767,6 +1782,7 @@ async function init() {
     renderTopNavigation({ role });
     const email = String(profile?.email || "").trim();
     setStatus(email ? `Signed in as ${email}` : "Signed in");
+    await loadCompanyAssets();
     await loadPhotos();
   } catch (error) {
     if (error?.status === 403) {
