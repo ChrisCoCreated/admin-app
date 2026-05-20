@@ -107,6 +107,7 @@ const detailInputs = {
 };
 
 const detailTagsPreview = document.getElementById("detailTagsPreview");
+const detailTagsAutocomplete = document.getElementById("detailTagsAutocomplete");
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -579,6 +580,71 @@ function splitTagList(value) {
 
 function normalizeTagString(value) {
   return splitTagList(value).join(", ");
+}
+
+function getTagAutocompleteState(rawValue) {
+  const value = String(rawValue || "");
+  const separatorMatches = [...value.matchAll(/[,\n;|]/g)];
+  const lastSeparatorIndex = separatorMatches.length ? separatorMatches[separatorMatches.length - 1].index : -1;
+  const prefix = lastSeparatorIndex >= 0 ? value.slice(0, lastSeparatorIndex + 1) : "";
+  const token = cleanText(lastSeparatorIndex >= 0 ? value.slice(lastSeparatorIndex + 1) : value);
+  return {
+    token,
+    selectedTags: splitTagList(prefix),
+  };
+}
+
+function getRecruitmentTagChoices() {
+  const tags = new Set();
+  for (const candidate of allCandidates) {
+    for (const tag of splitTagList(candidate?.tags)) {
+      tags.add(tag);
+    }
+  }
+  return Array.from(tags).sort((left, right) => left.localeCompare(right, "en", { sensitivity: "base" }));
+}
+
+function getFilteredTagChoices(rawValue, choices) {
+  const { token, selectedTags } = getTagAutocompleteState(rawValue);
+  const selectedSet = new Set(selectedTags.map((tag) => tag.toLowerCase()));
+  return (Array.isArray(choices) ? choices : [])
+    .map(cleanText)
+    .filter(Boolean)
+    .filter((tag) => !selectedSet.has(tag.toLowerCase()))
+    .filter((tag) => !token || tag.toLowerCase().includes(token.toLowerCase()));
+}
+
+function renderTagAutocomplete(node, input, choices) {
+  if (!node || !input) {
+    return;
+  }
+  const filtered = getFilteredTagChoices(input.value, choices);
+  if (!filtered.length) {
+    node.hidden = true;
+    node.innerHTML = "";
+    return;
+  }
+  node.innerHTML = filtered
+    .map((tag) => `<button type="button" class="tag-autocomplete-option" data-tag-option="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`)
+    .join("");
+  node.hidden = false;
+}
+
+function hideTagAutocomplete(node) {
+  if (node) {
+    node.hidden = true;
+  }
+}
+
+function applyAutocompleteTag(input, tag) {
+  if (!input || !tag) {
+    return;
+  }
+  const existing = splitTagList(input.value);
+  if (!existing.some((item) => item.toLowerCase() === tag.toLowerCase())) {
+    existing.push(tag);
+  }
+  input.value = existing.join(", ") + ", ";
 }
 
 function renderTagPreview(node, tags, emptyLabel = "No tags yet") {
@@ -1632,6 +1698,7 @@ function openStatusQuickMenu(candidate, anchorEl) {
 
 function setDetail(candidate) {
   if (!candidate) {
+    hideTagAutocomplete(detailTagsAutocomplete);
     if (candidateDetailModalTitle) {
       candidateDetailModalTitle.textContent = "Candidate Detail";
     }
@@ -1679,6 +1746,7 @@ function setDetail(candidate) {
     return;
   }
 
+  hideTagAutocomplete(detailTagsAutocomplete);
   if (candidateDetailModalTitle) {
     candidateDetailModalTitle.textContent = cleanText(candidate.candidateName) || "Candidate Detail";
   }
@@ -2875,10 +2943,38 @@ recruitmentTableBody?.addEventListener("toggle", (event) => {
 }, true);
 detailInputs.tags?.addEventListener("input", () => {
   renderTagPreview(detailTagsPreview, detailInputs.tags.value);
+  renderTagAutocomplete(detailTagsAutocomplete, detailInputs.tags, getRecruitmentTagChoices());
+});
+detailInputs.tags?.addEventListener("focus", () => {
+  renderTagAutocomplete(detailTagsAutocomplete, detailInputs.tags, getRecruitmentTagChoices());
 });
 detailInputs.tags?.addEventListener("blur", () => {
   detailInputs.tags.value = normalizeTagString(detailInputs.tags.value);
   renderTagPreview(detailTagsPreview, detailInputs.tags.value);
+  window.setTimeout(() => {
+    hideTagAutocomplete(detailTagsAutocomplete);
+  }, 120);
+});
+detailTagsAutocomplete?.addEventListener("click", (event) => {
+  const option = event.target instanceof Element ? event.target.closest("[data-tag-option]") : null;
+  if (!option || !detailInputs.tags) {
+    return;
+  }
+  event.preventDefault();
+  applyAutocompleteTag(detailInputs.tags, cleanText(option.getAttribute("data-tag-option")));
+  renderTagPreview(detailTagsPreview, detailInputs.tags.value);
+  renderTagAutocomplete(detailTagsAutocomplete, detailInputs.tags, getRecruitmentTagChoices());
+  detailInputs.tags.focus();
+});
+document.addEventListener("click", (event) => {
+  if (
+    detailTagsAutocomplete &&
+    detailInputs.tags &&
+    !detailTagsAutocomplete.contains(event.target) &&
+    event.target !== detailInputs.tags
+  ) {
+    hideTagAutocomplete(detailTagsAutocomplete);
+  }
 });
 detailInputs.indeedUrl?.addEventListener("input", () => {
   setIndeedButton(detailInputs.indeedUrl.value);

@@ -2866,6 +2866,39 @@ dd {
   min-height: 20px;
 }
 
+.tag-autocomplete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -2px;
+  margin-bottom: 2px;
+  padding: 10px 12px;
+  border: 1px solid #d8e1ed;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfdff 0%, #f5f9fd 100%);
+}
+
+.tag-autocomplete-option {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #d8e1ed;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #234156;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.tag-autocomplete-option:hover {
+  transform: translateY(-1px);
+  border-color: rgba(49, 183, 200, 0.46);
+  background: #effbfd;
+}
+
 .tag-chip {
   display: inline-flex;
   align-items: center;

@@ -38,6 +38,7 @@ const SCREEN_FIELDS = [
   "ScreenNextSteps",
   "_x0031_stInterviewDate",
 ];
+const TAGS_QUERY_FIELDS = ["Tags"];
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -75,6 +76,31 @@ function normalizeScore(value) {
 function normalizeDateOnly(value) {
   const normalized = normalizeText(value);
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
+}
+
+function collectTagChoices(items = []) {
+  const tags = new Set();
+  for (const item of items) {
+    const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
+    for (const part of normalizeText(fields.Tags).split(/[,\n;|]+/)) {
+      const tag = normalizeText(part);
+      if (tag) {
+        tags.add(tag);
+      }
+    }
+  }
+  return Array.from(tags).sort((left, right) => left.localeCompare(right, "en", { sensitivity: "base" }));
+}
+
+async function fetchListItems(graphClient, siteId, listId, fieldNames) {
+  const items = [];
+  let nextUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?$expand=fields($select=${fieldNames.join(",")})&$top=200`;
+  while (nextUrl) {
+    const payload = await graphClient.fetchJson(nextUrl);
+    items.push(...(Array.isArray(payload?.value) ? payload.value : []));
+    nextUrl = normalizeText(payload?.["@odata.nextLink"]);
+  }
+  return items;
 }
 
 function normalizeSharePointDateOnly(value) {
@@ -251,10 +277,12 @@ module.exports = async (req, res) => {
     }
 
     const item = mapInitialScreenItem(await graphClient.fetchJson(itemUrl));
+    const tagChoices = collectTagChoices(await fetchListItems(graphClient, siteId, listId, TAGS_QUERY_FIELDS));
 
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
       item,
+      tagChoices,
     });
   } catch (error) {
     if (req.method === "POST") {

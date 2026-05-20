@@ -29,6 +29,7 @@ const screenSummaryTitle = document.getElementById("screenSummaryTitle");
 const screenSummaryContact = document.getElementById("screenSummaryContact");
 const screenSummaryTags = document.getElementById("screenSummaryTags");
 const screenTagsPreview = document.getElementById("screenTagsPreview");
+const screenTagsAutocomplete = document.getElementById("screenTagsAutocomplete");
 const screenFirstInterviewDateField = document.getElementById("screenFirstInterviewDateField");
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
@@ -65,6 +66,7 @@ const directoryApi = createDirectoryApi(authController);
 let currentItemId = "";
 let currentCandidateItem = null;
 let savedFirstInterviewDate = "";
+let availableTagChoices = [];
 let saveBusy = false;
 let copyFeedbackTimer = 0;
 let restoreDocumentTitle = document.title;
@@ -120,6 +122,63 @@ function renderTagPreview(node, tags, emptyLabel = "No tags yet") {
     return;
   }
   node.innerHTML = list.map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("");
+}
+
+function getTagAutocompleteState(rawValue) {
+  const value = String(rawValue || "");
+  const separatorMatches = [...value.matchAll(/[,\n;|]/g)];
+  const lastSeparatorIndex = separatorMatches.length ? separatorMatches[separatorMatches.length - 1].index : -1;
+  const prefix = lastSeparatorIndex >= 0 ? value.slice(0, lastSeparatorIndex + 1) : "";
+  const token = cleanText(lastSeparatorIndex >= 0 ? value.slice(lastSeparatorIndex + 1) : value);
+  return {
+    prefix,
+    token,
+    selectedTags: splitTagList(prefix),
+  };
+}
+
+function getFilteredTagChoices(rawValue, choices) {
+  const { token, selectedTags } = getTagAutocompleteState(rawValue);
+  const selectedSet = new Set(selectedTags.map((tag) => tag.toLowerCase()));
+  return (Array.isArray(choices) ? choices : [])
+    .map(cleanText)
+    .filter(Boolean)
+    .filter((tag) => !selectedSet.has(tag.toLowerCase()))
+    .filter((tag) => !token || tag.toLowerCase().includes(token.toLowerCase()));
+}
+
+function renderTagAutocomplete(node, input, choices) {
+  if (!node || !input) {
+    return;
+  }
+  const filtered = getFilteredTagChoices(input.value, choices);
+  if (!filtered.length) {
+    node.hidden = true;
+    node.innerHTML = "";
+    return;
+  }
+  node.innerHTML = filtered
+    .map((tag) => `<button type="button" class="tag-autocomplete-option" data-tag-option="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`)
+    .join("");
+  node.hidden = false;
+}
+
+function hideTagAutocomplete(node) {
+  if (!node) {
+    return;
+  }
+  node.hidden = true;
+}
+
+function applyAutocompleteTag(input, tag) {
+  if (!input || !tag) {
+    return;
+  }
+  const existing = splitTagList(input.value);
+  if (!existing.some((item) => item.toLowerCase() === tag.toLowerCase())) {
+    existing.push(tag);
+  }
+  input.value = existing.join(", ") + ", ";
 }
 
 function normalizePhoneForActions(phoneNumber) {
@@ -671,6 +730,7 @@ async function loadInitialScreen() {
   setFormEnabled(false);
   const payload = await directoryApi.getRecruitmentInitialScreen({ itemId: currentItemId });
   const item = payload?.item || null;
+  availableTagChoices = Array.isArray(payload?.tagChoices) ? payload.tagChoices.map(cleanText).filter(Boolean) : [];
   if (!item?.itemId) {
     throw new Error("Candidate screening record could not be loaded.");
   }
@@ -678,6 +738,7 @@ async function loadInitialScreen() {
   renderCandidateHeader(item);
   savedFirstInterviewDate = cleanText(item?.responses?.firstInterviewDate);
   fillForm(item.responses || {});
+  hideTagAutocomplete(screenTagsAutocomplete);
   const localDraft = loadLocalDraft(currentItemId);
   if (localDraft?.responses && typeof localDraft.responses === "object") {
     fillForm(localDraft.responses);
@@ -791,7 +852,12 @@ for (const field of Object.values(fieldRefs)) {
 
 fieldRefs.tags?.addEventListener("input", () => {
   renderScoreSummary();
+  renderTagAutocomplete(screenTagsAutocomplete, fieldRefs.tags, availableTagChoices);
   saveLocalDraft();
+});
+
+fieldRefs.tags?.addEventListener("focus", () => {
+  renderTagAutocomplete(screenTagsAutocomplete, fieldRefs.tags, availableTagChoices);
 });
 
 copyScreenSummaryBtn?.addEventListener("click", async () => {
@@ -821,6 +887,33 @@ fieldRefs.tags?.addEventListener("blur", () => {
   fieldRefs.tags.value = normalizeTagString(fieldRefs.tags.value);
   renderScoreSummary();
   saveLocalDraft();
+  window.setTimeout(() => {
+    hideTagAutocomplete(screenTagsAutocomplete);
+  }, 120);
+});
+
+screenTagsAutocomplete?.addEventListener("click", (event) => {
+  const option = event.target instanceof Element ? event.target.closest("[data-tag-option]") : null;
+  if (!option || !fieldRefs.tags) {
+    return;
+  }
+  event.preventDefault();
+  applyAutocompleteTag(fieldRefs.tags, cleanText(option.getAttribute("data-tag-option")));
+  renderScoreSummary();
+  renderTagAutocomplete(screenTagsAutocomplete, fieldRefs.tags, availableTagChoices);
+  saveLocalDraft();
+  fieldRefs.tags.focus();
+});
+
+document.addEventListener("click", (event) => {
+  if (
+    screenTagsAutocomplete &&
+    fieldRefs.tags &&
+    !screenTagsAutocomplete.contains(event.target) &&
+    event.target !== fieldRefs.tags
+  ) {
+    hideTagAutocomplete(screenTagsAutocomplete);
+  }
 });
 
 signOutBtn?.addEventListener("click", async () => {
