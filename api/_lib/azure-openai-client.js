@@ -1,4 +1,4 @@
-const { AzureOpenAI } = require("openai");
+const { OpenAI } = require("openai");
 const {
   extractResponseText,
   normalizeMaxTokens,
@@ -35,11 +35,7 @@ function endpointHost(endpoint) {
 }
 
 function normalizeApiVersion(value) {
-  const apiVersion = normalizeText(value || process.env.AZURE_OPENAI_API_VERSION);
-  if (!apiVersion) {
-    throw missingConfigError("Server missing AZURE_OPENAI_API_VERSION for Azure OpenAI requests.");
-  }
-  return apiVersion;
+  return normalizeText(value || process.env.AZURE_OPENAI_API_VERSION) || null;
 }
 
 function normalizeApiKey(value) {
@@ -99,13 +95,20 @@ function buildAzureRouteMetadata({ endpoint, apiVersion, deployment, requestedMo
   };
 }
 
+function buildFoundryBaseUrl(endpoint) {
+  const normalized = normalizeEndpoint(endpoint);
+  if (/\/openai\/v1\/?$/i.test(normalized)) {
+    return normalized.replace(/\/+$/, "");
+  }
+  return `${normalized.replace(/\/+$/, "")}/openai/v1`;
+}
+
 function resolveAzureRouteMetadata(options = {}) {
   const deployment = resolveDeploymentName(options);
   const endpoint = normalizeEndpoint(options.endpoint);
-  const apiVersion = normalizeApiVersion(options.apiVersion || options.api_version);
   return buildAzureRouteMetadata({
     endpoint,
-    apiVersion,
+    apiVersion: null,
     deployment,
     requestedModel: options.model,
   });
@@ -128,39 +131,81 @@ function buildClient(options = {}) {
     return options.clientFactory();
   }
 
-  return new AzureOpenAI({
-    endpoint: normalizeEndpoint(options.endpoint),
+  return new OpenAI({
+    baseURL: buildFoundryBaseUrl(options.endpoint),
     apiKey: normalizeApiKey(options.apiKey),
-    apiVersion: normalizeApiVersion(options.apiVersion || options.api_version),
-    deployment: normalizeDeployment(options.deployment),
     maxRetries: 0,
     timeout: SDK_TIMEOUT_MS,
   });
+}
+
+function buildResponsesInput(messages) {
+  const normalizedMessages = normalizeMessages(messages);
+  const instructions = normalizedMessages
+    .filter((message) => message.role === "system" || message.role === "developer")
+    .map((message) => normalizeText(message.content))
+    .filter(Boolean)
+    .join("\n\n");
+  const input = normalizedMessages
+    .filter((message) => message.role !== "system" && message.role !== "developer")
+    .map((message) => ({
+      role: message.role === "assistant" ? "assistant" : "user",
+      content: normalizeText(message.content),
+    }));
+
+  return {
+    instructions: instructions || undefined,
+    input: input.length > 0 ? input : normalizeText(normalizedMessages[0]?.content),
+  };
+}
+
+function extractResponsesText(payload) {
+  const outputText = normalizeText(payload?.output_text);
+  if (outputText) {
+    return outputText;
+  }
+
+  const parts = [];
+  for (const item of payload?.output || []) {
+    if (item?.type !== "message") {
+      continue;
+    }
+    for (const content of item.content || []) {
+      if (content?.type === "output_text" && typeof content.text === "string") {
+        parts.push(content.text);
+      }
+    }
+  }
+  return parts.join("").trim();
 }
 
 async function createChatCompletion(options = {}) {
   const aiRoute = resolveAzureRouteMetadata(options);
   const deployment = aiRoute.deployment;
   const thinking = normalizeThinking(options.thinking, null);
+  const responsesInput = buildResponsesInput(options.messages);
   const body = {
     model: deployment,
-    messages: normalizeMessages(options.messages),
+    input: responsesInput.input,
   };
+  if (responsesInput.instructions) {
+    body.instructions = responsesInput.instructions;
+  }
 
   const maxTokens = normalizeMaxTokens(options.maxTokens ?? options.max_tokens);
   if (maxTokens != null) {
-    body.max_tokens = maxTokens;
+    body.max_output_tokens = maxTokens;
   }
 
   if (options.responseFormat && typeof options.responseFormat === "object") {
-    body.response_format = options.responseFormat;
+    body.text = { format: options.responseFormat };
   }
 
   if (thinking) {
-    body.reasoning_effort = mapThinkingToReasoningEffort(
-      thinking,
-      options.reasoningEffort || options.reasoning_effort
-    );
+    const effort = mapThinkingToReasoningEffort(thinking, options.reasoningEffort || options.reasoning_effort);
+    if (effort !== "none") {
+      body.reasoning = { effort };
+    }
   }
 
   if (thinking !== "enabled") {
@@ -180,13 +225,12 @@ async function createChatCompletion(options = {}) {
   const client = buildClient({
     ...options,
     endpoint: options.endpoint,
-    apiVersion: aiRoute.apiVersion,
     deployment,
   });
   let payload;
   let requestId;
   try {
-    const request = client.chat.completions.create(body, {
+    const request = client.responses.create(body, {
       maxRetries: 0,
       timeout: SDK_TIMEOUT_MS,
     });
@@ -200,13 +244,13 @@ async function createChatCompletion(options = {}) {
 
   return {
     payload,
-    text: extractResponseText(payload),
-    content: payload?.choices?.[0]?.message?.content || "",
+    text: extractResponsesText(payload) || extractResponseText(payload),
+    content: extractResponsesText(payload) || "",
     reasoningContent: "",
     usage: payload?.usage || null,
     model: payload?.model || deployment,
     thinking: thinking || null,
-    reasoningEffort: thinking ? body.reasoning_effort : null,
+    reasoningEffort: body.reasoning?.effort || null,
     requestId,
     aiRoute,
   };

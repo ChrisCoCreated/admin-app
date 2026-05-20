@@ -39,7 +39,6 @@ function validateConfiguredAiProvider(providerOverride) {
   const requiredKeys = [
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_API_VERSION",
   ];
   const missing = requiredKeys.filter((key) => !normalizeText(process.env[key]));
   if (missing.length > 0) {
