@@ -1187,6 +1187,21 @@ button.is-generating::after {
   background: #dcedff;
 }
 
+.client-data-replacement-placeholder {
+  font-weight: 700;
+}
+
+.client-data-replacement-original {
+  margin-left: 4px;
+  color: #315f90;
+}
+
+.client-data-replacement-original::before {
+  content: "removed: ";
+  color: #5f748c;
+  font-size: 0.82em;
+}
+
 .review-highlight.likely {
   outline: 1px solid #d26b23;
   background: #ffe0c4;

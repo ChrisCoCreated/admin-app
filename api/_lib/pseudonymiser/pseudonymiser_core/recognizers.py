@@ -21,6 +21,7 @@ PLACEHOLDER_CATEGORIES = (
 )
 
 PLACEHOLDER_RE = re.compile(r"\[(?:[A-Z_]+)_\d{3}\]")
+LOW_SIGNAL_PRONOUNS = {"he", "him", "his", "she", "her", "hers"}
 
 EMAIL_RE = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 
@@ -669,6 +670,8 @@ def _known_identifier_matches(
     category: str,
     reason: str,
 ) -> list[ResidualIdentifier]:
+    if _is_low_signal_pronoun(identifier):
+        return []
     escaped = re.escape(identifier.strip())
     if not escaped:
         return []
@@ -699,7 +702,11 @@ def _collect_direct_matches(
 ) -> None:
     for match in pattern.finditer(text):
         value = match.group(group).strip()
-        if value and not _inside_placeholder(match.start(group), match.end(group), placeholder_ranges):
+        if (
+            value
+            and not _is_low_signal_pronoun(value)
+            and not _inside_placeholder(match.start(group), match.end(group), placeholder_ranges)
+        ):
             direct.append(
                 ResidualIdentifier(
                     value=value,
@@ -710,6 +717,10 @@ def _collect_direct_matches(
                     reason=reason,
                 )
             )
+
+
+def _is_low_signal_pronoun(value: str) -> bool:
+    return value.strip().lower() in LOW_SIGNAL_PRONOUNS
 
 
 def _extract_residual_matches(

@@ -633,8 +633,15 @@ function renderReviewMark(mark, identifierOptions) {
     const button = document.createElement("button");
     button.className = "review-highlight replaced";
     button.type = "button";
-    button.textContent = content;
     button.title = `Revert: ${mark.original}`;
+    const placeholderTextSpan = document.createElement("span");
+    placeholderTextSpan.className = "client-data-replacement-placeholder";
+    placeholderTextSpan.textContent = content;
+    button.appendChild(placeholderTextSpan);
+    const originalTextSpan = document.createElement("span");
+    originalTextSpan.className = "client-data-replacement-original";
+    originalTextSpan.textContent = mark.original;
+    button.appendChild(originalTextSpan);
     button.addEventListener("click", () => {
       replaceReviewRange(mark.start, mark.end, mark.original);
       setStatus(`Reverted ${mark.placeholder} for review.`);
