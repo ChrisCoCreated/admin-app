@@ -36,6 +36,10 @@ const PLACEHOLDER_CATEGORY_OPTIONS = [
 ];
 
 const REPORT_MODES = {
+  simple_summary: {
+    label: "Simple summary report",
+    reportType: "simple_summary",
+  },
   wellbeing_assurance_visit: {
     label: "Wellbeing Assurance Visit Summary",
     reportType: "wellbeing_assurance_visit",

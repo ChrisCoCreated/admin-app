@@ -87,6 +87,9 @@ function normalizeReportJson(payload, reportType) {
 }
 
 async function readExampleDocumentText(reportType) {
+  if (!reportType.example_document) {
+    return "No example document is configured for this report type.";
+  }
   try {
     const buffer = await fs.readFile(reportType.example_document);
     return `Example document available at ${reportType.example_document}. Size: ${buffer.length} bytes.`;

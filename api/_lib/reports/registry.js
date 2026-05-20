@@ -104,7 +104,37 @@ const WELLBEING_ASSURANCE_VISIT = {
   ],
 };
 
-const REPORT_TYPES = new Map([[WELLBEING_ASSURANCE_VISIT.report_type, WELLBEING_ASSURANCE_VISIT]]);
+const SIMPLE_SUMMARY = {
+  report_type: "simple_summary",
+  display_name: "Simple Summary Report",
+  example_document: "",
+  template_document: "",
+  json_schema: {
+    ...WELLBEING_ASSURANCE_VISIT_SCHEMA,
+    properties: {
+      ...WELLBEING_ASSURANCE_VISIT_SCHEMA.properties,
+      report_type: { const: "simple_summary" },
+    },
+  },
+  template_mapping: {},
+  instructions: [
+    "You generate a simple summary report from pseudonymised care/admin notes.",
+    "Return structured JSON only. Do not include markdown, prose outside JSON, or a final Word document.",
+    "If no notes are provided, return status needs_notes and ask the user to provide notes.",
+    "If notes are too limited, contradictory, or unclear to safely summarise, return status needs_clarification.",
+    "Otherwise return status ready_for_render and write a concise summary in report_sections.executive_summary.",
+    "Use clear, professional language suitable for an internal care/admin note.",
+    "Summarise only information present in the notes.",
+    "Do not add clinical facts, names, dates, locations, actions, risks, or opinions that are not in the notes.",
+    "Keep all bracketed placeholders exactly as written.",
+    "Leave wellbeing-specific section fields empty unless directly supported by the notes.",
+  ],
+};
+
+const REPORT_TYPES = new Map([
+  [WELLBEING_ASSURANCE_VISIT.report_type, WELLBEING_ASSURANCE_VISIT],
+  [SIMPLE_SUMMARY.report_type, SIMPLE_SUMMARY],
+]);
 
 function listReportTypes() {
   return Array.from(REPORT_TYPES.values()).map((reportType) => ({

@@ -21,6 +21,14 @@ test("report registry exposes wellbeing assurance visit configuration", () => {
   assert.equal(reportType.template_mapping.executive_summary, "report_sections.executive_summary");
 });
 
+test("report registry exposes simple summary configuration", () => {
+  const reportType = getReportType("simple_summary");
+  assert.equal(reportType.display_name, "Simple Summary Report");
+  assert.equal(reportType.example_document, "");
+  assert.equal(reportType.json_schema.properties.report_type.const, "simple_summary");
+  assert.match(reportType.instructions.join("\n"), /simple summary/i);
+});
+
 test("report registry rejects unknown report types", () => {
   assert.throws(() => getReportType("unknown_report"), /Unsupported report type/);
 });
