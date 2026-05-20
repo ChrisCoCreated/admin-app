@@ -109,6 +109,7 @@ const SIMPLE_SUMMARY = {
   display_name: "Simple Summary Report",
   example_document: "",
   template_document: "",
+  output_mode: "plain_text_summary",
   json_schema: {
     ...WELLBEING_ASSURANCE_VISIT_SCHEMA,
     properties: {
@@ -119,15 +120,11 @@ const SIMPLE_SUMMARY = {
   template_mapping: {},
   instructions: [
     "You generate a simple summary report from pseudonymised care/admin notes.",
-    "Return structured JSON only. Do not include markdown, prose outside JSON, or a final Word document.",
-    "If no notes are provided, return status needs_notes and ask the user to provide notes.",
-    "If notes are too limited, contradictory, or unclear to safely summarise, return status needs_clarification.",
-    "Otherwise return status ready_for_render and write a concise summary in report_sections.executive_summary.",
     "Use clear, professional language suitable for an internal care/admin note.",
     "Summarise only information present in the notes.",
     "Do not add clinical facts, names, dates, locations, actions, risks, or opinions that are not in the notes.",
     "Keep all bracketed placeholders exactly as written.",
-    "Leave wellbeing-specific section fields empty unless directly supported by the notes.",
+    "Return only the report text, with no preamble.",
   ],
 };
 

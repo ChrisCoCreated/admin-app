@@ -87,6 +87,28 @@ test("structured report generation parses ready_for_render JSON from AI", async 
   assert.equal(report.suggested_smart_goals.length, 1);
 });
 
+test("simple summary generation uses plain text AI response without JSON response format", async () => {
+  let capturedOptions = null;
+  const report = await generateStructuredReport({
+    reportType: "simple_summary",
+    notes: "[CLIENT_001] feels safe.",
+    provider: "azure_openai",
+    model: "fast",
+    createCompletion: async (options) => {
+      capturedOptions = options;
+      return {
+        content: "[CLIENT_001] feels safe and staff support is positive.",
+      };
+    },
+  });
+
+  assert.equal(capturedOptions.responseFormat, undefined);
+  assert.equal(capturedOptions.maxTokens, 1200);
+  assert.equal(report.status, "ready_for_render");
+  assert.equal(report.report_type, "simple_summary");
+  assert.equal(report.report_sections.executive_summary, "[CLIENT_001] feels safe and staff support is positive.");
+});
+
 test("structured report generation rejects malformed model JSON", async () => {
   await assert.rejects(
     () =>

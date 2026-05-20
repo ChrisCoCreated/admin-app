@@ -1156,6 +1156,29 @@ async function exportWordDoc() {
     updateExportControls();
     return;
   }
+  if (getSelectedReportType() === "simple_summary") {
+    const html = [
+      "<!doctype html>",
+      "<html>",
+      "<head>",
+      '<meta charset="utf-8">',
+      `<title>${escapeHtml(buildExportTitle())}</title>`,
+      "<style>",
+      "body{font-family:Arial,sans-serif;line-height:1.45;color:#1c2533;}",
+      "h1{font-size:20pt;margin:0 0 16pt;}",
+      "p{font-size:11pt;margin:0 0 10pt;}",
+      "</style>",
+      "</head>",
+      "<body>",
+      buildReportHtml(text),
+      "</body>",
+      "</html>",
+    ].join("\n");
+    const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
+    downloadBlob(blob, "client-data-report.doc");
+    setExportStatus("Word document exported.");
+    return;
+  }
   if (!structuredReport || structuredReport.status !== "ready_for_render") {
     setExportStatus("Generate a structured report before exporting Word.", true);
     updateExportControls();

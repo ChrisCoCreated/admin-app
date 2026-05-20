@@ -135,6 +135,89 @@ async function buildReportMessages({ reportType, notes, previousReport, revision
   ];
 }
 
+function wrapPlainTextSummary({ reportType, text, notes }) {
+  const summary = normalizeText(text);
+  if (!summary) {
+    const error = new Error("AI returned an empty report response.");
+    error.status = 502;
+    throw error;
+  }
+
+  return normalizeReportJson(
+    {
+      status: "ready_for_render",
+      report_type: reportType.report_type,
+      report_title: reportType.display_name,
+      client_details: {},
+      inferred_context: { assessment_type: "unclear", evidence: [] },
+      suggested_smart_goals: [],
+      report_sections: {
+        executive_summary: summary,
+        current_situation: "",
+        physical_wellbeing: "",
+        emotional_wellbeing: "",
+        environmental_wellbeing: "",
+        wellbeing_highlights: "",
+        recommendations: [],
+        next_steps: [],
+      },
+      omitted_sections: [],
+      assumptions_avoided: [],
+      clarification_notes: [],
+      source_notes_used: [normalizeText(notes)].filter(Boolean),
+      warnings: [],
+      tone_check: { professional: true, concise: true, empathetic: true, issues: [] },
+      revision_prompt: "Request edits or a regenerated version if needed.",
+    },
+    reportType
+  );
+}
+
+async function generatePlainTextSummary({
+  reportType,
+  notes,
+  provider,
+  model,
+  thinking,
+  reasoningEffort,
+  previousReport,
+  revisionRequest,
+  createCompletion,
+}) {
+  const isRevision = previousReport && typeof previousReport === "object" && normalizeText(revisionRequest);
+  const completion = await createCompletion({
+    provider,
+    model,
+    thinking,
+    reasoningEffort,
+    maxTokens: 1200,
+    temperature: 0.2,
+    messages: [
+      {
+        role: "system",
+        content: reportType.instructions.join("\n"),
+      },
+      {
+        role: "user",
+        content: [
+          "Text:",
+          normalizeText(notes),
+          isRevision ? `Previous summary:\n${normalizeText(previousReport?.report_sections?.executive_summary)}` : "",
+          isRevision ? `Requested changes:\n${normalizeText(revisionRequest)}` : "",
+        ]
+          .filter((part) => part !== "")
+          .join("\n"),
+      },
+    ],
+  });
+
+  return wrapPlainTextSummary({
+    reportType,
+    text: completion.content || completion.text,
+    notes,
+  });
+}
+
 async function generateStructuredReport({
   reportType: reportTypeKey,
   notes,
@@ -168,6 +251,20 @@ async function generateStructuredReport({
       },
       reportType
     );
+  }
+
+  if (reportType.output_mode === "plain_text_summary") {
+    return generatePlainTextSummary({
+      reportType,
+      notes: cleanNotes,
+      provider,
+      model,
+      thinking,
+      reasoningEffort,
+      previousReport,
+      revisionRequest,
+      createCompletion,
+    });
   }
 
   const completion = await createCompletion({
