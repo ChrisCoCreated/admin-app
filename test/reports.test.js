@@ -50,38 +50,44 @@ test("structured report generation returns needs_notes without calling AI for em
 });
 
 test("structured report generation parses ready_for_render JSON from AI", async () => {
+  let capturedOptions = null;
   const report = await generateStructuredReport({
     reportType: "wellbeing_assurance_visit",
     notes: "[CLIENT_001] feels safe.",
-    createCompletion: async () => ({
-      content: JSON.stringify({
-        status: "ready_for_render",
-        report_type: "wellbeing_assurance_visit",
-        report_title: "Wellbeing Assurance Visit Summary",
-        client_details: { client_name: "[CLIENT_001]" },
-        inferred_context: { assessment_type: "review", evidence: ["feels safe"] },
-        suggested_smart_goals: [{ goal: "Review companionship options", measurable: "One option agreed" }],
-        report_sections: {
-          executive_summary: "[CLIENT_001] feels safe.",
-          current_situation: "Current situation text.",
-          physical_wellbeing: "",
-          emotional_wellbeing: "",
-          environmental_wellbeing: "",
-          wellbeing_highlights: "Feels safe.",
-          recommendations: ["Continue support"],
-          next_steps: ["Review goals"],
-        },
-        omitted_sections: [],
-        assumptions_avoided: [],
-        clarification_notes: [],
-        source_notes_used: ["[CLIENT_001] feels safe."],
-        warnings: [],
-        tone_check: { professional: true },
-        revision_prompt: "Request changes if needed.",
-      }),
-    }),
+    createCompletion: async (options) => {
+      capturedOptions = options;
+      return {
+        content: JSON.stringify({
+          status: "ready_for_render",
+          report_type: "wellbeing_assurance_visit",
+          report_title: "Wellbeing Assurance Visit Summary",
+          client_details: { client_name: "[CLIENT_001]" },
+          inferred_context: { assessment_type: "review", evidence: ["feels safe"] },
+          suggested_smart_goals: [{ goal: "Review companionship options", measurable: "One option agreed" }],
+          report_sections: {
+            executive_summary: "[CLIENT_001] feels safe.",
+            current_situation: "Current situation text.",
+            physical_wellbeing: "",
+            emotional_wellbeing: "",
+            environmental_wellbeing: "",
+            wellbeing_highlights: "Feels safe.",
+            recommendations: ["Continue support"],
+            next_steps: ["Review goals"],
+          },
+          omitted_sections: [],
+          assumptions_avoided: [],
+          clarification_notes: [],
+          source_notes_used: ["[CLIENT_001] feels safe."],
+          warnings: [],
+          tone_check: { professional: true },
+          revision_prompt: "Request changes if needed.",
+        }),
+      };
+    },
   });
 
+  assert.equal(capturedOptions.responseFormat, undefined);
+  assert.match(capturedOptions.messages[0].content, /exactly one valid JSON object/);
   assert.equal(report.status, "ready_for_render");
   assert.equal(report.client_details.client_name, "[CLIENT_001]");
   assert.equal(report.suggested_smart_goals.length, 1);

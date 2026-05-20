@@ -107,6 +107,10 @@ async function buildReportMessages({ reportType, notes, previousReport, revision
       role: "system",
       content: [
         ...reportType.instructions,
+        "You must output exactly one valid JSON object matching the schema below.",
+        "Start your response with { and end it with }. Do not wrap it in markdown fences.",
+        "Use double quotes for all JSON keys and string values.",
+        "Use empty strings or empty arrays for unknown optional content rather than adding unsupported commentary.",
         "",
         "JSON schema:",
         safeJson(reportType.json_schema),
@@ -274,7 +278,6 @@ async function generateStructuredReport({
     reasoningEffort,
     maxTokens: 2500,
     temperature: 0.2,
-    responseFormat: { type: "json_object" },
     messages: await buildReportMessages({
       reportType,
       notes: cleanNotes,
