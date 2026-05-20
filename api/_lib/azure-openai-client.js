@@ -119,8 +119,28 @@ function mapThinkingToReasoningEffort(thinking, effort) {
     return "none";
   }
 
-  const normalized = normalizeReasoningEffort(effort);
-  return normalized === "max" ? "high" : normalized;
+  const normalized = normalizeText(effort).toLowerCase();
+  if (!normalized) {
+    return "medium";
+  }
+  if (["low", "medium", "high"].includes(normalized)) {
+    return normalized;
+  }
+  if (["max", "xhigh"].includes(normalized)) {
+    return "high";
+  }
+
+  const error = new Error('Invalid Azure reasoning effort. Use "low", "medium", "high", or "max".');
+  error.status = 400;
+  throw error;
+}
+
+function supportsAzureReasoning(options = {}, aiRoute = {}) {
+  const requestedModel = normalizeText(options.model || aiRoute.requestedModel).toLowerCase();
+  if (FAST_MODEL_NAMES.has(requestedModel)) {
+    return false;
+  }
+  return true;
 }
 
 function buildClient(options = {}) {
@@ -203,7 +223,7 @@ async function createChatCompletion(options = {}) {
 
   if (thinking) {
     const effort = mapThinkingToReasoningEffort(thinking, options.reasoningEffort || options.reasoning_effort);
-    if (effort !== "none") {
+    if (effort !== "none" && supportsAzureReasoning(options, aiRoute)) {
       body.reasoning = { effort };
     }
   }

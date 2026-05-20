@@ -190,6 +190,7 @@ test("routes Azure flash requests through the fast deployment env", async () => 
   });
 
   assert.equal(capturedBody.model, "ai-fast-prod");
+  assert.equal(capturedBody.reasoning, undefined);
   assert.equal(result.model, "ai-fast-prod");
   assert.equal(result.content, "fast azure");
   assert.deepEqual(result.aiRoute, {
@@ -199,6 +200,47 @@ test("routes Azure flash requests through the fast deployment env", async () => 
     apiVersion: null,
     endpointHost: "example-resource.openai.azure.com",
   });
+});
+
+test("maps Azure reasoning effort levels to the Responses API shape for primary deployment", async () => {
+  process.env.AI_PROVIDER = "azure_openai";
+  process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";
+  process.env.AZURE_OPENAI_API_KEY = "azure-test-key";
+  process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY = "ai-primary-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_FAST = "ai-fast-prod";
+
+  const capturedEfforts = [];
+  const stubClient = {
+    responses: {
+      create(body) {
+        capturedEfforts.push(body.reasoning?.effort || null);
+        return {
+          withResponse: async () => ({
+            data: {
+              output_text: "ok",
+              usage: { input_tokens: 1, output_tokens: 1 },
+              model: "ai-primary-prod",
+            },
+            request_id: "req_reasoning",
+          }),
+        };
+      },
+    },
+  };
+
+  const { createChatCompletion } = loadAiClient();
+  for (const effort of ["low", "medium", "high", "max"]) {
+    await createChatCompletion({
+      provider: "azure_openai",
+      model: "primary",
+      thinking: "enabled",
+      reasoningEffort: effort,
+      messages: [{ role: "user", content: "Hi" }],
+      clientFactory: () => stubClient,
+    });
+  }
+
+  assert.deepEqual(capturedEfforts, ["low", "medium", "high", "high"]);
 });
 
 test("allows request provider to override AI_PROVIDER", async () => {
