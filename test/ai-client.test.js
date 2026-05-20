@@ -10,6 +10,8 @@ const AI_ENV_KEYS = [
   "AZURE_OPENAI_API_KEY",
   "AZURE_OPENAI_API_VERSION",
   "AZURE_OPENAI_DEPLOYMENT_NAME",
+  "AZURE_OPENAI_DEPLOYMENT_PRIMARY",
+  "AZURE_OPENAI_DEPLOYMENT_FAST",
 ];
 
 const ORIGINAL_ENV = Object.fromEntries(AI_ENV_KEYS.map((key) => [key, process.env[key]]));
@@ -85,11 +87,13 @@ test("validates Azure configuration only when Azure is selected", async () => {
   delete process.env.AZURE_OPENAI_API_KEY;
   delete process.env.AZURE_OPENAI_API_VERSION;
   delete process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+  delete process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY;
+  delete process.env.AZURE_OPENAI_DEPLOYMENT_FAST;
 
   const azureClient = loadAiClient();
   assert.throws(
     () => azureClient.validateConfiguredAiProvider(),
-    /Missing Azure OpenAI configuration/
+    /Missing Azure OpenAI configuration|Missing Azure OpenAI deployment configuration/
   );
 });
 
@@ -98,7 +102,8 @@ test("routes Azure requests through the configured deployment with a mocked Open
   process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";
   process.env.AZURE_OPENAI_API_KEY = "azure-test-key";
   process.env.AZURE_OPENAI_API_VERSION = "2024-10-21";
-  process.env.AZURE_OPENAI_DEPLOYMENT_NAME = "gpt-5-chat-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY = "ai-primary-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_FAST = "ai-fast-prod";
 
   let capturedBody = null;
   const stubClient = {
@@ -111,7 +116,7 @@ test("routes Azure requests through the configured deployment with a mocked Open
               data: {
                 choices: [{ message: { content: "hello from azure" } }],
                 usage: { prompt_tokens: 2, completion_tokens: 3 },
-                model: "gpt-5-chat-prod",
+                model: "ai-primary-prod",
               },
               request_id: "req_test_123",
             }),
@@ -131,11 +136,53 @@ test("routes Azure requests through the configured deployment with a mocked Open
     clientFactory: () => stubClient,
   });
 
-  assert.equal(capturedBody.model, "gpt-5-chat-prod");
+  assert.equal(capturedBody.model, "ai-primary-prod");
   assert.equal(capturedBody.reasoning_effort, "high");
   assert.deepEqual(capturedBody.response_format, { type: "json_object" });
   assert.equal(result.content, "hello from azure");
-  assert.equal(result.model, "gpt-5-chat-prod");
+  assert.equal(result.model, "ai-primary-prod");
+});
+
+test("routes Azure flash requests through the fast deployment env", async () => {
+  process.env.AI_PROVIDER = "azure_openai";
+  process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";
+  process.env.AZURE_OPENAI_API_KEY = "azure-test-key";
+  process.env.AZURE_OPENAI_API_VERSION = "2024-10-21";
+  process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY = "ai-primary-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_FAST = "ai-fast-prod";
+
+  let capturedBody = null;
+  const stubClient = {
+    chat: {
+      completions: {
+        create(body) {
+          capturedBody = body;
+          return {
+            withResponse: async () => ({
+              data: {
+                choices: [{ message: { content: "fast azure" } }],
+                usage: { prompt_tokens: 1, completion_tokens: 1 },
+                model: "ai-fast-prod",
+              },
+              request_id: "req_test_fast",
+            }),
+          };
+        },
+      },
+    },
+  };
+
+  const { createChatCompletion } = loadAiClient();
+  const result = await createChatCompletion({
+    model: "deepseek-v4-flash",
+    thinking: "disabled",
+    messages: [{ role: "user", content: "Hi" }],
+    clientFactory: () => stubClient,
+  });
+
+  assert.equal(capturedBody.model, "ai-fast-prod");
+  assert.equal(result.model, "ai-fast-prod");
+  assert.equal(result.content, "fast azure");
 });
 
 test("maps Azure SDK errors to the existing internal error shape and logs request metadata only", async () => {
@@ -143,7 +190,8 @@ test("maps Azure SDK errors to the existing internal error shape and logs reques
   process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";
   process.env.AZURE_OPENAI_API_KEY = "azure-test-key";
   process.env.AZURE_OPENAI_API_VERSION = "2024-10-21";
-  process.env.AZURE_OPENAI_DEPLOYMENT_NAME = "gpt-5-chat-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY = "ai-primary-prod";
+  process.env.AZURE_OPENAI_DEPLOYMENT_FAST = "ai-fast-prod";
 
   const logged = [];
   console.error = (...args) => {

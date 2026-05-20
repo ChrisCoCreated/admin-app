@@ -29,11 +29,20 @@ function validateConfiguredAiProvider() {
     "AZURE_OPENAI_ENDPOINT",
     "AZURE_OPENAI_API_KEY",
     "AZURE_OPENAI_API_VERSION",
-    "AZURE_OPENAI_DEPLOYMENT_NAME",
   ];
   const missing = requiredKeys.filter((key) => !normalizeText(process.env[key]));
   if (missing.length > 0) {
     throw createConfigError(`Missing Azure OpenAI configuration: ${missing.join(", ")}.`);
+  }
+
+  const hasSingleDeployment = Boolean(normalizeText(process.env.AZURE_OPENAI_DEPLOYMENT_NAME));
+  const hasTieredDeployment =
+    Boolean(normalizeText(process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY)) &&
+    Boolean(normalizeText(process.env.AZURE_OPENAI_DEPLOYMENT_FAST));
+  if (!hasSingleDeployment && !hasTieredDeployment) {
+    throw createConfigError(
+      "Missing Azure OpenAI deployment configuration: set AZURE_OPENAI_DEPLOYMENT_NAME, or both AZURE_OPENAI_DEPLOYMENT_PRIMARY and AZURE_OPENAI_DEPLOYMENT_FAST."
+    );
   }
 
   return provider;

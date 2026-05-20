@@ -9,6 +9,8 @@ const {
 } = require("./deepseek-client");
 
 const SDK_TIMEOUT_MS = 2147483647;
+const FAST_MODEL_NAMES = new Set(["deepseek-v4-flash", "deepseek-chat", "flash", "fast"]);
+const PRIMARY_MODEL_NAMES = new Set(["deepseek-v4-pro", "deepseek-reasoner", "pro", "primary"]);
 
 function missingConfigError(message) {
   const error = new Error(message);
@@ -43,9 +45,40 @@ function normalizeApiKey(value) {
 function normalizeDeployment(value) {
   const deployment = normalizeText(value || process.env.AZURE_OPENAI_DEPLOYMENT_NAME);
   if (!deployment) {
-    throw missingConfigError("Server missing AZURE_OPENAI_DEPLOYMENT_NAME for Azure OpenAI requests.");
+    throw missingConfigError(
+      "Server missing Azure deployment config. Set AZURE_OPENAI_DEPLOYMENT_NAME, or tiered AZURE_OPENAI_DEPLOYMENT_PRIMARY / AZURE_OPENAI_DEPLOYMENT_FAST."
+    );
   }
   return deployment;
+}
+
+function resolveDeploymentName(options = {}) {
+  const explicitDeployment = normalizeText(options.deployment);
+  if (explicitDeployment) {
+    return explicitDeployment;
+  }
+
+  const requestedModel = normalizeText(options.model).toLowerCase();
+  if (FAST_MODEL_NAMES.has(requestedModel)) {
+    const fastDeployment = normalizeText(process.env.AZURE_OPENAI_DEPLOYMENT_FAST);
+    if (fastDeployment) {
+      return fastDeployment;
+    }
+  }
+
+  if (PRIMARY_MODEL_NAMES.has(requestedModel)) {
+    const primaryDeployment = normalizeText(process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY);
+    if (primaryDeployment) {
+      return primaryDeployment;
+    }
+  }
+
+  const defaultPrimaryDeployment = normalizeText(process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY);
+  if (defaultPrimaryDeployment) {
+    return defaultPrimaryDeployment;
+  }
+
+  return normalizeDeployment(options.deployment);
 }
 
 function mapThinkingToReasoningEffort(thinking, effort) {
@@ -76,7 +109,7 @@ function buildClient(options = {}) {
 }
 
 async function createChatCompletion(options = {}) {
-  const deployment = normalizeDeployment(options.deployment);
+  const deployment = resolveDeploymentName(options);
   const thinking = normalizeThinking(options.thinking, null);
   const body = {
     model: deployment,

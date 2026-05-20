@@ -100,7 +100,9 @@ Set values in `frontend-config.js`:
 - `AZURE_OPENAI_ENDPOINT` when `AI_PROVIDER=azure_openai`
 - `AZURE_OPENAI_API_KEY` when `AI_PROVIDER=azure_openai`
 - `AZURE_OPENAI_API_VERSION` when `AI_PROVIDER=azure_openai`
-- `AZURE_OPENAI_DEPLOYMENT_NAME` when `AI_PROVIDER=azure_openai`
+- `AZURE_OPENAI_DEPLOYMENT_NAME` when `AI_PROVIDER=azure_openai` as a single deployment fallback
+- `AZURE_OPENAI_DEPLOYMENT_PRIMARY` when `AI_PROVIDER=azure_openai` for primary/pro requests
+- `AZURE_OPENAI_DEPLOYMENT_FAST` when `AI_PROVIDER=azure_openai` for fast/flash requests
 
 Optional fallback toggles:
 
@@ -131,10 +133,11 @@ AI_PROVIDER=azure_openai
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 AZURE_OPENAI_API_KEY=your-key
 AZURE_OPENAI_API_VERSION=2024-10-21
-AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+AZURE_OPENAI_DEPLOYMENT_PRIMARY=ai-primary-prod
+AZURE_OPENAI_DEPLOYMENT_FAST=ai-fast-prod
 ```
 
-When Azure OpenAI is enabled, the server uses the configured deployment name for chat completions so the rest of the app does not need to know the public model name.
+When Azure OpenAI is enabled, the server can map the existing app model choices onto Azure deployment names. `deepseek-v4-pro` routes to `AZURE_OPENAI_DEPLOYMENT_PRIMARY` and `deepseek-v4-flash` routes to `AZURE_OPENAI_DEPLOYMENT_FAST`. `AZURE_OPENAI_DEPLOYMENT_NAME` remains available as a single-deployment fallback.
 
 ## App access roles
 
