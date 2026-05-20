@@ -317,6 +317,10 @@
             <dd data-field="keepInMind">-</dd>
           </div>
           <div>
+            <dt>Live-in Mailing List</dt>
+            <dd data-field="liveInMailingList">-</dd>
+          </div>
+          <div>
             <dt>Lives In</dt>
             <dd data-field="livesIn">-</dd>
           </div>
@@ -348,7 +352,7 @@
           </div>
         </div>
         <form id="candidateDetailEditForm" class="modal-form recruitment-detail-edit-form">
-          <div class="mapping-form-grid">
+          <div class="mapping-form-grid recruitment-detail-core-grid">
             <label class="field" for="detailCandidateNameInput">
               Candidate
               <input id="detailCandidateNameInput" type="text" autocomplete="name" />
@@ -381,25 +385,39 @@
               Earmarked For
               <input id="detailEarmarkedForInput" type="text" />
             </label>
+          </div>
+
+          <section class="recruitment-detail-preferences">
+            <div class="recruitment-detail-preferences-head">
+              <h5>Profile Preferences</h5>
+              <p class="muted">Track candidate preferences and future follow-up signals.</p>
+            </div>
+            <div class="mapping-form-grid recruitment-detail-preferences-grid">
             <label class="checkbox-field recruitment-detail-checkbox-field" for="detailKeepInMindInput">
               <input id="detailKeepInMindInput" type="checkbox" />
               Keep in Mind
             </label>
-          </div>
+            <label class="checkbox-field recruitment-detail-checkbox-field" for="detailLiveInMailingListInput">
+              <input id="detailLiveInMailingListInput" type="checkbox" />
+              Live-in Mailing List
+              <span class="checkbox-field-help">Candidate wants future live-in role updates.</span>
+            </label>
+            </div>
 
-          <label class="field" for="detailTagsInput">
-            Tags
-            <input
-              id="detailTagsInput"
-              type="text"
-              placeholder="Add tags separated by commas"
-              autocomplete="off"
-            />
-          </label>
-          <div id="detailTagsAutocomplete" class="tag-autocomplete" hidden aria-live="polite"></div>
-          <div id="detailTagsPreview" class="tag-chip-list" aria-live="polite">
-            <span class="tag-chip tag-chip-muted">No tags yet</span>
-          </div>
+            <label class="field" for="detailTagsInput">
+              Tags
+              <input
+                id="detailTagsInput"
+                type="text"
+                placeholder="Add tags separated by commas"
+                autocomplete="off"
+              />
+            </label>
+            <div id="detailTagsAutocomplete" class="tag-autocomplete" hidden aria-live="polite"></div>
+            <div id="detailTagsPreview" class="tag-chip-list" aria-live="polite">
+              <span class="tag-chip tag-chip-muted">No tags yet</span>
+            </div>
+          </section>
 
           <label class="field" for="detailNotesInput">
             Notes

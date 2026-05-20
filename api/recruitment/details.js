@@ -103,6 +103,7 @@ module.exports = async (req, res) => {
       LivesIn: normalizeText(req.body?.livesIn),
       EarmarkedFor: normalizeText(req.body?.earmarkedFor),
       KeepinMind: req.body?.keepInMind === true,
+      "Live-inmailinglist": req.body?.liveInMailingList === true,
       Tags: normalizeText(req.body?.tags),
       Notes: normalizeText(req.body?.notes),
     };

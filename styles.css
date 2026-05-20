@@ -2145,9 +2145,48 @@ dd {
   background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
 }
 
+.recruitment-detail-core-grid {
+  margin-bottom: 18px;
+}
+
+.recruitment-detail-preferences {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid #dce6f2;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.recruitment-detail-preferences-head {
+  margin-bottom: 12px;
+}
+
+.recruitment-detail-preferences-head h5 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #1f2a3d;
+}
+
+.recruitment-detail-preferences-head .muted {
+  margin: 4px 0 0;
+}
+
+.recruitment-detail-preferences-grid {
+  margin-bottom: 14px;
+}
+
 .recruitment-detail-checkbox-field {
   align-self: end;
   min-height: 48px;
+}
+
+.checkbox-field-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #607089;
 }
 
 .recruitment-active-field {
@@ -2205,6 +2244,31 @@ dd {
 
 .recruitment-detail-link-row {
   gap: 12px;
+}
+
+.recruitment-candidate-cell {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.recruitment-candidate-name {
+  display: block;
+}
+
+.recruitment-inline-flag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 4px 10px;
+  border: 1px solid rgba(49, 183, 200, 0.28);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f0fbfc 0%, #e6f7f9 100%);
+  color: #1d6975;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .recruitment-detail-link-row > a {

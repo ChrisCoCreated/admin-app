@@ -84,6 +84,7 @@ const detailFields = {
   interviewBooked: detailRoot?.querySelector('[data-field="interviewBooked"]'),
   interviewWith: detailRoot?.querySelector('[data-field="interviewWith"]'),
   keepInMind: detailRoot?.querySelector('[data-field="keepInMind"]'),
+  liveInMailingList: detailRoot?.querySelector('[data-field="liveInMailingList"]'),
   livesIn: detailRoot?.querySelector('[data-field="livesIn"]'),
   firstInterviewDate: detailRoot?.querySelector('[data-field="firstInterviewDate"]'),
   earmarkedFor: detailRoot?.querySelector('[data-field="earmarkedFor"]'),
@@ -102,6 +103,7 @@ const detailInputs = {
   livesIn: document.getElementById("detailLivesInInput"),
   earmarkedFor: document.getElementById("detailEarmarkedForInput"),
   keepInMind: document.getElementById("detailKeepInMindInput"),
+  liveInMailingList: document.getElementById("detailLiveInMailingListInput"),
   tags: document.getElementById("detailTagsInput"),
   notes: document.getElementById("detailNotesInput"),
 };
@@ -1713,6 +1715,7 @@ function setDetail(candidate) {
     detailFields.interviewBooked.textContent = "-";
     detailFields.interviewWith.textContent = "-";
     detailFields.keepInMind.textContent = "-";
+    detailFields.liveInMailingList.textContent = "-";
     detailFields.livesIn.textContent = "-";
     detailFields.firstInterviewDate.textContent = "-";
     detailFields.earmarkedFor.textContent = "-";
@@ -1729,6 +1732,7 @@ function setDetail(candidate) {
       detailInputs.livesIn.value = "";
       detailInputs.earmarkedFor.value = "";
       detailInputs.keepInMind.checked = false;
+      detailInputs.liveInMailingList.checked = false;
       detailInputs.tags.value = "";
       detailInputs.notes.value = "";
     }
@@ -1761,6 +1765,7 @@ function setDetail(candidate) {
   detailFields.interviewBooked.textContent = formatBoolean(candidate.interviewBooked);
   detailFields.interviewWith.textContent = cleanText(candidate.interviewWith) || "-";
   detailFields.keepInMind.textContent = formatBoolean(candidate.keepInMind);
+  detailFields.liveInMailingList.textContent = formatBoolean(candidate.liveInMailingList);
   detailFields.livesIn.textContent = cleanText(candidate.livesIn) || "-";
   detailFields.firstInterviewDate.textContent = formatDate(candidate.firstInterviewDate);
   detailFields.earmarkedFor.textContent = cleanText(candidate.earmarkedFor) || "-";
@@ -1779,6 +1784,7 @@ function setDetail(candidate) {
     detailInputs.livesIn.value = cleanText(candidate.livesIn);
     detailInputs.earmarkedFor.value = cleanText(candidate.earmarkedFor);
     detailInputs.keepInMind.checked = candidate.keepInMind === true;
+    detailInputs.liveInMailingList.checked = candidate.liveInMailingList === true;
     detailInputs.tags.value = normalizeTagString(candidate.tags);
     detailInputs.notes.value = cleanText(candidate.notes);
   }
@@ -1950,7 +1956,12 @@ function renderCandidates() {
     const indeedUrl = getIndeedProfileUrl(candidate);
     const showInactiveReview = isInactiveReviewPending(candidate);
     tr.innerHTML = `
-      <td>${escapeHtml(cleanText(candidate.candidateName) || "-")}</td>
+      <td>
+        <div class="recruitment-candidate-cell">
+          <span class="recruitment-candidate-name">${escapeHtml(cleanText(candidate.candidateName) || "-")}</span>
+          ${candidate.liveInMailingList ? '<span class="recruitment-inline-flag">Live-in list</span>' : ""}
+        </div>
+      </td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
       <td>
         <div class="recruitment-status-cell${showInactiveReview ? " is-inactive-review" : ""}">
@@ -2563,6 +2574,7 @@ async function saveCandidateDetails() {
     livesIn: cleanText(detailInputs.livesIn?.value),
     earmarkedFor: cleanText(detailInputs.earmarkedFor?.value),
     keepInMind: detailInputs.keepInMind?.checked === true,
+    liveInMailingList: detailInputs.liveInMailingList?.checked === true,
     tags: normalizeTagString(detailInputs.tags?.value),
     notes: cleanText(detailInputs.notes?.value),
   };
@@ -2584,6 +2596,7 @@ async function saveCandidateDetails() {
       candidate.livesIn = payload.livesIn;
       candidate.earmarkedFor = payload.earmarkedFor;
       candidate.keepInMind = payload.keepInMind;
+      candidate.liveInMailingList = payload.liveInMailingList;
       candidate.tags = payload.tags;
       candidate.notes = payload.notes;
       setDetail(candidate);
