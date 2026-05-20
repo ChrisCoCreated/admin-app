@@ -150,10 +150,17 @@
           <label class="field" for="reportModeSelect">
             Mode
             <select id="reportModeSelect">
-              <option value="simple-summary">Simple summary report</option>
+              <option value="wellbeing_assurance_visit">Wellbeing Assurance Visit Summary</option>
             </select>
           </label>
           <button id="generateReportBtn" type="button" disabled>Generate report</button>
+        </div>
+        <div id="reportRevisionPanel" class="client-data-report-revision" hidden>
+          <label class="field" for="reportRevisionText">
+            Request changes
+            <textarea id="reportRevisionText" class="client-data-textarea" rows="4" spellcheck="true"></textarea>
+          </label>
+          <button id="reviseReportBtn" class="secondary" type="button">Regenerate with changes</button>
         </div>
       </section>
 

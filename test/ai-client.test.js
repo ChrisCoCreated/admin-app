@@ -135,7 +135,7 @@ test("routes Azure requests through the configured deployment with a mocked Open
   });
 
   assert.equal(capturedBody.model, "ai-primary-prod");
-  assert.deepEqual(capturedBody.reasoning, { effort: "high" });
+  assert.equal(capturedBody.reasoning, undefined);
   assert.deepEqual(capturedBody.text, { format: { type: "json_object" } });
   assert.deepEqual(capturedBody.input, [{ role: "user", content: "Hi" }]);
   assert.equal(result.content, "hello from azure");
@@ -202,18 +202,18 @@ test("routes Azure flash requests through the fast deployment env", async () => 
   });
 });
 
-test("maps Azure reasoning effort levels to the Responses API shape for primary deployment", async () => {
+test("omits Azure reasoning for every UI thinking level", async () => {
   process.env.AI_PROVIDER = "azure_openai";
   process.env.AZURE_OPENAI_ENDPOINT = "https://example-resource.openai.azure.com";
   process.env.AZURE_OPENAI_API_KEY = "azure-test-key";
   process.env.AZURE_OPENAI_DEPLOYMENT_PRIMARY = "ai-primary-prod";
   process.env.AZURE_OPENAI_DEPLOYMENT_FAST = "ai-fast-prod";
 
-  const capturedEfforts = [];
+  const capturedReasoning = [];
   const stubClient = {
     responses: {
       create(body) {
-        capturedEfforts.push(body.reasoning?.effort || null);
+        capturedReasoning.push(body.reasoning || null);
         return {
           withResponse: async () => ({
             data: {
@@ -240,7 +240,7 @@ test("maps Azure reasoning effort levels to the Responses API shape for primary 
     });
   }
 
-  assert.deepEqual(capturedEfforts, ["low", "medium", "high", "high"]);
+  assert.deepEqual(capturedReasoning, [null, null, null, null]);
 });
 
 test("allows request provider to override AI_PROVIDER", async () => {

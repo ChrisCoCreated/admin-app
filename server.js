@@ -50,6 +50,8 @@ const mapsJourneyTimesHandler = require("./api/maps/journey-times");
 const mapsOfficeCatchmentCheckClickHandler = require("./api/maps/office-catchment/check-click");
 const consultantReportDocxHandler = require("./api/consultant/report-docx");
 const aiChatHandler = require("./api/ai/chat");
+const reportsGenerateHandler = require("./api/reports/generate");
+const reportsDocxHandler = require("./api/reports/docx");
 const wellbeingIntakeParseHandler = require("./api/wellbeing-intake/parse");
 const scorecardHandler = require("./api/scorecard");
 const scorecardDefinitionsHandler = require("./api/scorecard/definitions");
@@ -547,6 +549,22 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await aiChatHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/reports/generate") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await reportsGenerateHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/reports/docx") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await reportsDocxHandler(apiReq, apiRes);
     return true;
   }
 

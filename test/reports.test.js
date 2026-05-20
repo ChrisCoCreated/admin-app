@@ -1,0 +1,151 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const JSZip = require("jszip");
+
+const { getReportType } = require("../api/_lib/reports/registry");
+const { buildReportMessages, generateStructuredReport } = require("../api/_lib/reports/service");
+const { buildReportDocx } = require("../api/_lib/reports/docx");
+
+async function docxText(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  const xml = await zip.file("word/document.xml").async("string");
+  return xml.replace(/<[^>]+>/g, "");
+}
+
+test("report registry exposes wellbeing assurance visit configuration", () => {
+  const reportType = getReportType("wellbeing_assurance_visit");
+  assert.equal(reportType.display_name, "Wellbeing Assurance Visit Summary");
+  assert.ok(reportType.example_document.endsWith("Wellbeing_Assurance_Visit_Example.docx"));
+  assert.ok(reportType.template_document.endsWith("Wellbeing_Assurance_Report_Template.docx"));
+  assert.equal(reportType.json_schema.properties.status.enum.includes("ready_for_render"), true);
+  assert.equal(reportType.template_mapping.executive_summary, "report_sections.executive_summary");
+});
+
+test("report registry rejects unknown report types", () => {
+  assert.throws(() => getReportType("unknown_report"), /Unsupported report type/);
+});
+
+test("structured report generation returns needs_notes without calling AI for empty notes", async () => {
+  let called = false;
+  const report = await generateStructuredReport({
+    reportType: "wellbeing_assurance_visit",
+    notes: "",
+    createCompletion: async () => {
+      called = true;
+      throw new Error("Should not call AI");
+    },
+  });
+
+  assert.equal(called, false);
+  assert.equal(report.status, "needs_notes");
+  assert.equal(report.report_type, "wellbeing_assurance_visit");
+});
+
+test("structured report generation parses ready_for_render JSON from AI", async () => {
+  const report = await generateStructuredReport({
+    reportType: "wellbeing_assurance_visit",
+    notes: "[CLIENT_001] feels safe.",
+    createCompletion: async () => ({
+      content: JSON.stringify({
+        status: "ready_for_render",
+        report_type: "wellbeing_assurance_visit",
+        report_title: "Wellbeing Assurance Visit Summary",
+        client_details: { client_name: "[CLIENT_001]" },
+        inferred_context: { assessment_type: "review", evidence: ["feels safe"] },
+        suggested_smart_goals: [{ goal: "Review companionship options", measurable: "One option agreed" }],
+        report_sections: {
+          executive_summary: "[CLIENT_001] feels safe.",
+          current_situation: "Current situation text.",
+          physical_wellbeing: "",
+          emotional_wellbeing: "",
+          environmental_wellbeing: "",
+          wellbeing_highlights: "Feels safe.",
+          recommendations: ["Continue support"],
+          next_steps: ["Review goals"],
+        },
+        omitted_sections: [],
+        assumptions_avoided: [],
+        clarification_notes: [],
+        source_notes_used: ["[CLIENT_001] feels safe."],
+        warnings: [],
+        tone_check: { professional: true },
+        revision_prompt: "Request changes if needed.",
+      }),
+    }),
+  });
+
+  assert.equal(report.status, "ready_for_render");
+  assert.equal(report.client_details.client_name, "[CLIENT_001]");
+  assert.equal(report.suggested_smart_goals.length, 1);
+});
+
+test("structured report generation rejects malformed model JSON", async () => {
+  await assert.rejects(
+    () =>
+      generateStructuredReport({
+        reportType: "wellbeing_assurance_visit",
+        notes: "Some notes",
+        createCompletion: async () => ({ content: "not json" }),
+      }),
+    /Unexpected token|AI report response/
+  );
+});
+
+test("revision prompt includes original notes, previous JSON, and requested changes", async () => {
+  const reportType = getReportType("wellbeing_assurance_visit");
+  const messages = await buildReportMessages({
+    reportType,
+    notes: "Original notes",
+    previousReport: { status: "ready_for_render", report_type: "wellbeing_assurance_visit" },
+    revisionRequest: "Make it warmer",
+  });
+  const userMessage = messages[1].content;
+  assert.match(userMessage, /Original notes/);
+  assert.match(userMessage, /Make it warmer/);
+  assert.match(userMessage, /Previous structured JSON/);
+});
+
+test("report docx replaces placeholders, renders goals, and removes omitted sections and notes", async () => {
+  const output = await buildReportDocx({
+    reportType: "wellbeing_assurance_visit",
+    report: {
+      report_type: "wellbeing_assurance_visit",
+      report_title: "Wellbeing Assurance Visit Summary",
+      client_details: {
+        client_name: "Paul Jones",
+        report_date: "20.05.2026",
+        conducted_by: "Thrive",
+        assessment_venue: "Mossbank",
+        date_of_birth: "",
+        prepared_for: "Family",
+      },
+      inferred_context: { assessment_type: "initial_assessment" },
+      suggested_smart_goals: [
+        {
+          goal: "Support confidence at home",
+          measurable: "One weekly check-in completed",
+          owner: "Care team",
+          time_bound: "Four weeks",
+        },
+      ],
+      report_sections: {
+        executive_summary: "Paul feels safe.",
+        current_situation: "Current situation.",
+        physical_wellbeing: "Physical wellbeing.",
+        emotional_wellbeing: "Emotional wellbeing.",
+        environmental_wellbeing: "Environmental wellbeing.",
+        wellbeing_highlights: "Should be omitted.",
+        recommendations: ["Continue support"],
+        next_steps: ["Review plan"],
+      },
+      omitted_sections: ["Wellbeing Highlights"],
+    },
+  });
+  const text = await docxText(output);
+  assert.match(text, /Paul Jones/);
+  assert.match(text, /Paul feels safe/);
+  assert.match(text, /Support confidence at home/);
+  assert.doesNotMatch(text, /Wellbeing Highlights/);
+  assert.doesNotMatch(text, /Implementation Notes/);
+  assert.doesNotMatch(text, /\{\{/);
+});

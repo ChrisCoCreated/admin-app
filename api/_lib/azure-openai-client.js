@@ -3,7 +3,6 @@ const {
   extractResponseText,
   normalizeMaxTokens,
   normalizeMessages,
-  normalizeReasoningEffort,
   normalizeText,
   normalizeThinking,
 } = require("./deepseek-client");
@@ -136,11 +135,7 @@ function mapThinkingToReasoningEffort(thinking, effort) {
 }
 
 function supportsAzureReasoning(options = {}, aiRoute = {}) {
-  const requestedModel = normalizeText(options.model || aiRoute.requestedModel).toLowerCase();
-  if (FAST_MODEL_NAMES.has(requestedModel)) {
-    return false;
-  }
-  return true;
+  return false;
 }
 
 function buildClient(options = {}) {

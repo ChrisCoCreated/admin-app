@@ -36,17 +36,9 @@ const PLACEHOLDER_CATEGORY_OPTIONS = [
 ];
 
 const REPORT_MODES = {
-  "simple-summary": {
-    label: "Simple summary report",
-    instructions: [
-      "Report instructions:",
-      "Write a simple summary report from the pseudonymised text.",
-      "Use clear, professional language suitable for an internal care/admin note.",
-      "Summarise only information present in the text.",
-      "Do not add clinical facts, names, dates, locations, actions, risks, or opinions that are not in the text.",
-      "Keep all bracketed placeholders exactly as written.",
-      "Return only the report text, with no preamble.",
-    ].join("\n"),
+  wellbeing_assurance_visit: {
+    label: "Wellbeing Assurance Visit Summary",
+    reportType: "wellbeing_assurance_visit",
   },
 };
 
@@ -93,6 +85,9 @@ const reportThinkingField = document.getElementById("reportThinkingField");
 const reportThinkingSelect = document.getElementById("reportThinkingSelect");
 const reportModeSelect = document.getElementById("reportModeSelect");
 const generateReportBtn = document.getElementById("generateReportBtn");
+const reportRevisionPanel = document.getElementById("reportRevisionPanel");
+const reportRevisionText = document.getElementById("reportRevisionText");
+const reviseReportBtn = document.getElementById("reviseReportBtn");
 const exportStatus = document.getElementById("exportStatus");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportWordBtn = document.getElementById("exportWordBtn");
@@ -103,6 +98,8 @@ let reviewTextValue = "";
 let manualMapping = {};
 let busy = false;
 let reportBusy = false;
+let structuredReport = null;
+let reportSourceNotes = "";
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -165,6 +162,11 @@ function getSelectedReportProvider() {
   return reportProviderSelect?.value || "azure_openai";
 }
 
+function getSelectedReportType() {
+  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES.wellbeing_assurance_visit;
+  return mode.reportType || "wellbeing_assurance_visit";
+}
+
 function syncReportThinkingControl() {
   const isAzure = getSelectedReportProvider() === "azure_openai";
   if (reportThinkingField) {
@@ -194,6 +196,16 @@ function getSelectedThinkingOptions() {
     thinking: "enabled",
     reasoningEffort: value,
   };
+}
+
+function updateRevisionControls() {
+  const canRevise = Boolean(structuredReport && structuredReport.status === "ready_for_render");
+  if (reportRevisionPanel) {
+    reportRevisionPanel.hidden = !canRevise;
+  }
+  if (reviseReportBtn) {
+    reviseReportBtn.disabled = reportBusy || !canRevise || !reportRevisionText?.value.trim();
+  }
 }
 
 function populateReportModels() {
@@ -300,16 +312,18 @@ function updateReportControls() {
   if (!generateReportBtn) {
     return;
   }
-  generateReportBtn.disabled = reportBusy || busy || !reviewTextValue.trim();
+  generateReportBtn.disabled = reportBusy || busy;
+  updateRevisionControls();
 }
 
 function updateExportControls() {
   const hasRestoredText = Boolean(restoredText.value.trim());
+  const canExport = hasRestoredText && (!structuredReport || structuredReport.status === "ready_for_render");
   if (exportPdfBtn) {
-    exportPdfBtn.disabled = !hasRestoredText;
+    exportPdfBtn.disabled = !canExport;
   }
   if (exportWordBtn) {
-    exportWordBtn.disabled = !hasRestoredText;
+    exportWordBtn.disabled = !canExport || !structuredReport;
   }
 }
 
@@ -333,6 +347,11 @@ function clearAll() {
   manualIdentifierText.value = "";
   result = null;
   manualMapping = {};
+  structuredReport = null;
+  reportSourceNotes = "";
+  if (reportRevisionText) {
+    reportRevisionText.value = "";
+  }
   if (summaryDetails) {
     delete summaryDetails.dataset.userOpened;
     summaryDetails.open = false;
@@ -368,6 +387,11 @@ async function pseudonymise() {
       summaryDetails.open = false;
     }
     setReviewText(result.pseudonymised_text || "");
+    structuredReport = null;
+    reportSourceNotes = "";
+    if (reportRevisionText) {
+      reportRevisionText.value = "";
+    }
     if (!preferredNameInput.value.trim()) {
       preferredNameInput.value = defaultPreferredName(result.mapping || {});
     }
@@ -401,50 +425,121 @@ async function copyRestored() {
   setStatus("Copied restored text.");
 }
 
-function buildReportPrompt() {
-  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES["simple-summary"];
-  return `${LLM_COPY_PREFIX}\n${reviewTextValue}\n\n${mode.instructions}`;
+function stringifyReportValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(stringifyReportValue).filter(Boolean).join("; ");
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).map(stringifyReportValue).filter(Boolean).join(" ");
+  }
+  return String(value || "").trim();
 }
 
-async function generateReport() {
-  if (!reviewTextValue.trim() || reportBusy) {
+function formatReportList(items) {
+  return (Array.isArray(items) ? items : [])
+    .map((item) => stringifyReportValue(item))
+    .filter(Boolean)
+    .map((item) => `- ${item}`)
+    .join("\n");
+}
+
+function buildStructuredReportText(report) {
+  if (!report || typeof report !== "object") {
+    return "";
+  }
+  const sections = report.report_sections || {};
+  const omitted = new Set((report.omitted_sections || []).map((item) => String(item || "").toLowerCase()));
+  const parts = [
+    report.report_title || buildExportTitle(),
+    sections.executive_summary ? `Executive Summary\n${sections.executive_summary}` : "",
+    sections.current_situation ? `1. Current Situation\n${sections.current_situation}` : "",
+    sections.physical_wellbeing ? `2. Physical Wellbeing\n${sections.physical_wellbeing}` : "",
+    sections.emotional_wellbeing ? `3. Emotional Wellbeing\n${sections.emotional_wellbeing}` : "",
+    sections.environmental_wellbeing ? `4. Environmental Wellbeing\n${sections.environmental_wellbeing}` : "",
+  ];
+  if (sections.wellbeing_highlights && !omitted.has("wellbeing highlights")) {
+    parts.push(`5. Wellbeing Highlights\n${sections.wellbeing_highlights}`);
+  }
+  const goals = formatReportList(report.suggested_smart_goals);
+  if (goals) {
+    parts.push(`Suggested SMART Goals\n${goals}\nThese goals are suggested and can be reviewed or amended.`);
+  }
+  const recommendations = formatReportList(sections.recommendations);
+  if (recommendations) {
+    parts.push(`Recommendations to Improve Quality of Life\n${recommendations}`);
+  }
+  const nextSteps = formatReportList(sections.next_steps);
+  if (nextSteps) {
+    parts.push(`Next Steps\n${nextSteps}`);
+  }
+  const warnings = formatReportList(report.warnings);
+  if (warnings) {
+    parts.push(`Warnings\n${warnings}`);
+  }
+  const clarifications = formatReportList(report.clarification_notes);
+  if (clarifications) {
+    parts.push(`Clarification Notes\n${clarifications}`);
+  }
+  return parts.filter(Boolean).join("\n\n");
+}
+
+function setStructuredReport(report) {
+  structuredReport = report && typeof report === "object" ? report : null;
+  if (!structuredReport) {
+    placeholderText.value = "";
+    updateRestore();
+    updateRevisionControls();
+    updateExportControls();
+    return;
+  }
+
+  if (structuredReport.status === "needs_notes") {
+    placeholderText.value = "";
+    updateRestore();
+    setReportStatus("Please provide notes.", true);
+  } else if (structuredReport.status === "needs_clarification") {
+    placeholderText.value = buildStructuredReportText(structuredReport);
+    updateRestore();
+    setReportStatus("Clarification needed before this report can be rendered.", true);
+  } else {
+    placeholderText.value = buildStructuredReportText(structuredReport);
+    updateRestore();
+    setReportStatus("Report generated. Preview restored text below and export as Word when ready.");
+  }
+  updateRevisionControls();
+  updateExportControls();
+}
+
+async function generateReport(revisionRequest = "") {
+  if (reportBusy) {
     return;
   }
 
   setReportBusy(true);
   const thinkingOptions = getSelectedThinkingOptions();
-  setReportStatus("Generating report...");
+  const isRevision = Boolean(String(revisionRequest || "").trim() && structuredReport);
+  setReportStatus(isRevision ? "Regenerating report..." : "Generating report...");
   try {
-    const response = await directoryApi.createAiChatCompletion({
+    const response = await directoryApi.generateStructuredReport({
+      reportType: getSelectedReportType(),
+      notes: isRevision ? reportSourceNotes || reviewTextValue : reviewTextValue,
       provider: getSelectedReportProvider(),
       model: reportModelSelect?.value,
       thinking: thinkingOptions.thinking,
       reasoningEffort: thinkingOptions.reasoningEffort,
-      maxTokens: 1200,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content: [
-            "You generate concise care/admin reports from pseudonymised notes.",
-            "You must preserve every bracketed placeholder exactly.",
-            "Do not use or infer any raw personal data.",
-          ].join("\n"),
-        },
-        {
-          role: "user",
-          content: buildReportPrompt(),
-        },
-      ],
+      previousReport: isRevision ? structuredReport : null,
+      revisionRequest: isRevision ? revisionRequest : "",
     });
-    const content = String(response?.content || "").trim();
-    if (!content) {
-      throw new Error("AI returned an empty report.");
+    const report = response?.report;
+    if (!report) {
+      throw new Error("AI returned an empty report payload.");
     }
-    placeholderText.value = content;
-    updateRestore();
-    setReportStatus("Report generated into the restore box.");
-    setStatus("Generated report. Restored text updated.");
+    reportSourceNotes = reviewTextValue;
+    setStructuredReport(report);
+    setStatus(report.status === "ready_for_render" ? "Generated structured report." : "Report needs more input.");
+    if (isRevision && reportRevisionText) {
+      reportRevisionText.value = "";
+    }
   } catch (error) {
     const message = error?.message || "Could not generate report.";
     if (/Azure OpenAI deployment not found/i.test(message)) {
@@ -458,6 +553,15 @@ async function generateReport() {
   } finally {
     setReportBusy(false);
   }
+}
+
+async function reviseReport() {
+  const request = reportRevisionText?.value.trim();
+  if (!request || !structuredReport) {
+    updateRevisionControls();
+    return;
+  }
+  await generateReport(request);
 }
 
 function addManualIdentifier() {
@@ -855,7 +959,7 @@ function updateRestore() {
 }
 
 function buildExportTitle() {
-  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES["simple-summary"];
+  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES.wellbeing_assurance_visit;
   return mode.label || "Client data report";
 }
 
@@ -872,6 +976,21 @@ function buildReportHtml(text) {
     paragraphs || "<p></p>",
     "</article>",
   ].join("\n");
+}
+
+function restoreReportPlaceholders(value, mapping = buildEffectiveMapping()) {
+  if (typeof value === "string") {
+    return deanonymiseText(mapping, value).text;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => restoreReportPlaceholders(item, mapping));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, restoreReportPlaceholders(item, mapping)])
+    );
+  }
+  return value;
 }
 
 function downloadBlob(blob, filename) {
@@ -1019,34 +1138,31 @@ function exportPdf() {
   setExportStatus("PDF exported.");
 }
 
-function exportWordDoc() {
+async function exportWordDoc() {
   const text = restoredText.value.trim();
   if (!text) {
     setExportStatus("Restore text before exporting.", true);
     updateExportControls();
     return;
   }
+  if (!structuredReport || structuredReport.status !== "ready_for_render") {
+    setExportStatus("Generate a structured report before exporting Word.", true);
+    updateExportControls();
+    return;
+  }
 
-  const html = [
-    "<!doctype html>",
-    "<html>",
-    "<head>",
-    '<meta charset="utf-8">',
-    `<title>${escapeHtml(buildExportTitle())}</title>`,
-    "<style>",
-    "body{font-family:Arial,sans-serif;line-height:1.45;color:#1c2533;}",
-    "h1{font-size:20pt;margin:0 0 16pt;}",
-    "p{font-size:11pt;margin:0 0 10pt;}",
-    "</style>",
-    "</head>",
-    "<body>",
-    buildReportHtml(text),
-    "</body>",
-    "</html>",
-  ].join("\n");
-  const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
-  downloadBlob(blob, "client-data-report.doc");
-  setExportStatus("Word document exported.");
+  try {
+    setExportStatus("Generating Word document...");
+    const restoredReport = restoreReportPlaceholders(structuredReport);
+    const blob = await directoryApi.exportStructuredReportDocx({
+      reportType: getSelectedReportType(),
+      report: restoredReport,
+    });
+    downloadBlob(blob, "wellbeing-assurance-visit-summary.docx");
+    setExportStatus("Word document exported.");
+  } catch (error) {
+    setExportStatus(error?.message || "Could not export Word document.", true);
+  }
 }
 
 function renderSummary() {
@@ -1187,9 +1303,15 @@ copyRestoredBtn.addEventListener("click", () => {
   void copyRestored();
 });
 exportPdfBtn?.addEventListener("click", exportPdf);
-exportWordBtn?.addEventListener("click", exportWordDoc);
+exportWordBtn?.addEventListener("click", () => {
+  void exportWordDoc();
+});
 generateReportBtn?.addEventListener("click", () => {
   void generateReport();
+});
+reportRevisionText?.addEventListener("input", updateRevisionControls);
+reviseReportBtn?.addEventListener("click", () => {
+  void reviseReport();
 });
 reportProviderSelect?.addEventListener("change", () => {
   populateReportModels();
@@ -1203,7 +1325,7 @@ reportThinkingSelect?.addEventListener("change", () => {
   setReportStatus(`${reportThinkingSelect.options[reportThinkingSelect.selectedIndex]?.text || "Thinking"} thinking selected.`);
 });
 reportModeSelect?.addEventListener("change", () => {
-  const mode = REPORT_MODES[reportModeSelect.value] || REPORT_MODES["simple-summary"];
+  const mode = REPORT_MODES[reportModeSelect.value] || REPORT_MODES.wellbeing_assurance_visit;
   setReportStatus(`${mode.label} selected.`);
 });
 addManualIdentifierBtn.addEventListener("click", addManualIdentifier);

@@ -345,6 +345,34 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async generateStructuredReport(payload = {}) {
+      const response = await authFetch(endpoint("/api/reports/generate"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Report generation failed");
+      }
+      return response.json();
+    },
+
+    async exportStructuredReportDocx(payload = {}) {
+      const response = await authFetch(endpoint("/api/reports/docx"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Report document export failed");
+      }
+      return response.blob();
+    },
+
     async parseWellbeingIntake(payload = {}) {
       const response = await authFetch(endpoint("/api/wellbeing-intake/parse"), {
         method: "POST",
