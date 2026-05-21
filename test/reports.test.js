@@ -286,3 +286,16 @@ test("report docx filename can derive client name from title and remove duplicat
 
   assert.equal(filename, "Paul Jones - Wellbeing Assurance Visit Summary - 21 May 2026.docx");
 });
+
+test("report docx content disposition is header safe with unicode filename", () => {
+  const header = reportDocxHandler.contentDispositionForFilename(
+    'Paul Jones – "Warm" Wellbeing Summary, v2 - 21 May 2026.docx'
+  );
+
+  assert.doesNotThrow(() => {
+    const { validateHeaderValue } = require("node:http");
+    validateHeaderValue("Content-Disposition", header);
+  });
+  assert.match(header, /filename\*=UTF-8''/);
+  assert.match(header, /Paul%20Jones/);
+});

@@ -185,6 +185,12 @@ PERSON_VALUE_STOPWORDS = {
     "Name",
     "Type",
     "Visit",
+    "He",
+    "Him",
+    "His",
+    "She",
+    "Her",
+    "Hers",
 }
 
 PERSON_CATEGORIES_FOR_FILTERING = {
@@ -443,6 +449,8 @@ def _match_pattern(
     for match in pattern.finditer(text):
         value = match.group(group).strip(" ,.")
         first_token = value.split()[0] if value.split() else ""
+        if _is_low_signal_pronoun(value):
+            continue
         if entity_type in PERSON_CATEGORIES_FOR_FILTERING and value in PERSON_VALUE_STOPWORDS:
             continue
         if entity_type == "PERSON" and (
@@ -461,6 +469,8 @@ def _single_name_candidates(text: str) -> list[CandidateFinding]:
     candidates: list[CandidateFinding] = []
     for match in SINGLE_NAME_RE.finditer(text):
         value = match.group(1)
+        if _is_low_signal_pronoun(value):
+            continue
         if value in SINGLE_NAME_STOPWORDS or value in LOCATION_STOPWORDS:
             continue
         candidates.append(CandidateFinding("PERSON", match.start(1), match.end(1), 0.68, value))

@@ -82,6 +82,22 @@ function buildReportFilename(report, fallbackDate = new Date()) {
   return `${filename}.docx`;
 }
 
+function asciiHeaderFilename(filename) {
+  const fallback = String(filename || "report.docx")
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]+/g, "")
+    .replace(/["\\]/g, "")
+    .replace(/[;,]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return fallback || "report.docx";
+}
+
+function contentDispositionForFilename(filename) {
+  const clean = String(filename || "report.docx").replace(/[\r\n]+/g, " ").trim() || "report.docx";
+  return `attachment; filename="${asciiHeaderFilename(clean)}"; filename*=UTF-8''${encodeURIComponent(clean)}`;
+}
+
 async function reportDocxHandler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({
@@ -118,7 +134,7 @@ async function reportDocxHandler(req, res) {
     const filename = buildReportFilename(report);
     res.status(200);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", contentDispositionForFilename(filename));
     res.setHeader("Cache-Control", "no-store");
     res.send(output);
   } catch (error) {
@@ -133,4 +149,5 @@ async function reportDocxHandler(req, res) {
 
 module.exports = reportDocxHandler;
 module.exports.buildReportFilename = buildReportFilename;
+module.exports.contentDispositionForFilename = contentDispositionForFilename;
 module.exports.formatReportDate = formatReportDate;

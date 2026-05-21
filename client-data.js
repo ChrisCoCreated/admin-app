@@ -122,6 +122,9 @@ let reportSourceNotes = "";
 let reportModelUnlocked = false;
 let reportRevisionRequests = [];
 
+const LOW_SIGNAL_PRONOUNS = new Set(["he", "him", "his", "she", "her", "hers"]);
+const PERSON_PLACEHOLDER_CATEGORIES = new Set(["CLIENT", "STAFF", "RELATIVE", "FRIEND", "PROFESSIONAL"]);
+
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
   clientId: FRONTEND_CONFIG.spaClientId,
@@ -760,11 +763,16 @@ function addManualIdentifier() {
     updateManualControls();
     return;
   }
+  if (isLowSignalPronoun(value)) {
+    setStatus("Pronouns are not treated as identifiers.");
+    updateManualControls();
+    return;
+  }
 
   const mapping = buildEffectiveMapping();
   const placeholder = nextManualPlaceholder(manualIdentifierCategory.value, mapping);
   manualMapping = { ...manualMapping, [placeholder]: value };
-  setReviewText(reviewTextValue.split(value).join(placeholder));
+  setReviewText(replaceAllOccurrences(reviewTextValue, value, placeholder));
   manualIdentifierText.value = "";
   setStatus(`Added ${placeholder}.`);
 }
@@ -774,11 +782,15 @@ function applyResidual(span) {
   if (!value || !reviewTextValue.includes(value)) {
     return;
   }
+  if (isLowSignalPronoun(value)) {
+    setStatus("Pronouns are not treated as identifiers.");
+    return;
+  }
 
   const mapping = buildEffectiveMapping();
   const placeholder = nextManualPlaceholder(span.category || "IDENTIFIER", mapping);
   manualMapping = { ...manualMapping, [placeholder]: value };
-  setReviewText(reviewTextValue.split(value).join(placeholder));
+  setReviewText(replaceAllOccurrences(reviewTextValue, value, placeholder, { caseInsensitive: true }));
   setStatus(`Replaced residual with ${placeholder}.`);
 }
 
@@ -835,7 +847,12 @@ function onApplySelectedReviewText() {
   if (!value || !reviewTextValue.includes(value)) {
     return false;
   }
-  if (/^\[[A-Z_]+_\d{3}\]$/.test(value)) {
+  if (isLowSignalPronoun(value)) {
+    setStatus("Pronouns are not treated as identifiers.");
+    window.getSelection?.().removeAllRanges();
+    return true;
+  }
+  if (/^\[[A-Za-z_]+_\d{3}\]$/.test(value)) {
     setStatus("Selected text is already a placeholder.");
     window.getSelection?.().removeAllRanges();
     return true;
@@ -844,7 +861,7 @@ function onApplySelectedReviewText() {
   const mapping = buildEffectiveMapping();
   const placeholder = nextManualPlaceholder(manualIdentifierCategory.value || "IDENTIFIER", mapping);
   manualMapping = { ...manualMapping, [placeholder]: value };
-  setReviewText(reviewTextValue.split(value).join(placeholder));
+  setReviewText(replaceAllOccurrences(reviewTextValue, value, placeholder, { caseInsensitive: true }));
   window.getSelection?.().removeAllRanges();
   setStatus(`Replaced all selected text matches with ${placeholder}.`);
   return true;
@@ -919,7 +936,7 @@ function onRemoveSuggestion(mark) {
   if (!mark.value) {
     return;
   }
-  ignoredReviewValues.add(mark.value);
+  ignoredReviewValues.add(normaliseIgnoredReviewValue(mark.value));
   renderReviewOutput();
   renderSummary();
   setStatus(`Removed highlighting for all matching ${mark.kind === "likely" ? "direct" : "possible"} identifiers.`);
@@ -927,9 +944,9 @@ function onRemoveSuggestion(mark) {
 
 function onApplySuggestion(mark) {
   const placeholder = mark.replacement || nextManualPlaceholder(mark.category, buildEffectiveMapping());
-  ignoredReviewValues.delete(mark.value);
+  ignoredReviewValues.delete(normaliseIgnoredReviewValue(mark.value));
   manualMapping = { ...manualMapping, [placeholder]: mark.value };
-  setReviewText(reviewTextValue.split(mark.value).join(placeholder));
+  setReviewText(replaceAllOccurrences(reviewTextValue, mark.value, placeholder, { caseInsensitive: mark.caseInsensitive }));
   setStatus(`Replaced all matching ${mark.kind === "likely" ? "direct" : "possible"} identifiers with ${placeholder}.`);
 }
 
@@ -946,7 +963,7 @@ function onChooseReplacementIdentifier(mark, value, singleInstance = false) {
     return;
   }
 
-  setReviewText(reviewTextValue.split(mark.placeholder).join(placeholder));
+  setReviewText(replaceAllOccurrences(reviewTextValue, mark.placeholder, placeholder, { caseInsensitive: true }));
   setStatus(`Changed all ${mark.placeholder} instances to ${placeholder}.`);
 }
 
@@ -956,7 +973,7 @@ function buildReviewMarks(text, originalPseudonymisedText, mapping, residualSpan
   }
 
   const replacedMarks = Object.entries(mapping).flatMap(([placeholder, original]) =>
-    findAllOccurrences(text, placeholder).map((start) => ({
+    findAllOccurrences(text, placeholder, { caseInsensitive: true }).map((start) => ({
       kind: "replaced",
       start,
       end: start + placeholder.length,
@@ -964,51 +981,116 @@ function buildReviewMarks(text, originalPseudonymisedText, mapping, residualSpan
       original,
     }))
   );
-  const revertedMarks = Object.entries(mapping).flatMap(([placeholder, original]) =>
-    findAllOccurrences(text, original).map((start) => ({
-      kind: "likely",
-      start,
-      end: start + original.length,
-      category: placeholderCategoryValue(placeholder),
-      reason: "Previously pseudonymised value was restored",
-      value: original,
-      replacement: placeholder,
-    }))
-  );
-  const suggestionMarks = residualSpans.flatMap((span) => {
-    const value = originalPseudonymisedText.slice(span.start, span.end);
-    if (!value || mapping[value] || ignoredReviewValues.has(value)) {
+  const revertedMarks = Object.entries(mapping).flatMap(([placeholder, original]) => {
+    const info = parseBasePlaceholder(placeholder);
+    if (!info || isLowSignalPronoun(original)) {
       return [];
     }
 
-    return findAllOccurrences(text, value).map((start) => ({
+    const marks = restoredValueMarks(placeholder, original, info);
+    return marks.flatMap((mark) =>
+      findAllOccurrences(text, mark.value, { caseInsensitive: true }).map((start) => ({
+        kind: "likely",
+        start,
+        end: start + mark.value.length,
+        category: info.category,
+        reason: "Previously pseudonymised value was restored",
+        value: mark.value,
+        replacement: mark.replacement,
+        caseInsensitive: true,
+      }))
+    );
+  });
+  const suggestionMarks = residualSpans.flatMap((span) => {
+    const value = originalPseudonymisedText.slice(span.start, span.end);
+    if (!value || mapping[value] || isLowSignalPronoun(value) || ignoredReviewValues.has(normaliseIgnoredReviewValue(value))) {
+      return [];
+    }
+
+    return findAllOccurrences(text, value, { caseInsensitive: true }).map((start) => ({
       kind: span.severity === "direct" ? "likely" : "possible",
       start,
       end: start + value.length,
       category: span.category,
       reason: span.reason,
       value,
+      caseInsensitive: true,
     }));
   });
 
   return normaliseReviewMarks(
-    [...replacedMarks, ...revertedMarks.filter((mark) => !ignoredReviewValues.has(mark.value)), ...suggestionMarks],
+    [
+      ...replacedMarks,
+      ...revertedMarks.filter((mark) => !ignoredReviewValues.has(normaliseIgnoredReviewValue(mark.value))),
+      ...suggestionMarks,
+    ],
     text.length
   );
 }
 
-function findAllOccurrences(text, value) {
+function findAllOccurrences(text, value, options = {}) {
   const starts = [];
+  const needle = String(value || "");
+  if (!needle) {
+    return starts;
+  }
+  const haystack = options.caseInsensitive ? String(text || "").toLowerCase() : String(text || "");
+  const searchNeedle = options.caseInsensitive ? needle.toLowerCase() : needle;
   let cursor = 0;
-  while (value && cursor < text.length) {
-    const start = text.indexOf(value, cursor);
+  while (cursor < haystack.length) {
+    const start = haystack.indexOf(searchNeedle, cursor);
     if (start === -1) {
       break;
     }
     starts.push(start);
-    cursor = start + value.length;
+    cursor = start + needle.length;
   }
   return starts;
+}
+
+function restoredValueMarks(placeholder, original, info) {
+  const baseMark = [{ value: original, replacement: placeholder }];
+  if (!PERSON_PLACEHOLDER_CATEGORIES.has(info.category)) {
+    return baseMark;
+  }
+
+  const { firstName, surname } = splitPersonName(original);
+  const personMarks = [...baseMark];
+  if (firstName && !isLowSignalPronoun(firstName)) {
+    personMarks.push({
+      value: firstName,
+      replacement: `[${info.category}_PREFERRED_NAME_${info.index}]`,
+    });
+  }
+  if (surname && !isLowSignalPronoun(surname)) {
+    personMarks.push({
+      value: surname,
+      replacement: `[${info.category}_SURNAME_${info.index}]`,
+    });
+  }
+
+  return dedupeValueMarks(personMarks);
+}
+
+function dedupeValueMarks(marks) {
+  const seen = new Set();
+  return marks.filter((mark) => {
+    const key = `${normaliseIgnoredReviewValue(mark.value)}|${mark.replacement}`;
+    if (!mark.value || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function replaceAllOccurrences(text, value, replacement, options = {}) {
+  return findAllOccurrences(text, value, options)
+    .reverse()
+    .reduce(
+      (nextText, start) => `${nextText.slice(0, start)}${replacement}${nextText.slice(start + String(value).length)}`,
+      String(text || "")
+    );
 }
 
 function normaliseReviewMarks(marks, textLength) {
@@ -1041,11 +1123,14 @@ function reviewMarkRank(kind) {
 }
 
 function buildEffectiveMapping() {
-  const merged = { ...(result?.mapping || {}), ...manualMapping };
+  const merged = { ...(result?.mapping || {}) };
+  for (const [placeholder, value] of Object.entries(manualMapping)) {
+    merged[normalisePlaceholderKey(placeholder)] = value;
+  }
   const preferredClientName = normalisePreferredName(preferredNameInput.value);
 
   for (const [placeholder, original] of Object.entries({ ...merged })) {
-    const match = placeholder.match(/^\[([A-Z_]+)_(\d{3})\]$/);
+    const match = normalisePlaceholderKey(placeholder).match(/^\[([A-Z_]+)_(\d{3})\]$/);
     if (!match) {
       continue;
     }
@@ -1139,8 +1224,33 @@ function identifierOptionLabel(value) {
 }
 
 function placeholderCategoryValue(placeholder) {
-  const match = String(placeholder || "").match(/^\[([A-Z_]+)_\d{3}\]$/);
-  return match?.[1] || "IDENTIFIER";
+  return parseBasePlaceholder(placeholder)?.category || "IDENTIFIER";
+}
+
+function parseBasePlaceholder(placeholder) {
+  const match = normalisePlaceholderKey(placeholder).match(/^\[([A-Z_]+)_(\d{3})\]$/);
+  if (!match) {
+    return null;
+  }
+  return { category: match[1], index: match[2] };
+}
+
+function normalisePlaceholderKey(placeholder) {
+  const match = String(placeholder || "").match(/^([\[<])([A-Za-z0-9_]+)([\]>])$/);
+  if (!match) {
+    return String(placeholder || "");
+  }
+  const open = match[1] === "<" ? "<" : "[";
+  const close = open === "<" ? ">" : "]";
+  return `${open}${match[2].toUpperCase()}${close}`;
+}
+
+function isLowSignalPronoun(value) {
+  return LOW_SIGNAL_PRONOUNS.has(String(value || "").trim().toLowerCase());
+}
+
+function normaliseIgnoredReviewValue(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function normaliseResidualSpans(spans, textLength) {
@@ -1172,7 +1282,7 @@ function severityRank(severity) {
 function deanonymiseText(mapping, text) {
   let restoredCount = 0;
   let unresolvedCount = 0;
-  const output = String(text || "").replace(/(?:\[[A-Z0-9_]+\]|<[A-Z0-9_]+>)/g, (placeholder) => {
+  const output = String(text || "").replace(/(?:\[[A-Za-z0-9_]+\]|<[A-Za-z0-9_]+>)/g, (placeholder) => {
     const value = resolvePlaceholderValue(mapping, placeholder);
     if (!value) {
       unresolvedCount += 1;
@@ -1185,11 +1295,15 @@ function deanonymiseText(mapping, text) {
 }
 
 function resolvePlaceholderValue(mapping, placeholder) {
+  const normalisedPlaceholder = normalisePlaceholderKey(placeholder);
   if (mapping[placeholder]) {
     return mapping[placeholder];
   }
+  if (mapping[normalisedPlaceholder]) {
+    return mapping[normalisedPlaceholder];
+  }
 
-  const match = placeholder.match(/^[<\[]([A-Z_]+)_(PREFERRED_NAME|FIRST_NAME|SURNAME)_(\d{3})[>\]]$/);
+  const match = normalisedPlaceholder.match(/^[<\[]([A-Z_]+)_(PREFERRED_NAME|FIRST_NAME|SURNAME)_(\d{3})[>\]]$/);
   if (!match) {
     return null;
   }
