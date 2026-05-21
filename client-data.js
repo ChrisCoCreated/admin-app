@@ -111,6 +111,7 @@ let account = null;
 let result = null;
 let reviewTextValue = "";
 let manualMapping = {};
+let ignoredReviewValues = new Set();
 let busy = false;
 let reportBusy = false;
 let structuredReport = null;
@@ -412,6 +413,7 @@ function clearAll() {
   manualIdentifierText.value = "";
   result = null;
   manualMapping = {};
+  ignoredReviewValues = new Set();
   structuredReport = null;
   reportSourceNotes = "";
   reportRevisionRequests = [];
@@ -457,6 +459,7 @@ async function pseudonymise() {
   try {
     result = await apiPost("/api/pseudonymiser/pseudonymise", { text });
     manualMapping = {};
+    ignoredReviewValues = new Set();
     if (summaryDetails) {
       delete summaryDetails.dataset.userOpened;
       summaryDetails.open = false;
@@ -864,7 +867,7 @@ function renderReviewMark(mark, identifierOptions) {
   button.className = `review-highlight ${mark.kind}`;
   button.type = "button";
   button.textContent = content;
-  button.title = `Pseudonymise: ${mark.reason}. Shift-click to remove all matching text.`;
+  button.title = `Pseudonymise: ${mark.reason}. Shift-click to remove this highlight for all matching text.`;
   button.addEventListener("click", (event) => {
     event.stopPropagation();
     if (event.shiftKey) {
@@ -877,12 +880,18 @@ function renderReviewMark(mark, identifierOptions) {
 }
 
 function onRemoveSuggestion(mark) {
-  setReviewText(reviewTextValue.split(mark.value).join(""));
-  setStatus(`Removed all matching ${mark.kind === "likely" ? "direct" : "possible"} identifiers.`);
+  if (!mark.value) {
+    return;
+  }
+  ignoredReviewValues.add(mark.value);
+  renderReviewOutput();
+  renderSummary();
+  setStatus(`Removed highlighting for all matching ${mark.kind === "likely" ? "direct" : "possible"} identifiers.`);
 }
 
 function onApplySuggestion(mark) {
   const placeholder = mark.replacement || nextManualPlaceholder(mark.category, buildEffectiveMapping());
+  ignoredReviewValues.delete(mark.value);
   manualMapping = { ...manualMapping, [placeholder]: mark.value };
   setReviewText(reviewTextValue.split(mark.value).join(placeholder));
   setStatus(`Replaced all matching ${mark.kind === "likely" ? "direct" : "possible"} identifiers with ${placeholder}.`);
@@ -932,7 +941,7 @@ function buildReviewMarks(text, originalPseudonymisedText, mapping, residualSpan
   );
   const suggestionMarks = residualSpans.flatMap((span) => {
     const value = originalPseudonymisedText.slice(span.start, span.end);
-    if (!value || mapping[value]) {
+    if (!value || mapping[value] || ignoredReviewValues.has(value)) {
       return [];
     }
 
@@ -946,7 +955,10 @@ function buildReviewMarks(text, originalPseudonymisedText, mapping, residualSpan
     }));
   });
 
-  return normaliseReviewMarks([...replacedMarks, ...revertedMarks, ...suggestionMarks], text.length);
+  return normaliseReviewMarks(
+    [...replacedMarks, ...revertedMarks.filter((mark) => !ignoredReviewValues.has(mark.value)), ...suggestionMarks],
+    text.length
+  );
 }
 
 function findAllOccurrences(text, value) {
