@@ -98,6 +98,51 @@ test("structured report generation parses ready_for_render JSON from AI", async 
   assert.equal(report.suggested_smart_goals.length, 1);
 });
 
+test("structured report generation omits JSON response format for Azure Foundry", async () => {
+  let capturedOptions = null;
+  const report = await generateStructuredReport({
+    reportType: "wellbeing_assurance_visit",
+    notes: "[CLIENT_001] feels safe.",
+    provider: "azure_openai",
+    model: "primary",
+    createCompletion: async (options) => {
+      capturedOptions = options;
+      return {
+        content: JSON.stringify({
+          status: "ready_for_render",
+          report_type: "wellbeing_assurance_visit",
+          report_title: "Wellbeing Assurance Visit Summary",
+          client_details: { client_name: "[CLIENT_001]" },
+          inferred_context: { assessment_type: "review", evidence: [] },
+          suggested_smart_goals: [],
+          report_sections: {
+            executive_summary: "[CLIENT_001] feels safe.",
+            current_situation: "",
+            physical_wellbeing: "",
+            emotional_wellbeing: "",
+            environmental_wellbeing: "",
+            wellbeing_highlights: "",
+            recommendations: [],
+            next_steps: [],
+          },
+          omitted_sections: [],
+          assumptions_avoided: [],
+          clarification_notes: [],
+          source_notes_used: ["[CLIENT_001] feels safe."],
+          warnings: [],
+          tone_check: {},
+          revision_prompt: "",
+        }),
+      };
+    },
+  });
+
+  assert.equal(capturedOptions.responseFormat, undefined);
+  assert.equal(capturedOptions.maxTokens, 6000);
+  assert.match(capturedOptions.messages[0].content, /JSON\.parse/);
+  assert.equal(report.status, "ready_for_render");
+});
+
 test("simple summary generation uses plain text AI response without JSON response format", async () => {
   let capturedOptions = null;
   const report = await generateStructuredReport({

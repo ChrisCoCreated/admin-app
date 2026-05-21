@@ -11,6 +11,10 @@ function jsonObjectResponseFormat() {
   return { type: "json_object" };
 }
 
+function shouldUseJsonResponseFormat(provider) {
+  return normalizeText(provider).toLowerCase() !== "azure_openai";
+}
+
 function extractJsonObject(text) {
   const raw = normalizeText(text);
   if (!raw) {
@@ -116,7 +120,7 @@ async function buildReportMessages({ reportType, notes, previousReport, revision
         "Use double quotes for all JSON keys and string values.",
         "Escape newline characters inside JSON string values as \\n. Do not put literal unescaped line breaks inside string values.",
         "Use empty strings or empty arrays for unknown optional content rather than adding unsupported commentary.",
-        "The API response format is JSON object mode, so every response must be parseable by JSON.parse.",
+        "Every response must be parseable by JSON.parse.",
         "",
         "JSON schema:",
         safeJson(reportType.json_schema),
@@ -284,7 +288,7 @@ async function generateStructuredReport({
     reasoningEffort,
     maxTokens: 6000,
     temperature: 0.2,
-    responseFormat: jsonObjectResponseFormat(),
+    responseFormat: shouldUseJsonResponseFormat(provider) ? jsonObjectResponseFormat() : undefined,
     messages: await buildReportMessages({
       reportType,
       notes: cleanNotes,
@@ -302,4 +306,5 @@ module.exports = {
   generateStructuredReport,
   jsonObjectResponseFormat,
   normalizeReportJson,
+  shouldUseJsonResponseFormat,
 };

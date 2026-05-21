@@ -704,6 +704,42 @@ function renderReviewOutput() {
   }
 }
 
+function getSelectedReviewText() {
+  const selection = window.getSelection?.();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    return "";
+  }
+
+  const range = selection.getRangeAt(0);
+  const container = range.commonAncestorContainer;
+  const selectionRoot = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+  if (!selectionRoot || !reviewOutput.contains(selectionRoot)) {
+    return "";
+  }
+
+  return selection.toString().trim();
+}
+
+function onApplySelectedReviewText() {
+  const value = getSelectedReviewText();
+  if (!value || !reviewTextValue.includes(value)) {
+    return false;
+  }
+  if (/^\[[A-Z_]+_\d{3}\]$/.test(value)) {
+    setStatus("Selected text is already a placeholder.");
+    window.getSelection?.().removeAllRanges();
+    return true;
+  }
+
+  const mapping = buildEffectiveMapping();
+  const placeholder = nextManualPlaceholder(manualIdentifierCategory.value || "IDENTIFIER", mapping);
+  manualMapping = { ...manualMapping, [placeholder]: value };
+  setReviewText(reviewTextValue.split(value).join(placeholder));
+  window.getSelection?.().removeAllRanges();
+  setStatus(`Replaced all selected text matches with ${placeholder}.`);
+  return true;
+}
+
 function renderReviewMark(mark, identifierOptions) {
   const content = reviewTextValue.slice(mark.start, mark.end);
   if (mark.kind === "replaced") {
@@ -759,6 +795,7 @@ function renderReviewMark(mark, identifierOptions) {
   button.textContent = content;
   button.title = `Pseudonymise: ${mark.reason}. Shift-click to remove all matching text.`;
   button.addEventListener("click", (event) => {
+    event.stopPropagation();
     if (event.shiftKey) {
       onRemoveSuggestion(mark);
       return;
@@ -1509,6 +1546,14 @@ preferredNameInput.addEventListener("input", () => {
   renderReviewOutput();
   renderSummary();
   updateRestore();
+});
+reviewOutput.addEventListener("click", (event) => {
+  if (!event.shiftKey || event.target.closest("button, select, input, textarea")) {
+    return;
+  }
+  if (onApplySelectedReviewText()) {
+    event.preventDefault();
+  }
 });
 manualIdentifierText.addEventListener("input", updateManualControls);
 pseudonymiseBtn.addEventListener("click", () => {
