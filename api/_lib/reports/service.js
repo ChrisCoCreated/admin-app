@@ -106,9 +106,12 @@ async function readExampleDocumentText(reportType) {
   }
 }
 
-async function buildReportMessages({ reportType, notes, previousReport, revisionRequest }) {
+async function buildReportMessages({ reportType, notes, previousReport, revisionRequest, guidance, audience, writingStyle }) {
   const exampleSummary = await readExampleDocumentText(reportType);
   const isRevision = previousReport && typeof previousReport === "object" && normalizeText(revisionRequest);
+  const cleanGuidance = normalizeText(guidance);
+  const cleanAudience = normalizeText(audience) || "Professional";
+  const cleanWritingStyle = normalizeText(writingStyle) || "Professional";
 
   return [
     {
@@ -121,6 +124,7 @@ async function buildReportMessages({ reportType, notes, previousReport, revision
         "Escape newline characters inside JSON string values as \\n. Do not put literal unescaped line breaks inside string values.",
         "Use empty strings or empty arrays for unknown optional content rather than adding unsupported commentary.",
         "Every response must be parseable by JSON.parse.",
+        "Follow the audience, writing style, and user guidance where they improve readability, but never use them to invent facts or override source-note evidence.",
         "",
         "JSON schema:",
         safeJson(reportType.json_schema),
@@ -136,6 +140,9 @@ async function buildReportMessages({ reportType, notes, previousReport, revision
       content: [
         `Report type: ${reportType.report_type}`,
         isRevision ? "Task: Revise the previous structured report." : "Task: Generate the structured report.",
+        `Report audience: ${cleanAudience}`,
+        `Preferred writing style: ${cleanWritingStyle}`,
+        cleanGuidance ? `Additional user guidance:\n${cleanGuidance}` : "",
         "",
         "Original pseudonymised notes:",
         normalizeText(notes) || "(none)",
@@ -194,6 +201,9 @@ async function generatePlainTextSummary({
   model,
   thinking,
   reasoningEffort,
+  guidance,
+  audience,
+  writingStyle,
   previousReport,
   revisionRequest,
   createCompletion,
@@ -216,6 +226,9 @@ async function generatePlainTextSummary({
         content: [
           "Text:",
           normalizeText(notes),
+          `Report audience: ${normalizeText(audience) || "Professional"}`,
+          `Preferred writing style: ${normalizeText(writingStyle) || "Professional"}`,
+          normalizeText(guidance) ? `Additional user guidance:\n${normalizeText(guidance)}` : "",
           isRevision ? `Previous summary:\n${normalizeText(previousReport?.report_sections?.executive_summary)}` : "",
           isRevision ? `Requested changes:\n${normalizeText(revisionRequest)}` : "",
         ]
@@ -239,6 +252,9 @@ async function generateStructuredReport({
   model,
   thinking,
   reasoningEffort,
+  guidance,
+  audience,
+  writingStyle,
   previousReport,
   revisionRequest,
   createCompletion = createChatCompletion,
@@ -275,6 +291,9 @@ async function generateStructuredReport({
       model,
       thinking,
       reasoningEffort,
+      guidance,
+      audience,
+      writingStyle,
       previousReport,
       revisionRequest,
       createCompletion,
@@ -294,6 +313,9 @@ async function generateStructuredReport({
       notes: cleanNotes,
       previousReport,
       revisionRequest,
+      guidance,
+      audience,
+      writingStyle,
     }),
   });
 

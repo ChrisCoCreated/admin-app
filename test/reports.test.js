@@ -182,6 +182,9 @@ test("revision prompt includes original notes, previous JSON, and requested chan
   const messages = await buildReportMessages({
     reportType,
     notes: "Original notes",
+    guidance: "Keep it short and suitable for a family update.",
+    audience: "Family member",
+    writingStyle: "Plain English",
     previousReport: { status: "ready_for_render", report_type: "wellbeing_assurance_visit" },
     revisionRequest: "Make it warmer",
   });
@@ -189,6 +192,9 @@ test("revision prompt includes original notes, previous JSON, and requested chan
   assert.match(userMessage, /Original notes/);
   assert.match(userMessage, /Make it warmer/);
   assert.match(userMessage, /Previous structured JSON/);
+  assert.match(userMessage, /Family member/);
+  assert.match(userMessage, /Plain English/);
+  assert.match(userMessage, /Keep it short/);
 });
 
 test("report docx replaces placeholders, renders goals, and removes omitted sections and notes", async () => {

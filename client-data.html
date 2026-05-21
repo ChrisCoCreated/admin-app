@@ -168,6 +168,30 @@
               <option value="max">Max</option>
             </select>
           </label>
+          <div class="client-data-report-guidance-controls">
+            <label class="field" for="reportGuidanceText">
+              Guidance
+              <textarea id="reportGuidanceText" class="client-data-textarea client-data-guidance-textarea" rows="3" spellcheck="true"></textarea>
+            </label>
+            <label class="field" for="reportAudienceSelect">
+              Who is the report mainly for?
+              <select id="reportAudienceSelect">
+                <option value="Professional">Professional</option>
+                <option value="Family member">Family member</option>
+                <option value="Lay LPA / lay deputy">Lay LPA / lay deputy</option>
+              </select>
+            </label>
+            <label class="field" for="reportStyleSelect">
+              Preferred writing style
+              <select id="reportStyleSelect">
+                <option value="Professional">Professional</option>
+                <option value="Plain English">Plain English</option>
+                <option value="Friendly">Friendly</option>
+                <option value="Factual">Factual</option>
+                <option value="Warm">Warm</option>
+              </select>
+            </label>
+          </div>
           <button id="generateReportBtn" type="button" disabled>Generate report</button>
         </div>
         <div id="reportDraftPanel" class="client-data-report-draft" hidden>

@@ -98,6 +98,9 @@ const reportThinkingField = document.getElementById("reportThinkingField");
 const reportThinkingSelect = document.getElementById("reportThinkingSelect");
 const reportModeSelect = document.getElementById("reportModeSelect");
 const reportModelLockBtn = document.getElementById("reportModelLockBtn");
+const reportGuidanceText = document.getElementById("reportGuidanceText");
+const reportAudienceSelect = document.getElementById("reportAudienceSelect");
+const reportStyleSelect = document.getElementById("reportStyleSelect");
 const generateReportBtn = document.getElementById("generateReportBtn");
 const reportRevisionPanel = document.getElementById("reportRevisionPanel");
 const reportRevisionText = document.getElementById("reportRevisionText");
@@ -426,6 +429,15 @@ function clearAll() {
   restoredText.value = "";
   preferredNameInput.value = "";
   manualIdentifierText.value = "";
+  if (reportGuidanceText) {
+    reportGuidanceText.value = "";
+  }
+  if (reportAudienceSelect) {
+    reportAudienceSelect.value = "Professional";
+  }
+  if (reportStyleSelect) {
+    reportStyleSelect.value = "Professional";
+  }
   result = null;
   manualMapping = {};
   ignoredReviewValues = new Set();
@@ -697,6 +709,9 @@ async function generateReport(revisionRequest = "") {
       model: reportModelSelect?.value,
       thinking: thinkingOptions.thinking,
       reasoningEffort: thinkingOptions.reasoningEffort,
+      guidance: reportGuidanceText?.value.trim() || "",
+      audience: reportAudienceSelect?.value || "Professional",
+      writingStyle: reportStyleSelect?.value || "Professional",
       previousReport: isRevision ? structuredReport : null,
       revisionRequest: isRevision ? revisionRequest : "",
     });

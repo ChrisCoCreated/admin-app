@@ -25,6 +25,9 @@ module.exports = async (req, res) => {
       model: body.model,
       thinking: body.thinking,
       reasoningEffort: body.reasoningEffort || body.reasoning_effort,
+      guidance: body.guidance || body.report_guidance,
+      audience: body.audience || body.report_audience,
+      writingStyle: body.writingStyle || body.writing_style,
       previousReport: body.previousReport || body.previous_report,
       revisionRequest: body.revisionRequest || body.revision_request,
     });
