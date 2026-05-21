@@ -1129,6 +1129,10 @@ button.is-generating::after {
   align-items: stretch;
 }
 
+.client-data-pseudonymiser-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .client-data-pane {
   min-width: 0;
   display: flex;
