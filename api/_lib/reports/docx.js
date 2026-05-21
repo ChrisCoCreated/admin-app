@@ -131,43 +131,6 @@ function replaceTextPlaceholders(documentXml, reportType, report) {
   return replaceRepeatedGoalTokens(output, report);
 }
 
-function paragraphXml(text, { bold = false } = {}) {
-  const runProperties = bold ? "<w:rPr><w:b/></w:rPr>" : "";
-  return `<w:p><w:r>${runProperties}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
-}
-
-function reportListParagraphs(title, items) {
-  const values = (Array.isArray(items) ? items : [])
-    .map((item) => asText(item))
-    .filter(Boolean);
-  if (!values.length) {
-    return "";
-  }
-  return [paragraphXml(title, { bold: true }), ...values.map((item) => paragraphXml(`- ${item}`))].join("");
-}
-
-function buildSupplementarySections(report) {
-  return [
-    reportListParagraphs("Warnings", report?.warnings),
-    reportListParagraphs("Clarification Notes", report?.clarification_notes),
-    reportListParagraphs("Assumptions Avoided", report?.assumptions_avoided),
-  ]
-    .filter(Boolean)
-    .join("");
-}
-
-function insertBeforeAssessorFooter(documentXml, insertXml) {
-  if (!insertXml) {
-    return documentXml;
-  }
-  const paragraphs = documentXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) || [];
-  const assessorParagraph = paragraphs.find((paragraph) => /assessor_name|assessor_role/.test(paragraph));
-  if (assessorParagraph) {
-    return documentXml.replace(assessorParagraph, `${insertXml}${assessorParagraph}`);
-  }
-  return documentXml.replace("</w:body>", `${insertXml}</w:body>`);
-}
-
 function removeParagraphRangeByText(documentXml, startText, endText) {
   const paragraphs = documentXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) || [];
   if (!paragraphs.length) {
@@ -238,7 +201,6 @@ async function buildReportDocx({ reportType: reportTypeKey, report }) {
   }
   documentXml = removeImplementationNotes(documentXml);
   documentXml = replaceTextPlaceholders(documentXml, reportType, report || {});
-  documentXml = insertBeforeAssessorFooter(documentXml, buildSupplementarySections(report || {}));
 
   zip.file("word/document.xml", documentXml);
   return zip.generateAsync({

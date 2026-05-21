@@ -170,32 +170,28 @@
           </label>
           <button id="generateReportBtn" type="button" disabled>Generate report</button>
         </div>
-        <div id="reportRevisionPanel" class="client-data-report-revision" hidden>
-          <label class="field" for="reportRevisionText">
-            Request changes
-            <textarea id="reportRevisionText" class="client-data-textarea" rows="4" spellcheck="true"></textarea>
-          </label>
-          <button id="reviseReportBtn" class="secondary" type="button">Regenerate with changes</button>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2>Restore</h2>
-            <p id="restoreStatus" class="muted">Paste placeholder-bearing output to restore with the local map.</p>
+        <div id="reportDraftPanel" class="client-data-report-draft" hidden>
+          <div class="panel-head client-data-draft-head">
+            <div>
+              <h3>Draft report</h3>
+              <p id="restoreStatus" class="muted">Generated report text will appear here.</p>
+            </div>
+            <label class="client-data-placeholder-toggle" for="showPlaceholderText">
+              <input id="showPlaceholderText" type="checkbox" />
+              Show placeholders
+            </label>
           </div>
-          <button id="copyRestoredBtn" class="secondary" type="button" disabled>Copy restored</button>
-        </div>
-        <div class="client-data-grid client-data-grid-restore">
-          <label class="field" for="placeholderText">
-            Text with placeholders
-            <textarea id="placeholderText" class="client-data-textarea restore-textarea" spellcheck="false"></textarea>
-          </label>
-          <label class="field" for="restoredText">
-            Restored text
-            <textarea id="restoredText" class="client-data-textarea restore-textarea" readonly spellcheck="false"></textarea>
-          </label>
+          <textarea id="restoredText" class="client-data-textarea restore-textarea" readonly spellcheck="false"></textarea>
+          <textarea id="placeholderText" class="client-data-textarea restore-textarea" readonly spellcheck="false" hidden></textarea>
+          <div id="reportNotesPanel" class="client-data-report-notes" hidden></div>
+          <div id="reportRevisionPanel" class="client-data-report-revision" hidden>
+            <label class="field" for="reportRevisionText">
+              Request changes
+              <textarea id="reportRevisionText" class="client-data-textarea" rows="4" spellcheck="true"></textarea>
+            </label>
+            <button id="reviseReportBtn" class="secondary" type="button">Regenerate with changes</button>
+            <div id="reportRevisionHistory" class="client-data-revision-history" hidden></div>
+          </div>
         </div>
       </section>
 
@@ -203,10 +199,11 @@
         <div class="panel-head">
           <div>
             <h2>Output</h2>
-            <p id="exportStatus" class="muted">Export the restored report text.</p>
+            <p id="exportStatus" class="muted">Export or copy the draft report text.</p>
           </div>
         </div>
         <div class="client-data-export-actions">
+          <button id="copyRestoredBtn" class="secondary" type="button" disabled>Copy text</button>
           <button id="exportPdfBtn" class="secondary" type="button" disabled>Output as PDF</button>
           <button id="exportWordBtn" class="secondary" type="button" disabled>Output as Word doc</button>
         </div>

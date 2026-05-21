@@ -44,13 +44,28 @@ function formatReportDate(value, fallbackDate = new Date()) {
   }).format(date);
 }
 
+function titleClientName(title) {
+  const match = String(title || "").match(/\bfor\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
+
+function cleanReportTitle(title, clientName = "") {
+  const raw = String(title || "Report").trim();
+  if (!clientName) {
+    return raw;
+  }
+  return raw.replace(new RegExp(`\\s+for\\s+${clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"), "").trim() || raw;
+}
+
 function buildReportFilename(report, fallbackDate = new Date()) {
   const clientDetails = report?.client_details && typeof report.client_details === "object" ? report.client_details : {};
+  const rawTitle = report?.report_title || "Report";
   const clientName =
     clientDetails.client_name ||
     clientDetails.name ||
     clientDetails.full_name ||
     clientDetails.preferred_name ||
+    titleClientName(rawTitle) ||
     "Client";
   const reportDate =
     clientDetails.report_date ||
@@ -58,11 +73,11 @@ function buildReportFilename(report, fallbackDate = new Date()) {
     clientDetails.assessment_date ||
     report?.report_date ||
     report?.date;
-  const title = report?.report_title || "Report";
+  const title = cleanReportTitle(rawTitle, clientName);
   const filename = [
     safeFilenamePart(clientName, "Client"),
-    safeFilenamePart(formatReportDate(reportDate, fallbackDate), "Date"),
     safeFilenamePart(title, "Report"),
+    safeFilenamePart(formatReportDate(reportDate, fallbackDate), "Date"),
   ].join(" - ");
   return `${filename}.docx`;
 }

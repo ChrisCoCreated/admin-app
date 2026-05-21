@@ -89,6 +89,9 @@ const residualList = document.getElementById("residualList");
 const mappingList = document.getElementById("mappingList");
 const restoreStatus = document.getElementById("restoreStatus");
 const reportStatus = document.getElementById("reportStatus");
+const reportDraftPanel = document.getElementById("reportDraftPanel");
+const showPlaceholderText = document.getElementById("showPlaceholderText");
+const reportNotesPanel = document.getElementById("reportNotesPanel");
 const reportProviderSelect = document.getElementById("reportProviderSelect");
 const reportModelSelect = document.getElementById("reportModelSelect");
 const reportThinkingField = document.getElementById("reportThinkingField");
@@ -98,6 +101,7 @@ const reportModelLockBtn = document.getElementById("reportModelLockBtn");
 const generateReportBtn = document.getElementById("generateReportBtn");
 const reportRevisionPanel = document.getElementById("reportRevisionPanel");
 const reportRevisionText = document.getElementById("reportRevisionText");
+const reportRevisionHistory = document.getElementById("reportRevisionHistory");
 const reviseReportBtn = document.getElementById("reviseReportBtn");
 const exportStatus = document.getElementById("exportStatus");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
@@ -112,6 +116,7 @@ let reportBusy = false;
 let structuredReport = null;
 let reportSourceNotes = "";
 let reportModelUnlocked = false;
+let reportRevisionRequests = [];
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -409,9 +414,19 @@ function clearAll() {
   manualMapping = {};
   structuredReport = null;
   reportSourceNotes = "";
+  reportRevisionRequests = [];
+  if (reportDraftPanel) {
+    reportDraftPanel.hidden = true;
+  }
+  if (showPlaceholderText) {
+    showPlaceholderText.checked = false;
+  }
   if (reportRevisionText) {
     reportRevisionText.value = "";
   }
+  renderReportNotes(null);
+  renderRevisionHistory();
+  syncDraftTextVisibility();
   if (summaryDetails) {
     delete summaryDetails.dataset.userOpened;
     summaryDetails.open = false;
@@ -419,7 +434,7 @@ function clearAll() {
   setRiskBadge(null);
   setStatus("Paste a note to begin.");
   setReportStatus("Generate a placeholder-preserving report from the pseudonymised text.");
-  setExportStatus("Export the restored report text.");
+  setExportStatus("Export or copy the draft report text.");
   renderReviewOutput();
   renderSummary();
   updateCounts();
@@ -482,7 +497,7 @@ async function copyRestored() {
     return;
   }
   await copyTextToClipboard(restoredText.value);
-  setStatus("Copied restored text.");
+  setExportStatus("Copied draft report text.");
 }
 
 function stringifyReportValue(value) {
@@ -552,15 +567,55 @@ function buildStructuredReportText(report) {
   if (nextSteps) {
     parts.push(`Next Steps\n${nextSteps}`);
   }
-  const warnings = formatReportList(report.warnings);
-  if (warnings) {
-    parts.push(`Warnings\n${warnings}`);
-  }
-  const clarifications = formatReportList(report.clarification_notes);
-  if (clarifications) {
-    parts.push(`Clarification Notes\n${clarifications}`);
-  }
   return parts.filter(Boolean).join("\n\n");
+}
+
+function renderReportNotes(report) {
+  if (!reportNotesPanel) {
+    return;
+  }
+  const groups = [
+    ["Warnings", report?.warnings],
+    ["Clarification Notes", report?.clarification_notes],
+    ["Assumptions Avoided", report?.assumptions_avoided],
+  ]
+    .map(([title, items]) => [title, (Array.isArray(items) ? items : []).map(stringifyReportValue).filter(Boolean)])
+    .filter(([, items]) => items.length > 0);
+
+  reportNotesPanel.hidden = groups.length === 0;
+  reportNotesPanel.innerHTML = groups
+    .map(
+      ([title, items]) => `
+        <div class="client-data-report-note-group">
+          <h4>${escapeHtml(title)}</h4>
+          <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function renderRevisionHistory() {
+  if (!reportRevisionHistory) {
+    return;
+  }
+  reportRevisionHistory.hidden = reportRevisionRequests.length === 0;
+  reportRevisionHistory.innerHTML = reportRevisionRequests.length
+    ? `
+        <h4>Requested changes</h4>
+        <ol>${reportRevisionRequests.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol>
+      `
+    : "";
+}
+
+function syncDraftTextVisibility() {
+  const showPlaceholders = Boolean(showPlaceholderText?.checked);
+  if (placeholderText) {
+    placeholderText.hidden = !showPlaceholders;
+  }
+  if (restoredText) {
+    restoredText.hidden = showPlaceholders;
+  }
 }
 
 function setStructuredReport(report) {
@@ -568,26 +623,38 @@ function setStructuredReport(report) {
   if (!structuredReport) {
     placeholderText.value = "";
     updateRestore();
+    if (reportDraftPanel) {
+      reportDraftPanel.hidden = true;
+    }
+    renderReportNotes(null);
     updateRevisionControls();
     updateExportControls();
     return;
   }
 
+  if (reportDraftPanel) {
+    reportDraftPanel.hidden = false;
+  }
   if (structuredReport.status === "needs_notes") {
     placeholderText.value = "";
     updateRestore();
+    renderReportNotes(structuredReport);
     setReportStatus("Please provide notes.", true);
   } else if (structuredReport.status === "needs_clarification") {
     placeholderText.value = buildStructuredReportText(structuredReport);
     updateRestore();
+    renderReportNotes(structuredReport);
     setReportStatus("Clarification needed before this report can be rendered.", true);
   } else {
     placeholderText.value = buildStructuredReportText(structuredReport);
     updateRestore();
-    setReportStatus("Report generated. Preview restored text below and export as Word when ready.");
+    renderReportNotes(structuredReport);
+    setReportStatus("Draft report generated. Review it below, request changes, or export when ready.");
   }
+  syncDraftTextVisibility();
   updateRevisionControls();
   updateExportControls();
+  renderRevisionHistory();
 }
 
 async function generateReport(revisionRequest = "") {
@@ -617,8 +684,12 @@ async function generateReport(revisionRequest = "") {
     reportSourceNotes = reviewTextValue;
     setStructuredReport(report);
     setStatus(report.status === "ready_for_render" ? "Generated structured report." : "Report needs more input.");
-    if (isRevision && reportRevisionText) {
-      reportRevisionText.value = "";
+    if (isRevision) {
+      reportRevisionRequests.push(normalisePreferredName(revisionRequest) || String(revisionRequest || "").trim());
+      renderRevisionHistory();
+      if (reportRevisionText) {
+        reportRevisionText.value = "";
+      }
     }
   } catch (error) {
     const message = error?.message || "Could not generate report.";
@@ -1096,7 +1167,7 @@ function updateRestore() {
   copyRestoredBtn.disabled = !restored.text.trim();
   updateExportControls();
   if (!placeholderText.value.trim()) {
-    restoreStatus.textContent = "Paste placeholder-bearing output to restore with the local map.";
+    restoreStatus.textContent = "Generated report text will appear here.";
     return;
   }
   restoreStatus.textContent = `${restored.restoredCount.toLocaleString()} restored${
@@ -1167,13 +1238,32 @@ function formatReportDate(value, fallbackDate = new Date()) {
   }).format(date);
 }
 
+function escapedRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function titleClientName(title) {
+  const match = String(title || "").match(/\bfor\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
+
+function cleanReportTitle(title, clientName = "") {
+  const raw = String(title || buildExportTitle()).trim();
+  if (!clientName) {
+    return raw;
+  }
+  return raw.replace(new RegExp(`\\s+for\\s+${escapedRegExp(clientName)}\\s*$`, "i"), "").trim() || raw;
+}
+
 function buildReportDownloadFilename(report, extension, fallbackDate = new Date()) {
   const clientDetails = report?.client_details && typeof report.client_details === "object" ? report.client_details : {};
+  const rawTitle = report?.report_title || buildExportTitle();
   const clientName =
     clientDetails.client_name ||
     clientDetails.name ||
     clientDetails.full_name ||
     clientDetails.preferred_name ||
+    titleClientName(rawTitle) ||
     "Client";
   const reportDate =
     clientDetails.report_date ||
@@ -1181,11 +1271,11 @@ function buildReportDownloadFilename(report, extension, fallbackDate = new Date(
     clientDetails.assessment_date ||
     report?.report_date ||
     report?.date;
-  const title = report?.report_title || buildExportTitle();
+  const title = cleanReportTitle(rawTitle, clientName);
   return [
     safeFilenamePart(clientName, "Client"),
-    safeFilenamePart(formatReportDate(reportDate, fallbackDate), "Date"),
     safeFilenamePart(title, "Report"),
+    safeFilenamePart(formatReportDate(reportDate, fallbackDate), "Date"),
   ].join(" - ") + `.${extension}`;
 }
 
@@ -1427,8 +1517,6 @@ function buildStructuredReportPdfBlocks(report) {
   );
   pushPdfListSection(blocks, "Recommendations to Improve Quality of Life", sections.recommendations);
   pushPdfListSection(blocks, "Next Steps", sections.next_steps);
-  pushPdfListSection(blocks, "Warnings", report.warnings);
-  pushPdfListSection(blocks, "Clarification Notes", report.clarification_notes);
   return blocks;
 }
 
@@ -1629,6 +1717,7 @@ manualIdentifierCategory.value = "PROFESSIONAL";
 
 sourceText.addEventListener("input", updateCounts);
 placeholderText.addEventListener("input", updateRestore);
+showPlaceholderText?.addEventListener("change", syncDraftTextVisibility);
 preferredNameInput.addEventListener("input", () => {
   renderReviewOutput();
   renderSummary();

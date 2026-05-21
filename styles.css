@@ -1322,6 +1322,61 @@ button.is-generating::after {
   transform-origin: 8px 10px;
 }
 
+.client-data-report-draft {
+  display: grid;
+  gap: 12px;
+}
+
+.client-data-draft-head {
+  align-items: center;
+}
+
+.client-data-draft-head h3 {
+  margin: 0;
+}
+
+.client-data-placeholder-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #5f6f85;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.client-data-report-notes {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.client-data-report-note-group h4,
+.client-data-revision-history h4 {
+  margin: 0 0 6px;
+  color: #253246;
+  font-size: 0.94rem;
+}
+
+.client-data-report-note-group ul,
+.client-data-revision-history ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #40536d;
+}
+
+.client-data-report-revision {
+  display: grid;
+  gap: 10px;
+}
+
+.client-data-revision-history {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+
 .client-data-report-controls > button:not(.client-data-model-lock-btn) {
   flex: 0 0 220px;
 }

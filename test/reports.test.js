@@ -233,8 +233,8 @@ test("report docx replaces placeholders, renders goals, and removes omitted sect
   assert.match(text, /Paul Jones/);
   assert.match(text, /Paul feels safe/);
   assert.match(text, /Support confidence at home/);
-  assert.match(text, /Limited information provided/);
-  assert.match(text, /Physical wellbeing details are missing/);
+  assert.doesNotMatch(text, /Limited information provided/);
+  assert.doesNotMatch(text, /Physical wellbeing details are missing/);
   assert.doesNotMatch(text, /Wellbeing Highlights/);
   assert.doesNotMatch(text, /Implementation Notes/);
   assert.doesNotMatch(text, /\{\{/);
@@ -252,7 +252,7 @@ test("report docx filename includes client name and text month date", () => {
     new Date(2026, 4, 21)
   );
 
-  assert.equal(filename, "Paul Jones - 20 May 2026 - Wellbeing Assurance Visit Summary.docx");
+  assert.equal(filename, "Paul Jones - Wellbeing Assurance Visit Summary - 20 May 2026.docx");
 });
 
 test("report docx filename falls back to today when report date is missing", () => {
@@ -266,5 +266,17 @@ test("report docx filename falls back to today when report date is missing", () 
     new Date(2026, 4, 21)
   );
 
-  assert.equal(filename, "Claire Smith - 21 May 2026 - Wellbeing Assurance Visit Summary.docx");
+  assert.equal(filename, "Claire Smith - Wellbeing Assurance Visit Summary - 21 May 2026.docx");
+});
+
+test("report docx filename can derive client name from title and remove duplicate suffix", () => {
+  const filename = reportDocxHandler.buildReportFilename(
+    {
+      report_title: "Wellbeing Assurance Visit Summary for Paul Jones",
+      client_details: {},
+    },
+    new Date(2026, 4, 21)
+  );
+
+  assert.equal(filename, "Paul Jones - Wellbeing Assurance Visit Summary - 21 May 2026.docx");
 });
