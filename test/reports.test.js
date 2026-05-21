@@ -5,6 +5,7 @@ const JSZip = require("jszip");
 const { getReportType } = require("../api/_lib/reports/registry");
 const { buildReportMessages, generateStructuredReport } = require("../api/_lib/reports/service");
 const { buildReportDocx } = require("../api/_lib/reports/docx");
+const reportDocxHandler = require("../api/reports/docx");
 
 async function docxText(buffer) {
   const zip = await JSZip.loadAsync(buffer);
@@ -19,6 +20,7 @@ test("report registry exposes wellbeing assurance visit configuration", () => {
   assert.ok(reportType.template_document.endsWith("Wellbeing_Assurance_Report_Template.docx"));
   assert.equal(reportType.json_schema.properties.status.enum.includes("ready_for_render"), true);
   assert.equal(reportType.template_mapping.executive_summary, "report_sections.executive_summary");
+  assert.match(reportType.instructions.join("\n"), /preferred-name placeholder/);
 });
 
 test("report registry exposes simple summary configuration", () => {
@@ -27,6 +29,7 @@ test("report registry exposes simple summary configuration", () => {
   assert.equal(reportType.example_document, "");
   assert.equal(reportType.json_schema.properties.report_type.const, "simple_summary");
   assert.match(reportType.instructions.join("\n"), /simple summary/i);
+  assert.match(reportType.instructions.join("\n"), /preferred-name placeholder/);
 });
 
 test("report registry rejects unknown report types", () => {
@@ -184,4 +187,33 @@ test("report docx replaces placeholders, renders goals, and removes omitted sect
   assert.doesNotMatch(text, /Wellbeing Highlights/);
   assert.doesNotMatch(text, /Implementation Notes/);
   assert.doesNotMatch(text, /\{\{/);
+});
+
+test("report docx filename includes client name and text month date", () => {
+  const filename = reportDocxHandler.buildReportFilename(
+    {
+      report_title: "Wellbeing Assurance Visit Summary",
+      client_details: {
+        client_name: "Paul Jones",
+        report_date: "20.05.2026",
+      },
+    },
+    new Date(2026, 4, 21)
+  );
+
+  assert.equal(filename, "Paul Jones - 20 May 2026 - Wellbeing Assurance Visit Summary.docx");
+});
+
+test("report docx filename falls back to today when report date is missing", () => {
+  const filename = reportDocxHandler.buildReportFilename(
+    {
+      report_title: "Wellbeing Assurance Visit Summary",
+      client_details: {
+        client_name: "Claire Smith",
+      },
+    },
+    new Date(2026, 4, 21)
+  );
+
+  assert.equal(filename, "Claire Smith - 21 May 2026 - Wellbeing Assurance Visit Summary.docx");
 });

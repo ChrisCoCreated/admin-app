@@ -45,6 +45,24 @@ async function parseError(response, fallbackLabel) {
   throw error;
 }
 
+function filenameFromContentDisposition(value) {
+  const header = String(value || "");
+  const encodedMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (encodedMatch) {
+    try {
+      return decodeURIComponent(encodedMatch[1].trim());
+    } catch {
+      return encodedMatch[1].trim();
+    }
+  }
+  const quotedMatch = header.match(/filename="([^"]+)"/i);
+  if (quotedMatch) {
+    return quotedMatch[1].trim();
+  }
+  const plainMatch = header.match(/filename=([^;]+)/i);
+  return plainMatch ? plainMatch[1].trim() : "";
+}
+
 export function createDirectoryApi(authController) {
   function resolveScopes(scopeSource) {
     if (Array.isArray(scopeSource) && scopeSource.length > 0) {
@@ -370,7 +388,10 @@ export function createDirectoryApi(authController) {
       if (!response.ok) {
         await parseError(response, "Report document export failed");
       }
-      return response.blob();
+      return {
+        blob: await response.blob(),
+        filename: filenameFromContentDisposition(response.headers.get("Content-Disposition")),
+      };
     },
 
     async parseWellbeingIntake(payload = {}) {

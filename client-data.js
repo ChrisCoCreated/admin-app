@@ -451,14 +451,34 @@ function formatReportList(items) {
     .join("\n");
 }
 
+function buildClientDetailsText(clientDetails = {}) {
+  const rows = [
+    ["Client", clientDetails.client_name],
+    ["Report date", clientDetails.report_date],
+    ["Conducted by", clientDetails.conducted_by],
+    ["Assessment venue", clientDetails.assessment_venue],
+    ["Date of birth", clientDetails.date_of_birth],
+    ["Prepared for", clientDetails.prepared_for],
+  ];
+  return rows
+    .map(([label, value]) => {
+      const text = stringifyReportValue(value);
+      return text ? `${label}: ${text}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 function buildStructuredReportText(report) {
   if (!report || typeof report !== "object") {
     return "";
   }
   const sections = report.report_sections || {};
   const omitted = new Set((report.omitted_sections || []).map((item) => String(item || "").toLowerCase()));
+  const clientDetails = buildClientDetailsText(report.client_details);
   const parts = [
     report.report_title || buildExportTitle(),
+    clientDetails,
     sections.executive_summary ? `Executive Summary\n${sections.executive_summary}` : "",
     sections.current_situation ? `1. Current Situation\n${sections.current_situation}` : "",
     sections.physical_wellbeing ? `2. Physical Wellbeing\n${sections.physical_wellbeing}` : "",
@@ -1015,6 +1035,71 @@ function buildReportHtml(text) {
   ].join("\n");
 }
 
+function safeFilenamePart(value, fallback) {
+  return String(value || fallback || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .replace(/\s+/g, " ")
+    .slice(0, 80) || fallback;
+}
+
+function parseReportDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const isoMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const ukMatch = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (ukMatch) {
+    const [, day, month, year] = ukMatch;
+    const fullYear = year.length === 2 ? Number(`20${year}`) : Number(year);
+    return new Date(fullYear, Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatReportDate(value, fallbackDate = new Date()) {
+  const date = parseReportDate(value) || fallbackDate;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function buildReportDownloadFilename(report, extension, fallbackDate = new Date()) {
+  const clientDetails = report?.client_details && typeof report.client_details === "object" ? report.client_details : {};
+  const clientName =
+    clientDetails.client_name ||
+    clientDetails.name ||
+    clientDetails.full_name ||
+    clientDetails.preferred_name ||
+    "Client";
+  const reportDate =
+    clientDetails.report_date ||
+    clientDetails.visit_date ||
+    clientDetails.assessment_date ||
+    report?.report_date ||
+    report?.date;
+  const title = report?.report_title || buildExportTitle();
+  return [
+    safeFilenamePart(clientName, "Client"),
+    safeFilenamePart(formatReportDate(reportDate, fallbackDate), "Date"),
+    safeFilenamePart(title, "Report"),
+  ].join(" - ") + `.${extension}`;
+}
+
 function restoreReportPlaceholders(value, mapping = buildEffectiveMapping()) {
   if (typeof value === "string") {
     return deanonymiseText(mapping, value).text;
@@ -1163,11 +1248,33 @@ function buildPdfBlob({ title, text }) {
   return new Blob([pdf], { type: "application/pdf" });
 }
 
+function stripLeadingPdfTitle(text, title) {
+  const value = String(text || "").trim();
+  const heading = String(title || "").trim();
+  if (!heading || !value.startsWith(heading)) {
+    return value;
+  }
+  return value.slice(heading.length).replace(/^\s+/, "");
+}
+
 function exportPdf() {
   const text = restoredText.value.trim();
   if (!text) {
     setExportStatus("Restore text before exporting.", true);
     updateExportControls();
+    return;
+  }
+
+  const reportType = getGeneratedReportType();
+  if (reportType !== "simple_summary" && structuredReport?.status === "ready_for_render") {
+    const restoredReport = restoreReportPlaceholders(structuredReport);
+    const title = restoredReport.report_title || buildExportTitle();
+    const reportText = stripLeadingPdfTitle(buildStructuredReportText(restoredReport), title);
+    downloadBlob(
+      buildPdfBlob({ title, text: reportText }),
+      buildReportDownloadFilename(restoredReport, "pdf")
+    );
+    setExportStatus("PDF exported.");
     return;
   }
 
@@ -1215,11 +1322,11 @@ async function exportWordDoc() {
   try {
     setExportStatus("Generating Word document...");
     const restoredReport = restoreReportPlaceholders(structuredReport);
-    const blob = await directoryApi.exportStructuredReportDocx({
+    const exportResult = await directoryApi.exportStructuredReportDocx({
       reportType,
       report: restoredReport,
     });
-    downloadBlob(blob, "wellbeing-assurance-visit-summary.docx");
+    downloadBlob(exportResult.blob || exportResult, exportResult.filename || "wellbeing-assurance-visit-summary.docx");
     setExportStatus("Word document exported.");
   } catch (error) {
     setExportStatus(error?.message || "Could not export Word document.", true);

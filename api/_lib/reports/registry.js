@@ -101,6 +101,8 @@ const WELLBEING_ASSURANCE_VISIT = {
     "Include detail from every meaningful part of the notes.",
     "Suggest SMART goals based only on the notes. Make clear they are suggested and can be reviewed or amended.",
     "Preserve every bracketed placeholder exactly as written.",
+    "In narrative body sections, refer to the client by their preferred-name placeholder where one exists, for example [CLIENT_PREFERRED_NAME_001], rather than repeating the full client placeholder [CLIENT_001].",
+    "Use the full client placeholder only for headings, labels, metadata, tables, or where the full placeholder is explicitly required by the source notes.",
   ],
 };
 
@@ -124,6 +126,7 @@ const SIMPLE_SUMMARY = {
     "Summarise only information present in the notes.",
     "Do not add clinical facts, names, dates, locations, actions, risks, or opinions that are not in the notes.",
     "Keep all bracketed placeholders exactly as written.",
+    "In narrative body text, refer to the client by their preferred-name placeholder where one exists, for example [CLIENT_PREFERRED_NAME_001], rather than repeating the full client placeholder [CLIENT_001].",
     "Return only the report text, with no preamble.",
   ],
 };
