@@ -89,8 +89,10 @@ test("structured report generation parses ready_for_render JSON from AI", async 
     },
   });
 
-  assert.equal(capturedOptions.responseFormat, undefined);
+  assert.deepEqual(capturedOptions.responseFormat, { type: "json_object" });
+  assert.equal(capturedOptions.maxTokens, 6000);
   assert.match(capturedOptions.messages[0].content, /exactly one valid JSON object/);
+  assert.match(capturedOptions.messages[0].content, /JSON\.parse/);
   assert.equal(report.status, "ready_for_render");
   assert.equal(report.client_details.client_name, "[CLIENT_001]");
   assert.equal(report.suggested_smart_goals.length, 1);

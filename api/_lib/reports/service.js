@@ -7,6 +7,10 @@ function safeJson(value) {
   return JSON.stringify(value, null, 2);
 }
 
+function jsonObjectResponseFormat() {
+  return { type: "json_object" };
+}
+
 function extractJsonObject(text) {
   const raw = normalizeText(text);
   if (!raw) {
@@ -110,7 +114,9 @@ async function buildReportMessages({ reportType, notes, previousReport, revision
         "You must output exactly one valid JSON object matching the schema below.",
         "Start your response with { and end it with }. Do not wrap it in markdown fences.",
         "Use double quotes for all JSON keys and string values.",
+        "Escape newline characters inside JSON string values as \\n. Do not put literal unescaped line breaks inside string values.",
         "Use empty strings or empty arrays for unknown optional content rather than adding unsupported commentary.",
+        "The API response format is JSON object mode, so every response must be parseable by JSON.parse.",
         "",
         "JSON schema:",
         safeJson(reportType.json_schema),
@@ -276,8 +282,9 @@ async function generateStructuredReport({
     model,
     thinking,
     reasoningEffort,
-    maxTokens: 2500,
+    maxTokens: 6000,
     temperature: 0.2,
+    responseFormat: jsonObjectResponseFormat(),
     messages: await buildReportMessages({
       reportType,
       notes: cleanNotes,
@@ -293,5 +300,6 @@ async function generateStructuredReport({
 module.exports = {
   buildReportMessages,
   generateStructuredReport,
+  jsonObjectResponseFormat,
   normalizeReportJson,
 };

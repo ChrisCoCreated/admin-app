@@ -39,10 +39,16 @@ const REPORT_MODES = {
   wellbeing_assurance_visit: {
     label: "Wellbeing Assurance Visit Summary",
     reportType: "wellbeing_assurance_visit",
+    defaultProvider: "azure_openai",
+    defaultModel: "primary",
+    modelLocked: true,
   },
   simple_summary: {
     label: "Simple summary report",
     reportType: "simple_summary",
+    defaultProvider: "azure_openai",
+    defaultModel: "fast",
+    modelLocked: false,
   },
 };
 
@@ -88,6 +94,7 @@ const reportModelSelect = document.getElementById("reportModelSelect");
 const reportThinkingField = document.getElementById("reportThinkingField");
 const reportThinkingSelect = document.getElementById("reportThinkingSelect");
 const reportModeSelect = document.getElementById("reportModeSelect");
+const reportModelLockBtn = document.getElementById("reportModelLockBtn");
 const generateReportBtn = document.getElementById("generateReportBtn");
 const reportRevisionPanel = document.getElementById("reportRevisionPanel");
 const reportRevisionText = document.getElementById("reportRevisionText");
@@ -104,6 +111,7 @@ let busy = false;
 let reportBusy = false;
 let structuredReport = null;
 let reportSourceNotes = "";
+let reportModelUnlocked = false;
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -166,8 +174,12 @@ function getSelectedReportProvider() {
   return reportProviderSelect?.value || "azure_openai";
 }
 
+function getSelectedReportMode() {
+  return REPORT_MODES[reportModeSelect?.value] || REPORT_MODES.wellbeing_assurance_visit;
+}
+
 function getSelectedReportType() {
-  const mode = REPORT_MODES[reportModeSelect?.value] || REPORT_MODES.wellbeing_assurance_visit;
+  const mode = getSelectedReportMode();
   return mode.reportType || "wellbeing_assurance_visit";
 }
 
@@ -182,6 +194,33 @@ function syncReportThinkingControl() {
   }
   if (isAzure && reportThinkingSelect) {
     reportThinkingSelect.value = "disabled";
+  }
+}
+
+function isReportModelLocked() {
+  return Boolean(getSelectedReportMode().modelLocked && !reportModelUnlocked);
+}
+
+function updateReportModelLockControl() {
+  const mode = getSelectedReportMode();
+  const lockApplies = Boolean(mode.modelLocked);
+  const locked = isReportModelLocked();
+  if (reportProviderSelect) {
+    reportProviderSelect.disabled = reportBusy || locked;
+  }
+  if (reportModelSelect) {
+    reportModelSelect.disabled = reportBusy || locked;
+  }
+  if (reportModelLockBtn) {
+    reportModelLockBtn.hidden = !lockApplies;
+    reportModelLockBtn.parentElement?.classList.toggle("is-lock-hidden", !lockApplies);
+    reportModelLockBtn.disabled = reportBusy || !lockApplies;
+    reportModelLockBtn.classList.toggle("is-unlocked", lockApplies && !locked);
+    reportModelLockBtn.setAttribute(
+      "aria-label",
+      locked ? "Unlock report model controls" : "Lock report model controls"
+    );
+    reportModelLockBtn.title = locked ? "Unlock report model controls" : "Lock report model controls";
   }
 }
 
@@ -216,7 +255,7 @@ function updateRevisionControls() {
   }
 }
 
-function populateReportModels() {
+function populateReportModels(selectedModel = "") {
   if (!reportModelSelect) {
     return;
   }
@@ -224,6 +263,7 @@ function populateReportModels() {
   const provider = getSelectedReportProvider();
   const options = REPORT_MODEL_OPTIONS[provider] || REPORT_MODEL_OPTIONS.azure_openai;
   const previousValue = reportModelSelect.value;
+  const preferredValue = selectedModel || previousValue;
   reportModelSelect.innerHTML = "";
 
   for (const item of options) {
@@ -233,9 +273,20 @@ function populateReportModels() {
     reportModelSelect.appendChild(option);
   }
 
-  if (options.some((item) => item.value === previousValue)) {
-    reportModelSelect.value = previousValue;
+  if (options.some((item) => item.value === preferredValue)) {
+    reportModelSelect.value = preferredValue;
   }
+}
+
+function applyReportModeDefaults() {
+  const mode = getSelectedReportMode();
+  reportModelUnlocked = false;
+  if (reportProviderSelect && mode.defaultProvider) {
+    reportProviderSelect.value = mode.defaultProvider;
+  }
+  populateReportModels(mode.defaultModel);
+  syncReportThinkingControl();
+  updateReportControls();
 }
 
 function setExportStatus(message, isError = false) {
@@ -321,6 +372,7 @@ function updateReportControls() {
     return;
   }
   generateReportBtn.disabled = reportBusy || busy;
+  updateReportModelLockControl();
   updateRevisionControls();
 }
 
@@ -1481,6 +1533,19 @@ reportRevisionText?.addEventListener("input", updateRevisionControls);
 reviseReportBtn?.addEventListener("click", () => {
   void reviseReport();
 });
+reportModelLockBtn?.addEventListener("click", () => {
+  const mode = getSelectedReportMode();
+  if (!mode.modelLocked) {
+    return;
+  }
+  reportModelUnlocked = !reportModelUnlocked;
+  updateReportControls();
+  setReportStatus(
+    reportModelUnlocked
+      ? "Model controls unlocked for this report."
+      : `${mode.label} model controls locked to the default.`
+  );
+});
 reportProviderSelect?.addEventListener("change", () => {
   populateReportModels();
   syncReportThinkingControl();
@@ -1493,7 +1558,8 @@ reportThinkingSelect?.addEventListener("change", () => {
   setReportStatus(`${reportThinkingSelect.options[reportThinkingSelect.selectedIndex]?.text || "Thinking"} thinking selected.`);
 });
 reportModeSelect?.addEventListener("change", () => {
-  const mode = REPORT_MODES[reportModeSelect.value] || REPORT_MODES.wellbeing_assurance_visit;
+  const mode = getSelectedReportMode();
+  applyReportModeDefaults();
   setReportStatus(`${mode.label} selected.`);
 });
 addManualIdentifierBtn.addEventListener("click", addManualIdentifier);
@@ -1508,6 +1574,5 @@ signOutBtn?.addEventListener("click", () => {
 
 updateCounts();
 renderReviewOutput();
-populateReportModels();
-syncReportThinkingControl();
+applyReportModeDefaults();
 void init();
