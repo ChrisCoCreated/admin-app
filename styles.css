@@ -1325,6 +1325,17 @@ button.is-generating::after {
 .client-data-report-draft {
   display: grid;
   gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.client-data-report-draft.is-complete {
+  border-color: #a6d7c4;
+  background: #f6fcf9;
+  box-shadow: 0 0 0 3px rgba(49, 183, 200, 0.08);
+  padding: 12px;
 }
 
 .client-data-draft-head {
@@ -1342,6 +1353,51 @@ button.is-generating::after {
   color: #5f6f85;
   font-size: 0.9rem;
   font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.client-data-placeholder-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.client-data-toggle-track {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #bfcbdb;
+  background: #e8eef6;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.client-data-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(16, 33, 57, 0.22);
+  transition: transform 160ms ease;
+}
+
+.client-data-placeholder-toggle input:checked + .client-data-toggle-track {
+  border-color: #31b7c8;
+  background: #31b7c8;
+}
+
+.client-data-placeholder-toggle input:checked + .client-data-toggle-track::after {
+  transform: translateX(18px);
+}
+
+.client-data-placeholder-toggle input:focus-visible + .client-data-toggle-track {
+  outline: 2px solid #1d7f95;
+  outline-offset: 2px;
 }
 
 .client-data-report-notes {

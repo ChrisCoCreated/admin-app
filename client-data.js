@@ -168,6 +168,21 @@ function setReportStatus(message, isError = false) {
   reportStatus.classList.toggle("error", isError);
 }
 
+function setDraftComplete(message = "Changes complete.") {
+  if (reportDraftPanel) {
+    reportDraftPanel.classList.add("is-complete");
+  }
+  if (restoreStatus) {
+    restoreStatus.textContent = message;
+  }
+}
+
+function clearDraftComplete() {
+  if (reportDraftPanel) {
+    reportDraftPanel.classList.remove("is-complete");
+  }
+}
+
 function setReportBusy(nextBusy) {
   reportBusy = Boolean(nextBusy);
   if (generateReportBtn) {
@@ -417,6 +432,7 @@ function clearAll() {
   structuredReport = null;
   reportSourceNotes = "";
   reportRevisionRequests = [];
+  clearDraftComplete();
   if (reportDraftPanel) {
     reportDraftPanel.hidden = true;
   }
@@ -624,6 +640,7 @@ function syncDraftTextVisibility() {
 function setStructuredReport(report) {
   structuredReport = report && typeof report === "object" ? report : null;
   if (!structuredReport) {
+    clearDraftComplete();
     placeholderText.value = "";
     updateRestore();
     if (reportDraftPanel) {
@@ -638,6 +655,7 @@ function setStructuredReport(report) {
   if (reportDraftPanel) {
     reportDraftPanel.hidden = false;
   }
+  clearDraftComplete();
   if (structuredReport.status === "needs_notes") {
     placeholderText.value = "";
     updateRestore();
@@ -653,6 +671,7 @@ function setStructuredReport(report) {
     updateRestore();
     renderReportNotes(structuredReport);
     setReportStatus("Draft report generated. Review it below, request changes, or export when ready.");
+    setDraftComplete("Draft ready.");
   }
   syncDraftTextVisibility();
   updateRevisionControls();
@@ -668,6 +687,7 @@ async function generateReport(revisionRequest = "") {
   setReportBusy(true);
   const thinkingOptions = getSelectedThinkingOptions();
   const isRevision = Boolean(String(revisionRequest || "").trim() && structuredReport);
+  clearDraftComplete();
   setReportStatus(isRevision ? "Regenerating report..." : "Generating report...");
   try {
     const response = await directoryApi.generateStructuredReport({
@@ -693,6 +713,7 @@ async function generateReport(revisionRequest = "") {
       if (reportRevisionText) {
         reportRevisionText.value = "";
       }
+      setDraftComplete("Changes complete.");
     }
   } catch (error) {
     const message = error?.message || "Could not generate report.";
@@ -1182,9 +1203,10 @@ function updateRestore() {
     restoreStatus.textContent = "Generated report text will appear here.";
     return;
   }
-  restoreStatus.textContent = `${restored.restoredCount.toLocaleString()} restored${
-    restored.unresolvedCount > 0 ? `, ${restored.unresolvedCount.toLocaleString()} unresolved` : ""
-  }.`;
+  restoreStatus.textContent =
+    restored.unresolvedCount > 0
+      ? `Draft ready with ${restored.unresolvedCount.toLocaleString()} unresolved placeholder${restored.unresolvedCount === 1 ? "" : "s"}.`
+      : "Draft ready.";
 }
 
 function buildExportTitle() {
