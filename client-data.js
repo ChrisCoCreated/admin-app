@@ -666,9 +666,16 @@ function renderReviewMark(mark, identifierOptions) {
       option.textContent = identifierOptionLabel(optionValue);
       select.appendChild(option);
     }
+    select.addEventListener("pointerdown", (event) => {
+      select.dataset.singleChange = event.altKey ? "true" : "false";
+    });
+    select.addEventListener("keydown", (event) => {
+      select.dataset.singleChange = event.altKey ? "true" : "false";
+    });
     select.addEventListener("click", (event) => event.stopPropagation());
     select.addEventListener("change", (event) => {
-      onChooseReplacementIdentifier(mark, event.target.value);
+      onChooseReplacementIdentifier(mark, event.target.value, event.target.dataset.singleChange === "true");
+      event.target.dataset.singleChange = "false";
     });
     wrap.appendChild(select);
     return wrap;
@@ -678,29 +685,44 @@ function renderReviewMark(mark, identifierOptions) {
   button.className = `review-highlight ${mark.kind}`;
   button.type = "button";
   button.textContent = content;
-  button.title = `Pseudonymise: ${mark.reason}`;
-  button.addEventListener("click", () => {
+  button.title = `Pseudonymise: ${mark.reason}. Shift-click to remove all matching text.`;
+  button.addEventListener("click", (event) => {
+    if (event.shiftKey) {
+      onRemoveSuggestion(mark);
+      return;
+    }
     onApplySuggestion(mark);
   });
   return button;
 }
 
+function onRemoveSuggestion(mark) {
+  setReviewText(reviewTextValue.split(mark.value).join(""));
+  setStatus(`Removed all matching ${mark.kind === "likely" ? "direct" : "possible"} identifiers.`);
+}
+
 function onApplySuggestion(mark) {
   const placeholder = mark.replacement || nextManualPlaceholder(mark.category, buildEffectiveMapping());
   manualMapping = { ...manualMapping, [placeholder]: mark.value };
-  replaceReviewRange(mark.start, mark.end, placeholder);
-  setStatus(`Replaced ${mark.kind === "likely" ? "direct" : "possible"} identifier with ${placeholder}.`);
+  setReviewText(reviewTextValue.split(mark.value).join(placeholder));
+  setStatus(`Replaced all matching ${mark.kind === "likely" ? "direct" : "possible"} identifiers with ${placeholder}.`);
 }
 
-function onChooseReplacementIdentifier(mark, value) {
+function onChooseReplacementIdentifier(mark, value, singleInstance = false) {
   const placeholder = placeholderFromIdentifierOption(value, buildEffectiveMapping());
   if (!placeholder || placeholder === mark.placeholder) {
     return;
   }
 
   manualMapping = { ...manualMapping, [placeholder]: mark.original };
+  if (singleInstance) {
+    replaceReviewRange(mark.start, mark.end, placeholder);
+    setStatus(`Changed one ${mark.placeholder} to ${placeholder}.`);
+    return;
+  }
+
   setReviewText(reviewTextValue.split(mark.placeholder).join(placeholder));
-  setStatus(`Changed ${mark.placeholder} to ${placeholder}.`);
+  setStatus(`Changed all ${mark.placeholder} instances to ${placeholder}.`);
 }
 
 function buildReviewMarks(text, originalPseudonymisedText, mapping, residualSpans) {
