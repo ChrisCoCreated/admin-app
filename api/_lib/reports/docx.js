@@ -16,6 +16,10 @@ function stripXmlTags(value) {
   return String(value || "").replace(/<[^>]+>/g, "");
 }
 
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function valueAtPath(source, path) {
   return String(path || "")
     .split(".")
@@ -59,45 +63,109 @@ function buildGoalRows(report) {
   }));
 }
 
-function replaceFirstToken(xml, token, value) {
-  return xml.replace(token, escapeXml(value));
+function placeholderPattern(placeholder, flags = "g") {
+  return new RegExp(`\\{\\{\\s*${escapeRegExp(placeholder)}\\s*\\}\\}`, flags);
+}
+
+function replacePlaceholderTokens(xml, placeholder, value) {
+  return xml.replace(placeholderPattern(placeholder), escapeXml(value));
+}
+
+function replaceFirstPlaceholderToken(xml, placeholder, value) {
+  return xml.replace(placeholderPattern(placeholder, ""), escapeXml(value));
 }
 
 function replaceRepeatedGoalTokens(documentXml, report) {
   let output = documentXml;
   const rows = buildGoalRows(report);
   for (const row of rows) {
-    output = replaceFirstToken(output, "{{goal}}", row.goal);
-    output = replaceFirstToken(output, "{{measure}}", row.measure);
-    output = replaceFirstToken(output, "{{owner}}", row.owner);
-    output = replaceFirstToken(output, "{{timescale}}", row.timescale);
-    output = replaceFirstToken(output, "{{status_notes}}", row.status_notes);
+    output = replaceFirstPlaceholderToken(output, "goal", row.goal);
+    output = replaceFirstPlaceholderToken(output, "measure", row.measure);
+    output = replaceFirstPlaceholderToken(output, "owner", row.owner);
+    output = replaceFirstPlaceholderToken(output, "timescale", row.timescale);
+    output = replaceFirstPlaceholderToken(output, "status_notes", row.status_notes);
   }
   return output;
 }
 
-function normalizeSplitPlaceholders(documentXml) {
-  return documentXml.replace(
-    /<w:t>\{\{<\/w:t><\/w:r>(?:(?!<\/w:p>)[\s\S])*?<w:t>assessment_type<\/w:t><\/w:r>(?:(?!<\/w:p>)[\s\S])*?<w:t>\}\}<\/w:t>/g,
-    "<w:t>{{assessment_type}}</w:t>"
+function normalizeSplitPlaceholder(documentXml, placeholder) {
+  const escaped = escapeRegExp(placeholder);
+  const pattern = new RegExp(
+    `<w:t>\\{\\{<\\/w:t><\\/w:r>(?:(?!<\\/w:p>)[\\s\\S])*?<w:t>\\s*${escaped}\\s*<\\/w:t><\\/w:r>(?:(?!<\\/w:p>)[\\s\\S])*?<w:t>\\}\\}<\\/w:t>`,
+    "g"
   );
+  return documentXml.replace(pattern, `<w:t>{{${placeholder}}}</w:t>`);
+}
+
+function normalizeSplitPlaceholders(documentXml, placeholders) {
+  return placeholders.reduce((output, placeholder) => normalizeSplitPlaceholder(output, placeholder), documentXml);
 }
 
 function replaceTextPlaceholders(documentXml, reportType, report) {
-  let output = normalizeSplitPlaceholders(documentXml);
+  const placeholders = [
+    ...Object.keys(reportType.template_mapping),
+    "goal",
+    "measure",
+    "owner",
+    "timescale",
+    "status_notes",
+    "images",
+    "assessor_name",
+    "assessor_role",
+    "organisation",
+    "email",
+    "phone",
+  ];
+  let output = normalizeSplitPlaceholders(documentXml, placeholders);
   for (const [placeholder, sourcePath] of Object.entries(reportType.template_mapping)) {
     if (placeholder === "smart_goals") {
       continue;
     }
-    const token = `{{${placeholder}}}`;
     const value = asText(valueAtPath(report, sourcePath));
-    output = output.split(token).join(escapeXml(value));
+    output = replacePlaceholderTokens(output, placeholder, value);
   }
 
-  for (const placeholder of ["assessor_name", "assessor_role", "organisation", "email", "phone"]) {
-    output = output.split(`{{${placeholder}}}`).join("");
+  for (const placeholder of ["images", "assessor_name", "assessor_role", "organisation", "email", "phone"]) {
+    output = replacePlaceholderTokens(output, placeholder, "");
   }
   return replaceRepeatedGoalTokens(output, report);
+}
+
+function paragraphXml(text, { bold = false } = {}) {
+  const runProperties = bold ? "<w:rPr><w:b/></w:rPr>" : "";
+  return `<w:p><w:r>${runProperties}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+}
+
+function reportListParagraphs(title, items) {
+  const values = (Array.isArray(items) ? items : [])
+    .map((item) => asText(item))
+    .filter(Boolean);
+  if (!values.length) {
+    return "";
+  }
+  return [paragraphXml(title, { bold: true }), ...values.map((item) => paragraphXml(`- ${item}`))].join("");
+}
+
+function buildSupplementarySections(report) {
+  return [
+    reportListParagraphs("Warnings", report?.warnings),
+    reportListParagraphs("Clarification Notes", report?.clarification_notes),
+    reportListParagraphs("Assumptions Avoided", report?.assumptions_avoided),
+  ]
+    .filter(Boolean)
+    .join("");
+}
+
+function insertBeforeAssessorFooter(documentXml, insertXml) {
+  if (!insertXml) {
+    return documentXml;
+  }
+  const paragraphs = documentXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) || [];
+  const assessorParagraph = paragraphs.find((paragraph) => /assessor_name|assessor_role/.test(paragraph));
+  if (assessorParagraph) {
+    return documentXml.replace(assessorParagraph, `${insertXml}${assessorParagraph}`);
+  }
+  return documentXml.replace("</w:body>", `${insertXml}</w:body>`);
 }
 
 function removeParagraphRangeByText(documentXml, startText, endText) {
@@ -166,10 +234,11 @@ async function buildReportDocx({ reportType: reportTypeKey, report }) {
 
   let documentXml = await documentFile.async("string");
   if (shouldOmitWellbeingHighlights(report)) {
-    documentXml = removeParagraphRangeByText(documentXml, "5. Wellbeing Highlights", "6. SMART Goals");
+    documentXml = removeParagraphRangeByText(documentXml, "Wellbeing Highlights", "Goals");
   }
   documentXml = removeImplementationNotes(documentXml);
   documentXml = replaceTextPlaceholders(documentXml, reportType, report || {});
+  documentXml = insertBeforeAssessorFooter(documentXml, buildSupplementarySections(report || {}));
 
   zip.file("word/document.xml", documentXml);
   return zip.generateAsync({

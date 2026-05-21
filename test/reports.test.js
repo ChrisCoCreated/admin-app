@@ -225,12 +225,16 @@ test("report docx replaces placeholders, renders goals, and removes omitted sect
         next_steps: ["Review plan"],
       },
       omitted_sections: ["Wellbeing Highlights"],
+      warnings: ["Limited information provided."],
+      clarification_notes: ["Physical wellbeing details are missing."],
     },
   });
   const text = await docxText(output);
   assert.match(text, /Paul Jones/);
   assert.match(text, /Paul feels safe/);
   assert.match(text, /Support confidence at home/);
+  assert.match(text, /Limited information provided/);
+  assert.match(text, /Physical wellbeing details are missing/);
   assert.doesNotMatch(text, /Wellbeing Highlights/);
   assert.doesNotMatch(text, /Implementation Notes/);
   assert.doesNotMatch(text, /\{\{/);

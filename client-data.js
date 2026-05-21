@@ -1252,33 +1252,92 @@ function wrapPdfLine(text, maxChars) {
   return lines.length ? lines : [""];
 }
 
-function buildPdfBlob({ title, text }) {
-  const pageWidth = 595;
-  const pageHeight = 842;
-  const margin = 54;
-  const titleSize = 18;
-  const bodySize = 11;
-  const lineHeight = 15;
-  const maxLinesPerPage = Math.floor((pageHeight - margin * 2 - titleSize - 18) / lineHeight);
-  const bodyLines = [];
+function lineWidthForBlock(block) {
+  if (block.type === "title") {
+    return 54;
+  }
+  if (block.type === "heading") {
+    return 68;
+  }
+  if (block.type === "bullet") {
+    return 82;
+  }
+  return 88;
+}
 
-  for (const block of normalizePdfText(text).split(/\n{2,}/)) {
-    const trimmed = block.trim();
+function pdfBlockStyle(block) {
+  if (block.type === "title") {
+    return { font: "F2", size: 18, lineHeight: 22, before: 0, after: 16, indent: 0 };
+  }
+  if (block.type === "heading") {
+    return { font: "F2", size: 13, lineHeight: 17, before: 10, after: 5, indent: 0 };
+  }
+  if (block.type === "meta") {
+    return { font: "F1", size: 10, lineHeight: 14, before: 0, after: 2, indent: 0 };
+  }
+  if (block.type === "bullet") {
+    return { font: "F1", size: 10.5, lineHeight: 14, before: 0, after: 4, indent: 14 };
+  }
+  return { font: "F1", size: 10.5, lineHeight: 14, before: 0, after: 8, indent: 0 };
+}
+
+function textToPdfBlocks(title, text) {
+  const blocks = [{ type: "title", text: title }];
+  for (const rawBlock of normalizePdfText(text).split(/\n{2,}/)) {
+    const trimmed = rawBlock.trim();
     if (!trimmed) {
       continue;
     }
-    for (const line of trimmed.split(/\n/)) {
-      bodyLines.push(...wrapPdfLine(line, 88));
+    const [firstLine, ...rest] = trimmed.split(/\n/);
+    if (rest.length > 0 && !firstLine.startsWith("- ")) {
+      blocks.push({ type: "heading", text: firstLine });
+      for (const line of rest) {
+        blocks.push({ type: line.trim().startsWith("- ") ? "bullet" : "body", text: line.trim() });
+      }
+    } else {
+      blocks.push({ type: trimmed.startsWith("- ") ? "bullet" : "body", text: trimmed });
     }
-    bodyLines.push("");
   }
-  if (bodyLines.at(-1) === "") {
-    bodyLines.pop();
-  }
+  return blocks;
+}
 
-  const pages = [];
-  for (let index = 0; index < bodyLines.length || index === 0; index += maxLinesPerPage) {
-    pages.push(bodyLines.slice(index, index + maxLinesPerPage));
+function buildPdfBlob({ title, text, blocks = null }) {
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 54;
+  const pageEntries = [[]];
+  let y = pageHeight - margin;
+
+  const addPage = () => {
+    pageEntries.push([]);
+    y = pageHeight - margin;
+  };
+
+  for (const block of blocks || textToPdfBlocks(title, text)) {
+    const value = normalizePdfText(block.text).trim();
+    if (!value) {
+      continue;
+    }
+    const style = pdfBlockStyle(block);
+    y -= style.before;
+    const lines = [];
+    for (const line of value.split(/\n/)) {
+      lines.push(...wrapPdfLine(line, lineWidthForBlock(block)));
+    }
+    for (const line of lines) {
+      if (y - style.lineHeight < margin) {
+        addPage();
+      }
+      pageEntries[pageEntries.length - 1].push({
+        text: block.type === "bullet" && !line.startsWith("- ") ? `- ${line}` : line,
+        x: margin + style.indent,
+        y,
+        font: style.font,
+        size: style.size,
+      });
+      y -= style.lineHeight;
+    }
+    y -= style.after;
   }
 
   const objects = [];
@@ -1290,31 +1349,18 @@ function buildPdfBlob({ title, text }) {
   const catalogId = addObject("<< /Type /Catalog /Pages 2 0 R >>");
   const pagesId = addObject("");
   const fontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const boldFontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
   const pageIds = [];
 
-  pages.forEach((lines) => {
-    const commands = [
-      "BT",
-      `/F1 ${titleSize} Tf`,
-      `${margin} ${pageHeight - margin} Td`,
-      `(${escapePdfText(title)}) Tj`,
-      `/F1 ${bodySize} Tf`,
-      `0 -${titleSize + 18} Td`,
-      `${lineHeight} TL`,
-    ];
-
-    lines.forEach((line, index) => {
-      if (index > 0) {
-        commands.push("T*");
-      }
-      commands.push(`(${escapePdfText(line)}) Tj`);
-    });
-    commands.push("ET");
+  pageEntries.forEach((entries) => {
+    const commands = entries.map(
+      (entry) => `BT\n/${entry.font} ${entry.size} Tf\n${entry.x} ${entry.y} Td\n(${escapePdfText(entry.text)}) Tj\nET`
+    );
 
     const stream = commands.join("\n");
     const contentId = addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
     const pageId = addObject(
-      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R /F2 ${boldFontId} 0 R >> >> /Contents ${contentId} 0 R >>`
     );
     pageIds.push(pageId);
   });
@@ -1337,13 +1383,53 @@ function buildPdfBlob({ title, text }) {
   return new Blob([pdf], { type: "application/pdf" });
 }
 
-function stripLeadingPdfTitle(text, title) {
-  const value = String(text || "").trim();
-  const heading = String(title || "").trim();
-  if (!heading || !value.startsWith(heading)) {
-    return value;
+function pushPdfSection(blocks, heading, value) {
+  const text = stringifyReportValue(value);
+  if (!text) {
+    return;
   }
-  return value.slice(heading.length).replace(/^\s+/, "");
+  blocks.push({ type: "heading", text: heading });
+  blocks.push({ type: "body", text });
+}
+
+function pushPdfListSection(blocks, heading, items, suffix = "") {
+  const values = (Array.isArray(items) ? items : []).map(stringifyReportValue).filter(Boolean);
+  if (!values.length) {
+    return;
+  }
+  blocks.push({ type: "heading", text: heading });
+  values.forEach((item) => blocks.push({ type: "bullet", text: item }));
+  if (suffix) {
+    blocks.push({ type: "body", text: suffix });
+  }
+}
+
+function buildStructuredReportPdfBlocks(report) {
+  const sections = report.report_sections || {};
+  const omitted = new Set((report.omitted_sections || []).map((item) => String(item || "").toLowerCase()));
+  const blocks = [{ type: "title", text: report.report_title || buildExportTitle() }];
+  for (const line of buildClientDetailsText(report.client_details).split("\n").filter(Boolean)) {
+    blocks.push({ type: "meta", text: line });
+  }
+  pushPdfSection(blocks, "Executive Summary", sections.executive_summary);
+  pushPdfSection(blocks, "1. Current Situation", sections.current_situation);
+  pushPdfSection(blocks, "2. Physical Wellbeing", sections.physical_wellbeing);
+  pushPdfSection(blocks, "3. Emotional Wellbeing", sections.emotional_wellbeing);
+  pushPdfSection(blocks, "4. Environmental Wellbeing", sections.environmental_wellbeing);
+  if (sections.wellbeing_highlights && !omitted.has("wellbeing highlights")) {
+    pushPdfSection(blocks, "5. Wellbeing Highlights", sections.wellbeing_highlights);
+  }
+  pushPdfListSection(
+    blocks,
+    "Suggested SMART Goals",
+    report.suggested_smart_goals,
+    "These goals are suggested and can be reviewed or amended."
+  );
+  pushPdfListSection(blocks, "Recommendations to Improve Quality of Life", sections.recommendations);
+  pushPdfListSection(blocks, "Next Steps", sections.next_steps);
+  pushPdfListSection(blocks, "Warnings", report.warnings);
+  pushPdfListSection(blocks, "Clarification Notes", report.clarification_notes);
+  return blocks;
 }
 
 function exportPdf() {
@@ -1357,10 +1443,11 @@ function exportPdf() {
   const reportType = getGeneratedReportType();
   if (reportType !== "simple_summary" && structuredReport?.status === "ready_for_render") {
     const restoredReport = restoreReportPlaceholders(structuredReport);
-    const title = restoredReport.report_title || buildExportTitle();
-    const reportText = stripLeadingPdfTitle(buildStructuredReportText(restoredReport), title);
     downloadBlob(
-      buildPdfBlob({ title, text: reportText }),
+      buildPdfBlob({
+        title: restoredReport.report_title || buildExportTitle(),
+        blocks: buildStructuredReportPdfBlocks(restoredReport),
+      }),
       buildReportDownloadFilename(restoredReport, "pdf")
     );
     setExportStatus("PDF exported.");
