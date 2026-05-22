@@ -129,6 +129,7 @@ async function reportDocxHandler(req, res) {
     const output = await buildReportDocx({
       reportType: body.reportType || body.report_type || report.report_type,
       report,
+      images: body.images && typeof body.images === "object" ? body.images : {},
     });
 
     const filename = buildReportFilename(report);

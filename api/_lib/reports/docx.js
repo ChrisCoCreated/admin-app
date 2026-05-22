@@ -131,6 +131,87 @@ function replaceTextPlaceholders(documentXml, reportType, report) {
   return replaceRepeatedGoalTokens(output, report);
 }
 
+function normalizeImagePayload(images) {
+  const collage = images?.collage && typeof images.collage === "object" ? images.collage : null;
+  const dataBase64 = String(collage?.dataBase64 || "").replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "");
+  if (!dataBase64) {
+    return null;
+  }
+  const mimeType = String(collage?.mimeType || "image/png").toLowerCase();
+  if (!/^image\/(?:png|jpeg|jpg)$/.test(mimeType)) {
+    return null;
+  }
+  const width = Math.max(1, Number(collage?.width) || 2000);
+  const height = Math.max(1, Number(collage?.height) || 1200);
+  return {
+    buffer: Buffer.from(dataBase64, "base64"),
+    mimeType: mimeType === "image/jpg" ? "image/jpeg" : mimeType,
+    width,
+    height,
+  };
+}
+
+function nextRelationshipId(relsXml) {
+  const ids = [...String(relsXml || "").matchAll(/\bId="rId(\d+)"/g)].map((match) => Number(match[1]));
+  return `rId${Math.max(0, ...ids) + 1}`;
+}
+
+function addImageRelationship(zip, image, imageIndex = 1) {
+  const extension = image.mimeType === "image/jpeg" ? "jpg" : "png";
+  const mediaPath = `word/media/report-collage-${imageIndex}.${extension}`;
+  zip.file(mediaPath, image.buffer);
+
+  const relsPath = "word/_rels/document.xml.rels";
+  const relsFile = zip.file(relsPath);
+  const relsPromise = relsFile
+    ? relsFile.async("string")
+    : Promise.resolve('<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
+
+  return relsPromise.then((relsXml) => {
+    const relationshipId = nextRelationshipId(relsXml);
+    const relationshipXml = `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/report-collage-${imageIndex}.${extension}"/>`;
+    const nextRelsXml = relsXml.replace("</Relationships>", `${relationshipXml}</Relationships>`);
+    zip.file(relsPath, nextRelsXml);
+    ensureImageContentType(zip, extension, image.mimeType);
+    return relationshipId;
+  });
+}
+
+function ensureImageContentType(zip, extension, mimeType) {
+  const contentTypesFile = zip.file("[Content_Types].xml");
+  if (!contentTypesFile) {
+    return;
+  }
+  zip.file("[Content_Types].xml", contentTypesFile.async("string").then((xml) => {
+    if (xml.includes(`Extension="${extension}"`)) {
+      return xml;
+    }
+    return xml.replace("</Types>", `<Default Extension="${extension}" ContentType="${mimeType}"/></Types>`);
+  }));
+}
+
+function imageDrawingXml(relationshipId, image) {
+  const maxWidthEmu = 5486400; // 6 inches.
+  const maxHeightEmu = 3657600; // 4 inches.
+  const sourceWidth = Math.max(1, Number(image.width) || 1);
+  const sourceHeight = Math.max(1, Number(image.height) || 1);
+  const scale = Math.min(maxWidthEmu / sourceWidth, maxHeightEmu / sourceHeight);
+  const cx = Math.round(sourceWidth * scale);
+  const cy = Math.round(sourceHeight * scale);
+  return `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1001" name="Report photo collage"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1001" name="Report photo collage"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${relationshipId}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+}
+
+function replaceImagesPlaceholderWithDrawing(documentXml, relationshipId, image) {
+  const normalized = normalizeSplitPlaceholder(documentXml, "images");
+  const drawingXml = imageDrawingXml(relationshipId, image);
+  const paragraphs = normalized.match(/<w:p\b[\s\S]*?<\/w:p>/g) || [];
+  const placeholderParagraph = paragraphs.find((paragraph) => placeholderPattern("images").test(paragraph));
+  if (placeholderParagraph) {
+    return normalized.replace(placeholderParagraph, drawingXml);
+  }
+  return replacePlaceholderTokens(normalized, "images", "");
+}
+
 function removeParagraphRangeByText(documentXml, startText, endText) {
   const paragraphs = documentXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) || [];
   if (!paragraphs.length) {
@@ -186,7 +267,7 @@ function shouldOmitWellbeingHighlights(report) {
   return omitted.some((item) => /wellbeing highlights/i.test(String(item || "")));
 }
 
-async function buildReportDocx({ reportType: reportTypeKey, report }) {
+async function buildReportDocx({ reportType: reportTypeKey, report, images = {} }) {
   const reportType = getReportType(reportTypeKey || report?.report_type);
   const templateBuffer = await fs.readFile(reportType.template_document);
   const zip = await JSZip.loadAsync(templateBuffer);
@@ -200,6 +281,11 @@ async function buildReportDocx({ reportType: reportTypeKey, report }) {
     documentXml = removeParagraphRangeByText(documentXml, "Wellbeing Highlights", "Goals");
   }
   documentXml = removeImplementationNotes(documentXml);
+  const image = normalizeImagePayload(images);
+  if (image) {
+    const relationshipId = await addImageRelationship(zip, image);
+    documentXml = replaceImagesPlaceholderWithDrawing(documentXml, relationshipId, image);
+  }
   documentXml = replaceTextPlaceholders(documentXml, reportType, report || {});
 
   zip.file("word/document.xml", documentXml);

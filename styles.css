@@ -1460,6 +1460,56 @@ button.is-generating::after {
   gap: 10px;
 }
 
+.client-data-photo-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.client-data-photo-controls {
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) max-content minmax(240px, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.client-data-photo-drop {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+}
+
+.client-data-photo-image-grid {
+  max-height: 250px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.client-data-photo-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 14px;
+  align-items: start;
+}
+
+.client-data-photo-stage-wrap {
+  margin-top: 12px;
+}
+
+.client-data-photo-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.client-data-photo-tools .field {
+  margin: 0;
+}
+
+.client-data-photo-tools .layout-color-picker {
+  margin-bottom: 2px;
+}
+
 .client-data-count-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -7677,7 +7727,9 @@ body.lightbox-open {
   .client-data-grid,
   .client-data-summary-grid,
   .manual-identifier-grid,
-  .client-data-report-guidance-controls {
+  .client-data-report-guidance-controls,
+  .client-data-photo-controls,
+  .client-data-photo-compose {
     grid-template-columns: 1fr;
   }
 

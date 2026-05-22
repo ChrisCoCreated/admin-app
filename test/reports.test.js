@@ -246,6 +246,46 @@ test("report docx replaces placeholders, renders goals, and removes omitted sect
   assert.doesNotMatch(text, /\{\{/);
 });
 
+test("report docx replaces images placeholder with embedded collage image", async () => {
+  const output = await buildReportDocx({
+    reportType: "wellbeing_assurance_visit",
+    report: {
+      report_type: "wellbeing_assurance_visit",
+      report_title: "Wellbeing Assurance Visit Summary",
+      client_details: { client_name: "Paul Jones" },
+      inferred_context: { assessment_type: "review" },
+      suggested_smart_goals: [],
+      report_sections: {
+        executive_summary: "Paul feels safe.",
+        current_situation: "Current situation.",
+        physical_wellbeing: "",
+        emotional_wellbeing: "",
+        environmental_wellbeing: "",
+        wellbeing_highlights: "",
+        recommendations: [],
+        next_steps: [],
+      },
+      omitted_sections: [],
+    },
+    images: {
+      collage: {
+        dataBase64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lR8r0wAAAABJRU5ErkJggg==",
+        mimeType: "image/png",
+        width: 2000,
+        height: 1200,
+      },
+    },
+  });
+  const zip = await JSZip.loadAsync(output);
+  const xml = await zip.file("word/document.xml").async("string");
+  const rels = await zip.file("word/_rels/document.xml.rels").async("string");
+  assert.ok(zip.file("word/media/report-collage-1.png"));
+  assert.match(xml, /Report photo collage/);
+  assert.match(xml, /<w:drawing>/);
+  assert.doesNotMatch(xml, /\{\{images\}\}/);
+  assert.match(rels, /report-collage-1\.png/);
+});
+
 test("report docx filename includes client name and text month date", () => {
   const filename = reportDocxHandler.buildReportFilename(
     {

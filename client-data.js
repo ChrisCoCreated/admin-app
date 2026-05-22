@@ -2,6 +2,20 @@ import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260512";
+import {
+  DEFAULT_GAP_PX,
+  DEFAULT_RADIUS_PX,
+  EXPORT_WIDTH,
+  LAYOUTS,
+  LAYOUT_BACKGROUND_COLORS,
+  MAX_SELECTION,
+  clamp,
+  computeAdjustedSlotRect,
+  computeImagePlacement,
+  drawImageIntoSlot,
+  drawRoundedRectPath,
+  getSlotNeighborFlags,
+} from "./photo-layout-core.js";
 
 const EXAMPLE_NOTE =
   "Paul Jones feels safe at Mossbank. Claire is brilliant. Discussed Bob Smith and selling her properties.";
@@ -63,6 +77,9 @@ const REPORT_MODEL_OPTIONS = {
   ],
 };
 
+const CLIENT_LIST_CACHE_KEY = "clientDataReportPhotoClientsV1";
+const CLIENT_LIST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
 const sourceText = document.getElementById("sourceText");
 const reviewOutput = document.getElementById("reviewOutput");
 const placeholderText = document.getElementById("placeholderText");
@@ -106,6 +123,29 @@ const reportRevisionPanel = document.getElementById("reportRevisionPanel");
 const reportRevisionText = document.getElementById("reportRevisionText");
 const reportRevisionHistory = document.getElementById("reportRevisionHistory");
 const reviseReportBtn = document.getElementById("reviseReportBtn");
+const reportPhotoClientSelect = document.getElementById("reportPhotoClientSelect");
+const reportPhotoLoadBtn = document.getElementById("reportPhotoLoadBtn");
+const reportPhotoStatus = document.getElementById("reportPhotoStatus");
+const reportPhotoImagesGrid = document.getElementById("reportPhotoImagesGrid");
+const reportPhotoLayoutPicker = document.getElementById("reportPhotoLayoutPicker");
+const reportPhotoStage = document.getElementById("reportPhotoStage");
+const reportPhotoSelectedList = document.getElementById("reportPhotoSelectedList");
+const reportPhotoLocalDropZone = document.getElementById("reportPhotoLocalDropZone");
+const reportPhotoLocalInput = document.getElementById("reportPhotoLocalInput");
+const reportPhotoZoomRange = document.getElementById("reportPhotoZoomRange");
+const reportPhotoPanXRange = document.getElementById("reportPhotoPanXRange");
+const reportPhotoPanYRange = document.getElementById("reportPhotoPanYRange");
+const reportPhotoResetBtn = document.getElementById("reportPhotoResetBtn");
+const reportPhotoGapEnabled = document.getElementById("reportPhotoGapEnabled");
+const reportPhotoGapRange = document.getElementById("reportPhotoGapRange");
+const reportPhotoGapValue = document.getElementById("reportPhotoGapValue");
+const reportPhotoRoundedEnabled = document.getElementById("reportPhotoRoundedEnabled");
+const reportPhotoCornerRange = document.getElementById("reportPhotoCornerRange");
+const reportPhotoCornerValue = document.getElementById("reportPhotoCornerValue");
+const reportPhotoBackgroundPicker = document.getElementById("reportPhotoBackgroundPicker");
+const generateCollageBtn = document.getElementById("generateCollageBtn");
+const clearCollageBtn = document.getElementById("clearCollageBtn");
+const reportCollagePreview = document.getElementById("reportCollagePreview");
 const exportStatus = document.getElementById("exportStatus");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
 const exportWordBtn = document.getElementById("exportWordBtn");
@@ -121,6 +161,23 @@ let structuredReport = null;
 let reportSourceNotes = "";
 let reportModelUnlocked = false;
 let reportRevisionRequests = [];
+let reportPhotoClients = [];
+let reportPhotoPool = [];
+let reportPhotoSelected = [];
+let reportPhotoSelectedSlot = -1;
+let reportPhotoActiveLayoutId = LAYOUTS[0].id;
+let reportPhotoDragState = null;
+let reportPhotoCollage = null;
+let reportPhotoCollageUrl = "";
+const reportPhotoImageMetaCache = new Map();
+const reportPhotoExportImageCache = new Map();
+const reportPhotoStyle = {
+  backgroundColor: "#ffffff",
+  gapEnabled: true,
+  gapPx: DEFAULT_GAP_PX,
+  roundedEnabled: true,
+  cornerRadiusPx: DEFAULT_RADIUS_PX,
+};
 
 const LOW_SIGNAL_PRONOUNS = new Set(["he", "him", "his", "she", "her", "hers"]);
 const PERSON_PLACEHOLDER_CATEGORIES = new Set(["CLIENT", "STAFF", "RELATIVE", "FRIEND", "PROFESSIONAL"]);
@@ -447,6 +504,15 @@ function clearAll() {
   structuredReport = null;
   reportSourceNotes = "";
   reportRevisionRequests = [];
+  reportPhotoSelected.forEach((image) => {
+    if (image?.localObjectUrl) {
+      URL.revokeObjectURL(image.localObjectUrl);
+    }
+  });
+  reportPhotoSelected = [];
+  reportPhotoPool = [];
+  reportPhotoSelectedSlot = -1;
+  invalidateReportCollage();
   clearDraftComplete();
   if (reportDraftPanel) {
     reportDraftPanel.hidden = true;
@@ -467,8 +533,10 @@ function clearAll() {
   setRiskBadge(null);
   setStatus("Paste a note to begin.");
   setReportStatus("Generate a placeholder-preserving report from the pseudonymised text.");
+  setReportPhotoStatus("Optional: create a collage for the report image section.");
   setExportStatus("Export or copy the draft report text.");
   renderReviewOutput();
+  renderReportPhotoComposer();
   renderSummary();
   updateCounts();
 }
@@ -1468,6 +1536,622 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+function setReportPhotoStatus(message, isError = false) {
+  if (!reportPhotoStatus) {
+    return;
+  }
+  reportPhotoStatus.textContent = message;
+  reportPhotoStatus.classList.toggle("error", isError);
+}
+
+function normalizePhotoClientName(value) {
+  return String(value || "").trim();
+}
+
+function loadCachedReportPhotoClients() {
+  try {
+    const raw = localStorage.getItem(CLIENT_LIST_CACHE_KEY) || sessionStorage.getItem(CLIENT_LIST_CACHE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.clients) || Date.now() - Number(parsed.cachedAt || 0) > CLIENT_LIST_CACHE_TTL_MS) {
+      return [];
+    }
+    return parsed.clients;
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedReportPhotoClients(clients) {
+  const payload = JSON.stringify({ clients, cachedAt: Date.now() });
+  try {
+    localStorage.setItem(CLIENT_LIST_CACHE_KEY, payload);
+  } catch {
+    // Ignore browser storage limits.
+  }
+  try {
+    sessionStorage.setItem(CLIENT_LIST_CACHE_KEY, payload);
+  } catch {
+    // Ignore browser storage limits.
+  }
+}
+
+function renderReportPhotoClientOptions() {
+  if (!reportPhotoClientSelect) {
+    return;
+  }
+  const current = reportPhotoClientSelect.value;
+  reportPhotoClientSelect.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = reportPhotoClients.length ? "Select client" : "No clients with images";
+  reportPhotoClientSelect.append(placeholder);
+  for (const client of reportPhotoClients.slice().sort((a, b) => a.localeCompare(b))) {
+    const option = document.createElement("option");
+    option.value = client;
+    option.textContent = client;
+    reportPhotoClientSelect.append(option);
+  }
+  reportPhotoClientSelect.value = reportPhotoClients.includes(current) ? current : "";
+}
+
+async function loadReportPhotoClients() {
+  reportPhotoClients = loadCachedReportPhotoClients();
+  renderReportPhotoClientOptions();
+  try {
+    const payload = await directoryApi.listMarketingPhotos({ clientsOnly: 1 });
+    reportPhotoClients = (Array.isArray(payload?.clients) ? payload.clients : [])
+      .map((item) => normalizePhotoClientName(item?.name))
+      .filter((value, index, array) => Boolean(value) && array.indexOf(value) === index);
+    saveCachedReportPhotoClients(reportPhotoClients);
+    renderReportPhotoClientOptions();
+  } catch (error) {
+    setReportPhotoStatus(error?.message || "Could not load photo clients.", true);
+  }
+}
+
+function reportPhotoClientFromReport() {
+  if (structuredReport?.status === "ready_for_render") {
+    const restoredReport = restoreReportPlaceholders(structuredReport);
+    const details = restoredReport?.client_details || {};
+    return normalizePhotoClientName(
+      details.client_name || details.name || details.full_name || details.preferred_name || titleClientName(restoredReport.report_title)
+    );
+  }
+  return normalizePhotoClientName(defaultPreferredName(buildEffectiveMapping()) || preferredNameInput.value);
+}
+
+async function loadReportPhotosForClient(clientName) {
+  const client = normalizePhotoClientName(clientName);
+  if (!client) {
+    reportPhotoPool = [];
+    renderReportPhotoImages();
+    setReportPhotoStatus("Select a client or add local images.");
+    return;
+  }
+  setReportPhotoStatus(`Loading images for ${client}...`);
+  try {
+    const payload = await directoryApi.listMarketingPhotos({ client });
+    reportPhotoPool = (Array.isArray(payload?.photos) ? payload.photos : []).filter(isReportPhotoImage);
+    renderReportPhotoImages();
+    setReportPhotoStatus(`${reportPhotoPool.length} image${reportPhotoPool.length === 1 ? "" : "s"} found for ${client}.`);
+  } catch (error) {
+    setReportPhotoStatus(error?.message || "Could not load client photos.", true);
+  }
+}
+
+function isReportPhotoImage(photo) {
+  const type = String(photo?.mediaType || "").toLowerCase();
+  const url = String(photo?.imageUrl || photo?.mediaUrl || photo?.attachmentUrl || "").toLowerCase();
+  return type !== "video" && Boolean(url) && !/\.(mp4|mov|webm)(?:$|[?#])/.test(url);
+}
+
+function selectReportPhoto(photo) {
+  const existing = reportPhotoSelected.findIndex((item) => item.id === photo.id);
+  if (existing >= 0) {
+    removeReportPhotoSelection(existing);
+    return;
+  }
+  if (reportPhotoSelected.length >= MAX_SELECTION) {
+    setReportPhotoStatus(`Select up to ${MAX_SELECTION} images.`, true);
+    return;
+  }
+  reportPhotoSelected.push({
+    id: photo.id,
+    title: photo.title || photo.fileName || photo.client || "Untitled image",
+    sourceCandidates: [photo.attachmentUrl, photo.mediaUrl, photo.imageUrl]
+      .map((value) => String(value || "").trim())
+      .filter((value, index, array) => Boolean(value) && array.indexOf(value) === index),
+    previewUrl: photo.imageUrl || photo.mediaUrl || photo.attachmentUrl || "",
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+  });
+  if (reportPhotoSelectedSlot < 0) {
+    reportPhotoSelectedSlot = 0;
+  }
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+}
+
+function removeReportPhotoSelection(index) {
+  const [removed] = reportPhotoSelected.splice(index, 1);
+  if (removed?.localObjectUrl) {
+    URL.revokeObjectURL(removed.localObjectUrl);
+  }
+  if (reportPhotoSelectedSlot >= reportPhotoSelected.length) {
+    reportPhotoSelectedSlot = reportPhotoSelected.length - 1;
+  }
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+}
+
+function addReportLocalImages(files = []) {
+  const candidates = Array.from(files || []).filter((file) => String(file?.type || "").toLowerCase().startsWith("image/"));
+  const accepted = candidates.slice(0, Math.max(0, MAX_SELECTION - reportPhotoSelected.length));
+  for (const file of accepted) {
+    const objectUrl = URL.createObjectURL(file);
+    reportPhotoSelected.push({
+      id: `report-local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      title: file.name || "Local image",
+      sourceCandidates: [objectUrl],
+      previewUrl: objectUrl,
+      localObjectUrl: objectUrl,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+    });
+  }
+  if (reportPhotoSelectedSlot < 0 && reportPhotoSelected.length) {
+    reportPhotoSelectedSlot = 0;
+  }
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+  setReportPhotoStatus(accepted.length ? `Added ${accepted.length} local image${accepted.length === 1 ? "" : "s"}.` : "No images added.");
+}
+
+function renderReportPhotoImages() {
+  if (!reportPhotoImagesGrid) {
+    return;
+  }
+  reportPhotoImagesGrid.innerHTML = "";
+  const selected = new Set(reportPhotoSelected.map((item) => item.id));
+  for (const photo of reportPhotoPool) {
+    const selectedPhoto = selected.has(photo.id);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `layout-image-card${selectedPhoto ? " selected" : ""}`;
+    button.disabled = !selectedPhoto && reportPhotoSelected.length >= MAX_SELECTION;
+    button.setAttribute("aria-pressed", selectedPhoto ? "true" : "false");
+    const img = document.createElement("img");
+    img.className = "layout-image-thumb";
+    img.src = photo.imageUrl || photo.mediaUrl || photo.attachmentUrl;
+    img.alt = photo.title || photo.client || "Client image";
+    img.loading = "lazy";
+    const caption = document.createElement("span");
+    caption.className = "layout-image-caption";
+    caption.textContent = photo.title || photo.fileName || "Untitled image";
+    button.append(img, caption);
+    button.addEventListener("click", () => selectReportPhoto(photo));
+    reportPhotoImagesGrid.append(button);
+  }
+}
+
+function getReportPhotoLayout() {
+  return LAYOUTS.find((layout) => layout.id === reportPhotoActiveLayoutId) || LAYOUTS[0];
+}
+
+function renderReportPhotoLayoutPicker() {
+  if (!reportPhotoLayoutPicker) {
+    return;
+  }
+  reportPhotoLayoutPicker.innerHTML = "";
+  const selectedCount = reportPhotoSelected.length;
+  const exact = selectedCount ? LAYOUTS.filter((layout) => layout.slots.length === selectedCount) : LAYOUTS.slice(0, 6);
+  const visibleLayouts = exact.length ? exact : LAYOUTS;
+  if (!visibleLayouts.some((layout) => layout.id === reportPhotoActiveLayoutId)) {
+    reportPhotoActiveLayoutId = visibleLayouts[0].id;
+  }
+  for (const layout of visibleLayouts) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `layout-thumb${layout.id === reportPhotoActiveLayoutId ? " active" : ""}`;
+    button.setAttribute("aria-pressed", layout.id === reportPhotoActiveLayoutId ? "true" : "false");
+    const mini = document.createElement("div");
+    mini.className = "layout-thumb-canvas";
+    mini.style.setProperty("--layout-thumb-aspect", String(layout.aspect));
+    for (const slot of layout.slots) {
+      const cell = document.createElement("span");
+      cell.className = "layout-thumb-slot";
+      cell.style.left = `${slot.x * 100}%`;
+      cell.style.top = `${slot.y * 100}%`;
+      cell.style.width = `${slot.w * 100}%`;
+      cell.style.height = `${slot.h * 100}%`;
+      mini.append(cell);
+    }
+    const label = document.createElement("span");
+    label.className = "layout-thumb-label";
+    label.textContent = layout.name;
+    button.append(mini, label);
+    button.addEventListener("click", () => {
+      reportPhotoActiveLayoutId = layout.id;
+      reportPhotoSelectedSlot = Math.min(reportPhotoSelectedSlot, layout.slots.length - 1);
+      invalidateReportCollage();
+      renderReportPhotoComposer();
+    });
+    reportPhotoLayoutPicker.append(button);
+  }
+}
+
+function getReportPhotoGapPx() {
+  return reportPhotoStyle.gapEnabled ? clamp(reportPhotoStyle.gapPx, 0, 120) : 0;
+}
+
+function getReportPhotoCornerRadiusPx() {
+  return reportPhotoStyle.roundedEnabled ? clamp(reportPhotoStyle.cornerRadiusPx, 0, 240) : 0;
+}
+
+function getReportPhotoBackgroundColor() {
+  const color = String(reportPhotoStyle.backgroundColor || "").trim().toLowerCase();
+  return LAYOUT_BACKGROUND_COLORS.has(color) ? color : "#ffffff";
+}
+
+function getReportPhotoSourceDimensions(previewUrl, fallbackWidth, fallbackHeight) {
+  return reportPhotoImageMetaCache.get(String(previewUrl || "")) || {
+    width: Math.max(1, Number(fallbackWidth) || 1),
+    height: Math.max(1, Number(fallbackHeight) || 1),
+  };
+}
+
+function renderReportPhotoStage() {
+  if (!reportPhotoStage) {
+    return;
+  }
+  const layout = getReportPhotoLayout();
+  reportPhotoStage.innerHTML = "";
+  reportPhotoStage.style.setProperty("--layout-stage-aspect", String(layout.aspect));
+  const stageWidth = reportPhotoStage.clientWidth || reportPhotoStage.getBoundingClientRect().width || 1;
+  const stageHeight = reportPhotoStage.clientHeight || stageWidth / layout.aspect || 1;
+  const previewScale = stageWidth / EXPORT_WIDTH;
+  const backgroundColor = getReportPhotoBackgroundColor();
+  const nonWhiteBackground = backgroundColor !== "#ffffff";
+  const gapPx = getReportPhotoGapPx() * previewScale;
+  const cornerRadiusPx = getReportPhotoCornerRadiusPx() * previewScale;
+  const outerPaddingPx = nonWhiteBackground ? gapPx : 0;
+  const innerWidth = Math.max(1, stageWidth - outerPaddingPx * 2);
+  const innerHeight = Math.max(1, stageHeight - outerPaddingPx * 2);
+  reportPhotoStage.style.background = nonWhiteBackground ? backgroundColor : "#e9eff8";
+  reportPhotoStage.style.borderRadius = `${nonWhiteBackground ? cornerRadiusPx : 8}px`;
+
+  layout.slots.forEach((slot, slotIndex) => {
+    const assignedImage = reportPhotoSelected[slotIndex];
+    const neighborFlags = getSlotNeighborFlags(layout.slots, slotIndex);
+    const base = computeAdjustedSlotRect(slot, neighborFlags, innerWidth, innerHeight, gapPx);
+    const slotRect = { x: base.x + outerPaddingPx, y: base.y + outerPaddingPx, w: base.w, h: base.h };
+    const slotEl = document.createElement("div");
+    slotEl.className = `layout-slot${slotIndex === reportPhotoSelectedSlot ? " active" : ""}${assignedImage ? " has-image" : ""}`;
+    slotEl.style.left = `${slotRect.x}px`;
+    slotEl.style.top = `${slotRect.y}px`;
+    slotEl.style.width = `${slotRect.w}px`;
+    slotEl.style.height = `${slotRect.h}px`;
+    slotEl.style.borderRadius = `${cornerRadiusPx}px`;
+    slotEl.addEventListener("click", () => {
+      reportPhotoSelectedSlot = slotIndex;
+      renderReportPhotoComposer();
+    });
+
+    if (assignedImage) {
+      const img = document.createElement("img");
+      img.className = "layout-slot-image";
+      img.src = assignedImage.previewUrl;
+      img.alt = assignedImage.title;
+      img.draggable = false;
+      img.style.position = "absolute";
+      const source = getReportPhotoSourceDimensions(assignedImage.previewUrl, slotRect.w, slotRect.h);
+      const placement = computeImagePlacement(slotRect.w, slotRect.h, source.width, source.height, assignedImage.zoom, assignedImage.panX, assignedImage.panY);
+      img.style.left = `${placement.renderX}px`;
+      img.style.top = `${placement.renderY}px`;
+      img.style.width = `${placement.renderW}px`;
+      img.style.height = `${placement.renderH}px`;
+      img.addEventListener("load", () => {
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          const previous = reportPhotoImageMetaCache.get(assignedImage.previewUrl);
+          if (!previous || previous.width !== img.naturalWidth || previous.height !== img.naturalHeight) {
+            reportPhotoImageMetaCache.set(assignedImage.previewUrl, { width: img.naturalWidth, height: img.naturalHeight });
+            renderReportPhotoStage();
+          }
+        }
+      });
+      img.addEventListener("pointerdown", (event) => {
+        reportPhotoSelectedSlot = slotIndex;
+        reportPhotoDragState = {
+          slotIndex,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          startPanX: assignedImage.panX,
+          startPanY: assignedImage.panY,
+          maxOffsetX: placement.maxOffsetX,
+          maxOffsetY: placement.maxOffsetY,
+        };
+        img.setPointerCapture(event.pointerId);
+      });
+      img.addEventListener("pointermove", (event) => {
+        if (!reportPhotoDragState || reportPhotoDragState.pointerId !== event.pointerId || reportPhotoDragState.slotIndex !== slotIndex) {
+          return;
+        }
+        const image = reportPhotoSelected[slotIndex];
+        const deltaX = event.clientX - reportPhotoDragState.startX;
+        const deltaY = event.clientY - reportPhotoDragState.startY;
+        image.panX = clamp(reportPhotoDragState.startPanX + (reportPhotoDragState.maxOffsetX > 0 ? (deltaX / reportPhotoDragState.maxOffsetX) * 100 : 0), -100, 100);
+        image.panY = clamp(reportPhotoDragState.startPanY + (reportPhotoDragState.maxOffsetY > 0 ? (deltaY / reportPhotoDragState.maxOffsetY) * 100 : 0), -100, 100);
+        invalidateReportCollage();
+        renderReportPhotoStage();
+        renderReportPhotoAdjustControls();
+      });
+      img.addEventListener("pointerup", () => {
+        reportPhotoDragState = null;
+      });
+      img.addEventListener("pointercancel", () => {
+        reportPhotoDragState = null;
+      });
+      slotEl.append(img);
+    } else {
+      const placeholder = document.createElement("span");
+      placeholder.className = "layout-slot-placeholder";
+      placeholder.textContent = `Slot ${slotIndex + 1}`;
+      slotEl.append(placeholder);
+    }
+    reportPhotoStage.append(slotEl);
+  });
+}
+
+function renderReportPhotoSelectedList() {
+  if (!reportPhotoSelectedList) {
+    return;
+  }
+  reportPhotoSelectedList.innerHTML = "";
+  if (!reportPhotoSelected.length) {
+    reportPhotoSelectedList.innerHTML = '<p class="muted">No images selected yet.</p>';
+    return;
+  }
+  reportPhotoSelected.forEach((image, index) => {
+    const row = document.createElement("div");
+    row.className = `selected-image-row${index === reportPhotoSelectedSlot ? " active" : ""}`;
+    const info = document.createElement("button");
+    info.type = "button";
+    info.className = "selected-image-info";
+    info.textContent = `${index + 1}. ${image.title}`;
+    info.addEventListener("click", () => {
+      reportPhotoSelectedSlot = index;
+      renderReportPhotoComposer();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "secondary selected-image-remove";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => removeReportPhotoSelection(index));
+    row.append(info, remove);
+    reportPhotoSelectedList.append(row);
+  });
+}
+
+function renderReportPhotoAdjustControls() {
+  const image = reportPhotoSelected[reportPhotoSelectedSlot];
+  const disabled = !image;
+  for (const input of [reportPhotoZoomRange, reportPhotoPanXRange, reportPhotoPanYRange, reportPhotoResetBtn]) {
+    if (input) {
+      input.disabled = disabled;
+    }
+  }
+  if (!image) {
+    return;
+  }
+  reportPhotoZoomRange.value = String(image.zoom);
+  reportPhotoPanXRange.value = String(Math.round(image.panX));
+  reportPhotoPanYRange.value = String(Math.round(image.panY));
+}
+
+function renderReportPhotoStyleControls() {
+  if (reportPhotoGapEnabled) {
+    reportPhotoGapEnabled.checked = reportPhotoStyle.gapEnabled;
+  }
+  if (reportPhotoRoundedEnabled) {
+    reportPhotoRoundedEnabled.checked = reportPhotoStyle.roundedEnabled;
+  }
+  if (reportPhotoGapRange) {
+    reportPhotoGapRange.value = String(reportPhotoStyle.gapPx);
+    reportPhotoGapRange.disabled = !reportPhotoStyle.gapEnabled;
+  }
+  if (reportPhotoCornerRange) {
+    reportPhotoCornerRange.value = String(reportPhotoStyle.cornerRadiusPx);
+    reportPhotoCornerRange.disabled = !reportPhotoStyle.roundedEnabled;
+  }
+  if (reportPhotoGapValue) {
+    reportPhotoGapValue.textContent = `${Math.round(reportPhotoStyle.gapPx)}px`;
+  }
+  if (reportPhotoCornerValue) {
+    reportPhotoCornerValue.textContent = `${Math.round(reportPhotoStyle.cornerRadiusPx)}px`;
+  }
+  if (reportPhotoBackgroundPicker) {
+    const active = getReportPhotoBackgroundColor();
+    reportPhotoBackgroundPicker.querySelectorAll(".layout-color-swatch[data-color]").forEach((button) => {
+      const selected = String(button.getAttribute("data-color") || "").toLowerCase() === active;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+  }
+  if (generateCollageBtn) {
+    generateCollageBtn.disabled = reportPhotoSelected.length === 0;
+  }
+  if (clearCollageBtn) {
+    clearCollageBtn.disabled = !reportPhotoCollage && reportPhotoSelected.length === 0;
+  }
+}
+
+function renderReportPhotoComposer() {
+  renderReportPhotoImages();
+  renderReportPhotoLayoutPicker();
+  renderReportPhotoSelectedList();
+  renderReportPhotoStage();
+  renderReportPhotoAdjustControls();
+  renderReportPhotoStyleControls();
+}
+
+function invalidateReportCollage() {
+  reportPhotoCollage = null;
+  if (reportPhotoCollageUrl) {
+    URL.revokeObjectURL(reportPhotoCollageUrl);
+    reportPhotoCollageUrl = "";
+  }
+  if (reportCollagePreview) {
+    reportCollagePreview.hidden = true;
+    reportCollagePreview.removeAttribute("src");
+  }
+  renderReportPhotoStyleControls();
+}
+
+function decodeBase64ToBlob(base64, mimeType) {
+  const binary = atob(String(base64 || ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mimeType || "image/jpeg" });
+}
+
+function loadImageElement(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Could not load image from ${url}`));
+    img.src = url;
+  });
+}
+
+async function loadReportExportImage(sourceCandidates = []) {
+  const candidates = Array.isArray(sourceCandidates) ? sourceCandidates.filter(Boolean) : [];
+  let lastError = null;
+  for (const candidate of candidates) {
+    if (reportPhotoExportImageCache.has(candidate)) {
+      return reportPhotoExportImageCache.get(candidate);
+    }
+    try {
+      if (/^(blob:|data:|\.\/assets\/|\/assets\/)/i.test(candidate)) {
+        const image = await loadImageElement(candidate);
+        reportPhotoExportImageCache.set(candidate, image);
+        return image;
+      }
+      const payload = await directoryApi.getMarketingMedia({ url: candidate });
+      const blob = decodeBase64ToBlob(payload?.dataBase64, payload?.mimeType);
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const image = await loadImageElement(objectUrl);
+        reportPhotoExportImageCache.set(candidate, image);
+        return image;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Could not load image.");
+}
+
+async function buildReportPhotoCanvas() {
+  if (!reportPhotoSelected.length) {
+    throw new Error("Select at least one image.");
+  }
+  const layout = getReportPhotoLayout();
+  const canvas = document.createElement("canvas");
+  canvas.width = EXPORT_WIDTH;
+  canvas.height = Math.round(EXPORT_WIDTH / layout.aspect);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Could not create collage canvas.");
+  }
+  const backgroundColor = getReportPhotoBackgroundColor();
+  const nonWhiteBackground = backgroundColor !== "#ffffff";
+  const gapPx = getReportPhotoGapPx();
+  const cornerRadiusPx = getReportPhotoCornerRadiusPx();
+  const outerPaddingPx = nonWhiteBackground ? gapPx : 0;
+  const innerWidth = Math.max(1, canvas.width - outerPaddingPx * 2);
+  const innerHeight = Math.max(1, canvas.height - outerPaddingPx * 2);
+  ctx.fillStyle = backgroundColor;
+  if (nonWhiteBackground) {
+    ctx.save();
+    ctx.beginPath();
+    drawRoundedRectPath(ctx, 0, 0, canvas.width, canvas.height, cornerRadiusPx);
+    ctx.clip();
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else {
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const renderableSlots = Math.min(layout.slots.length, reportPhotoSelected.length);
+  for (let index = 0; index < renderableSlots; index += 1) {
+    const imageState = reportPhotoSelected[index];
+    const image = await loadReportExportImage(imageState.sourceCandidates);
+    const slot = layout.slots[index];
+    const neighborFlags = getSlotNeighborFlags(layout.slots, index);
+    const base = computeAdjustedSlotRect(slot, neighborFlags, innerWidth, innerHeight, gapPx);
+    drawImageIntoSlot(ctx, image, { x: base.x + outerPaddingPx, y: base.y + outerPaddingPx, w: base.w, h: base.h }, imageState, cornerRadiusPx);
+  }
+  return canvas;
+}
+
+function canvasToBlob(canvas, type = "image/png") {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Could not encode collage image."));
+        return;
+      }
+      resolve(blob);
+    }, type);
+  });
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(reader.error || new Error("Could not read image."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function generateReportCollage() {
+  try {
+    setReportPhotoStatus("Generating collage...");
+    const canvas = await buildReportPhotoCanvas();
+    const blob = await canvasToBlob(canvas);
+    reportPhotoCollage = {
+      dataBase64: await blobToBase64(blob),
+      mimeType: "image/png",
+      width: canvas.width,
+      height: canvas.height,
+      layoutId: getReportPhotoLayout().id,
+      imageCount: reportPhotoSelected.length,
+    };
+    if (reportPhotoCollageUrl) {
+      URL.revokeObjectURL(reportPhotoCollageUrl);
+    }
+    reportPhotoCollageUrl = URL.createObjectURL(blob);
+    if (reportCollagePreview) {
+      reportCollagePreview.src = reportPhotoCollageUrl;
+      reportCollagePreview.hidden = false;
+    }
+    setReportPhotoStatus("Collage ready for report export.");
+    renderReportPhotoStyleControls();
+  } catch (error) {
+    setReportPhotoStatus(error?.message || "Could not generate collage.", true);
+  }
+}
+
 function normalizePdfText(value) {
   return String(value || "")
     .replace(/[“”]/g, '"')
@@ -1752,6 +2436,7 @@ async function exportWordDoc() {
     const exportResult = await directoryApi.exportStructuredReportDocx({
       reportType,
       report: restoredReport,
+      images: reportPhotoCollage ? { collage: reportPhotoCollage } : undefined,
     });
     downloadBlob(exportResult.blob || exportResult, exportResult.filename || "wellbeing-assurance-visit-summary.docx");
     setExportStatus("Word document exported.");
@@ -1859,6 +2544,8 @@ async function init() {
     }
     renderTopNavigation({ role });
     setStatus("Paste a note to begin.");
+    renderReportPhotoComposer();
+    void loadReportPhotoClients();
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("clientdata");
@@ -1946,6 +2633,127 @@ reportModeSelect?.addEventListener("change", () => {
   applyReportModeDefaults();
   setReportStatus(`${mode.label} selected.`);
 });
+reportPhotoClientSelect?.addEventListener("change", () => {
+  void loadReportPhotosForClient(reportPhotoClientSelect.value);
+});
+reportPhotoLoadBtn?.addEventListener("click", () => {
+  const client = reportPhotoClientFromReport();
+  if (client && reportPhotoClientSelect) {
+    if (!reportPhotoClients.includes(client)) {
+      reportPhotoClients = [...reportPhotoClients, client];
+      renderReportPhotoClientOptions();
+    }
+    reportPhotoClientSelect.value = client;
+  }
+  void loadReportPhotosForClient(client);
+});
+reportPhotoLocalDropZone?.addEventListener("click", () => reportPhotoLocalInput?.click());
+reportPhotoLocalDropZone?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    reportPhotoLocalInput?.click();
+  }
+});
+reportPhotoLocalDropZone?.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  reportPhotoLocalDropZone.classList.add("is-dragover");
+});
+reportPhotoLocalDropZone?.addEventListener("dragleave", () => {
+  reportPhotoLocalDropZone.classList.remove("is-dragover");
+});
+reportPhotoLocalDropZone?.addEventListener("drop", (event) => {
+  event.preventDefault();
+  reportPhotoLocalDropZone.classList.remove("is-dragover");
+  addReportLocalImages(event.dataTransfer?.files || []);
+});
+reportPhotoLocalInput?.addEventListener("change", () => {
+  addReportLocalImages(reportPhotoLocalInput.files || []);
+  reportPhotoLocalInput.value = "";
+});
+reportPhotoZoomRange?.addEventListener("input", () => {
+  const image = reportPhotoSelected[reportPhotoSelectedSlot];
+  if (!image) {
+    return;
+  }
+  image.zoom = clamp(Number(reportPhotoZoomRange.value) || 1, 1, 3);
+  invalidateReportCollage();
+  renderReportPhotoStage();
+});
+reportPhotoPanXRange?.addEventListener("input", () => {
+  const image = reportPhotoSelected[reportPhotoSelectedSlot];
+  if (!image) {
+    return;
+  }
+  image.panX = clamp(Number(reportPhotoPanXRange.value) || 0, -100, 100);
+  invalidateReportCollage();
+  renderReportPhotoStage();
+});
+reportPhotoPanYRange?.addEventListener("input", () => {
+  const image = reportPhotoSelected[reportPhotoSelectedSlot];
+  if (!image) {
+    return;
+  }
+  image.panY = clamp(Number(reportPhotoPanYRange.value) || 0, -100, 100);
+  invalidateReportCollage();
+  renderReportPhotoStage();
+});
+reportPhotoResetBtn?.addEventListener("click", () => {
+  const image = reportPhotoSelected[reportPhotoSelectedSlot];
+  if (!image) {
+    return;
+  }
+  image.zoom = 1;
+  image.panX = 0;
+  image.panY = 0;
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+});
+reportPhotoGapEnabled?.addEventListener("change", () => {
+  reportPhotoStyle.gapEnabled = Boolean(reportPhotoGapEnabled.checked);
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+});
+reportPhotoGapRange?.addEventListener("input", () => {
+  reportPhotoStyle.gapPx = clamp(Number(reportPhotoGapRange.value) || 0, 0, 120);
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+});
+reportPhotoRoundedEnabled?.addEventListener("change", () => {
+  reportPhotoStyle.roundedEnabled = Boolean(reportPhotoRoundedEnabled.checked);
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+});
+reportPhotoCornerRange?.addEventListener("input", () => {
+  reportPhotoStyle.cornerRadiusPx = clamp(Number(reportPhotoCornerRange.value) || 0, 0, 240);
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+});
+reportPhotoBackgroundPicker?.addEventListener("click", (event) => {
+  const target = event.target instanceof Element ? event.target.closest(".layout-color-swatch[data-color]") : null;
+  if (!target) {
+    return;
+  }
+  const color = String(target.getAttribute("data-color") || "").toLowerCase();
+  reportPhotoStyle.backgroundColor = LAYOUT_BACKGROUND_COLORS.has(color) ? color : "#ffffff";
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+});
+generateCollageBtn?.addEventListener("click", () => {
+  void generateReportCollage();
+});
+clearCollageBtn?.addEventListener("click", () => {
+  reportPhotoSelected.forEach((image) => {
+    if (image?.localObjectUrl) {
+      URL.revokeObjectURL(image.localObjectUrl);
+    }
+  });
+  reportPhotoSelected = [];
+  reportPhotoPool = [];
+  reportPhotoSelectedSlot = -1;
+  invalidateReportCollage();
+  renderReportPhotoComposer();
+  setReportPhotoStatus("Collage cleared.");
+});
 addManualIdentifierBtn.addEventListener("click", addManualIdentifier);
 summaryDetails?.addEventListener("toggle", () => {
   if (summaryDetails.open) {
@@ -1954,6 +2762,17 @@ summaryDetails?.addEventListener("toggle", () => {
 });
 signOutBtn?.addEventListener("click", () => {
   authController.signOut({ redirectUri: `${window.location.origin}/index.html` }).catch(() => {});
+});
+
+window.addEventListener("beforeunload", () => {
+  for (const image of reportPhotoSelected) {
+    if (image?.localObjectUrl) {
+      URL.revokeObjectURL(image.localObjectUrl);
+    }
+  }
+  if (reportPhotoCollageUrl) {
+    URL.revokeObjectURL(reportPhotoCollageUrl);
+  }
 });
 
 updateCounts();
