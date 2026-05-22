@@ -1465,6 +1465,25 @@ button.is-generating::after {
   gap: 14px;
 }
 
+.client-data-photo-handoff {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d8dfed;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.client-data-photo-handoff ol {
+  margin: 0;
+  padding-left: 22px;
+  color: #536174;
+}
+
+.client-data-photo-handoff li + li {
+  margin-top: 4px;
+}
+
 .client-data-photo-controls {
   display: grid;
   grid-template-columns: minmax(240px, 360px) max-content minmax(240px, 1fr);

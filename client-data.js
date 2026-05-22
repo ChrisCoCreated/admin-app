@@ -123,6 +123,7 @@ const reportRevisionPanel = document.getElementById("reportRevisionPanel");
 const reportRevisionText = document.getElementById("reportRevisionText");
 const reportRevisionHistory = document.getElementById("reportRevisionHistory");
 const reviseReportBtn = document.getElementById("reviseReportBtn");
+const pasteCollageBtn = document.getElementById("pasteCollageBtn");
 const reportPhotoClientSelect = document.getElementById("reportPhotoClientSelect");
 const reportPhotoLoadBtn = document.getElementById("reportPhotoLoadBtn");
 const reportPhotoStatus = document.getElementById("reportPhotoStatus");
@@ -2124,6 +2125,61 @@ function blobToBase64(blob) {
   });
 }
 
+async function setReportCollageFromBlob(blob) {
+  if (!blob || !String(blob.type || "").toLowerCase().startsWith("image/")) {
+    throw new Error("Clipboard does not contain an image.");
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = await loadImageElement(objectUrl);
+    reportPhotoCollage = {
+      dataBase64: await blobToBase64(blob),
+      mimeType: blob.type || "image/png",
+      width: image.naturalWidth || image.width || 2000,
+      height: image.naturalHeight || image.height || 1200,
+      source: "clipboard",
+    };
+    if (reportPhotoCollageUrl) {
+      URL.revokeObjectURL(reportPhotoCollageUrl);
+    }
+    reportPhotoCollageUrl = objectUrl;
+    if (reportCollagePreview) {
+      reportCollagePreview.src = reportPhotoCollageUrl;
+      reportCollagePreview.hidden = false;
+    }
+    if (clearCollageBtn) {
+      clearCollageBtn.disabled = false;
+    }
+    setReportPhotoStatus("Collage pasted and ready for report export.");
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
+async function pasteReportCollageFromClipboard() {
+  if (!navigator.clipboard?.read) {
+    setReportPhotoStatus("Clipboard image paste is not supported in this browser. Use the browser paste shortcut after copying the image.", true);
+    return;
+  }
+
+  try {
+    setReportPhotoStatus("Reading copied collage...");
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const imageType = item.types.find((type) => String(type || "").toLowerCase().startsWith("image/"));
+      if (imageType) {
+        await setReportCollageFromBlob(await item.getType(imageType));
+        return;
+      }
+    }
+    setReportPhotoStatus("Clipboard does not contain an image. Copy the collage from Photo Layout first.", true);
+  } catch (error) {
+    setReportPhotoStatus(error?.message || "Could not paste collage from the clipboard.", true);
+  }
+}
+
 async function generateReportCollage() {
   try {
     setReportPhotoStatus("Generating collage...");
@@ -2544,8 +2600,7 @@ async function init() {
     }
     renderTopNavigation({ role });
     setStatus("Paste a note to begin.");
-    renderReportPhotoComposer();
-    void loadReportPhotoClients();
+    setReportPhotoStatus("Optional: create a collage in Photo Layout, copy it, then paste it here.");
   } catch (error) {
     if (error?.status === 403) {
       redirectToUnauthorized("clientdata");
@@ -2741,6 +2796,9 @@ reportPhotoBackgroundPicker?.addEventListener("click", (event) => {
 generateCollageBtn?.addEventListener("click", () => {
   void generateReportCollage();
 });
+pasteCollageBtn?.addEventListener("click", () => {
+  void pasteReportCollageFromClipboard();
+});
 clearCollageBtn?.addEventListener("click", () => {
   reportPhotoSelected.forEach((image) => {
     if (image?.localObjectUrl) {
@@ -2751,8 +2809,26 @@ clearCollageBtn?.addEventListener("click", () => {
   reportPhotoPool = [];
   reportPhotoSelectedSlot = -1;
   invalidateReportCollage();
-  renderReportPhotoComposer();
-  setReportPhotoStatus("Collage cleared.");
+  if (clearCollageBtn) {
+    clearCollageBtn.disabled = true;
+  }
+  setReportPhotoStatus("Collage cleared. Copy a new image from Photo Layout, then paste it here.");
+});
+document.addEventListener("paste", (event) => {
+  const imageItem = Array.from(event.clipboardData?.items || []).find((item) =>
+    String(item?.type || "").toLowerCase().startsWith("image/")
+  );
+  if (!imageItem) {
+    return;
+  }
+  const blob = imageItem.getAsFile();
+  if (!blob) {
+    return;
+  }
+  event.preventDefault();
+  void setReportCollageFromBlob(blob).catch((error) => {
+    setReportPhotoStatus(error?.message || "Could not paste collage.", true);
+  });
 });
 addManualIdentifierBtn.addEventListener("click", addManualIdentifier);
 summaryDetails?.addEventListener("toggle", () => {

@@ -224,77 +224,20 @@
         <div class="panel-head">
           <div>
             <h2>Photos</h2>
-            <p id="reportPhotoStatus" class="muted">Optional: create a collage for the report image section.</p>
+            <p id="reportPhotoStatus" class="muted">Optional: paste a collage copied from Photo Layout for the report image section.</p>
           </div>
           <button id="clearCollageBtn" class="secondary" type="button" disabled>Clear collage</button>
         </div>
-        <div class="client-data-photo-controls">
-          <label class="field" for="reportPhotoClientSelect">
-            Client photos
-            <select id="reportPhotoClientSelect">
-              <option value="">Loading clients...</option>
-            </select>
-          </label>
-          <button id="reportPhotoLoadBtn" class="secondary" type="button">Use report client</button>
-          <div id="reportPhotoLocalDropZone" class="layout-drop-zone client-data-photo-drop" tabindex="0" role="button">
-            Drag and drop images here, or click to browse
+        <div class="client-data-photo-handoff">
+          <ol>
+            <li>Open Photo Layout in a new tab so this report page stays exactly as it is.</li>
+            <li>Create the collage there, then use Copy Image.</li>
+            <li>Return here and paste the copied collage into this report.</li>
+          </ol>
+          <div class="row wrap-row">
+            <a class="secondary button-link" href="./photo-layout.html" target="_blank" rel="noopener">Open Photo Layout</a>
+            <button id="pasteCollageBtn" type="button">Paste copied collage</button>
           </div>
-          <input id="reportPhotoLocalInput" type="file" accept="image/*" multiple hidden />
-        </div>
-        <div id="reportPhotoImagesGrid" class="layout-image-grid client-data-photo-image-grid" aria-live="polite"></div>
-        <div class="client-data-photo-compose">
-          <div>
-            <h3 class="subheading">Layout</h3>
-            <div id="reportPhotoLayoutPicker" class="layout-picker" aria-live="polite"></div>
-            <div class="layout-stage-wrap client-data-photo-stage-wrap">
-              <div id="reportPhotoStage" class="layout-stage" aria-label="Report collage preview"></div>
-            </div>
-          </div>
-          <aside class="layout-tools client-data-photo-tools">
-            <h3>Selected Images</h3>
-            <div id="reportPhotoSelectedList" class="selected-images-list"></div>
-            <h3>Image Adjustments</h3>
-            <label class="field" for="reportPhotoZoomRange">
-              Zoom
-              <input id="reportPhotoZoomRange" type="range" min="1" max="3" step="0.01" value="1" />
-            </label>
-            <label class="field" for="reportPhotoPanXRange">
-              Horizontal
-              <input id="reportPhotoPanXRange" type="range" min="-100" max="100" step="1" value="0" />
-            </label>
-            <label class="field" for="reportPhotoPanYRange">
-              Vertical
-              <input id="reportPhotoPanYRange" type="range" min="-100" max="100" step="1" value="0" />
-            </label>
-            <button id="reportPhotoResetBtn" class="secondary" type="button">Reset position</button>
-            <h3>Layout Style</h3>
-            <div id="reportPhotoBackgroundPicker" class="layout-color-picker" role="group" aria-label="Collage background colour">
-              <button type="button" class="layout-color-swatch active" data-color="#ffffff" aria-label="White" style="--swatch:#ffffff"></button>
-              <button type="button" class="layout-color-swatch" data-color="#000000" aria-label="Black" style="--swatch:#000000"></button>
-              <button type="button" class="layout-color-swatch" data-color="#1db9d2" aria-label="1DB9D2" style="--swatch:#1db9d2"></button>
-              <button type="button" class="layout-color-swatch" data-color="#6d3ac6" aria-label="6D3AC6" style="--swatch:#6d3ac6"></button>
-              <button type="button" class="layout-color-swatch" data-color="#ce3f8f" aria-label="CE3F8F" style="--swatch:#ce3f8f"></button>
-              <button type="button" class="layout-color-swatch" data-color="#3aceac" aria-label="3ACEAC" style="--swatch:#3aceac"></button>
-              <button type="button" class="layout-color-swatch" data-color="#ffd23f" aria-label="FFD23F" style="--swatch:#ffd23f"></button>
-            </div>
-            <label class="checkbox-row" for="reportPhotoGapEnabled">
-              <input id="reportPhotoGapEnabled" type="checkbox" checked />
-              Gap between images
-            </label>
-            <label class="field" for="reportPhotoGapRange">
-              Gap size <span id="reportPhotoGapValue" class="muted">24px</span>
-              <input id="reportPhotoGapRange" type="range" min="0" max="120" step="1" value="24" />
-            </label>
-            <label class="checkbox-row" for="reportPhotoRoundedEnabled">
-              <input id="reportPhotoRoundedEnabled" type="checkbox" checked />
-              Rounded corners
-            </label>
-            <label class="field" for="reportPhotoCornerRange">
-              Corner radius <span id="reportPhotoCornerValue" class="muted">36px</span>
-              <input id="reportPhotoCornerRange" type="range" min="0" max="240" step="1" value="36" />
-            </label>
-            <button id="generateCollageBtn" type="button" disabled>Generate collage</button>
-          </aside>
         </div>
         <img id="reportCollagePreview" class="layout-output-preview" alt="Generated report collage preview" hidden />
       </section>
