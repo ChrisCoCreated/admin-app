@@ -613,7 +613,21 @@ function renderBusiness(payload) {
 
 function renderEnquiries(payload) {
   const latestLabel = payload?.latestWeekLabel || "";
+  const assessmentOutcome = payload?.enquiryAssessmentOutcome || {};
+  const assessedOutcomes = Number(assessmentOutcome.assessedOutcomes || 0);
+  const outcomeSource = assessmentOutcome.startDateLabel
+    ? `From Enquiries Log since ${assessmentOutcome.startDateLabel}`
+    : "From Enquiries Log";
   appendChildren(enquiriesKpis, [
+    createKpiMetricCard({
+      title: "Won vs Lost After Assessment",
+      value: `${formatNumber(assessmentOutcome.won || 0)} won / ${formatNumber(assessmentOutcome.lost || 0)} lost`,
+      detail: assessedOutcomes
+        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(assessedOutcomes)} assessed outcomes in the past 3 months`
+        : "No won/lost post-assessment outcomes in the past 3 months",
+      metric: { sourceLabel: outcomeSource, stale: false },
+      tone: "positive",
+    }),
     createKpiMetricCard({
       title: "Active Enquiries",
       value: formatNumber(metricValue(payload, "activeEnquiries")?.value),

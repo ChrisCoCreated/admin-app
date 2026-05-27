@@ -7,7 +7,10 @@ const DEFAULT_KPI_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/NewBusiness/Lists/KPIs%20Thrive/AllItems.aspx?viewid=091674c0%2D96cc%2D48ad%2Dbcac%2D787253e3cf31&env=WebViewList";
 const DEFAULT_RECRUITMENT_SITE_URL = "https://planwithcare.sharepoint.com/sites/OperationsSupportTeam_TE1079-RecruitmentandAgency";
 const DEFAULT_RECRUITMENT_LIST_NAME = "Associate Recruitment";
+const DEFAULT_ENQUIRIES_SITE_URL = "https://planwithcare.sharepoint.com/sites/ThriveCalls";
+const DEFAULT_ENQUIRIES_LIST_NAME = "Enquiries Log";
 const QUARTER_WEEK_COUNT = 13;
+const ASSESSMENT_OUTCOME_MONTHS = 3;
 
 const KPI_FIELD_DEFINITIONS = {
   weekCommencing: ["Week Commenceing", "Week Commencing", "WeekCommenceing"],
@@ -44,6 +47,12 @@ const RECRUITMENT_FIELD_DEFINITIONS = {
   candidateName: ["Title", "Candidate Name"],
   status: ["Status"],
   active: ["Active"],
+};
+
+const ENQUIRY_FIELD_DEFINITIONS = {
+  status: ["Status"],
+  currentStatus: ["Current Status"],
+  assessmentDate: ["Assessor's meeting arrange for", "Assessor's meeting arrange for ", "Assessment Date"],
 };
 
 function cleanText(value) {
@@ -95,6 +104,14 @@ function parseRecruitmentConfig() {
     cleanText(process.env.SHAREPOINT_RECRUITMENT_SITE_URL || DEFAULT_RECRUITMENT_SITE_URL),
     cleanText(process.env.SHAREPOINT_RECRUITMENT_LIST_NAME || DEFAULT_RECRUITMENT_LIST_NAME),
     "Missing SHAREPOINT_RECRUITMENT_SITE_URL or SHAREPOINT_RECRUITMENT_LIST_NAME."
+  );
+}
+
+function parseEnquiriesConfig() {
+  return parseSharePointListConfig(
+    cleanText(process.env.SHAREPOINT_ENQUIRIES_SITE_URL || DEFAULT_ENQUIRIES_SITE_URL),
+    cleanText(process.env.SHAREPOINT_ENQUIRIES_LIST_NAME || DEFAULT_ENQUIRIES_LIST_NAME),
+    "Missing SHAREPOINT_ENQUIRIES_SITE_URL or SHAREPOINT_ENQUIRIES_LIST_NAME."
   );
 }
 
@@ -502,6 +519,30 @@ function firstName(fullName) {
   return cleanText(fullName).split(/\s+/).find(Boolean) || "";
 }
 
+function subtractMonths(date, months) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() - months);
+  return next;
+}
+
+function getValidDate(value) {
+  const date = new Date(value);
+  return value && !Number.isNaN(date.getTime()) ? date : null;
+}
+
+function normalizeEnquiryStatus(value) {
+  return cleanText(value).toLowerCase();
+}
+
+function isWonAfterAssessmentStatus(status) {
+  return normalizeEnquiryStatus(status) === "won";
+}
+
+function isLostAfterAssessmentStatus(status) {
+  const normalized = normalizeEnquiryStatus(status);
+  return normalized.includes("lost") && normalized.includes("post assessment");
+}
+
 async function fetchAcceptedOnboarding(graphClient) {
   const config = parseRecruitmentConfig();
   const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
@@ -525,6 +566,56 @@ async function fetchAcceptedOnboarding(graphClient) {
   return {
     count: accepted.length,
     firstNames: accepted,
+  };
+}
+
+async function fetchEnquiryAssessmentOutcome(graphClient) {
+  const config = parseEnquiriesConfig();
+  const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
+  const list = await resolveList(graphClient, siteId, config.listName);
+  const columns = await resolveListColumns(graphClient, siteId, list.id);
+  const fieldMap = createFieldMap(columns, ENQUIRY_FIELD_DEFINITIONS);
+  const selectFields = uniqueFieldNames(fieldMap);
+  const expand = selectFields.length ? `fields($select=${selectFields.join(",")})` : "fields";
+  const params = new URLSearchParams({
+    $top: "200",
+    $expand: expand,
+  });
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${list.id}/items?${params.toString()}`;
+  const items = await graphClient.fetchAllPages(url);
+  const startDate = subtractMonths(new Date(), ASSESSMENT_OUTCOME_MONTHS);
+  startDate.setHours(0, 0, 0, 0);
+
+  let won = 0;
+  let lost = 0;
+  for (const item of items) {
+    const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
+    const row = { fields, fieldMap };
+    const assessmentDate = getValidDate(getFieldValue(row, "assessmentDate"));
+    if (!assessmentDate || assessmentDate < startDate) {
+      continue;
+    }
+
+    const status = getFieldValue(row, "status") || getFieldValue(row, "currentStatus");
+    if (isWonAfterAssessmentStatus(status)) {
+      won += 1;
+      continue;
+    }
+    if (isLostAfterAssessmentStatus(status)) {
+      lost += 1;
+    }
+  }
+
+  const assessedOutcomes = won + lost;
+  return {
+    won,
+    lost,
+    assessedOutcomes,
+    winPercent: assessedOutcomes ? (won / assessedOutcomes) * 100 : null,
+    months: ASSESSMENT_OUTCOME_MONTHS,
+    startDate: startDate.toISOString(),
+    startDateLabel: formatWeek(startDate.toISOString()),
+    listUrl: list.webUrl,
   };
 }
 
@@ -558,6 +649,7 @@ module.exports = async (req, res) => {
     const { rows, listUrl, fieldMap } = await fetchKpiRows(graphClient, kpiConfig);
     const metrics = resolveMetrics(rows);
     const onboarding = await fetchAcceptedOnboarding(graphClient);
+    const enquiryAssessmentOutcome = await fetchEnquiryAssessmentOutcome(graphClient);
 
     res.setHeader("Cache-Control", "private, max-age=60");
     res.status(200).json({
@@ -568,6 +660,7 @@ module.exports = async (req, res) => {
       values: metrics.values,
       trendSeries: buildTrendSeries(rows),
       onboarding,
+      enquiryAssessmentOutcome,
       rowCount: rows.length,
       refreshedAt: new Date().toISOString(),
     });
