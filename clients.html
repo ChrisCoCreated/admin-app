@@ -73,14 +73,17 @@
 
       <section id="reconcilePanel" class="panel reconcile-panel collapsed" hidden>
         <div id="reconcileHeader" class="row wrap-row reconcile-header" role="button" tabindex="0" aria-expanded="false">
-          <h2>Reconciliation</h2>
+          <h2>Reconciliation (onetouch to sharepoint)</h2>
           <span id="reconcileChevron" class="reconcile-chevron" aria-hidden="true">▸</span>
         </div>
         <div id="reconcileContent" hidden>
         <div class="row wrap-row">
           <button id="reconcileRefreshBtn" class="secondary" type="button">Refresh reconciliation</button>
         </div>
-        <p class="muted">OneTouch is the source of truth. Actions write updates into SharePoint clients.</p>
+        <p class="muted">
+          This section compares the OneTouch client directory against the SharePoint clients list. OneTouch is the
+          source of truth, and the actions here help bring SharePoint into line with it.
+        </p>
         <p class="muted">
           Instructions for updating SharePoint columns are
           <a href="https://chatgpt.com/share/e/69bd8235-d6c8-8007-bbc8-358f54e3b907" target="_blank" rel="noopener noreferrer">here</a>.
@@ -88,13 +91,37 @@
         <p id="reconcileStatus" class="muted">Loading reconciliation preview...</p>
 
         <h3 class="subheading">Add to SharePoint</h3>
+        <p class="muted">
+          These clients exist in OneTouch but do not yet have a matching SharePoint record, so they can be added to
+          the SharePoint list.
+        </p>
+        <div id="missingStatusFilters" class="status-filter-row" hidden></div>
+        <div id="missingBulkPanel" class="bulk-tag-panel">
+          <div class="bulk-tag-summary">
+            <strong id="missingSelectedCountLabel">0 selected</strong>
+            <button id="missingSelectVisibleBtn" class="secondary" type="button">Select visible</button>
+            <button id="missingClearSelectionBtn" class="secondary" type="button">Clear selection</button>
+          </div>
+          <div class="bulk-tag-controls">
+            <label class="field" for="missingBulkAreaSelect">
+              Bulk add area
+              <select id="missingBulkAreaSelect">
+                <option value="">Select an area</option>
+              </select>
+            </label>
+            <button id="applyMissingBulkBtn" type="button" disabled>Add selected</button>
+          </div>
+          <p id="missingBulkStatus" class="muted">Select one or more visible rows to bulk add them to SharePoint.</p>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Select</th>
                 <th>OneTouch ID</th>
                 <th>Name</th>
                 <th>DOB</th>
+                <th>Status</th>
                 <th>Area</th>
                 <th>Action</th>
               </tr>
@@ -107,6 +134,10 @@
           <h3 class="subheading">Copy OneTouchID</h3>
           <button id="copyAllBtn" class="secondary" type="button">Copy all</button>
         </div>
+        <p class="muted">
+          These SharePoint clients appear to match a OneTouch client, but the SharePoint record is missing the
+          OneTouch ID. Use this to copy the correct OneTouch ID into SharePoint.
+        </p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -125,6 +156,10 @@
           <h3 class="subheading">Inaccurate Records</h3>
           <button id="updateAllBtn" class="secondary" type="button">Update all</button>
         </div>
+        <p class="muted">
+          These records are linked between OneTouch and SharePoint, but one or more SharePoint fields do not match the
+          current OneTouch data and can be updated.
+        </p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -140,6 +175,10 @@
         </div>
 
         <h3 class="subheading">Ambiguous Matches</h3>
+        <p class="muted">
+          These SharePoint records have more than one possible OneTouch match, so a person needs to choose the correct
+          OneTouch client before the ID can be copied across.
+        </p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -155,6 +194,9 @@
         </div>
 
         <h3 class="subheading">No OneTouch Record</h3>
+        <p class="muted">
+          These SharePoint clients could not be matched to any OneTouch client, so they need to be checked manually.
+        </p>
         <div class="table-wrap">
           <table>
             <thead>

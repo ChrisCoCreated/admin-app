@@ -33,6 +33,13 @@ const ambiguousBody = document.getElementById("ambiguousBody");
 const errorsBody = document.getElementById("errorsBody");
 const copyAllBtn = document.getElementById("copyAllBtn");
 const updateAllBtn = document.getElementById("updateAllBtn");
+const missingStatusFilters = document.getElementById("missingStatusFilters");
+const missingSelectedCountLabel = document.getElementById("missingSelectedCountLabel");
+const missingSelectVisibleBtn = document.getElementById("missingSelectVisibleBtn");
+const missingClearSelectionBtn = document.getElementById("missingClearSelectionBtn");
+const missingBulkAreaSelect = document.getElementById("missingBulkAreaSelect");
+const applyMissingBulkBtn = document.getElementById("applyMissingBulkBtn");
+const missingBulkStatus = document.getElementById("missingBulkStatus");
 
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
@@ -65,6 +72,8 @@ let copyStatusResetTimer = null;
 let selectedClientIds = new Set();
 let availableTags = [];
 let bulkTagBusy = false;
+let selectedMissingStatuses = new Set();
+let selectedMissingClientIds = new Set();
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -95,6 +104,14 @@ function setBulkTagStatus(message, isError = false) {
   }
   bulkTagStatus.textContent = message;
   bulkTagStatus.classList.toggle("error", isError);
+}
+
+function setMissingBulkStatus(message, isError = false) {
+  if (!missingBulkStatus) {
+    return;
+  }
+  missingBulkStatus.textContent = message;
+  missingBulkStatus.classList.toggle("error", isError);
 }
 
 function showCopyStatus(message, isError = false) {
@@ -298,6 +315,122 @@ function formatTags(tags) {
     )
   );
   return unique.length ? unique.join(", ") : "-";
+}
+
+function getMissingCandidates() {
+  return Array.isArray(reconcilePreview?.missingInSharePoint) ? reconcilePreview.missingInSharePoint : [];
+}
+
+function passesMissingStatusFilter(item) {
+  if (!selectedMissingStatuses.size) {
+    return true;
+  }
+  const normalized = normalizeStatus(item?.oneTouch?.status);
+  if (!normalized) {
+    return false;
+  }
+  return selectedMissingStatuses.has(normalized);
+}
+
+function getFilteredMissingCandidates() {
+  return getMissingCandidates().filter((item) => passesMissingStatusFilter(item));
+}
+
+function renderMissingStatusFilters(items) {
+  if (!missingStatusFilters) {
+    return;
+  }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    selectedMissingStatuses = new Set();
+    missingStatusFilters.hidden = true;
+    missingStatusFilters.innerHTML = "";
+    return;
+  }
+
+  const options = collectStatusOptions(items.map((item) => item?.oneTouch || {}));
+  if (!options.length) {
+    missingStatusFilters.hidden = true;
+    return;
+  }
+
+  const nextSelected = new Set(Array.from(selectedMissingStatuses).filter((status) => options.includes(status)));
+  if (!nextSelected.size) {
+    selectedMissingStatuses = new Set(options);
+  } else {
+    selectedMissingStatuses = nextSelected;
+  }
+
+  missingStatusFilters.hidden = false;
+  missingStatusFilters.innerHTML = "";
+
+  for (const status of options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `status-filter-btn${selectedMissingStatuses.has(status) ? " active" : ""}`;
+    btn.textContent = formatStatusLabel(status);
+    btn.addEventListener("click", () => {
+      const next = new Set(selectedMissingStatuses);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      if (!next.size) {
+        next.add(status);
+      }
+      selectedMissingStatuses = next;
+      renderMissingStatusFilters(getMissingCandidates());
+      renderMissingCandidates(getFilteredMissingCandidates());
+    });
+    missingStatusFilters.appendChild(btn);
+  }
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = `status-filter-btn${selectedMissingStatuses.size === options.length ? " active" : ""}`;
+  allBtn.textContent = "All";
+  allBtn.addEventListener("click", () => {
+    selectedMissingStatuses = new Set(options);
+    renderMissingStatusFilters(getMissingCandidates());
+    renderMissingCandidates(getFilteredMissingCandidates());
+  });
+  missingStatusFilters.appendChild(allBtn);
+}
+
+function renderMissingAreaOptions() {
+  if (!missingBulkAreaSelect) {
+    return;
+  }
+  const current = String(missingBulkAreaSelect.value || "");
+  missingBulkAreaSelect.innerHTML = '<option value="">Select an area</option>';
+  for (const area of RECONCILIATION_AREA_OPTIONS) {
+    const option = document.createElement("option");
+    option.value = area;
+    option.textContent = area;
+    if (area === current) {
+      option.selected = true;
+    }
+    missingBulkAreaSelect.appendChild(option);
+  }
+}
+
+function updateMissingBulkControls() {
+  const validIds = new Set(getMissingCandidates().map((item) => String(item?.oneTouch?.id || "")).filter(Boolean));
+  selectedMissingClientIds = new Set(Array.from(selectedMissingClientIds).filter((id) => validIds.has(id)));
+
+  if (missingSelectedCountLabel) {
+    missingSelectedCountLabel.textContent = `${selectedMissingClientIds.size} selected`;
+  }
+  if (missingSelectVisibleBtn) {
+    missingSelectVisibleBtn.disabled = reconcileBusy || getFilteredMissingCandidates().length === 0;
+  }
+  if (missingClearSelectionBtn) {
+    missingClearSelectionBtn.disabled = reconcileBusy || selectedMissingClientIds.size === 0;
+  }
+  if (applyMissingBulkBtn) {
+    applyMissingBulkBtn.disabled = reconcileBusy || selectedMissingClientIds.size === 0 || !missingBulkAreaSelect?.value;
+  }
 }
 
 function passesStatusFilter(status) {
@@ -514,6 +647,9 @@ function setReconcileBusy(isBusy) {
     const hasItems = Array.isArray(reconcilePreview?.updateCandidates) && reconcilePreview.updateCandidates.length > 0;
     updateAllBtn.disabled = isBusy || !hasItems;
   }
+  if (missingBulkAreaSelect) {
+    missingBulkAreaSelect.disabled = isBusy;
+  }
   if (reconcilePanel) {
     const controls = reconcilePanel.querySelectorAll(".recon-action-btn, .recon-select");
     for (const control of controls) {
@@ -525,6 +661,7 @@ function setReconcileBusy(isBusy) {
       }
     }
   }
+  updateMissingBulkControls();
 }
 
 function setReconcileCollapsed(collapsed) {
@@ -605,7 +742,7 @@ async function loadReconcilePreview() {
     console.error(error);
     setReconcileStatus(error?.message || "Could not load reconciliation preview.", true);
     renderEmptyRow(copyIdBody, "Could not load data.");
-    renderEmptyRow(missingBody, "Could not load data.");
+    renderEmptyRow(missingBody, "Could not load data.", 7);
     renderEmptyRow(updateBody, "Could not load data.");
     renderEmptyRow(ambiguousBody, "Could not load data.");
     renderEmptyRow(errorsBody, "Could not load data.", 3);
@@ -683,7 +820,8 @@ function renderMissingCandidates(items) {
   }
   missingBody.innerHTML = "";
   if (!items.length) {
-    renderEmptyRow(missingBody, "No missing records.", 5);
+    renderEmptyRow(missingBody, "No missing records.", 7);
+    updateMissingBulkControls();
     return;
   }
 
@@ -691,16 +829,35 @@ function renderMissingCandidates(items) {
     const suggestedArea = RECONCILIATION_AREA_OPTIONS.includes(String(item?.oneTouch?.area || "").trim())
       ? String(item.oneTouch.area).trim()
       : "";
+    const oneTouchId = String(item?.oneTouch?.id || "");
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td></td>
       <td>${escapeHtml(item?.oneTouch?.id || "-")}</td>
       <td>${escapeHtml(item?.oneTouch?.name || "-")}</td>
       <td>${escapeHtml(item?.oneTouch?.dateOfBirth || "-")}</td>
+      <td>${escapeHtml(formatStatusLabel(item?.oneTouch?.status || ""))}</td>
       <td></td>
       <td></td>
     `;
-    const areaCell = tr.children[3];
-    const actionCell = tr.children[4];
+    const selectionCell = tr.children[0];
+    const areaCell = tr.children[5];
+    const actionCell = tr.children[6];
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = selectedMissingClientIds.has(oneTouchId);
+    checkbox.disabled = reconcileBusy;
+    checkbox.setAttribute("aria-label", `Select ${item?.oneTouch?.name || oneTouchId || "client"}`);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        selectedMissingClientIds.add(oneTouchId);
+      } else {
+        selectedMissingClientIds.delete(oneTouchId);
+      }
+      updateMissingBulkControls();
+    });
+    selectionCell.appendChild(checkbox);
 
     const select = document.createElement("select");
     select.className = "recon-select";
@@ -737,6 +894,8 @@ function renderMissingCandidates(items) {
     actionCell.appendChild(addBtn);
     missingBody.appendChild(tr);
   }
+
+  updateMissingBulkControls();
 }
 
 function renderUpdateCandidates(items) {
@@ -837,8 +996,11 @@ function renderAmbiguousCandidates(items) {
 
 function renderReconcilePreview() {
   const payload = reconcilePreview || {};
+  const missingItems = Array.isArray(payload.missingInSharePoint) ? payload.missingInSharePoint : [];
+  renderMissingStatusFilters(missingItems);
+  renderMissingAreaOptions();
   renderCopyCandidates(Array.isArray(payload.copyOneTouchIdCandidates) ? payload.copyOneTouchIdCandidates : []);
-  renderMissingCandidates(Array.isArray(payload.missingInSharePoint) ? payload.missingInSharePoint : []);
+  renderMissingCandidates(getFilteredMissingCandidates());
   renderUpdateCandidates(Array.isArray(payload.updateCandidates) ? payload.updateCandidates : []);
   renderAmbiguousCandidates(Array.isArray(payload.ambiguousMatches) ? payload.ambiguousMatches : []);
   renderErrors(Array.isArray(payload.errors) ? payload.errors : []);
@@ -953,6 +1115,71 @@ async function applyCopyAllCandidates() {
     return;
   }
   setReconcileStatus(`Copy all complete: ${copied} copied.`);
+}
+
+async function applyAddMissingBulkCandidates() {
+  const itemsById = new Map(
+    getMissingCandidates()
+      .map((item) => [String(item?.oneTouch?.id || ""), item])
+      .filter(([id]) => Boolean(id))
+  );
+  const items = Array.from(selectedMissingClientIds).map((id) => itemsById.get(id)).filter(Boolean);
+  const area = String(missingBulkAreaSelect?.value || "");
+  if (!items.length || !area || reconcileBusy) {
+    updateMissingBulkControls();
+    return;
+  }
+
+  setReconcileBusy(true);
+  setReconcileStatus(`Adding ${items.length} record(s) to SharePoint...`);
+  let added = 0;
+  let failed = 0;
+  let lastError = "";
+  const failedIds = new Set();
+
+  try {
+    for (const item of items) {
+      try {
+        const response = await directoryApi.applyClientsReconcileAction({
+          action: "add_missing",
+          oneTouchClientId: item?.oneTouch?.id || "",
+          area,
+          expectedFingerprint: item?.expectedFingerprint || "",
+        });
+        if (response?.result?.updated === false) {
+          failed += 1;
+          failedIds.add(String(item?.oneTouch?.id || ""));
+          continue;
+        }
+        added += 1;
+      } catch (error) {
+        failed += 1;
+        failedIds.add(String(item?.oneTouch?.id || ""));
+        lastError = error?.message || String(error);
+      }
+    }
+  } finally {
+    setReconcileBusy(false);
+  }
+
+  await Promise.all([refreshClientsData(), loadReconcilePreview()]);
+  selectedMissingClientIds = failedIds;
+
+  if (failed > 0) {
+    const message = `Bulk add complete: ${added} added, ${failed} failed.${lastError ? ` Last error: ${lastError}` : ""}`;
+    setMissingBulkStatus(message, true);
+    setReconcileStatus(message, true);
+    updateMissingBulkControls();
+    return;
+  }
+
+  selectedMissingClientIds = new Set();
+  if (missingBulkAreaSelect) {
+    missingBulkAreaSelect.value = "";
+  }
+  setMissingBulkStatus(`Bulk add complete: ${added} client(s) added to SharePoint.`);
+  setReconcileStatus(`Bulk add complete: ${added} added.`);
+  updateMissingBulkControls();
 }
 
 function renderClients() {
@@ -1091,6 +1318,31 @@ areaFilterSelect?.addEventListener("change", () => {
 
 bulkTagSelect?.addEventListener("change", () => {
   updateBulkTagControls();
+});
+
+missingSelectVisibleBtn?.addEventListener("click", () => {
+  for (const item of getFilteredMissingCandidates()) {
+    const oneTouchId = String(item?.oneTouch?.id || "");
+    if (oneTouchId) {
+      selectedMissingClientIds.add(oneTouchId);
+    }
+  }
+  setMissingBulkStatus(`Selected ${selectedMissingClientIds.size} client(s) for bulk add.`);
+  renderMissingCandidates(getFilteredMissingCandidates());
+});
+
+missingClearSelectionBtn?.addEventListener("click", () => {
+  selectedMissingClientIds = new Set();
+  setMissingBulkStatus("Selection cleared.");
+  renderMissingCandidates(getFilteredMissingCandidates());
+});
+
+missingBulkAreaSelect?.addEventListener("change", () => {
+  updateMissingBulkControls();
+});
+
+applyMissingBulkBtn?.addEventListener("click", async () => {
+  await applyAddMissingBulkCandidates();
 });
 
 selectVisibleBtn?.addEventListener("click", () => {
