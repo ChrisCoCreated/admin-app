@@ -220,15 +220,47 @@
               <thead>
                 <tr>
                   <th>Select</th>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Area</th>
-                  <th>Care Type</th>
-                  <th>Status</th>
-                  <th>Postcode</th>
-                  <th>Xero</th>
-                  <th>Mandate</th>
-                  <th>Marketing Consent</th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="id">ID</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="name">Name</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="area">Area</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="careType">Care Type</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="status">Status</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="postcode">Postcode</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="xero">Xero</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="mandate">Mandate</button></th>
+                  <th><button type="button" class="table-sort-btn" data-sort-key="marketingConsent">Marketing Consent</button></th>
+                </tr>
+                <tr class="table-filter-row">
+                  <th></th>
+                  <th><input id="clientIdFilter" type="search" placeholder="Filter ID" aria-label="Filter ID" /></th>
+                  <th><input id="clientNameFilter" type="search" placeholder="Filter name" aria-label="Filter name" /></th>
+                  <th><select id="clientAreaTableFilter" aria-label="Filter area"><option value="">All</option></select></th>
+                  <th><select id="clientCareTypeFilter" aria-label="Filter care type"><option value="">All</option></select></th>
+                  <th><select id="clientStatusTableFilter" aria-label="Filter status"><option value="">All</option></select></th>
+                  <th><input id="clientPostcodeFilter" type="search" placeholder="Filter postcode" aria-label="Filter postcode" /></th>
+                  <th>
+                    <select id="clientXeroFilter" aria-label="Filter xero">
+                      <option value="">All</option>
+                      <option value="has">Has Xero</option>
+                      <option value="missing">No Xero</option>
+                    </select>
+                  </th>
+                  <th>
+                    <select id="clientMandateFilter" aria-label="Filter mandate">
+                      <option value="">All</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </th>
+                  <th>
+                    <select id="clientMarketingFilter" aria-label="Filter marketing consent">
+                      <option value="">All</option>
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </th>
                 </tr>
               </thead>
               <tbody id="clientsTableBody"></tbody>

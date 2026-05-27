@@ -8,6 +8,15 @@ const areaFilterSelect = document.getElementById("areaFilterSelect");
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const clientStatusFilters = document.getElementById("clientStatusFilters");
+const clientIdFilter = document.getElementById("clientIdFilter");
+const clientNameFilter = document.getElementById("clientNameFilter");
+const clientAreaTableFilter = document.getElementById("clientAreaTableFilter");
+const clientCareTypeFilter = document.getElementById("clientCareTypeFilter");
+const clientStatusTableFilter = document.getElementById("clientStatusTableFilter");
+const clientPostcodeFilter = document.getElementById("clientPostcodeFilter");
+const clientXeroFilter = document.getElementById("clientXeroFilter");
+const clientMandateFilter = document.getElementById("clientMandateFilter");
+const clientMarketingFilter = document.getElementById("clientMarketingFilter");
 const bulkTagSelect = document.getElementById("bulkTagSelect");
 const selectedCountLabel = document.getElementById("selectedCountLabel");
 const selectVisibleBtn = document.getElementById("selectVisibleBtn");
@@ -40,6 +49,7 @@ const missingClearSelectionBtn = document.getElementById("missingClearSelectionB
 const missingBulkAreaSelect = document.getElementById("missingBulkAreaSelect");
 const applyMissingBulkBtn = document.getElementById("applyMissingBulkBtn");
 const missingBulkStatus = document.getElementById("missingBulkStatus");
+const clientTableSortButtons = Array.from(document.querySelectorAll(".table-sort-btn"));
 
 const detailFields = {
   id: detailRoot?.querySelector('[data-field="id"]'),
@@ -74,6 +84,18 @@ let availableTags = [];
 let bulkTagBusy = false;
 let selectedMissingStatuses = new Set();
 let selectedMissingClientIds = new Set();
+let clientSort = { key: "name", direction: "asc" };
+let clientColumnFilters = {
+  id: "",
+  name: "",
+  area: "",
+  careType: "",
+  status: "",
+  postcode: "",
+  xero: "",
+  mandate: "",
+  marketingConsent: "",
+};
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -241,6 +263,55 @@ function getClientArea(client) {
 
 function getClientCareType(client) {
   return String(client?.careType || "").trim() || "-";
+}
+
+function normalizeFilterValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function indicatorFilterValue(value) {
+  if (value === true) {
+    return "yes";
+  }
+  if (value === false) {
+    return "no";
+  }
+  return "unknown";
+}
+
+function compareValues(left, right, direction = "asc") {
+  const a = String(left || "").toLowerCase();
+  const b = String(right || "").toLowerCase();
+  if (a === b) {
+    return 0;
+  }
+  const result = a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+  return direction === "desc" ? -result : result;
+}
+
+function getSortableClientValue(client, key) {
+  switch (key) {
+    case "id":
+      return client?.id || "";
+    case "name":
+      return client?.name || "";
+    case "area":
+      return getClientArea(client);
+    case "careType":
+      return getClientCareType(client);
+    case "status":
+      return formatStatusLabel(client?.status || "");
+    case "postcode":
+      return client?.postcode || "";
+    case "xero":
+      return client?.xeroId ? "has xero" : "no xero";
+    case "mandate":
+      return indicatorFilterValue(client?.hasMandate);
+    case "marketingConsent":
+      return indicatorFilterValue(client?.hasMarketingConsent);
+    default:
+      return client?.name || "";
+  }
 }
 
 function setDetailOpen(open) {
@@ -523,6 +594,65 @@ function renderAreaFilter() {
   areaFilterSelect.value = selectedArea;
 }
 
+function renderClientTableFilters() {
+  const areaOptions = CLIENT_AREA_OPTIONS.filter((area) => allClients.some((client) => getClientArea(client) === area));
+  const careTypeOptions = Array.from(
+    new Set(allClients.map((client) => getClientCareType(client)).filter((value) => value && value !== "-"))
+  ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const statusOptions = collectStatusOptions(allClients);
+
+  if (clientAreaTableFilter) {
+    const current = clientColumnFilters.area;
+    clientAreaTableFilter.innerHTML = '<option value="">All</option>';
+    for (const area of areaOptions) {
+      const option = document.createElement("option");
+      option.value = area;
+      option.textContent = area;
+      clientAreaTableFilter.appendChild(option);
+    }
+    clientAreaTableFilter.value = areaOptions.includes(current) ? current : "";
+    clientColumnFilters.area = clientAreaTableFilter.value;
+  }
+
+  if (clientCareTypeFilter) {
+    const current = clientColumnFilters.careType;
+    clientCareTypeFilter.innerHTML = '<option value="">All</option>';
+    for (const careType of careTypeOptions) {
+      const option = document.createElement("option");
+      option.value = careType;
+      option.textContent = careType;
+      clientCareTypeFilter.appendChild(option);
+    }
+    clientCareTypeFilter.value = careTypeOptions.includes(current) ? current : "";
+    clientColumnFilters.careType = clientCareTypeFilter.value;
+  }
+
+  if (clientStatusTableFilter) {
+    const current = clientColumnFilters.status;
+    clientStatusTableFilter.innerHTML = '<option value="">All</option>';
+    for (const status of statusOptions) {
+      const option = document.createElement("option");
+      option.value = status;
+      option.textContent = formatStatusLabel(status);
+      clientStatusTableFilter.appendChild(option);
+    }
+    clientStatusTableFilter.value = statusOptions.includes(current) ? current : "";
+    clientColumnFilters.status = clientStatusTableFilter.value;
+  }
+}
+
+function updateClientSortButtons() {
+  for (const btn of clientTableSortButtons) {
+    const key = String(btn.dataset.sortKey || "");
+    const baseLabel = String(btn.dataset.label || btn.textContent || "").replace(/\s[↑↓]$/, "");
+    btn.dataset.label = baseLabel;
+    const isActive = key === clientSort.key;
+    const arrow = isActive ? (clientSort.direction === "asc" ? " ↑" : " ↓") : "";
+    btn.textContent = `${baseLabel}${arrow}`;
+    btn.classList.toggle("active", isActive);
+  }
+}
+
 function renderBulkTagOptions() {
   if (!bulkTagSelect) {
     return;
@@ -564,25 +694,77 @@ function setBulkTagBusy(isBusy) {
 
 function getFilteredClients() {
   const query = String(searchInput.value || "").trim().toLowerCase();
-  return allClients.filter((client) => {
+  const filtered = allClients.filter((client) => {
     if (!passesStatusFilter(client.status)) {
       return false;
     }
     const area = getClientArea(client);
+    const careType = getClientCareType(client);
+    const normalizedStatus = normalizeStatus(client.status);
+    const postcode = String(client.postcode || "").toLowerCase();
+    const id = String(client.id || "").toLowerCase();
+    const name = String(client.name || "").toLowerCase();
+
     if (selectedArea !== "all" && area !== selectedArea) {
+      return false;
+    }
+    if (clientColumnFilters.id && !id.includes(normalizeFilterValue(clientColumnFilters.id))) {
+      return false;
+    }
+    if (clientColumnFilters.name && !name.includes(normalizeFilterValue(clientColumnFilters.name))) {
+      return false;
+    }
+    if (clientColumnFilters.area && area !== clientColumnFilters.area) {
+      return false;
+    }
+    if (clientColumnFilters.careType && careType !== clientColumnFilters.careType) {
+      return false;
+    }
+    if (clientColumnFilters.status && normalizedStatus !== normalizeStatus(clientColumnFilters.status)) {
+      return false;
+    }
+    if (clientColumnFilters.postcode && !postcode.includes(normalizeFilterValue(clientColumnFilters.postcode))) {
+      return false;
+    }
+    if (clientColumnFilters.xero === "has" && !client.xeroId) {
+      return false;
+    }
+    if (clientColumnFilters.xero === "missing" && client.xeroId) {
+      return false;
+    }
+    if (clientColumnFilters.mandate && indicatorFilterValue(client.hasMandate) !== clientColumnFilters.mandate) {
+      return false;
+    }
+    if (
+      clientColumnFilters.marketingConsent &&
+      indicatorFilterValue(client.hasMarketingConsent) !== clientColumnFilters.marketingConsent
+    ) {
       return false;
     }
     if (!query) {
       return true;
     }
     return (
-      String(client.id || "").toLowerCase().includes(query) ||
-      String(client.name || "").toLowerCase().includes(query) ||
+      id.includes(query) ||
+      name.includes(query) ||
       area.toLowerCase().includes(query) ||
-      String(client.postcode || "").toLowerCase().includes(query) ||
+      careType.toLowerCase().includes(query) ||
+      postcode.includes(query) ||
       formatStatusLabel(client.status).toLowerCase().includes(query) ||
       formatTags(client.tags).toLowerCase().includes(query)
     );
+  });
+
+  return filtered.sort((left, right) => {
+    const result = compareValues(
+      getSortableClientValue(left, clientSort.key),
+      getSortableClientValue(right, clientSort.key),
+      clientSort.direction
+    );
+    if (result !== 0) {
+      return result;
+    }
+    return compareValues(left?.name || "", right?.name || "", "asc");
   });
 }
 
@@ -713,6 +895,8 @@ async function refreshClientsData() {
   warningState.textContent = warnings.join(" ");
   renderStatusFilters();
   renderAreaFilter();
+  renderClientTableFilters();
+  updateClientSortButtons();
   setStatus(`Loaded ${allClients.length} client(s).`);
   renderClients();
 }
@@ -1184,6 +1368,7 @@ async function applyAddMissingBulkCandidates() {
 
 function renderClients() {
   const filtered = getFilteredClients();
+  updateClientSortButtons();
   clientsTableBody.innerHTML = "";
 
   if (!filtered.length) {
@@ -1315,6 +1500,69 @@ areaFilterSelect?.addEventListener("change", () => {
   selectedArea = String(areaFilterSelect.value || "all");
   renderClients();
 });
+
+clientIdFilter?.addEventListener("input", () => {
+  clientColumnFilters.id = clientIdFilter.value || "";
+  renderClients();
+});
+
+clientNameFilter?.addEventListener("input", () => {
+  clientColumnFilters.name = clientNameFilter.value || "";
+  renderClients();
+});
+
+clientAreaTableFilter?.addEventListener("change", () => {
+  clientColumnFilters.area = clientAreaTableFilter.value || "";
+  renderClients();
+});
+
+clientCareTypeFilter?.addEventListener("change", () => {
+  clientColumnFilters.careType = clientCareTypeFilter.value || "";
+  renderClients();
+});
+
+clientStatusTableFilter?.addEventListener("change", () => {
+  clientColumnFilters.status = clientStatusTableFilter.value || "";
+  renderClients();
+});
+
+clientPostcodeFilter?.addEventListener("input", () => {
+  clientColumnFilters.postcode = clientPostcodeFilter.value || "";
+  renderClients();
+});
+
+clientXeroFilter?.addEventListener("change", () => {
+  clientColumnFilters.xero = clientXeroFilter.value || "";
+  renderClients();
+});
+
+clientMandateFilter?.addEventListener("change", () => {
+  clientColumnFilters.mandate = clientMandateFilter.value || "";
+  renderClients();
+});
+
+clientMarketingFilter?.addEventListener("change", () => {
+  clientColumnFilters.marketingConsent = clientMarketingFilter.value || "";
+  renderClients();
+});
+
+for (const btn of clientTableSortButtons) {
+  btn.addEventListener("click", () => {
+    const key = String(btn.dataset.sortKey || "");
+    if (!key) {
+      return;
+    }
+    if (clientSort.key === key) {
+      clientSort = {
+        key,
+        direction: clientSort.direction === "asc" ? "desc" : "asc",
+      };
+    } else {
+      clientSort = { key, direction: "asc" };
+    }
+    renderClients();
+  });
+}
 
 bulkTagSelect?.addEventListener("change", () => {
   updateBulkTagControls();

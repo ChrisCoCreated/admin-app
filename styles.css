@@ -5837,6 +5837,35 @@ body.lightbox-open {
   border-color: #1f3c88;
 }
 
+.table-sort-btn {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-weight: 800;
+  border-radius: 0;
+}
+
+.table-sort-btn.active {
+  color: #1f3c88;
+}
+
+.table-filter-row th {
+  padding-top: 8px;
+  padding-bottom: 10px;
+}
+
+.table-filter-row input,
+.table-filter-row select {
+  min-width: 110px;
+  height: 34px;
+  padding: 0 8px;
+  font-size: 0.86rem;
+  border-radius: 8px;
+}
+
 .area-filter-btn {
   border: 1px solid #cad5ea;
   background: #f4f7fe;
