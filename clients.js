@@ -62,7 +62,6 @@ const detailFields = {
   tags: detailRoot?.querySelector('[data-field="tags"]'),
 };
 
-const DEFAULT_STATUS_FILTERS = new Set(["active", "pending"]);
 const STATUS_FILTER_ORDER = ["active", "pending", "archived"];
 const CLIENT_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "Wellbeing Assurance", "Unassigned"];
 const clientAreaByKey = new Map(CLIENT_AREA_OPTIONS.map((area) => [area.toLowerCase(), area]));
@@ -71,7 +70,7 @@ const RECONCILIATION_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "Wel
 let allClients = [];
 let selectedClientId = "";
 let selectedArea = "all";
-let selectedClientStatuses = new Set(DEFAULT_STATUS_FILTERS);
+let selectedClientStatuses = new Set();
 let account = null;
 let currentRole = "";
 let reconcilePreview = null;
@@ -515,6 +514,31 @@ function passesStatusFilter(status) {
   return selectedClientStatuses.has(normalized);
 }
 
+function isAllClientStatusesSelected(options) {
+  return !selectedClientStatuses.size || selectedClientStatuses.size === options.length;
+}
+
+function syncClientStatusDropdown(options) {
+  if (!clientStatusTableFilter) {
+    return;
+  }
+  if (isAllClientStatusesSelected(options)) {
+    clientColumnFilters.status = "";
+    clientStatusTableFilter.value = "";
+    return;
+  }
+
+  const selected = Array.from(selectedClientStatuses).filter((status) => options.includes(status));
+  if (selected.length === 1) {
+    clientColumnFilters.status = selected[0];
+    clientStatusTableFilter.value = selected[0];
+    return;
+  }
+
+  clientColumnFilters.status = "";
+  clientStatusTableFilter.value = "";
+}
+
 function renderStatusFilters() {
   if (!clientStatusFilters) {
     return;
@@ -528,10 +552,7 @@ function renderStatusFilters() {
 
   const nextSelected = new Set(Array.from(selectedClientStatuses).filter((status) => options.includes(status)));
   if (!nextSelected.size) {
-    selectedClientStatuses = new Set(options.filter((status) => DEFAULT_STATUS_FILTERS.has(status)));
-    if (!selectedClientStatuses.size) {
-      selectedClientStatuses = new Set(options);
-    }
+    selectedClientStatuses = new Set(options);
   } else {
     selectedClientStatuses = nextSelected;
   }
@@ -545,16 +566,14 @@ function renderStatusFilters() {
     btn.className = `status-filter-btn${selectedClientStatuses.has(status) ? " active" : ""}`;
     btn.textContent = formatStatusLabel(status);
     btn.addEventListener("click", () => {
-      const next = new Set(selectedClientStatuses);
-      if (next.has(status)) {
-        next.delete(status);
+      const currentlyOnlyThis =
+        selectedClientStatuses.size === 1 && selectedClientStatuses.has(status);
+      if (currentlyOnlyThis) {
+        selectedClientStatuses = new Set(options);
       } else {
-        next.add(status);
+        selectedClientStatuses = new Set([status]);
       }
-      if (!next.size) {
-        next.add(status);
-      }
-      selectedClientStatuses = next;
+      syncClientStatusDropdown(options);
       renderStatusFilters();
       renderClients();
     });
@@ -563,14 +582,17 @@ function renderStatusFilters() {
 
   const allBtn = document.createElement("button");
   allBtn.type = "button";
-  allBtn.className = `status-filter-btn${selectedClientStatuses.size === options.length ? " active" : ""}`;
+  allBtn.className = `status-filter-btn${isAllClientStatusesSelected(options) ? " active" : ""}`;
   allBtn.textContent = "All";
   allBtn.addEventListener("click", () => {
     selectedClientStatuses = new Set(options);
+    syncClientStatusDropdown(options);
     renderStatusFilters();
     renderClients();
   });
   clientStatusFilters.appendChild(allBtn);
+
+  syncClientStatusDropdown(options);
 }
 
 function renderAreaFilter() {
@@ -637,7 +659,6 @@ function renderClientTableFilters() {
       clientStatusTableFilter.appendChild(option);
     }
     clientStatusTableFilter.value = statusOptions.includes(current) ? current : "";
-    clientColumnFilters.status = clientStatusTableFilter.value;
   }
 }
 
@@ -1522,7 +1543,15 @@ clientCareTypeFilter?.addEventListener("change", () => {
 });
 
 clientStatusTableFilter?.addEventListener("change", () => {
-  clientColumnFilters.status = clientStatusTableFilter.value || "";
+  const nextStatus = normalizeStatus(clientStatusTableFilter.value || "");
+  clientColumnFilters.status = nextStatus;
+  if (nextStatus) {
+    selectedClientStatuses = new Set([nextStatus]);
+  } else {
+    const options = collectStatusOptions(allClients);
+    selectedClientStatuses = new Set(options);
+  }
+  renderStatusFilters();
   renderClients();
 });
 
