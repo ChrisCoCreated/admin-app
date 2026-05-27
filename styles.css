@@ -1691,13 +1691,55 @@ button.is-generating::after {
 }
 
 .bulk-tag-panel {
-  margin-top: 14px;
   display: grid;
   gap: 12px;
   border: 1px solid #d8e0ee;
   border-radius: 12px;
   background: #fbfcff;
   padding: 14px;
+}
+
+.clients-toolbar-group {
+  margin-top: 14px;
+  border: 1px solid #d8e0ee;
+  border-radius: 14px;
+  background: #fbfcff;
+  overflow: hidden;
+}
+
+.clients-toolbar-group summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  font-weight: 800;
+  color: #1d2a42;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clients-toolbar-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.clients-toolbar-group summary::after {
+  content: "▾";
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.clients-toolbar-group:not([open]) summary::after {
+  content: "▸";
+}
+
+.clients-toolbar-body {
+  padding: 0 16px 16px;
+}
+
+.clients-toolbar-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.8fr);
 }
 
 .bulk-tag-summary {
@@ -1712,6 +1754,13 @@ button.is-generating::after {
   gap: 10px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
+}
+
+@media (max-width: 820px) {
+  .clients-toolbar-grid,
+  .bulk-tag-controls {
+    grid-template-columns: 1fr;
+  }
 }
 
 table {
