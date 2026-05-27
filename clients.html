@@ -39,7 +39,10 @@
       </section>
 
       <section class="panel">
-        <div id="clientStatusFilters" class="status-filter-row"></div>
+        <div class="clients-filter-bar">
+          <div id="clientStatusFilters" class="status-filter-row"></div>
+          <p id="statusMessage" class="clients-loaded-count muted">Loading clients...</p>
+        </div>
         <details class="clients-toolbar-group">
           <summary>Advanced search</summary>
           <div class="clients-toolbar-body">
@@ -79,7 +82,6 @@
             </div>
           </div>
         </details>
-        <p id="statusMessage" class="muted">Loading clients...</p>
         <p id="warningState" class="muted" hidden></p>
       </section>
 
