@@ -623,8 +623,8 @@ function renderEnquiries(payload) {
       title: "Won vs Lost After Assessment",
       value: `${formatNumber(assessmentOutcome.won || 0)} won / ${formatNumber(assessmentOutcome.lost || 0)} lost`,
       detail: assessedOutcomes
-        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(assessedOutcomes)} assessed outcomes in the past 3 months`
-        : "No won/lost post-assessment outcomes in the past 3 months",
+        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(assessedOutcomes)} outcomes modified in the past 3 months`
+        : "No won/lost post-assessment outcomes modified in the past 3 months",
       metric: { sourceLabel: outcomeSource, stale: false },
       tone: "positive",
     }),

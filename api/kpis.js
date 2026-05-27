@@ -52,7 +52,7 @@ const RECRUITMENT_FIELD_DEFINITIONS = {
 const ENQUIRY_FIELD_DEFINITIONS = {
   status: ["Status"],
   currentStatus: ["Current Status"],
-  assessmentDate: ["Assessor's meeting arrange for", "Assessor's meeting arrange for ", "Assessment Date"],
+  modified: ["Modified"],
 };
 
 function cleanText(value) {
@@ -591,8 +591,8 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
   for (const item of items) {
     const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
     const row = { fields, fieldMap };
-    const assessmentDate = getValidDate(getFieldValue(row, "assessmentDate"));
-    if (!assessmentDate || assessmentDate < startDate) {
+    const modifiedDate = getValidDate(fields.Modified || item?.lastModifiedDateTime || getFieldValue(row, "modified"));
+    if (!modifiedDate || modifiedDate < startDate) {
       continue;
     }
 
