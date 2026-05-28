@@ -135,6 +135,16 @@ test("uses recipient override for trial delivery", () => {
   assert.deepEqual(resolveRecipientOverride({}), []);
 });
 
+test("rejects malformed recipient override before Graph send", () => {
+  assert.throws(
+    () =>
+      resolveRecipientOverride({
+        ENQUIRY_REMINDER_RECIPIENT_OVERRIDE: "chris@planwithcare",
+      }),
+    /invalid email address/i
+  );
+});
+
 test("dry-run job builds email payload without sending Graph mail", async () => {
   let sent = false;
   const result = await runEnquiryReminderJob({

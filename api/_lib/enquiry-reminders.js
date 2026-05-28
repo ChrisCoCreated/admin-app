@@ -1,5 +1,5 @@
 const { createGraphAppClient } = require("./graph-app-client");
-const { parseEmailList, sendGraphMail } = require("./graph-mailer");
+const { assertValidEmailAddresses, parseEmailList, sendGraphMail } = require("./graph-mailer");
 
 const DEFAULT_ENQUIRIES_SITE_URL = "https://planwithcare.sharepoint.com/sites/ThriveCalls";
 const DEFAULT_ENQUIRIES_LIST_NAME = "Enquiries Log";
@@ -437,7 +437,9 @@ function buildReminderEmail(classified, options = {}) {
 }
 
 function resolveRecipientOverride(env = process.env) {
-  return parseEmailList(env.ENQUIRY_REMINDER_RECIPIENT_OVERRIDE);
+  const recipients = parseEmailList(env.ENQUIRY_REMINDER_RECIPIENT_OVERRIDE);
+  assertValidEmailAddresses(recipients, "ENQUIRY_REMINDER_RECIPIENT_OVERRIDE");
+  return recipients;
 }
 
 async function runEnquiryReminderJob(options = {}) {

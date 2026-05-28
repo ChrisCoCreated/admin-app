@@ -9,6 +9,20 @@ function parseEmailList(value) {
     .filter(Boolean)));
 }
 
+function isValidEmailAddress(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanText(value));
+}
+
+function assertValidEmailAddresses(addresses, label) {
+  const invalid = (addresses || []).filter((address) => !isValidEmailAddress(address));
+  if (invalid.length) {
+    const error = new Error(`${label} contains invalid email address${invalid.length === 1 ? "" : "es"}: ${invalid.join(", ")}`);
+    error.code = "INVALID_EMAIL_ADDRESS";
+    error.status = 400;
+    throw error;
+  }
+}
+
 async function sendGraphMail(graphClient, options = {}) {
   const fromEmail = cleanText(options.fromEmail);
   const recipients = Array.from(new Set((options.to || []).map((entry) => cleanText(entry).toLowerCase()).filter(Boolean)));
@@ -21,6 +35,8 @@ async function sendGraphMail(graphClient, options = {}) {
   if (!recipients.length) {
     throw new Error("At least one email recipient is required.");
   }
+  assertValidEmailAddresses([fromEmail], "Sender");
+  assertValidEmailAddresses(recipients, "Recipients");
   if (!subject || !html) {
     throw new Error("Email subject and HTML body are required.");
   }
@@ -53,6 +69,8 @@ async function sendGraphMail(graphClient, options = {}) {
 }
 
 module.exports = {
+  assertValidEmailAddresses,
+  isValidEmailAddress,
   parseEmailList,
   sendGraphMail,
 };
