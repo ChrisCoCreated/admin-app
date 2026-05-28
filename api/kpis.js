@@ -52,6 +52,7 @@ const RECRUITMENT_FIELD_DEFINITIONS = {
 };
 
 const ENQUIRY_FIELD_DEFINITIONS = {
+  title: ["Title", "Name", "Client Name", "Enquirer Name"],
   status: ["Status"],
   currentStatus: ["Current Status"],
   modified: ["Modified"],
@@ -550,6 +551,10 @@ function isLostAfterAssessmentStatus(status) {
   return normalized.includes("lost") && normalized.includes("post assessment");
 }
 
+function isOnHoldEnquiryStatus(status) {
+  return normalizeEnquiryStatus(status).includes("on hold");
+}
+
 async function fetchAcceptedOnboarding(graphClient) {
   const config = parseRecruitmentConfig();
   const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
@@ -595,6 +600,12 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
 
   let won = 0;
   let lost = 0;
+  let onHold = 0;
+  const detail = {
+    won: [],
+    lost: [],
+    onHold: [],
+  };
   for (const item of items) {
     const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
     const row = { fields, fieldMap };
@@ -604,12 +615,26 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
     }
 
     const status = getFieldValue(row, "status") || getFieldValue(row, "currentStatus");
+    const detailItem = {
+      title: cleanText(getFieldValue(row, "title") || fields.Title || `Item ${item?.id || ""}`),
+      status: cleanText(status),
+      modified: modifiedDate.toISOString(),
+      modifiedLabel: formatWeek(modifiedDate.toISOString()),
+      webUrl: cleanText(item?.webUrl),
+    };
     if (isWonAfterAssessmentStatus(status)) {
       won += 1;
+      detail.won.push(detailItem);
       continue;
     }
     if (isLostAfterAssessmentStatus(status)) {
       lost += 1;
+      detail.lost.push(detailItem);
+      continue;
+    }
+    if (isOnHoldEnquiryStatus(status)) {
+      onHold += 1;
+      detail.onHold.push(detailItem);
     }
   }
 
@@ -617,12 +642,14 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
   return {
     won,
     lost,
+    onHold,
     assessedOutcomes,
     winPercent: assessedOutcomes ? (won / assessedOutcomes) * 100 : null,
     months: ASSESSMENT_OUTCOME_MONTHS,
     startDate: startDate.toISOString(),
     startDateLabel: formatWeek(startDate.toISOString()),
     listUrl: list.webUrl || config.listWebUrl,
+    detail,
   };
 }
 
@@ -638,12 +665,14 @@ async function fetchEnquiryAssessmentOutcomeSafe(graphClient) {
     return {
       won: 0,
       lost: 0,
+      onHold: 0,
       assessedOutcomes: 0,
       winPercent: null,
       months: ASSESSMENT_OUTCOME_MONTHS,
       startDate: "",
       startDateLabel: "",
       listUrl: "",
+      detail: { won: [], lost: [], onHold: [] },
       unavailable: true,
       warning: error?.message || "Could not load Enquiries Log.",
     };

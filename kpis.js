@@ -204,11 +204,25 @@ export function createKpiMetricCard({
   latestWeekLabelText = "",
   wide = false,
   trendCompanion = false,
+  onClick = null,
 }) {
   const card = document.createElement("article");
   card.className = `kpi-card kpi-card-${tone}${wide ? " kpi-card-wide" : ""}`;
   if (trendCompanion) {
     card.classList.add("kpi-trend-companion-tile");
+  }
+  if (typeof onClick === "function") {
+    card.classList.add("kpi-card-clickable");
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `Open detail for ${title}`);
+    card.addEventListener("click", onClick);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onClick(event);
+      }
+    });
   }
 
   const stale = staleLabel(metric);
@@ -443,6 +457,78 @@ function openTrendModal({ title, points, formatter, summary }) {
   modal.querySelector(".kpi-modal-close")?.focus();
 }
 
+function buildOutcomeDetailRows(items) {
+  if (!Array.isArray(items) || !items.length) {
+    return '<p class="muted">No enquiries in this group for the selected period.</p>';
+  }
+  return `
+    <div class="kpi-modal-detail-list">
+      ${items
+        .map(
+          (item) => `
+            <div class="kpi-modal-detail-row">
+              <div>
+                <strong>${escapeHtml(item.title || "Untitled enquiry")}</strong>
+                <span>${escapeHtml(item.status || "No status")}</span>
+              </div>
+              <small>${escapeHtml(item.modifiedLabel || "")}</small>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function openAssessmentOutcomeModal(assessmentOutcome) {
+  const modal = ensureTrendModal();
+  const titleNode = modal.querySelector("#kpiTrendModalTitle");
+  const statsNode = modal.querySelector("#kpiTrendModalStats");
+  const chartNode = modal.querySelector("#kpiTrendModalChart");
+  const rowsNode = modal.querySelector("#kpiTrendModalRows");
+  const detail = assessmentOutcome?.detail || {};
+  const won = Number(assessmentOutcome?.won || 0);
+  const lost = Number(assessmentOutcome?.lost || 0);
+  const onHold = Number(assessmentOutcome?.onHold || 0);
+
+  if (titleNode) {
+    titleNode.textContent = "Won / Lost / On Hold Detail";
+  }
+  if (statsNode) {
+    statsNode.innerHTML = `
+      <div><span>Won</span><strong>${escapeHtml(formatNumber(won))}</strong></div>
+      <div><span>Lost</span><strong>${escapeHtml(formatNumber(lost))}</strong></div>
+      <div><span>On hold</span><strong>${escapeHtml(formatNumber(onHold))}</strong></div>
+      <div><span>Period</span><strong>${escapeHtml(`${assessmentOutcome?.months || 3} months`)}</strong><small>${escapeHtml(
+        assessmentOutcome?.startDateLabel ? `Since ${assessmentOutcome.startDateLabel}` : ""
+      )}</small></div>
+    `;
+  }
+  if (chartNode) {
+    chartNode.innerHTML = "";
+  }
+  if (rowsNode) {
+    rowsNode.innerHTML = `
+      <section class="kpi-modal-detail-section">
+        <h3>Won</h3>
+        ${buildOutcomeDetailRows(detail.won)}
+      </section>
+      <section class="kpi-modal-detail-section">
+        <h3>Lost</h3>
+        ${buildOutcomeDetailRows(detail.lost)}
+      </section>
+      <section class="kpi-modal-detail-section">
+        <h3>On hold</h3>
+        ${buildOutcomeDetailRows(detail.onHold)}
+      </section>
+    `;
+  }
+
+  modal.hidden = false;
+  document.body.classList.add("kpi-modal-open");
+  modal.querySelector(".kpi-modal-close")?.focus();
+}
+
 function appendChildren(parent, children) {
   if (!parent) {
     return;
@@ -615,6 +701,7 @@ function renderEnquiries(payload) {
   const latestLabel = payload?.latestWeekLabel || "";
   const assessmentOutcome = payload?.enquiryAssessmentOutcome || {};
   const assessedOutcomes = Number(assessmentOutcome.assessedOutcomes || 0);
+  const periodOutcomeCount = assessedOutcomes + Number(assessmentOutcome.onHold || 0);
   const outcomeUnavailable = Boolean(assessmentOutcome.unavailable);
   const outcomeSource = assessmentOutcome.startDateLabel
     ? `From Enquiries Log since ${assessmentOutcome.startDateLabel}`
@@ -624,14 +711,19 @@ function renderEnquiries(payload) {
       title: "Won vs Lost After Assessment",
       value: outcomeUnavailable
         ? "Unavailable"
-        : `${formatNumber(assessmentOutcome.won || 0)} won / ${formatNumber(assessmentOutcome.lost || 0)} lost`,
+        : `${formatNumber(assessmentOutcome.won || 0)} won / ${formatNumber(assessmentOutcome.lost || 0)} lost / ${formatNumber(
+            assessmentOutcome.onHold || 0
+          )} on hold`,
       detail: outcomeUnavailable
         ? assessmentOutcome.warning || "Could not load Enquiries Log."
-        : assessedOutcomes
-        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(assessedOutcomes)} outcomes modified in the past 3 months`
-        : "No won/lost post-assessment outcomes modified in the past 3 months",
+        : periodOutcomeCount
+        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(
+            assessedOutcomes
+          )} won/lost outcomes; ${formatNumber(periodOutcomeCount)} total including on hold in the past 3 months`
+        : "No won/lost/on-hold outcomes modified in the past 3 months",
       metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
       tone: "positive",
+      onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
     }),
     createKpiMetricCard({
       title: "Active Enquiries",

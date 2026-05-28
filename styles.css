@@ -145,6 +145,27 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
   align-content: start;
 }
 
+.kpi-card-clickable {
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.kpi-card-clickable:hover {
+  transform: translateY(-1px);
+  border-color: rgba(49, 183, 200, 0.48);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 12px 24px rgba(17, 20, 26, 0.08);
+}
+
+.kpi-card-clickable:focus-visible {
+  outline: 3px solid rgba(49, 183, 200, 0.35);
+  outline-offset: 3px;
+}
+
 .kpi-card-delivery {
   border-color: rgba(49, 183, 200, 0.38);
   background: linear-gradient(135deg, rgba(49, 183, 200, 0.12), #fbfcff 68%);
@@ -423,6 +444,52 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
 
 .kpi-modal-bar-row strong {
   text-align: right;
+}
+
+.kpi-modal-detail-section {
+  display: grid;
+  gap: 8px;
+}
+
+.kpi-modal-detail-section h3 {
+  margin: 8px 0 0;
+  color: #293244;
+  font-size: 1rem;
+}
+
+.kpi-modal-detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.kpi-modal-detail-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dce3ee;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.kpi-modal-detail-row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.kpi-modal-detail-row strong {
+  color: #11141a;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.kpi-modal-detail-row span,
+.kpi-modal-detail-row small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 @media (max-width: 980px) {
