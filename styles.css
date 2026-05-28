@@ -130,6 +130,13 @@
   letter-spacing: 0.06em;
 }
 
+.enquiry-result-supporting {
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .enquiry-result-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

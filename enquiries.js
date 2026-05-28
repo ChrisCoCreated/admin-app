@@ -1,5 +1,6 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260512";
 import {
   buildFieldMaps,
@@ -167,6 +168,7 @@ const authController = createAuthController({
     setStatus("Signed out.");
   },
 });
+const directoryApi = createDirectoryApi(authController);
 
 function setSignedInUi() {
   if (authCard) {
@@ -457,13 +459,13 @@ function matchesMetric(item, metricKey, aliases = resolveFieldAliases()) {
 }
 
 function isWithinPastThreeMonths(item) {
-  const created = Date.parse(String(item?.Created || ""));
-  if (!Number.isFinite(created)) {
+  const lastTouched = Date.parse(String(item?.Modified || item?.Created || ""));
+  if (!Number.isFinite(lastTouched)) {
     return false;
   }
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - 3);
-  return created >= cutoff.getTime();
+  return lastTouched >= cutoff.getTime();
 }
 
 function getMetricCounts(metricKey, aliases = resolveFieldAliases()) {
@@ -599,9 +601,15 @@ function renderRecentEnquiries(aliases = resolveFieldAliases()) {
       const caller = getFieldValue(item, aliases.callerName) || "Unknown caller";
       const status = getEnquiryStatus(item, aliases) || "-";
       const owner = getPersonDisplayName(item, aliases.enquiryOwner) || "Unassigned";
-      const busDevNotes = getFieldValue(item, aliases.busDevNotes) || getFieldValue(item, aliases.updates) || "No extra detail recorded";
+      const source = getFieldValue(item, aliases.source) || "Not recorded";
+      const reasonForLoss = getFieldValue(item, aliases.reasonForLoss) || "Not recorded";
+      const busDevNotes = getFieldValue(item, aliases.busDevNotes) || "No business development notes recorded";
       const created = formatDate(item.Created);
       const statusClass = isStatusWon(status) ? "enquiry-result-won" : isStatusLost(status) ? "enquiry-result-lost" : isStatusActive(status) ? "enquiry-result-active" : "";
+      const detailBits = [
+        `Source of enquiry: ${source}`,
+        isStatusLost(status) ? `Reason for loss: ${reasonForLoss}` : "",
+      ].filter(Boolean);
       return `
         <article class="enquiry-result-card ${statusClass}">
           <div class="enquiry-result-head">
@@ -611,6 +619,7 @@ function renderRecentEnquiries(aliases = resolveFieldAliases()) {
             </div>
             <a class="selected-enquiry-link" href="${getEnquiryItemUrl(item.Id)}" target="_blank" rel="noopener noreferrer">Open</a>
           </div>
+          <p class="enquiry-result-supporting">${escapeHtml(detailBits.join(" • "))}</p>
           <p class="enquiry-result-label">Business development details</p>
           <p class="enquiry-result-notes">${escapeHtml(busDevNotes)}</p>
         </article>
@@ -1004,8 +1013,9 @@ function formatAuthError(error) {
   return message;
 }
 
-function renderSignedInNavigation() {
-  const userRole = account?.role || account?.idTokenClaims?.role || account?.idTokenClaims?.roles?.[0] || "";
+async function renderSignedInNavigation() {
+  const profile = await directoryApi.getCurrentUser();
+  const userRole = String(profile?.role || "").trim().toLowerCase();
   if (!userRole || !canAccessPage(userRole, "enquiries")) {
     return;
   }
@@ -1398,7 +1408,7 @@ async function handleSignIn() {
       return;
     }
 
-    renderSignedInNavigation();
+    await renderSignedInNavigation();
     setSignedInUi();
     await loadEnquiries();
     setStatus("Enquiries loaded.");
@@ -1420,7 +1430,7 @@ async function restoreSessionOnLoad() {
       return;
     }
 
-    renderSignedInNavigation();
+    await renderSignedInNavigation();
     setSignedInUi();
     await loadEnquiries();
     setStatus("Session restored.");
