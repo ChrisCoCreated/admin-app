@@ -9,6 +9,8 @@ const DEFAULT_RECRUITMENT_SITE_URL = "https://planwithcare.sharepoint.com/sites/
 const DEFAULT_RECRUITMENT_LIST_NAME = "Associate Recruitment";
 const DEFAULT_ENQUIRIES_SITE_URL = "https://planwithcare.sharepoint.com/sites/ThriveCalls";
 const DEFAULT_ENQUIRIES_LIST_NAME = "Enquiries Log";
+const DEFAULT_ENQUIRIES_LIST_WEB_URL =
+  "https://planwithcare.sharepoint.com/sites/ThriveCalls/Lists/Enquiries%20Log/AllItems.aspx";
 const QUARTER_WEEK_COUNT = 13;
 const ASSESSMENT_OUTCOME_MONTHS = 3;
 
@@ -108,11 +110,16 @@ function parseRecruitmentConfig() {
 }
 
 function parseEnquiriesConfig() {
-  return parseSharePointListConfig(
-    cleanText(process.env.SHAREPOINT_ENQUIRIES_SITE_URL || DEFAULT_ENQUIRIES_SITE_URL),
-    cleanText(process.env.SHAREPOINT_ENQUIRIES_LIST_NAME || DEFAULT_ENQUIRIES_LIST_NAME),
-    "Missing SHAREPOINT_ENQUIRIES_SITE_URL or SHAREPOINT_ENQUIRIES_LIST_NAME."
-  );
+  const listWebUrl = cleanText(process.env.SHAREPOINT_ENQUIRIES_LIST_WEB_URL || DEFAULT_ENQUIRIES_LIST_WEB_URL);
+  return {
+    ...parseSharePointListConfig(
+      cleanText(process.env.SHAREPOINT_ENQUIRIES_SITE_URL || DEFAULT_ENQUIRIES_SITE_URL),
+      cleanText(process.env.SHAREPOINT_ENQUIRIES_LIST_NAME || DEFAULT_ENQUIRIES_LIST_NAME),
+      "Missing SHAREPOINT_ENQUIRIES_SITE_URL or SHAREPOINT_ENQUIRIES_LIST_NAME."
+    ),
+    listWebUrl,
+    listPath: parseListPathFromWebUrl(listWebUrl),
+  };
 }
 
 function quoteODataString(value) {
@@ -572,7 +579,7 @@ async function fetchAcceptedOnboarding(graphClient) {
 async function fetchEnquiryAssessmentOutcome(graphClient) {
   const config = parseEnquiriesConfig();
   const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
-  const list = await resolveList(graphClient, siteId, config.listName);
+  const list = await resolveList(graphClient, siteId, config.listName, { listPath: config.listPath });
   const columns = await resolveListColumns(graphClient, siteId, list.id);
   const fieldMap = createFieldMap(columns, ENQUIRY_FIELD_DEFINITIONS);
   const selectFields = uniqueFieldNames(fieldMap);
@@ -615,8 +622,32 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
     months: ASSESSMENT_OUTCOME_MONTHS,
     startDate: startDate.toISOString(),
     startDateLabel: formatWeek(startDate.toISOString()),
-    listUrl: list.webUrl,
+    listUrl: list.webUrl || config.listWebUrl,
   };
+}
+
+async function fetchEnquiryAssessmentOutcomeSafe(graphClient) {
+  try {
+    return await fetchEnquiryAssessmentOutcome(graphClient);
+  } catch (error) {
+    console.warn("[kpis] Enquiry assessment outcome unavailable", {
+      message: error?.message || String(error),
+      code: error?.code || "",
+      status: error?.status || "",
+    });
+    return {
+      won: 0,
+      lost: 0,
+      assessedOutcomes: 0,
+      winPercent: null,
+      months: ASSESSMENT_OUTCOME_MONTHS,
+      startDate: "",
+      startDateLabel: "",
+      listUrl: "",
+      unavailable: true,
+      warning: error?.message || "Could not load Enquiries Log.",
+    };
+  }
 }
 
 function mapGraphError(error) {
@@ -649,7 +680,7 @@ module.exports = async (req, res) => {
     const { rows, listUrl, fieldMap } = await fetchKpiRows(graphClient, kpiConfig);
     const metrics = resolveMetrics(rows);
     const onboarding = await fetchAcceptedOnboarding(graphClient);
-    const enquiryAssessmentOutcome = await fetchEnquiryAssessmentOutcome(graphClient);
+    const enquiryAssessmentOutcome = await fetchEnquiryAssessmentOutcomeSafe(graphClient);
 
     res.setHeader("Cache-Control", "private, max-age=60");
     res.status(200).json({
