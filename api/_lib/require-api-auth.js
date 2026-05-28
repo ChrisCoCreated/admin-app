@@ -23,6 +23,7 @@ const ROLE_PAGES = {
     "simpletasks",
     "tasks",
     "taskstest",
+    "enquiryremindertest",
     "mapping",
     "drivetime",
     "reports",

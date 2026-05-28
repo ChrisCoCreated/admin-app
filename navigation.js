@@ -22,6 +22,7 @@ const ROLE_PAGES = {
     "simpletasks",
     "tasks",
     "taskstest",
+    "enquiryremindertest",
     "mapping",
     "drivetime",
     "reports",
@@ -116,6 +117,7 @@ const PAGE_META = {
   simpletasks: { href: "./simple-tasks.html", label: "Tasks (Simple)" },
   tasks: { href: "./tasks.html", label: "Tasks (Advanced)" },
   taskstest: { href: "./tasks-test.html", label: "Tasks Test" },
+  enquiryremindertest: { href: "./enquiry-reminder-test.html", label: "Enquiry Reminder Test", shortcutLabel: "Reminder Test" },
   mapping: { href: "./mapping.html", label: "Time Mapping" },
   drivetime: { href: "./drive-time-map.html", label: "Our Geography", shortcutLabel: "Map" },
   reports: { href: "./reports.html", label: "Reports" },
@@ -132,7 +134,7 @@ const MAX_STANDARD_ROLE_HOME_PAGES = 8;
 const MENU_GROUPS = [
   {
     title: "People",
-    pages: ["clients", "clientdata", "carers", "recruitment", "wellbeingintake", "enquiries", "suppliers", "consultant"],
+    pages: ["clients", "clientdata", "carers", "recruitment", "wellbeingintake", "enquiries", "enquiryremindertest", "suppliers", "consultant"],
   },
   {
     title: "Planning",

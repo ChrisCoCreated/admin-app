@@ -58,6 +58,7 @@ const scorecardDefinitionsHandler = require("./api/scorecard/definitions");
 const kpisHandler = require("./api/kpis");
 const pseudonymiserHandler = require("./api/pseudonymiser");
 const enquiryRemindersCronHandler = require("./api/cron/enquiry-reminders");
+const enquiryRemindersTestHandler = require("./api/enquiry-reminders/test");
 
 function loadEnvFile(envPath) {
   let raw = "";
@@ -440,6 +441,14 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await enquiryRemindersCronHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/enquiry-reminders/test") {
+    if (req.method === "POST") {
+      apiReq.body = await readJsonBody(req);
+    }
+    await enquiryRemindersTestHandler(apiReq, apiRes);
     return true;
   }
 

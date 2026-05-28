@@ -5537,6 +5537,18 @@ body.lightbox-open {
   color: #4c5d79;
 }
 
+.enquiry-reminder-test-grid {
+  align-items: stretch;
+}
+
+.enquiry-reminder-email-preview {
+  width: 100%;
+  min-height: 520px;
+  border: 1px solid rgba(10, 31, 68, 0.12);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
 .task-pill-list {
   display: grid;
   gap: 10px;

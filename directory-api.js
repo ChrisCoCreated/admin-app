@@ -813,6 +813,28 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async dryRunEnquiryReminders() {
+      const response = await authFetch(buildUrl("/api/enquiry-reminders/test"));
+      if (!response.ok) {
+        await parseError(response, "Enquiry reminder dry run failed");
+      }
+      return response.json();
+    },
+
+    async sendEnquiryReminderTrial() {
+      const response = await authFetch(endpoint("/api/enquiry-reminders/test"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ dryRun: false }),
+      });
+      if (!response.ok) {
+        await parseError(response, "Enquiry reminder trial send failed");
+      }
+      return response.json();
+    },
+
     async updateTask(payload = {}) {
       const response = await authFetch(endpoint("/api/tasks/update"), {
         method: "POST",
