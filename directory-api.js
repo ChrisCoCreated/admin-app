@@ -167,6 +167,20 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async updateKpis(payload = {}) {
+      const response = await authFetch(endpoint("/api/kpis"), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload && typeof payload === "object" ? payload : {}),
+      });
+      if (!response.ok) {
+        await parseError(response, "KPI update failed");
+      }
+      return response.json();
+    },
+
     async listAgendas(query = {}) {
       const response = await authFetch(buildUrl("/api/agendas", query));
       if (!response.ok) {

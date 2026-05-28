@@ -31,6 +31,7 @@ const authController = createAuthController({
 const directoryApi = createDirectoryApi(authController);
 
 let loadingKpis = false;
+let savingKpiField = "";
 const KPI_VIEW_PREFS_KEY = "thrive.kpis.viewPrefs";
 
 function cleanText(value) {
@@ -249,6 +250,102 @@ export function createKpiNoteCard({ title, metric, emptyLabel = "No detail recor
     wide,
   });
   card.classList.add("kpi-note-card", "kpi-detail-tile");
+  return card;
+}
+
+function editableInitialValue(metric) {
+  return cleanText(metric?.value);
+}
+
+function createEditableKpiCard({
+  title,
+  fieldKey,
+  metric,
+  displayValue,
+  editValue = null,
+  emptyLabel = "No detail recorded",
+  latestWeekLabelText = "",
+  tone = "default",
+  multiline = true,
+}) {
+  const card = document.createElement("article");
+  card.className = `kpi-card kpi-card-${tone} kpi-editable-card`;
+  const inputId = `kpi-edit-${fieldKey}`;
+  const source = sourceLabel(metric, latestWeekLabelText);
+  const initialValue = cleanText(editValue ?? editableInitialValue(metric));
+  const shownValue = cleanText(displayValue || initialValue || emptyLabel);
+  const inputMarkup = multiline
+    ? `<textarea id="${escapeHtml(inputId)}" class="kpi-edit-input" rows="5">${escapeHtml(initialValue)}</textarea>`
+    : `<input id="${escapeHtml(inputId)}" class="kpi-edit-input" type="text" value="${escapeHtml(initialValue)}">`;
+
+  card.innerHTML = `
+    <div class="kpi-card-topline">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="kpi-edit-actions">
+        <button class="secondary kpi-edit-btn" type="button">Edit</button>
+        <button class="primary kpi-save-btn" type="button" hidden>Save</button>
+      </div>
+    </div>
+    <div class="kpi-card-value kpi-edit-display">${escapeHtml(shownValue)}</div>
+    <div class="kpi-edit-field" hidden>${inputMarkup}</div>
+    <p class="kpi-card-source">${escapeHtml(source)}</p>
+  `;
+
+  const displayNode = card.querySelector(".kpi-edit-display");
+  const fieldWrap = card.querySelector(".kpi-edit-field");
+  const input = card.querySelector(".kpi-edit-input");
+  const editBtn = card.querySelector(".kpi-edit-btn");
+  const saveBtn = card.querySelector(".kpi-save-btn");
+
+  function setEditing(isEditing) {
+    displayNode.hidden = isEditing;
+    fieldWrap.hidden = !isEditing;
+    editBtn.hidden = isEditing;
+    saveBtn.hidden = !isEditing;
+    card.classList.toggle("is-editing", isEditing);
+    if (isEditing) {
+      input.focus();
+      input.select?.();
+    }
+  }
+
+  async function save() {
+    if (savingKpiField) {
+      return;
+    }
+    savingKpiField = fieldKey;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    setStatus(`Saving ${title}...`);
+    try {
+      await directoryApi.updateKpis({ fields: { [fieldKey]: input.value } });
+      setStatus(`${title} saved to the latest KPI row.`);
+      await loadKpis();
+    } catch (error) {
+      console.error("[kpis] Save failed", error);
+      setStatus(error?.message || `Could not save ${title}.`, true);
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    } finally {
+      savingKpiField = "";
+    }
+  }
+
+  card.addEventListener("click", (event) => {
+    if (event.target instanceof Element && event.target.closest("button, textarea, input")) {
+      return;
+    }
+    setEditing(true);
+  });
+  editBtn.addEventListener("click", () => setEditing(true));
+  saveBtn.addEventListener("click", save);
+  input.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      save();
+    }
+  });
+
   return card;
 }
 
@@ -615,8 +712,9 @@ function renderUtilisation(payload) {
       field: "utilisationPercent",
       formatter: formatPercent,
     }),
-    createKpiNoteCard({
+    createEditableKpiCard({
       title: "Utilisation Notes",
+      fieldKey: "utilisationNotes",
       metric: metricValue(payload, "utilisationNotes"),
       emptyLabel: "No utilisation notes recorded",
       latestWeekLabelText: latestLabel,
@@ -701,7 +799,10 @@ function renderEnquiries(payload) {
   const latestLabel = payload?.latestWeekLabel || "";
   const assessmentOutcome = payload?.enquiryAssessmentOutcome || {};
   const assessedOutcomes = Number(assessmentOutcome.assessedOutcomes || 0);
-  const periodOutcomeCount = assessedOutcomes + Number(assessmentOutcome.onHold || 0);
+  const wonCount = Number(assessmentOutcome.won || 0);
+  const lostCount = Number(assessmentOutcome.lost || 0);
+  const onHoldCount = Number(assessmentOutcome.onHold || 0);
+  const wonOnHoldRatio = onHoldCount ? `${formatNumber(wonCount / onHoldCount, 1)}:1 won/on hold` : "No on-hold enquiries";
   const outcomeUnavailable = Boolean(assessmentOutcome.unavailable);
   const outcomeSource = assessmentOutcome.startDateLabel
     ? `From Enquiries Log since ${assessmentOutcome.startDateLabel}`
@@ -711,16 +812,20 @@ function renderEnquiries(payload) {
       title: "Won vs Lost After Assessment",
       value: outcomeUnavailable
         ? "Unavailable"
-        : `${formatNumber(assessmentOutcome.won || 0)} won / ${formatNumber(assessmentOutcome.lost || 0)} lost / ${formatNumber(
-            assessmentOutcome.onHold || 0
-          )} on hold`,
+        : `${formatNumber(wonCount)} won / ${formatNumber(lostCount)} lost`,
       detail: outcomeUnavailable
         ? assessmentOutcome.warning || "Could not load Enquiries Log."
-        : periodOutcomeCount
-        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(
-            assessedOutcomes
-          )} won/lost outcomes; ${formatNumber(periodOutcomeCount)} total including on hold in the past 3 months`
-        : "No won/lost/on-hold outcomes modified in the past 3 months",
+        : assessedOutcomes
+        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(assessedOutcomes)} won/lost outcomes in the past 3 months`
+        : "No won/lost outcomes modified in the past 3 months",
+      metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
+      tone: "positive",
+      onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
+    }),
+    createKpiMetricCard({
+      title: "On Hold After Assessment",
+      value: outcomeUnavailable ? "Unavailable" : `${formatNumber(onHoldCount)} on hold`,
+      detail: outcomeUnavailable ? assessmentOutcome.warning || "Could not load Enquiries Log." : wonOnHoldRatio,
       metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
       tone: "positive",
       onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
@@ -857,15 +962,20 @@ function renderRecruitment(payload) {
 
 function renderCqcReadiness(payload) {
   appendChildren(cqcReadinessKpis, [
-    createKpiMetricCard({
+    createEditableKpiCard({
       title: "Training Completion",
-      value: formatPercent(metricValue(payload, "trainingCompletion")?.value),
+      fieldKey: "trainingCompletion",
+      displayValue: formatPercent(metricValue(payload, "trainingCompletion")?.value),
+      editValue: formatPercent(metricValue(payload, "trainingCompletion")?.value),
       metric: metricValue(payload, "trainingCompletion"),
+      emptyLabel: "No training completion recorded",
       tone: "training",
       latestWeekLabelText: payload?.latestWeekLabel || "",
+      multiline: false,
     }),
-    createKpiNoteCard({
+    createEditableKpiCard({
       title: "CQC Readiness",
+      fieldKey: "cqcReadiness",
       metric: metricValue(payload, "cqcReadiness"),
       emptyLabel: "No readiness note recorded",
       latestWeekLabelText: payload?.latestWeekLabel || "",

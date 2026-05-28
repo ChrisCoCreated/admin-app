@@ -13,6 +13,7 @@ const DEFAULT_ENQUIRIES_LIST_WEB_URL =
   "https://planwithcare.sharepoint.com/sites/ThriveCalls/Lists/Enquiries%20Log/AllItems.aspx";
 const QUARTER_WEEK_COUNT = 13;
 const ASSESSMENT_OUTCOME_MONTHS = 3;
+const EDITABLE_KPI_FIELDS = new Set(["utilisationNotes", "trainingCompletion", "cqcReadiness"]);
 
 const KPI_FIELD_DEFINITIONS = {
   weekCommencing: ["Week Commenceing", "Week Commencing", "WeekCommenceing"],
@@ -307,6 +308,24 @@ function parsePercent(value) {
   return number;
 }
 
+function normalizeEditableKpiValue(key, value, latestRow, fieldName) {
+  if (key === "trainingCompletion") {
+    const percent = parsePercent(value);
+    if (percent === null) {
+      const error = new Error("Training Completion must be a percentage.");
+      error.status = 400;
+      error.code = "INVALID_KPI_VALUE";
+      throw error;
+    }
+    const currentRaw = latestRow?.fields?.[fieldName];
+    if (typeof currentRaw === "number" && currentRaw > 0 && currentRaw <= 1) {
+      return percent / 100;
+    }
+    return percent;
+  }
+  return cleanText(value);
+}
+
 function toBoolean(value) {
   if (value === true || value === false) {
     return value;
@@ -513,6 +532,80 @@ async function fetchKpiRows(graphClient, config) {
   };
 }
 
+async function updateLatestKpiFields(graphClient, config, updates) {
+  if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
+    const error = new Error("KPI update payload must include fields.");
+    error.status = 400;
+    error.code = "INVALID_KPI_UPDATE";
+    throw error;
+  }
+
+  const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
+  const list = await resolveList(graphClient, siteId, config.listName, { listPath: config.listPath });
+  const columns = await resolveListColumns(graphClient, siteId, list.id);
+  const fieldMap = createFieldMap(columns, KPI_FIELD_DEFINITIONS);
+  const selectFields = uniqueFieldNames(fieldMap);
+  const expand = selectFields.length ? `fields($select=${selectFields.join(",")})` : "fields";
+  const params = new URLSearchParams({
+    $top: "40",
+    $expand: expand,
+  });
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${list.id}/items?${params.toString()}`;
+  const items = await graphClient.fetchAllPages(url);
+  const rows = items
+    .map((item) => normalizeKpiRow(item, fieldMap))
+    .filter((row) => row.weekTime > 0)
+    .sort((a, b) => b.weekTime - a.weekTime);
+  const latestRow = rows[0] || null;
+  if (!latestRow?.id) {
+    const error = new Error("Could not find the latest KPI row to update.");
+    error.status = 404;
+    error.code = "KPI_LATEST_ROW_NOT_FOUND";
+    throw error;
+  }
+
+  const patch = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (!EDITABLE_KPI_FIELDS.has(key)) {
+      const error = new Error(`KPI field '${key}' cannot be edited here.`);
+      error.status = 400;
+      error.code = "KPI_FIELD_NOT_EDITABLE";
+      throw error;
+    }
+    const fieldName = fieldMap[key];
+    if (!fieldName) {
+      const error = new Error(`Could not find SharePoint column for KPI field '${key}'.`);
+      error.status = 400;
+      error.code = "KPI_COLUMN_NOT_FOUND";
+      throw error;
+    }
+    patch[fieldName] = normalizeEditableKpiValue(key, value, latestRow, fieldName);
+  }
+
+  if (!Object.keys(patch).length) {
+    const error = new Error("No editable KPI fields were provided.");
+    error.status = 400;
+    error.code = "EMPTY_KPI_UPDATE";
+    throw error;
+  }
+
+  await graphClient.fetchJson(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${list.id}/items/${encodeURIComponent(latestRow.id)}/fields`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }
+  );
+
+  return {
+    updated: true,
+    latestWeek: latestRow.weekCommencing,
+    latestWeekLabel: latestRow.weekLabel,
+    itemId: latestRow.id,
+  };
+}
+
 function normalizeRecruitmentItem(item, fieldMap) {
   const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
   const row = { fields, fieldMap };
@@ -692,7 +785,7 @@ function mapGraphError(error) {
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "PATCH") {
     res.status(405).json({
       error: { code: "METHOD_NOT_ALLOWED", message: "Method Not Allowed" },
     });
@@ -706,6 +799,13 @@ module.exports = async (req, res) => {
   try {
     const graphClient = createGraphAppClient();
     const kpiConfig = parseKpiConfig();
+    if (req.method === "PATCH") {
+      const result = await updateLatestKpiFields(graphClient, kpiConfig, req.body?.fields || {});
+      res.setHeader("Cache-Control", "no-store");
+      res.status(200).json(result);
+      return;
+    }
+
     const { rows, listUrl, fieldMap } = await fetchKpiRows(graphClient, kpiConfig);
     const metrics = resolveMetrics(rows);
     const onboarding = await fetchAcceptedOnboarding(graphClient);

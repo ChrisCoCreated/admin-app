@@ -427,6 +427,9 @@ async function handleApi(req, res, reqUrl) {
   }
 
   if (reqUrl.pathname === "/api/kpis") {
+    if (req.method === "PATCH") {
+      apiReq.body = await readJsonBody(req);
+    }
     await kpisHandler(apiReq, apiRes);
     return true;
   }
