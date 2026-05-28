@@ -22,16 +22,62 @@
           <span class="brand-text">Thrive Admin</span>
         </a>
         <div class="topbar-actions">
-          <a class="topbar-shortcut" href="./index.html">Home</a>
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
           <button id="signOutBtn" class="secondary" type="button" hidden>Sign out</button>
         </div>
       </div>
     </header>
 
-    <main class="container">
+    <main class="container enquiries-dashboard-main">
+      <section class="hero compact enquiries-page-head">
+        <div>
+          <p class="kpi-kicker">Enquiry performance</p>
+          <h1>Enquiries</h1>
+          <p class="muted">Track wins, losses, on-hold enquiries, and the latest activity in one place.</p>
+          <p class="muted">Use Quick Entry for first-call details, then switch to Update Mode to move status and record key dates.</p>
+        </div>
+        <div class="enquiries-head-actions">
+          <button id="refreshDashboardBtn" class="secondary" type="button" disabled>Refresh dashboard</button>
+        </div>
+      </section>
+
+      <section id="enquiriesSummaryStrip" class="kpi-summary-strip enquiries-summary-strip" aria-label="Enquiries summary">
+        <div>
+          <span class="kpi-summary-label">Showing</span>
+          <strong id="dashboardScopeLabel">Latest enquiries</strong>
+        </div>
+        <div>
+          <span class="kpi-summary-label">Enquiries loaded</span>
+          <strong id="dashboardEnquiryCount">-</strong>
+        </div>
+        <div>
+          <span class="kpi-summary-label">Last refreshed</span>
+          <strong id="dashboardRefreshedAt">-</strong>
+        </div>
+      </section>
+
+      <section id="enquiriesMetricsPanel" class="panel" hidden>
+        <div class="panel-head">
+          <div>
+            <h2>Top Information</h2>
+            <p class="muted">Tap a metric to refocus the latest enquiries list below.</p>
+          </div>
+        </div>
+        <div id="enquiriesMetricsGrid" class="kpi-card-grid enquiries-metrics-grid"></div>
+      </section>
+
+      <section id="enquiriesRecentPanel" class="panel" hidden>
+        <div class="panel-head enquiries-results-head">
+          <div>
+            <h2 id="recentEnquiriesTitle">Latest enquiries</h2>
+            <p id="recentEnquiriesDescription" class="muted">Most recent enquiries across the log.</p>
+          </div>
+          <button id="clearMetricFilterBtn" class="secondary" type="button" hidden>Show all latest</button>
+        </div>
+        <div id="recentEnquiriesList" class="enquiries-recent-list" aria-live="polite"></div>
+      </section>
+
       <section class="hero compact">
-        <h1>Enquiries</h1>
-        <p class="muted">Use Quick Entry for first-call details, then switch to Update Mode to move status and record key dates.</p>
         <p class="muted alt-link">
           Open SharePoint list:
           <a href="https://planwithcare.sharepoint.com/sites/ThriveCalls/Lists/Enquiries%20Log/Mine.aspx" target="_blank" rel="noopener noreferrer">Enquiries Log (Mine)</a>

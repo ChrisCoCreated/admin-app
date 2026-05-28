@@ -1,5 +1,6 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260512";
 import {
   buildFieldMaps,
   createSharePointApi,
@@ -19,6 +20,7 @@ const ENQUIRIES_LIST_PATH = `${new URL(FIXED_SITE_URL).pathname}/Lists/${ENQUIRI
 
 const signInBtn = $("signInBtn");
 const signOutBtn = $("signOutBtn");
+const refreshDashboardBtn = $("refreshDashboardBtn");
 const authState = $("authState");
 const createEnquiryBtn = $("createEnquiryBtn");
 const saveUpdateBtn = $("saveUpdateBtn");
@@ -51,6 +53,16 @@ const dataQualityList = $("dataQualityList");
 const dataQualityToggleBtn = $("dataQualityToggleBtn");
 const dataQualityContent = $("dataQualityContent");
 const authCard = document.querySelector(".auth-card");
+const enquiriesMetricsPanel = $("enquiriesMetricsPanel");
+const enquiriesMetricsGrid = $("enquiriesMetricsGrid");
+const enquiriesRecentPanel = $("enquiriesRecentPanel");
+const recentEnquiriesList = $("recentEnquiriesList");
+const recentEnquiriesTitle = $("recentEnquiriesTitle");
+const recentEnquiriesDescription = $("recentEnquiriesDescription");
+const clearMetricFilterBtn = $("clearMetricFilterBtn");
+const dashboardScopeLabel = $("dashboardScopeLabel");
+const dashboardEnquiryCount = $("dashboardEnquiryCount");
+const dashboardRefreshedAt = $("dashboardRefreshedAt");
 
 let account;
 let spApi = null;
@@ -61,6 +73,8 @@ let enquiries = [];
 let selectedItem = null;
 let tbcAutoMode = false;
 let currentSpUserId = null;
+let selectedMetricKey = "all";
+let lastDashboardRefreshAt = "";
 
 const LOCATION_OTHER_VALUE = "__other__";
 const LOCATION_CHOICES = ["Ashford", "Canterbury", "Deal", "Folkestone", "Maidstone", "London", "West Kent"];
@@ -91,6 +105,38 @@ const LOSS_REASON_OPTIONS = [
   "Internal – Duplicate Enquiry or Admin Error",
   "Competition - Went with another provider",
 ];
+const METRIC_DEFINITIONS = {
+  all: {
+    title: "Recent enquiries",
+    description: "Latest enquiries across the log, newest first.",
+    tone: "delivery",
+  },
+  won: {
+    title: "Won",
+    description: "Recent enquiries marked as won.",
+    tone: "positive",
+  },
+  lostPostAssessment: {
+    title: "Lost post assessment",
+    description: "Recent enquiries lost after assessment.",
+    tone: "risk",
+  },
+  lostPreAssessment: {
+    title: "Lost pre assessment",
+    description: "Recent enquiries lost before assessment.",
+    tone: "risk",
+  },
+  onHold: {
+    title: "On hold",
+    description: "Recent enquiries waiting, paused, or awaiting follow-up.",
+    tone: "business",
+  },
+  arrangingAssessment: {
+    title: "Arranging assessment",
+    description: "Recent enquiries currently moving toward assessment.",
+    tone: "recruitment",
+  },
+};
 
 const authController = createAuthController({
   tenantId: FIXED_TENANT_ID,
@@ -129,6 +175,9 @@ function setSignedInUi() {
     signOutBtn.hidden = false;
     signOutBtn.disabled = false;
   }
+  if (refreshDashboardBtn) {
+    refreshDashboardBtn.disabled = false;
+  }
 }
 
 function setSignedOutUi() {
@@ -160,6 +209,12 @@ function setSignedOutUi() {
   if (signOutBtn) {
     signOutBtn.hidden = true;
   }
+  if (refreshDashboardBtn) {
+    refreshDashboardBtn.disabled = true;
+  }
+  selectedMetricKey = "all";
+  lastDashboardRefreshAt = "";
+  renderDashboard();
 }
 
 function setStatus(message, isError = false, detail = "") {
@@ -281,6 +336,31 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 function isBlank(value) {
   return !String(value || "").trim();
 }
@@ -300,6 +380,217 @@ function getFieldValue(item, internalName) {
   }
   const value = item[internalName];
   return value == null ? "" : String(value);
+}
+
+function getPersonDisplayName(item, internalName) {
+  if (!internalName) {
+    return "";
+  }
+  const raw = item[internalName];
+  if (raw && typeof raw === "object") {
+    return String(raw.Title || raw.title || raw.Name || raw.name || raw.EMail || "").trim();
+  }
+  return "";
+}
+
+function normalizeStatus(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getEnquiryStatus(item, aliases = resolveFieldAliases()) {
+  return getFieldValue(item, aliases.status) || getFieldValue(item, aliases.currentStatus) || "";
+}
+
+function matchesMetric(item, metricKey, aliases = resolveFieldAliases()) {
+  const status = normalizeStatus(getEnquiryStatus(item, aliases));
+  if (metricKey === "all") {
+    return true;
+  }
+  if (metricKey === "won") {
+    return status === "won";
+  }
+  if (metricKey === "lostPostAssessment") {
+    return status.includes("lost") && status.includes("post assessment");
+  }
+  if (metricKey === "lostPreAssessment") {
+    return status.includes("lost") && status.includes("pre assessment");
+  }
+  if (metricKey === "arrangingAssessment") {
+    return status.includes("arranging assessment");
+  }
+  if (metricKey === "onHold") {
+    return (
+      status.includes("awaiting call back") ||
+      status.includes("callback") ||
+      status.includes("on hold") ||
+      status.includes("follow up") ||
+      status.includes("follow-up")
+    );
+  }
+  return false;
+}
+
+function countMatchingMetric(metricKey, aliases = resolveFieldAliases()) {
+  return allEnquiries.filter((item) => matchesMetric(item, metricKey, aliases)).length;
+}
+
+function getFilteredRecentEnquiries(metricKey, aliases = resolveFieldAliases()) {
+  return [...allEnquiries]
+    .filter((item) => matchesMetric(item, metricKey, aliases))
+    .sort((first, second) => toSortableTimestamp(second.Created) - toSortableTimestamp(first.Created))
+    .slice(0, 12);
+}
+
+function createMetricCard({ key, title, value, detail, tone }) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `kpi-card kpi-card-${tone || "default"} enquiries-metric-card${selectedMetricKey === key ? " enquiries-metric-card-active" : ""}`;
+  button.setAttribute("aria-pressed", selectedMetricKey === key ? "true" : "false");
+  button.innerHTML = `
+    <div class="kpi-card-topline">
+      <h3>${escapeHtml(title)}</h3>
+    </div>
+    <div class="kpi-card-value">${escapeHtml(String(value))}</div>
+    <p class="kpi-card-detail">${escapeHtml(detail)}</p>
+    <p class="kpi-card-source">${selectedMetricKey === key ? "Currently shown below" : "Tap to view matching enquiries"}</p>
+  `;
+  button.addEventListener("click", () => {
+    selectedMetricKey = key;
+    renderDashboard();
+  });
+  return button;
+}
+
+function renderMetrics(aliases = resolveFieldAliases()) {
+  if (!enquiriesMetricsGrid) {
+    return;
+  }
+  const cards = [
+    {
+      key: "all",
+      title: "All recent",
+      value: allEnquiries.length,
+      detail: "Latest enquiries across the full list.",
+      tone: "delivery",
+    },
+    {
+      key: "won",
+      title: "Won",
+      value: countMatchingMetric("won", aliases),
+      detail: "Converted enquiries marked won.",
+      tone: "positive",
+    },
+    {
+      key: "lostPostAssessment",
+      title: "Lost post assessment",
+      value: countMatchingMetric("lostPostAssessment", aliases),
+      detail: "Lost after assessment was completed.",
+      tone: "risk",
+    },
+    {
+      key: "lostPreAssessment",
+      title: "Lost pre assessment",
+      value: countMatchingMetric("lostPreAssessment", aliases),
+      detail: "Lost before assessment was carried out.",
+      tone: "risk",
+    },
+    {
+      key: "onHold",
+      title: "On hold",
+      value: countMatchingMetric("onHold", aliases),
+      detail: "Awaiting callback or paused follow-up.",
+      tone: "business",
+    },
+    {
+      key: "arrangingAssessment",
+      title: "Arranging assessment",
+      value: countMatchingMetric("arrangingAssessment", aliases),
+      detail: "Active enquiries moving toward assessment.",
+      tone: "recruitment",
+    },
+  ];
+
+  enquiriesMetricsGrid.replaceChildren(...cards.map((card) => createMetricCard(card)));
+}
+
+function renderRecentEnquiries(aliases = resolveFieldAliases()) {
+  if (!recentEnquiriesList || !recentEnquiriesTitle || !recentEnquiriesDescription) {
+    return;
+  }
+  const definition = METRIC_DEFINITIONS[selectedMetricKey] || METRIC_DEFINITIONS.all;
+  const items = getFilteredRecentEnquiries(selectedMetricKey, aliases);
+  recentEnquiriesTitle.textContent = definition.title;
+  recentEnquiriesDescription.textContent = definition.description;
+  dashboardScopeLabel.textContent = definition.title;
+  clearMetricFilterBtn.hidden = selectedMetricKey === "all";
+
+  if (!items.length) {
+    recentEnquiriesList.innerHTML = `<p class="muted">No enquiries match ${escapeHtml(definition.title.toLowerCase())} right now.</p>`;
+    return;
+  }
+
+  recentEnquiriesList.innerHTML = items
+    .map((item) => {
+      const name = getFieldValue(item, aliases.fullName) || "(No name)";
+      const caller = getFieldValue(item, aliases.callerName) || "Unknown caller";
+      const status = getEnquiryStatus(item, aliases) || "-";
+      const owner = getPersonDisplayName(item, aliases.enquiryOwner) || "Unassigned";
+      const source = getFieldValue(item, aliases.source) || "Not recorded";
+      const referralFrom = getFieldValue(item, aliases.referralFrom) || "Not recorded";
+      const reasonForLoss = getFieldValue(item, aliases.reasonForLoss) || "Not recorded";
+      const busDevNotes = getFieldValue(item, aliases.busDevNotes) || getFieldValue(item, aliases.updates) || "No extra detail recorded";
+      const updated = formatDateTime(item.Modified || item.Created);
+      const created = formatDate(item.Created);
+      return `
+        <article class="enquiry-result-card">
+          <div class="enquiry-result-head">
+            <div>
+              <h3>${escapeHtml(name)}</h3>
+              <p class="enquiry-result-meta">${escapeHtml(status)} • Owner: ${escapeHtml(owner)}</p>
+            </div>
+            <a class="selected-enquiry-link" href="${getEnquiryItemUrl(item.Id)}" target="_blank" rel="noopener noreferrer">Open</a>
+          </div>
+          <dl class="enquiry-result-grid">
+            <div><dt>Caller</dt><dd>${escapeHtml(caller)}</dd></div>
+            <div><dt>Created</dt><dd>${escapeHtml(created)}</dd></div>
+            <div><dt>Updated</dt><dd>${escapeHtml(updated)}</dd></div>
+            <div><dt>Referral choice</dt><dd>${escapeHtml(source)}</dd></div>
+            <div><dt>Referral details</dt><dd>${escapeHtml(referralFrom)}</dd></div>
+            <div><dt>Reason for loss</dt><dd>${escapeHtml(reasonForLoss)}</dd></div>
+          </dl>
+          <p class="enquiry-result-notes">${escapeHtml(busDevNotes)}</p>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderDashboard() {
+  const hasData = Array.isArray(allEnquiries) && allEnquiries.length > 0;
+  if (dashboardEnquiryCount) {
+    dashboardEnquiryCount.textContent = hasData ? String(allEnquiries.length) : "-";
+  }
+  if (dashboardRefreshedAt) {
+    dashboardRefreshedAt.textContent = lastDashboardRefreshAt ? formatDateTime(lastDashboardRefreshAt) : "-";
+  }
+  if (enquiriesMetricsPanel) {
+    enquiriesMetricsPanel.hidden = !hasData;
+  }
+  if (enquiriesRecentPanel) {
+    enquiriesRecentPanel.hidden = !hasData;
+  }
+  if (!hasData) {
+    if (recentEnquiriesList) {
+      recentEnquiriesList.innerHTML = '<p class="muted">Sign in to load enquiry metrics and recent activity.</p>';
+    }
+    if (dashboardScopeLabel) {
+      dashboardScopeLabel.textContent = "Latest enquiries";
+    }
+    return;
+  }
+  const aliases = resolveFieldAliases();
+  renderMetrics(aliases);
+  renderRecentEnquiries(aliases);
 }
 
 function getPersonFieldId(item, internalName) {
@@ -659,6 +950,14 @@ function formatAuthError(error) {
   return message;
 }
 
+function renderSignedInNavigation() {
+  const userRole = account?.role || account?.idTokenClaims?.role || account?.idTokenClaims?.roles?.[0] || "";
+  if (!userRole || !canAccessPage(userRole, "enquiries")) {
+    return;
+  }
+  renderTopNavigation({ role: userRole });
+}
+
 async function getSharePointToken(config) {
   return authController.acquireSharePointToken(config.siteHost);
 }
@@ -875,17 +1174,21 @@ async function loadEnquiries() {
     .filter(([key, value]) => key !== "enquiryOwner" && Boolean(value))
     .map(([, value]) => value);
   const ownerIdField = aliases.enquiryOwner ? `${aliases.enquiryOwner}Id` : null;
-  const selectFields = [...new Set([...baseFields, ...dynamicFields, ownerIdField].filter(Boolean))];
+  const ownerDisplayFields = aliases.enquiryOwner ? [`${aliases.enquiryOwner}/Title`, `${aliases.enquiryOwner}/EMail`] : [];
+  const selectFields = [...new Set([...baseFields, ...dynamicFields, ownerIdField, aliases.enquiryOwner, ...ownerDisplayFields].filter(Boolean))];
   const query = selectFields.join(",");
+  const expandQuery = aliases.enquiryOwner ? `&$expand=${encodeURIComponent(aliases.enquiryOwner)}` : "";
 
   const data = await api.request(
-    `/_api/web/lists(guid'${listInfo.Id}')/items?$top=200&$orderby=Created desc&$select=${encodeURIComponent(query)}`,
+    `/_api/web/lists(guid'${listInfo.Id}')/items?$top=200&$orderby=Created desc&$select=${encodeURIComponent(query)}${expandQuery}`,
   );
 
   currentSpUserId = ownerId;
   allEnquiries = data.d.results;
+  lastDashboardRefreshAt = new Date().toISOString();
   renderDataQualityList();
   applyEnquiryFilters();
+  renderDashboard();
 }
 
 async function createEnquiry() {
@@ -1041,6 +1344,7 @@ async function handleSignIn() {
       return;
     }
 
+    renderSignedInNavigation();
     setSignedInUi();
     await loadEnquiries();
     setStatus("Enquiries loaded.");
@@ -1062,6 +1366,7 @@ async function restoreSessionOnLoad() {
       return;
     }
 
+    renderSignedInNavigation();
     setSignedInUi();
     await loadEnquiries();
     setStatus("Session restored.");
@@ -1085,6 +1390,25 @@ signOutBtn?.addEventListener("click", async () => {
     setStatus(error?.message || "Sign-out failed.", true);
     signOutBtn.disabled = false;
   }
+});
+
+refreshDashboardBtn?.addEventListener("click", async () => {
+  try {
+    refreshDashboardBtn.disabled = true;
+    setStatus("Refreshing enquiries dashboard...");
+    await loadEnquiries();
+    setStatus("Enquiries dashboard refreshed.");
+  } catch (error) {
+    console.error(error);
+    setStatus("Could not refresh enquiries dashboard.", true, error.message || String(error));
+  } finally {
+    refreshDashboardBtn.disabled = false;
+  }
+});
+
+clearMetricFilterBtn?.addEventListener("click", () => {
+  selectedMetricKey = "all";
+  renderDashboard();
 });
 
 createEnquiryBtn?.addEventListener("click", async () => {
