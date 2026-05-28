@@ -56,6 +56,11 @@
     0 14px 30px rgba(17, 20, 26, 0.1);
 }
 
+.kpi-card-active {
+  border-color: rgba(42, 112, 81, 0.3);
+  background: linear-gradient(135deg, rgba(73, 207, 191, 0.1), #fbfcff 72%);
+}
+
 .enquiries-results-head {
   align-items: center;
 }
@@ -77,6 +82,27 @@
     #fbfcff;
 }
 
+.enquiry-result-active {
+  border-color: rgba(73, 207, 191, 0.42);
+  background:
+    linear-gradient(135deg, rgba(73, 207, 191, 0.12), rgba(255, 255, 255, 0.96) 42%),
+    #fbfcff;
+}
+
+.enquiry-result-won {
+  border-color: rgba(42, 112, 81, 0.4);
+  background:
+    linear-gradient(135deg, rgba(73, 207, 191, 0.2), rgba(255, 255, 255, 0.96) 42%),
+    #fbfcff;
+}
+
+.enquiry-result-lost {
+  border-color: rgba(180, 35, 44, 0.3);
+  background:
+    linear-gradient(135deg, rgba(180, 35, 44, 0.1), rgba(255, 255, 255, 0.96) 42%),
+    #fbfcff;
+}
+
 .enquiry-result-head {
   display: flex;
   align-items: flex-start;
@@ -94,6 +120,14 @@
   color: var(--muted);
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.enquiry-result-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .enquiry-result-grid {

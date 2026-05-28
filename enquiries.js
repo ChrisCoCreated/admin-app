@@ -126,15 +126,25 @@ const METRIC_DEFINITIONS = {
     description: "Recent enquiries lost before assessment.",
     tone: "risk",
   },
-  onHold: {
-    title: "On hold",
-    description: "Recent enquiries waiting, paused, or awaiting follow-up.",
+  awaitingContract: {
+    title: "Awaiting contract",
+    description: "Recent enquiries currently waiting on contract.",
     tone: "business",
+  },
+  awaitingDecision: {
+    title: "Awaiting decision",
+    description: "Recent enquiries awaiting decision, including awaiting quote.",
+    tone: "business",
+  },
+  progressingFromInitial: {
+    title: "Progressing from initial enquiry",
+    description: "Recent enquiries in status 5 or 6 moving forward from initial enquiry.",
+    tone: "active",
   },
   arrangingAssessment: {
     title: "Arranging assessment",
     description: "Recent enquiries currently moving toward assessment.",
-    tone: "recruitment",
+    tone: "active",
   },
 };
 
@@ -397,6 +407,22 @@ function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function isStatusWon(status) {
+  return normalizeStatus(status) === "won";
+}
+
+function isStatusLost(status) {
+  return normalizeStatus(status).includes("lost");
+}
+
+function isStatusActive(status) {
+  const normalized = normalizeStatus(status);
+  if (!normalized) {
+    return false;
+  }
+  return !isStatusWon(normalized) && !isStatusLost(normalized);
+}
+
 function getEnquiryStatus(item, aliases = resolveFieldAliases()) {
   return getFieldValue(item, aliases.status) || getFieldValue(item, aliases.currentStatus) || "";
 }
@@ -418,20 +444,34 @@ function matchesMetric(item, metricKey, aliases = resolveFieldAliases()) {
   if (metricKey === "arrangingAssessment") {
     return status.includes("arranging assessment");
   }
-  if (metricKey === "onHold") {
-    return (
-      status.includes("awaiting call back") ||
-      status.includes("callback") ||
-      status.includes("on hold") ||
-      status.includes("follow up") ||
-      status.includes("follow-up")
-    );
+  if (metricKey === "awaitingContract") {
+    return status.includes("awaiting contract");
+  }
+  if (metricKey === "awaitingDecision") {
+    return status.includes("awaiting decision") || status.includes("awaiting quote");
+  }
+  if (metricKey === "progressingFromInitial") {
+    return status.startsWith("5.") || status.startsWith("6.");
   }
   return false;
 }
 
-function countMatchingMetric(metricKey, aliases = resolveFieldAliases()) {
-  return allEnquiries.filter((item) => matchesMetric(item, metricKey, aliases)).length;
+function isWithinPastThreeMonths(item) {
+  const created = Date.parse(String(item?.Created || ""));
+  if (!Number.isFinite(created)) {
+    return false;
+  }
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 3);
+  return created >= cutoff.getTime();
+}
+
+function getMetricCounts(metricKey, aliases = resolveFieldAliases()) {
+  const matching = allEnquiries.filter((item) => matchesMetric(item, metricKey, aliases));
+  return {
+    recent: matching.filter((item) => isWithinPastThreeMonths(item)).length,
+    allTime: matching.length,
+  };
 }
 
 function getFilteredRecentEnquiries(metricKey, aliases = resolveFieldAliases()) {
@@ -469,48 +509,72 @@ function renderMetrics(aliases = resolveFieldAliases()) {
     {
       key: "all",
       title: "All recent",
-      value: allEnquiries.length,
-      detail: "Latest enquiries across the full list.",
+      ...getMetricCounts("all", aliases),
+      detail: "All enquiries in the log.",
       tone: "delivery",
     },
     {
       key: "won",
       title: "Won",
-      value: countMatchingMetric("won", aliases),
+      ...getMetricCounts("won", aliases),
       detail: "Converted enquiries marked won.",
       tone: "positive",
     },
     {
       key: "lostPostAssessment",
       title: "Lost post assessment",
-      value: countMatchingMetric("lostPostAssessment", aliases),
+      ...getMetricCounts("lostPostAssessment", aliases),
       detail: "Lost after assessment was completed.",
       tone: "risk",
     },
     {
       key: "lostPreAssessment",
       title: "Lost pre assessment",
-      value: countMatchingMetric("lostPreAssessment", aliases),
+      ...getMetricCounts("lostPreAssessment", aliases),
       detail: "Lost before assessment was carried out.",
       tone: "risk",
     },
     {
-      key: "onHold",
-      title: "On hold",
-      value: countMatchingMetric("onHold", aliases),
-      detail: "Awaiting callback or paused follow-up.",
+      key: "arrangingAssessment",
+      title: "Arranging assessment",
+      ...getMetricCounts("arrangingAssessment", aliases),
+      detail: "Active enquiries moving toward assessment.",
+      tone: "active",
+    },
+    {
+      key: "awaitingContract",
+      title: "Awaiting contract",
+      ...getMetricCounts("awaitingContract", aliases),
+      detail: "Waiting for contract stage.",
       tone: "business",
     },
     {
-      key: "arrangingAssessment",
-      title: "Arranging assessment",
-      value: countMatchingMetric("arrangingAssessment", aliases),
-      detail: "Active enquiries moving toward assessment.",
-      tone: "recruitment",
+      key: "awaitingDecision",
+      title: "Awaiting decision",
+      ...getMetricCounts("awaitingDecision", aliases),
+      detail: "Includes awaiting quote.",
+      tone: "business",
+    },
+    {
+      key: "progressingFromInitial",
+      title: "Progressing from initial",
+      ...getMetricCounts("progressingFromInitial", aliases),
+      detail: "Statuses 5 and 6.",
+      tone: "active",
     },
   ];
 
-  enquiriesMetricsGrid.replaceChildren(...cards.map((card) => createMetricCard(card)));
+  enquiriesMetricsGrid.replaceChildren(
+    ...cards.map((card) =>
+      createMetricCard({
+        key: card.key,
+        title: card.title,
+        value: `${card.recent}`,
+        detail: `Past 3 months: ${card.recent} • All time: ${card.allTime}`,
+        tone: card.tone,
+      }),
+    ),
+  );
 }
 
 function renderRecentEnquiries(aliases = resolveFieldAliases()) {
@@ -535,29 +599,19 @@ function renderRecentEnquiries(aliases = resolveFieldAliases()) {
       const caller = getFieldValue(item, aliases.callerName) || "Unknown caller";
       const status = getEnquiryStatus(item, aliases) || "-";
       const owner = getPersonDisplayName(item, aliases.enquiryOwner) || "Unassigned";
-      const source = getFieldValue(item, aliases.source) || "Not recorded";
-      const referralFrom = getFieldValue(item, aliases.referralFrom) || "Not recorded";
-      const reasonForLoss = getFieldValue(item, aliases.reasonForLoss) || "Not recorded";
       const busDevNotes = getFieldValue(item, aliases.busDevNotes) || getFieldValue(item, aliases.updates) || "No extra detail recorded";
-      const updated = formatDateTime(item.Modified || item.Created);
       const created = formatDate(item.Created);
+      const statusClass = isStatusWon(status) ? "enquiry-result-won" : isStatusLost(status) ? "enquiry-result-lost" : isStatusActive(status) ? "enquiry-result-active" : "";
       return `
-        <article class="enquiry-result-card">
+        <article class="enquiry-result-card ${statusClass}">
           <div class="enquiry-result-head">
             <div>
               <h3>${escapeHtml(name)}</h3>
-              <p class="enquiry-result-meta">${escapeHtml(status)} • Owner: ${escapeHtml(owner)}</p>
+              <p class="enquiry-result-meta">${escapeHtml(status)} • Owner: ${escapeHtml(owner)} • Created: ${escapeHtml(created)} • Caller: ${escapeHtml(caller)}</p>
             </div>
             <a class="selected-enquiry-link" href="${getEnquiryItemUrl(item.Id)}" target="_blank" rel="noopener noreferrer">Open</a>
           </div>
-          <dl class="enquiry-result-grid">
-            <div><dt>Caller</dt><dd>${escapeHtml(caller)}</dd></div>
-            <div><dt>Created</dt><dd>${escapeHtml(created)}</dd></div>
-            <div><dt>Updated</dt><dd>${escapeHtml(updated)}</dd></div>
-            <div><dt>Referral choice</dt><dd>${escapeHtml(source)}</dd></div>
-            <div><dt>Referral details</dt><dd>${escapeHtml(referralFrom)}</dd></div>
-            <div><dt>Reason for loss</dt><dd>${escapeHtml(reasonForLoss)}</dd></div>
-          </dl>
+          <p class="enquiry-result-label">Business development details</p>
           <p class="enquiry-result-notes">${escapeHtml(busDevNotes)}</p>
         </article>
       `;
