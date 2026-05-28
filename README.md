@@ -80,8 +80,14 @@ Set values in `frontend-config.js`:
 - `AZURE_API_AUDIENCE` or `AZURE_API_CLIENT_ID`
 - `AZURE_REQUIRED_SCOPE` (default `client.read`)
 - `AZURE_API_CLIENT_SECRET` for app-only Graph calls
+- `CRON_SECRET` for Vercel Cron authorization
 - At least one app access env var such as `ACCESS_FULL_EMAILS` or `ACCESS_DIRECTOR_EMAILS`
 - `SHAREPOINT_SITE_URL`
+- `SHAREPOINT_ENQUIRIES_SITE_URL` (optional; defaults to ThriveCalls)
+- `SHAREPOINT_ENQUIRIES_LIST_NAME` (optional; default `Enquiries Log`)
+- `SHAREPOINT_ENQUIRIES_LIST_WEB_URL` (optional; used for reliable list resolution and email links)
+- `ENQUIRY_REMINDER_FROM_EMAIL` for the mailbox that sends enquiry reminder emails
+- `ENQUIRY_REMINDER_RECIPIENT_OVERRIDE` for trial delivery; set to `chris@planwithcare.co.uk`
 - `SHAREPOINT_TASK_OVERLAY_LIST_NAME` (optional; default `TaskOverlay`)
 - `SHAREPOINT_TASK_SETS_SITE_URL` (optional; defaults to `SHAREPOINT_SITE_URL`)
 - `SHAREPOINT_TASK_SETS_LIST_NAME` (optional; default `Actions for Task Sets`)
@@ -116,6 +122,14 @@ Google Maps Platform vars (for Time Mapping):
 
 - `GOOGLE_MAPS_API_KEY`
 - `GOOGLE_MAPS_REGION` (default `gb`)
+
+## Scheduled enquiry reminders
+
+`vercel.json` includes a weekly Vercel Cron entry for `/api/cron/enquiry-reminders` at `0 7 * * 1`, which is Monday 8am UK time during BST. If exact winter 8am UK delivery matters, change this to `0 8 * * 1` when the UK is on GMT.
+
+The route requires `Authorization: Bearer ${CRON_SECRET}`. It emails active enquiries not modified in the last 7 days every week, and includes on-hold enquiries only on the first Monday of each month. For the trial, keep `ENQUIRY_REMINDER_RECIPIENT_OVERRIDE=chris@planwithcare.co.uk` so all reminders go to Chris rather than enquiry owners.
+
+The Entra app used for Graph app-only calls must be able to read the SharePoint enquiries list and send mail from `ENQUIRY_REMINDER_FROM_EMAIL`, typically using `Sites.Read.All` or equivalent site access plus `Mail.Send`.
 
 Run costing vars (for Time Mapping):
 
