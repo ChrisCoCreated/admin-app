@@ -139,7 +139,7 @@
           <table>
             <thead>
               <tr>
-                <th>Area / Role</th>
+                <th>Area</th>
                 <th><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="carerCount">Associates</button></th>
                 <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="confirmedHours">Confirmed Hours</button></th>
                 <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="area" data-sort-key="contractedHours">Contracted Hours</button></th>
@@ -156,6 +156,31 @@
               </tr>
             </thead>
             <tbody id="areaSummaryBody"></tbody>
+          </table>
+        </div>
+
+        <h2 class="profitability-section-heading">By Role</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="carerCount">Associates</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="confirmedHours">Confirmed Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="contractedHours">Contracted Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="actualHours">Actual Hours</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="utilisation">Utilisation</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="projectedScheduledHours">Projected Scheduled</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="projectedContractedHours">Projected Contracted</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="projectedUtilisation">Projected Utilisation</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="revenue">Revenue</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="labourWithOnCost">Labour + On-Cost</button></th>
+                <th data-column="travel"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="travelExpense">Travel</button></th>
+                <th data-column="actual"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="profit">Actual Profit</button></th>
+                <th data-column="projected"><button class="table-sort-button" type="button" data-sort-table="role" data-sort-key="projectedProfit">Projected Profit</button></th>
+              </tr>
+            </thead>
+            <tbody id="roleSummaryBody"></tbody>
           </table>
         </div>
 
@@ -196,6 +221,6 @@
       </section>
     </main>
 
-    <script type="module" src="./carer-profitability.js?v=20260601"></script>
+    <script type="module" src="./carer-profitability.js?v=20260601-role"></script>
   </body>
 </html>
