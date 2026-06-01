@@ -334,6 +334,7 @@ function calculateFinancials(row, assumptions) {
   const profit = revenue - totalCost;
   const utilisation = actualHours > 0 ? (row.confirmedHours / actualHours) * 100 : null;
   const projectedScheduledHours = Number(row.projectedScheduledHours || 0);
+  const projectedContractedSourceHours = Number(row.projectedContractedSourceHours ?? row.projectedContractedHours ?? 0);
   const projectedContractedHours = Math.max(Number(row.projectedContractedHours || 0), projectedScheduledHours);
   const projectedRevenue = projectedScheduledHours * assumptions.incomeRate;
   const projectedBaseLabourCost = projectedContractedHours * assumptions.contractedRate;
@@ -341,7 +342,7 @@ function calculateFinancials(row, assumptions) {
   const projectedLabourWithOnCost = projectedBaseLabourCost + projectedOnCost;
   const projectedProfit = projectedRevenue - projectedLabourWithOnCost;
   const projectedUtilisation =
-    projectedContractedHours > 0 ? (projectedScheduledHours / projectedContractedHours) * 100 : null;
+    projectedContractedSourceHours > 0 ? (projectedScheduledHours / projectedContractedSourceHours) * 100 : null;
   const hasProjection = Boolean(row.hasProjection || projectedScheduledHours || projectedContractedHours);
 
   return {
@@ -355,6 +356,7 @@ function calculateFinancials(row, assumptions) {
     utilisation,
     hasProjection,
     projectedScheduledHours,
+    projectedContractedSourceHours,
     projectedContractedHours,
     projectedRevenue,
     projectedBaseLabourCost,
@@ -409,6 +411,7 @@ function buildReport() {
       travelExpense: 0,
       projectedScheduledHours: 0,
       projectedContractedHours: 0,
+      projectedContractedSourceHours: 0,
       hasProjection: false,
     };
 
@@ -452,15 +455,18 @@ function buildReport() {
       travelExpense: 0,
       projectedScheduledHours: 0,
       projectedContractedHours: 0,
+      projectedContractedSourceHours: 0,
       hasProjection: false,
     };
 
     existing.projectedScheduledHours += parseHours(
       getField(row, ["Scheduled Hrs (HH:MM)", "Scheduled (Hrs)", "Scheduled Hrs", "Scheduled Hours"])
     );
-    existing.projectedContractedHours += parseHours(
+    const projectedContractedHours = parseHours(
       getField(row, ["Contracted Hrs (HH:MM)", "Contracted Hrs", "Contracted Hours", "Contracted"])
     );
+    existing.projectedContractedHours += projectedContractedHours;
+    existing.projectedContractedSourceHours += projectedContractedHours;
     existing.hasProjection = true;
     carersByKey.set(key, existing);
     if (existing.id) {
@@ -500,6 +506,7 @@ function buildReport() {
         travelExpense,
         projectedScheduledHours: 0,
         projectedContractedHours: 0,
+        projectedContractedSourceHours: 0,
         hasProjection: false,
       });
     }
@@ -532,6 +539,7 @@ function buildReport() {
       travelExpense: 0,
       projectedScheduledHours: 0,
       projectedContractedHours: 0,
+      projectedContractedSourceHours: 0,
       hasProjection: false,
     };
     area.carerCount += 1;
@@ -542,6 +550,7 @@ function buildReport() {
     area.travelExpense += carer.travelExpense;
     area.projectedScheduledHours += carer.projectedScheduledHours;
     area.projectedContractedHours += carer.projectedContractedHours;
+    area.projectedContractedSourceHours += carer.projectedContractedSourceHours;
     area.hasProjection = area.hasProjection || carer.hasProjection;
     areasByName.set(carer.area, area);
   });
@@ -560,6 +569,8 @@ function buildReport() {
         travelExpense: total.travelExpense + carer.travelExpense,
         projectedScheduledHours: total.projectedScheduledHours + carer.projectedScheduledHours,
         projectedContractedHours: total.projectedContractedHours + carer.projectedContractedHours,
+        projectedContractedSourceHours:
+          total.projectedContractedSourceHours + carer.projectedContractedSourceHours,
         hasProjection: total.hasProjection || carer.hasProjection,
         carerCount: total.carerCount + 1,
       }),
@@ -571,6 +582,7 @@ function buildReport() {
         travelExpense: 0,
         projectedScheduledHours: 0,
         projectedContractedHours: 0,
+        projectedContractedSourceHours: 0,
         hasProjection: false,
         carerCount: 0,
       }
@@ -655,6 +667,8 @@ function buildTotalFromCarers(carers, assumptions) {
         travelExpense: total.travelExpense + carer.travelExpense,
         projectedScheduledHours: total.projectedScheduledHours + carer.projectedScheduledHours,
         projectedContractedHours: total.projectedContractedHours + carer.projectedContractedHours,
+        projectedContractedSourceHours:
+          total.projectedContractedSourceHours + carer.projectedContractedSourceHours,
         hasProjection: total.hasProjection || carer.hasProjection,
         carerCount: total.carerCount + 1,
       }),
@@ -666,6 +680,7 @@ function buildTotalFromCarers(carers, assumptions) {
         travelExpense: 0,
         projectedScheduledHours: 0,
         projectedContractedHours: 0,
+        projectedContractedSourceHours: 0,
         hasProjection: false,
         carerCount: 0,
       }
