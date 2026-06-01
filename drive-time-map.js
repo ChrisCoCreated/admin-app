@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260512";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260601";
 import { OUR_GEOGRAPHY_DEFAULT_SEARCHES } from "./our-geography-default-searches.js";
 
 const signOutBtn = document.getElementById("signOutBtn");

@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { renderTopNavigation } from "./navigation.js?v=20260512";
+import { renderTopNavigation } from "./navigation.js?v=20260601";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const deniedMessage = document.getElementById("deniedMessage");
@@ -26,6 +26,7 @@ const PAGE_LABELS = {
   consultant: "Consultant",
   marketing: "Marketing",
   photolayout: "Photo Layout",
+  qrgenerator: "QR Generator",
   emailtemplates: "Email Templates",
   reports: "Reports",
 };

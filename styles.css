@@ -4688,6 +4688,56 @@ tbody tr:hover .profitability-sticky-column {
   outline-offset: 2px;
 }
 
+.qr-generator-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  gap: 20px;
+  align-items: start;
+}
+
+.qr-generator-form {
+  display: grid;
+  gap: 14px;
+}
+
+.qr-generated-link-field textarea {
+  min-height: 116px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.88rem;
+}
+
+.qr-generator-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.qr-preview-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.qr-preview-frame {
+  display: grid;
+  place-items: center;
+  min-height: 320px;
+  border: 1px solid #d9e1ee;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(49, 183, 200, 0.08), rgba(255, 255, 255, 0.94) 46%),
+    #fbfcff;
+  padding: 18px;
+}
+
+.qr-preview-frame img {
+  width: min(100%, 300px);
+  aspect-ratio: 1;
+  border: 10px solid #fff;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(17, 20, 26, 0.12);
+}
+
 body.lightbox-open {
   overflow: hidden;
 }
@@ -6683,6 +6733,14 @@ body.lightbox-open {
     min-width: 0;
     right: 0;
     padding: 16px;
+  }
+
+  .qr-generator-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .qr-preview-frame {
+    min-height: 260px;
   }
 
   .topnav-section-links {

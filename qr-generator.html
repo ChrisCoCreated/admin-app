@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - QR Generator</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/company_marketing_assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260601" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/company_marketing_assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <h1>QR Generator</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel qr-generator-panel">
+        <div class="qr-generator-grid">
+          <form id="qrGeneratorForm" class="qr-generator-form">
+            <label class="field" for="baseUrlInput">
+              Thrive page link
+              <input id="baseUrlInput" type="url" inputmode="url" value="https://www.thrivehomecare.co.uk/" required />
+            </label>
+            <label class="field" for="sourceInput">
+              Source
+              <input id="sourceInput" type="text" placeholder="leaflet, facebook, care-show" autocomplete="off" required />
+            </label>
+            <label class="field" for="campaignInput">
+              Campaign
+              <input id="campaignInput" type="text" placeholder="summer-2026" autocomplete="off" required />
+            </label>
+            <label class="field" for="mediumInput">
+              Medium
+              <input id="mediumInput" type="text" value="referral" autocomplete="off" required />
+            </label>
+            <label class="field qr-generated-link-field" for="generatedUrlOutput">
+              Generated link
+              <textarea id="generatedUrlOutput" readonly></textarea>
+            </label>
+            <div class="qr-generator-actions">
+              <button id="copyGeneratedUrlBtn" type="button">Copy link</button>
+              <a id="openGeneratedUrlLink" class="button-link" href="https://www.thrivehomecare.co.uk/" target="_blank" rel="noopener noreferrer">Open link</a>
+              <a id="downloadQrLink" class="button-link" href="#" download="thrive-qr-code.png">Download QR</a>
+            </div>
+            <p id="qrFormStatus" class="muted row-note" aria-live="polite"></p>
+          </form>
+
+          <div class="qr-preview-panel" aria-live="polite">
+            <div class="qr-preview-frame">
+              <img id="qrPreviewImage" alt="QR code preview" />
+            </div>
+            <p class="muted">QR codes use: {thrive page link}/?utm_source={source}&amp;utm_medium=referral&amp;utm_campaign={campaign}</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./qr-generator.js"></script>
+  </body>
+</html>
