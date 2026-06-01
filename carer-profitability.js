@@ -635,6 +635,7 @@ function renderKpiSet(container, total, flags = {}) {
     cards.push(
       renderKpiCard("Projected Scheduled", formatHours(total.projectedScheduledHours)),
       renderKpiCard("Projected Contracted", formatHours(total.projectedContractedHours)),
+      renderKpiCard("Projected Utilisation", formatPercent(total.projectedUtilisation)),
       renderKpiCard("Projected Profit", formatProfitCurrency(total.projectedProfit), {
         isNegativeProfit: total.projectedProfit < 0,
       })
@@ -796,6 +797,7 @@ function renderAreaRows(rows, flags = latestReport?.flags || {}) {
     appendOptionalCell(tr, formatPercent(area.utilisation), "actual", flags);
     appendOptionalCell(tr, formatHours(area.projectedScheduledHours), "projected", flags);
     appendOptionalCell(tr, formatHours(area.projectedContractedHours), "projected", flags);
+    appendOptionalCell(tr, formatPercent(area.projectedUtilisation), "projected", flags);
     appendOptionalCell(tr, formatCurrency(area.revenue), "actual", flags);
     appendOptionalCell(tr, formatCurrency(area.labourWithOnCost), "actual", flags);
     appendOptionalCell(tr, formatCurrency(area.travelExpense), "travel", flags);
