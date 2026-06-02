@@ -32,6 +32,7 @@ const ROLE_PAGES = {
     "suppliers",
     "consultant",
     "marketing",
+    "marketingreports",
     "photolayout",
   ],
   care_manager: [
@@ -75,7 +76,7 @@ const ROLE_PAGES = {
   finance: ["finance"],
   consultant: ["consultant", "agendas"],
   director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
-  marketing: ["marketing", "photolayout", "emailtemplates", "agendas", "reports"],
+  marketing: ["marketing", "marketingreports", "photolayout", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
   hr_only: ["carers", "timesheets", "recruitment", "agendas"],
@@ -88,7 +89,7 @@ const ROLE_PAGES = {
   logged_in: ["drivetime"],
 };
 const ACCESS_PAGE_EXPANSIONS = {
-  marketing: ["marketing", "photolayout", "emailtemplates", "agendas", "reports"],
+  marketing: ["marketing", "marketingreports", "photolayout", "emailtemplates", "agendas"],
   photolayout: ["photolayout", "agendas"],
   finance: ["finance"],
   mapping: ["timesheets", "mapping", "drivetime", "agendas"],

@@ -11,6 +11,8 @@ const statusMessage = document.getElementById("statusMessage");
 const baseUrlInput = document.getElementById("baseUrlInput");
 const sourceInput = document.getElementById("sourceInput");
 const mediumInput = document.getElementById("mediumInput");
+const mediumField = document.getElementById("mediumField");
+const editMediumBtn = document.getElementById("editMediumBtn");
 const campaignInput = document.getElementById("campaignInput");
 const generatedUrlOutput = document.getElementById("generatedUrlOutput");
 const copyGeneratedUrlBtn = document.getElementById("copyGeneratedUrlBtn");
@@ -169,6 +171,15 @@ async function init() {
 
 copyGeneratedUrlBtn?.addEventListener("click", () => {
   void copyGeneratedUrl();
+});
+
+editMediumBtn?.addEventListener("click", () => {
+  const isExpanded = !mediumField?.hidden;
+  if (mediumField) {
+    mediumField.hidden = isExpanded;
+  }
+  editMediumBtn.setAttribute("aria-expanded", String(!isExpanded));
+  editMediumBtn.textContent = isExpanded ? "Edit medium" : "Hide medium";
 });
 
 signOutBtn?.addEventListener("click", async () => {

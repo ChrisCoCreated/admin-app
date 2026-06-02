@@ -14,8 +14,8 @@ const ACCESS_ENV_KEYS = [
 
 const ROLE_BY_PAGE_KEY = new Map(
   [
-    ["clients,carers,whiteboard,simpletasks,tasks,mapping,drivetime,reports,marketing,photolayout", "admin"],
-    ["marketing,photolayout,reports", "marketing"],
+    ["clients,carers,whiteboard,simpletasks,tasks,mapping,drivetime,reports,marketing,marketingreports,photolayout", "admin"],
+    ["marketing,marketingreports,photolayout", "marketing"],
     ["photolayout", "photo_layout"],
     ["finance", "finance"],
     ["mapping,drivetime", "time_only"],
@@ -72,7 +72,7 @@ function resolveRoleFromFlags(flags) {
 
   const pages = [];
   if (flags.marketing) {
-    pages.push("marketing", "photolayout", "reports");
+    pages.push("marketing", "marketingreports", "photolayout");
   }
   if (flags.photoLayout) {
     pages.push("photolayout");

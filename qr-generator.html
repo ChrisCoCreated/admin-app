@@ -47,13 +47,22 @@
             </label>
             <label class="field" for="sourceInput">
               Source
-              <input id="sourceInput" type="text" placeholder="leaflet, facebook, care-show" autocomplete="off" required />
+              <input id="sourceInput" type="text" placeholder="kent-life, village-directory, leaflet" autocomplete="off" required />
             </label>
             <label class="field" for="campaignInput">
               Campaign
-              <input id="campaignInput" type="text" placeholder="summer-2026" autocomplete="off" required />
+              <input id="campaignInput" type="text" placeholder="advert-june-27, dementia-leaflet-mar-26" autocomplete="off" required />
             </label>
-            <label class="field" for="mediumInput">
+            <button
+              id="editMediumBtn"
+              class="secondary qr-medium-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="mediumField"
+            >
+              Edit medium
+            </button>
+            <label id="mediumField" class="field" for="mediumInput" hidden>
               Medium
               <input id="mediumInput" type="text" value="referral" autocomplete="off" required />
             </label>

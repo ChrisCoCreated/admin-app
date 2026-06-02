@@ -23,12 +23,13 @@ const ROLE_PAGES = {
     "suppliers",
     "consultant",
     "marketing",
+    "marketingreports",
     "photolayout",
   ],
   finance: ["finance"],
   consultant: ["consultant", "agendas"],
   director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
-  marketing: ["marketing", "photolayout", "emailtemplates", "agendas", "reports"],
+  marketing: ["marketing", "marketingreports", "photolayout", "emailtemplates", "agendas"],
   operations: [
     "clients",
     "carers",
@@ -59,7 +60,7 @@ const ROLE_PAGES = {
   logged_in: ["drivetime"],
 };
 const ACCESS_PAGE_EXPANSIONS = {
-  marketing: ["marketing", "photolayout", "emailtemplates", "agendas", "reports"],
+  marketing: ["marketing", "marketingreports", "photolayout", "emailtemplates", "agendas"],
   photolayout: ["photolayout", "agendas"],
   finance: ["finance"],
   mapping: ["timesheets", "mapping", "drivetime", "agendas"],

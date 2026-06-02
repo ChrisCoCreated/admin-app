@@ -25,6 +25,7 @@ const PAGE_LABELS = {
   drivetime: "Our Geography",
   consultant: "Consultant",
   marketing: "Marketing",
+  marketingreports: "Marketing Reports",
   photolayout: "Photo Layout",
   qrgenerator: "QR Generator",
   emailtemplates: "Email Templates",

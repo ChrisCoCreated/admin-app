@@ -4712,6 +4712,13 @@ tbody tr:hover .profitability-sticky-column {
   gap: 10px;
 }
 
+.qr-medium-toggle {
+  justify-self: start;
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 0.84rem;
+}
+
 .qr-preview-panel {
   display: grid;
   gap: 12px;

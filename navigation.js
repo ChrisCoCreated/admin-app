@@ -31,6 +31,7 @@ const ROLE_PAGES = {
     "suppliers",
     "consultant",
     "marketing",
+    "marketingreports",
     "photolayout",
     "qrgenerator",
   ],
@@ -75,7 +76,7 @@ const ROLE_PAGES = {
   finance: ["finance"],
   consultant: ["consultant", "agendas"],
   director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
-  marketing: ["marketing", "photolayout", "qrgenerator", "emailtemplates", "agendas", "reports"],
+  marketing: ["marketing", "marketingreports", "photolayout", "qrgenerator", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
   hr_only: ["carers", "timesheets", "recruitment", "agendas"],
@@ -89,7 +90,7 @@ const ROLE_PAGES = {
 };
 
 const ACCESS_PAGE_EXPANSIONS = {
-  marketing: ["marketing", "photolayout", "qrgenerator", "emailtemplates", "agendas", "reports"],
+  marketing: ["marketing", "marketingreports", "photolayout", "qrgenerator", "emailtemplates", "agendas"],
   photolayout: ["photolayout", "agendas"],
   finance: ["finance"],
   mapping: ["timesheets", "mapping", "drivetime", "agendas"],
@@ -127,6 +128,7 @@ const PAGE_META = {
   suppliers: { href: "./suppliers.html", label: "Suppliers & Experiences" },
   consultant: { href: "./consultant.html", label: "Consultant" },
   marketing: { href: "./marketing.html", label: "Marketing" },
+  marketingreports: { href: "./marketing-reports.html", label: "Marketing Reports", shortcutLabel: "Reports" },
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
   qrgenerator: { href: "./qr-generator.html", label: "QR Generator", shortcutLabel: "QR" },
 };
@@ -152,7 +154,7 @@ const MENU_GROUPS = [
   },
   {
     title: "Marketing & Content",
-    pages: ["emailtemplates", "marketing", "photolayout", "qrgenerator", "reports"],
+    pages: ["emailtemplates", "marketing", "marketingreports", "photolayout", "qrgenerator"],
   },
 ];
 

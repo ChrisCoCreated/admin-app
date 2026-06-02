@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Marketing Reports</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/company_marketing_assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260601" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/company_marketing_assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <h1>Marketing Reports</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel">
+        <h2>Analytics</h2>
+        <p class="muted">Open marketing reporting destinations and source-tracking tools.</p>
+        <div class="reports-grid">
+          <article class="report-card">
+            <h3>UTM Referrals</h3>
+            <p class="muted">Review sessions by source in Google Analytics for tracked referral links and QR campaigns.</p>
+            <p class="row">
+              <a
+                class="button-link"
+                href="https://analytics.google.com/analytics/web/?utm_source=OGB&utm_medium=app&authuser=0#/a349828617p482830695/reports/explorer?params=_u..nav%3Dmaui%26_r.explorerCard..startRow%3D0%26_r.explorerCard..seldim%3D%5B%22sessionSource%22%5D&ruid=lifecycle-traffic-acquisition-v2,business-objectives,generate-leads&collectionId=business-objectives&r=lifecycle-traffic-acquisition-v2"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open UTM Referrals</a
+              >
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Weekly Marketing KPIs</h3>
+            <p class="muted">Open the KPI dashboard to review the current marketing performance measures.</p>
+            <p class="row">
+              <a class="button-link" href="./kpis.html">Open KPIs</a>
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Thrive Brochure</h3>
+            <p class="muted">Open the brochure used for campaign follow-up and enquiry responses.</p>
+            <p class="row">
+              <a class="button-link" href="./assets/downloads/THRIVE brochure for email.pdf" target="_blank" rel="noopener noreferrer"
+                >Open Brochure</a
+              >
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Marketing Tools</h2>
+        <p class="muted">Jump to the connected tools and source lists used for campaign follow-up.</p>
+        <div class="reports-grid">
+          <article class="report-card">
+            <h3>QR Generator</h3>
+            <p class="muted">Create campaign links and QR codes with UTM source, medium, and campaign values.</p>
+            <p class="row">
+              <a class="button-link" href="./qr-generator.html">Open QR Generator</a>
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Marketing Photos</h3>
+            <p class="muted">View SharePoint photos and filter for images with marketing consent.</p>
+            <p class="row">
+              <a class="button-link" href="./marketing.html">Open Photos</a>
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Photo Layout</h3>
+            <p class="muted">Prepare client and company marketing images for social posts and campaigns.</p>
+            <p class="row">
+              <a class="button-link" href="./photo-layout.html">Open Layout Tool</a>
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Email Templates</h3>
+            <p class="muted">Open the reusable email templates used for enquiry and marketing follow-up.</p>
+            <p class="row">
+              <a class="button-link" href="./email-templates.html">Open Templates</a>
+            </p>
+          </article>
+
+          <article class="report-card">
+            <h3>Photos SharePoint List</h3>
+            <p class="muted">Open the source SharePoint list for photo and consent records.</p>
+            <p class="row">
+              <a
+                class="button-link"
+                href="https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Photos%20and%20Lists/AllItems.aspx?env=WebViewList"
+                target="_blank"
+                rel="noopener noreferrer"
+                >Open SharePoint List</a
+              >
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./marketing-reports.js"></script>
+  </body>
+</html>
