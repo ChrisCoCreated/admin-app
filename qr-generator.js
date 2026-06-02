@@ -179,7 +179,7 @@ editMediumBtn?.addEventListener("click", () => {
     mediumField.hidden = isExpanded;
   }
   editMediumBtn.setAttribute("aria-expanded", String(!isExpanded));
-  editMediumBtn.textContent = isExpanded ? "Edit medium" : "Hide medium";
+  editMediumBtn.textContent = isExpanded ? "Advanced" : "Hide advanced";
 });
 
 signOutBtn?.addEventListener("click", async () => {
