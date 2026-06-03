@@ -33,6 +33,7 @@ const SKIPPED_FIELD_TITLES = new Set([
 ]);
 const ADDED_BY_FIELD_HINTS = [
   "addedby",
+  "createdby",
   "userwhofirstsentanemailtothisperson",
   "whofirstsentanemail",
   "firstsentanemail",
