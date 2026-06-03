@@ -31,6 +31,13 @@ const SKIPPED_FIELD_TITLES = new Set([
   "invite to east kent events",
   "response 15/01/26",
 ]);
+const ADDED_BY_FIELD_HINTS = [
+  "addedby",
+  "userwhofirstsentanemailtothisperson",
+  "whofirstsentanemail",
+  "firstsentanemail",
+  "firstsentemail",
+];
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
@@ -131,7 +138,12 @@ function isSkippedField(field) {
 }
 
 function isAddedByField(field) {
-  return normalizeIdentifier(field?.Title) === "addedby" || normalizeIdentifier(field?.InternalName) === "addedby";
+  const candidates = [
+    normalizeIdentifier(field?.Title),
+    normalizeIdentifier(field?.InternalName),
+    normalizeIdentifier(field?.Description),
+  ].filter(Boolean);
+  return candidates.some((candidate) => ADDED_BY_FIELD_HINTS.some((hint) => candidate.includes(hint)));
 }
 
 function isSupportedField(field) {
@@ -241,10 +253,11 @@ function setLinkedInBusyState() {
 
 function toFieldDefinition(field) {
   const title = normalizeText(field?.Title);
+  const displayTitle = isAddedByField(field) ? "Added by" : normalizeKey(title) === "title" ? "Surname" : title;
   return {
     internalName: normalizeText(field?.InternalName),
     title,
-    displayTitle: normalizeKey(title) === "title" ? "Surname" : title,
+    displayTitle,
     type: normalizeText(field?.TypeAsString),
     required: field?.Required === true,
     description: normalizeText(field?.Description),
@@ -491,8 +504,26 @@ async function loadListInfo() {
   const api = getSpApi();
   listInfo = await api.resolveListByPath(MASTER_CONTACTS_LIST_PATH);
   const fields = await api.getListFields(listInfo.Id);
+  console.info(
+    "[Add Contact] SharePoint fields loaded",
+    fields.map((field) => ({
+      title: field?.Title || "",
+      internalName: field?.InternalName || "",
+      type: field?.TypeAsString || "",
+      description: field?.Description || "",
+      isAddedBy: isAddedByField(field),
+      hidden: field?.Hidden === true,
+      readOnly: field?.ReadOnlyField === true,
+    })),
+  );
   supportedFields = sortFields(fields.filter(isSupportedField)).map(toFieldDefinition);
+  if (!supportedFields.some(isAddedByField)) {
+    console.warn("[Add Contact] Added by field was not found in supported fields.", {
+      expectedUsername: currentUserEmail,
+    });
+  }
   renderContactForm();
+  setAddedByValue();
   await loadLinkedInLinks(fields);
 }
 
