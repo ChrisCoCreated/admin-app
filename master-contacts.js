@@ -376,6 +376,10 @@ function renderContactForm() {
   contactForm.innerHTML = "";
 
   for (const field of supportedFields) {
+    if (isAddedByField(field)) {
+      continue;
+    }
+
     const label = document.createElement("label");
     label.className = "field";
     label.htmlFor = buildInputId(field);
@@ -416,6 +420,11 @@ function setAddedByValue() {
         internalName: field.internalName,
         expectedUsername: currentUserEmail,
         controlValue: control.value,
+      });
+    } else {
+      console.info("[Add Contact] Added by field hidden; value will be saved in payload", {
+        internalName: field.internalName,
+        expectedUsername: currentUserEmail,
       });
     }
   }

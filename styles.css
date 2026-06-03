@@ -3972,6 +3972,51 @@ dd {
   font-size: 1.05rem;
 }
 
+.marketing-stories-main {
+  padding-bottom: 44px;
+}
+
+.marketing-story-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.marketing-story-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.section-kicker {
+  margin-bottom: 6px;
+  color: #73561a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.marketing-story-cta {
+  flex: 0 0 auto;
+  background: #1f2228;
+}
+
+.marketing-story-image-link {
+  display: block;
+  overflow: hidden;
+  border: 1px solid #d8deea;
+  border-radius: 14px;
+  background: #f8fafc;
+  box-shadow: 0 12px 26px rgba(17, 20, 26, 0.08);
+}
+
+.marketing-story-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .subtle-link {
   min-height: 34px;
   padding: 7px 12px;
@@ -6762,6 +6807,15 @@ body.lightbox-open {
   .suppliers-hero {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .marketing-story-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .marketing-story-cta {
+    width: 100%;
   }
 
   .suppliers-mode-shell {

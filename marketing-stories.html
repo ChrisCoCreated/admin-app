@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Marketing Stories</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/company_marketing_assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260603" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/company_marketing_assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container marketing-stories-main">
+      <section class="hero compact">
+        <h1>Marketing Stories</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel marketing-story-panel">
+        <div class="marketing-story-head">
+          <div>
+            <p class="section-kicker">PERMA in action</p>
+            <h2>Real stories from our clients</h2>
+            <p class="muted">
+              Use this page as the quick jump to the PERMA story section and the current marketing story artwork.
+            </p>
+          </div>
+          <a
+            class="button-link marketing-story-cta"
+            href="https://www.thrivehomecare.co.uk/adviceandsupport/categories/perma"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Read PERMA case studies</a
+          >
+        </div>
+
+        <a
+          class="marketing-story-image-link"
+          href="https://www.thrivehomecare.co.uk/adviceandsupport/categories/perma"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open PERMA case studies"
+        >
+          <img
+            class="marketing-story-image"
+            src="./assets/marketing-stories-perma.png"
+            alt="PERMA in Action panel linking to real stories from Thrive clients"
+          />
+        </a>
+      </section>
+    </main>
+
+    <script type="module" src="./marketing-stories.js"></script>
+  </body>
+</html>
