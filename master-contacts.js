@@ -25,6 +25,11 @@ const SKIPPED_INTERNAL_NAMES = new Set([
   "_moderationstatus",
   "_moderationcomments",
 ]);
+const SKIPPED_FIELD_TITLES = new Set([
+  "enquiry date time",
+  "invite to east kent events",
+  "response 15/01/26",
+]);
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
@@ -49,6 +54,7 @@ let supportedFields = [];
 let unsupportedFields = [];
 let spApi = null;
 let saving = false;
+let currentUserEmail = "";
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -94,7 +100,12 @@ function getSpApi() {
 
 function isSkippedField(field) {
   const internalName = normalizeKey(field?.InternalName);
-  return !internalName || SKIPPED_INTERNAL_NAMES.has(internalName);
+  const title = normalizeKey(field?.Title);
+  return !internalName || SKIPPED_INTERNAL_NAMES.has(internalName) || SKIPPED_FIELD_TITLES.has(title);
+}
+
+function isAddedByField(field) {
+  return normalizeKey(field?.Title) === "added by" || normalizeKey(field?.InternalName) === "addedby";
 }
 
 function isSupportedField(field) {
@@ -106,6 +117,10 @@ function isSupportedField(field) {
 
 function getFieldPriority(field) {
   const key = normalizeKey(field?.Title);
+  if (isAddedByField(field)) {
+    return 1000;
+  }
+
   const priorities = new Map([
     ["title", 0],
     ["first name", 1],
@@ -155,6 +170,9 @@ function buildInputId(field) {
 
 function buildFieldHelpText(field) {
   const parts = [];
+  if (isAddedByField(field)) {
+    parts.push("Set automatically");
+  }
   if (field.required) {
     parts.push("Required");
   }
@@ -222,6 +240,20 @@ function createFieldControl(field) {
   control.dataset.internalName = field.internalName;
   control.dataset.fieldType = field.type;
   control.required = field.required;
+  if (isAddedByField(field)) {
+    if (control.tagName === "SELECT" && currentUserEmail && !field.choices.includes(currentUserEmail)) {
+      const userOption = document.createElement("option");
+      userOption.value = currentUserEmail;
+      userOption.textContent = currentUserEmail;
+      control.appendChild(userOption);
+    }
+    control.value = currentUserEmail;
+    control.readOnly = true;
+    if (control.tagName === "SELECT") {
+      control.disabled = true;
+    }
+    control.setAttribute("aria-readonly", "true");
+  }
   control.classList.add("wellbeing-field-control");
   return control;
 }
@@ -262,6 +294,18 @@ function getFieldControl(internalName) {
   return contactForm.querySelector(`[data-internal-name="${internalName}"]`);
 }
 
+function setAddedByValue() {
+  for (const field of supportedFields) {
+    if (!isAddedByField(field)) {
+      continue;
+    }
+    const control = getFieldControl(field.internalName);
+    if (control) {
+      control.value = currentUserEmail;
+    }
+  }
+}
+
 function coerceFieldValue(field, rawValue) {
   const value = normalizeText(rawValue);
   if (!value) {
@@ -300,6 +344,7 @@ function coerceFieldValue(field, rawValue) {
 }
 
 function collectPayload() {
+  setAddedByValue();
   const payload = {
     __metadata: { type: listInfo?.ListItemEntityTypeFullName || "" },
   };
@@ -321,6 +366,7 @@ function collectPayload() {
 
 function resetForm() {
   contactForm.reset();
+  setAddedByValue();
   setSaveStatus("Form cleared.");
 }
 
@@ -349,6 +395,7 @@ async function handleSave() {
     const result = await getSpApi().createListItem(listInfo.Id, payload);
     const itemId = Number(result?.d?.Id || 0);
     contactForm.reset();
+    setAddedByValue();
     setSaveStatus(itemId ? `Saved to SharePoint as item #${itemId}.` : "Saved to SharePoint.");
   } catch (error) {
     console.error(error);
@@ -377,9 +424,10 @@ async function init() {
 
     renderTopNavigation({ role: currentRole });
     const email = normalizeText(profile?.email);
+    currentUserEmail = email || normalizeText(account?.username);
     setStatus(email ? `Signed in as ${email}. Loading live SharePoint fields...` : "Loading live SharePoint fields...");
     await loadListInfo();
-    setStatus(`Ready to create a new contact in ${normalizeText(listInfo?.Title) || "Master Contacts"}.`);
+    setStatus(`Ready to add a contact to ${normalizeText(listInfo?.Title) || "Master Contacts"}.`);
     setSaveStatus("Nothing has been saved yet.");
   } catch (error) {
     if (error?.status === 403) {
@@ -387,7 +435,7 @@ async function init() {
       return;
     }
     console.error(error);
-    setStatus(error?.message || "Could not initialize the Master Contacts form.", true);
+    setStatus(error?.message || "Could not initialize the Add Contact form.", true);
     setSaveStatus("Saving is unavailable until the SharePoint form loads.", true);
   } finally {
     setBusyState();
