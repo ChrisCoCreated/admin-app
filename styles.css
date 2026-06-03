@@ -3999,7 +3999,13 @@ dd {
 
 .marketing-story-cta {
   flex: 0 0 auto;
+  min-height: 54px;
+  padding: 14px 22px;
+  border-radius: 999px;
   background: #1f2228;
+  font-size: 1.08rem;
+  font-weight: 800;
+  box-shadow: 0 16px 34px rgba(17, 20, 26, 0.18);
 }
 
 .marketing-story-image-link {
