@@ -90,6 +90,19 @@ function normalizeKey(value) {
   return normalizeText(value).toLowerCase();
 }
 
+function normalizeIdentifier(value) {
+  return normalizeKey(value).replace(/[^a-z0-9]/g, "");
+}
+
+function getAccountUsername(account) {
+  return normalizeText(
+    account?.username ||
+      account?.idTokenClaims?.preferred_username ||
+      account?.idTokenClaims?.upn ||
+      account?.idTokenClaims?.email,
+  );
+}
+
 function getSiteConfig() {
   const siteUrl = new URL(MARKETING_SITE_URL);
   return {
@@ -116,7 +129,7 @@ function isSkippedField(field) {
 }
 
 function isAddedByField(field) {
-  return normalizeKey(field?.Title) === "added by" || normalizeKey(field?.InternalName) === "addedby";
+  return normalizeKey(field?.Title) === "added by" || normalizeIdentifier(field?.InternalName) === "addedby";
 }
 
 function isSupportedField(field) {
@@ -422,7 +435,7 @@ function collectPayload() {
 
   for (const field of supportedFields) {
     const control = getFieldControl(field.internalName);
-    const rawValue = control?.value;
+    const rawValue = isAddedByField(field) ? currentUserEmail : control?.value;
     if (field.required && !normalizeText(rawValue)) {
       throw new Error(`${field.displayTitle || field.title} is required.`);
     }
@@ -593,8 +606,11 @@ async function init() {
     }
 
     renderTopNavigation({ role: currentRole });
+    currentUserEmail = getAccountUsername(account);
     const email = normalizeText(profile?.email);
-    currentUserEmail = email || normalizeText(account?.username);
+    if (!currentUserEmail) {
+      currentUserEmail = email;
+    }
     setStatus(email ? `Signed in as ${email}. Loading live SharePoint fields...` : "Loading live SharePoint fields...");
     await loadListInfo();
     setStatus(`Ready to add a contact to ${normalizeText(listInfo?.Title) || "Master Contacts"}.`);
