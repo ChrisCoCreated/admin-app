@@ -36,8 +36,6 @@ const statusMessage = document.getElementById("statusMessage");
 const openListLink = document.getElementById("openListLink");
 const contactForm = document.getElementById("contactForm");
 const formMeta = document.getElementById("formMeta");
-const unsupportedFieldsWrap = document.getElementById("unsupportedFieldsWrap");
-const unsupportedFieldsText = document.getElementById("unsupportedFieldsText");
 const saveBtn = document.getElementById("saveBtn");
 const resetDraftBtn = document.getElementById("resetDraftBtn");
 const saveStatus = document.getElementById("saveStatus");
@@ -51,7 +49,6 @@ const directoryApi = createDirectoryApi(authController);
 let currentRole = "";
 let listInfo = null;
 let supportedFields = [];
-let unsupportedFields = [];
 let spApi = null;
 let saving = false;
 let currentUserEmail = "";
@@ -122,9 +119,10 @@ function getFieldPriority(field) {
   }
 
   const priorities = new Map([
-    ["title", 0],
-    ["first name", 1],
-    ["last name", 2],
+    ["first name", 0],
+    ["title", 1],
+    ["surname", 1],
+    ["last name", 1],
     ["name", 3],
     ["organisation", 4],
     ["organization", 4],
@@ -152,9 +150,11 @@ function sortFields(fields) {
 }
 
 function toFieldDefinition(field) {
+  const title = normalizeText(field?.Title);
   return {
     internalName: normalizeText(field?.InternalName),
-    title: normalizeText(field?.Title),
+    title,
+    displayTitle: normalizeKey(title) === "title" ? "Surname" : title,
     type: normalizeText(field?.TypeAsString),
     required: field?.Required === true,
     description: normalizeText(field?.Description),
@@ -265,7 +265,7 @@ function renderContactForm() {
     const label = document.createElement("label");
     label.className = "field";
     label.htmlFor = buildInputId(field);
-    label.textContent = field.title;
+    label.textContent = field.displayTitle || field.title;
 
     const control = createFieldControl(field);
     label.appendChild(control);
@@ -281,10 +281,6 @@ function renderContactForm() {
     contactForm.appendChild(label);
   }
 
-  unsupportedFieldsWrap.hidden = unsupportedFields.length === 0;
-  unsupportedFieldsText.textContent = unsupportedFields.length
-    ? unsupportedFields.map((field) => field.Title).join(", ")
-    : "";
   formMeta.textContent = supportedFields.length
     ? `${supportedFields.length} editable SharePoint fields loaded from the live list.`
     : "No editable SharePoint fields were found.";
@@ -319,7 +315,7 @@ function coerceFieldValue(field, rawValue) {
   if (field.type === "Number" || field.type === "Currency") {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) {
-      throw new Error(`${field.title} must be a valid number.`);
+      throw new Error(`${field.displayTitle || field.title} must be a valid number.`);
     }
     return numeric;
   }
@@ -353,7 +349,7 @@ function collectPayload() {
     const control = getFieldControl(field.internalName);
     const rawValue = control?.value;
     if (field.required && !normalizeText(rawValue)) {
-      throw new Error(`${field.title} is required.`);
+      throw new Error(`${field.displayTitle || field.title} is required.`);
     }
     const coerced = coerceFieldValue(field, rawValue);
     if (coerced != null) {
@@ -381,7 +377,6 @@ async function loadListInfo() {
   listInfo = await api.resolveListByPath(MASTER_CONTACTS_LIST_PATH);
   const fields = await api.getListFields(listInfo.Id);
   supportedFields = sortFields(fields.filter(isSupportedField)).map(toFieldDefinition);
-  unsupportedFields = sortFields(fields.filter((field) => !isSupportedField(field) && !isSkippedField(field)));
   renderContactForm();
 }
 
