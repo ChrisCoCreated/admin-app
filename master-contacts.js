@@ -33,7 +33,6 @@ const SKIPPED_FIELD_TITLES = new Set([
 ]);
 const ADDED_BY_FIELD_HINTS = [
   "addedby",
-  "createdby",
   "userwhofirstsentanemailtothisperson",
   "whofirstsentanemail",
   "firstsentanemail",
@@ -140,9 +139,9 @@ function isSkippedField(field) {
 
 function isAddedByField(field) {
   const candidates = [
-    normalizeIdentifier(field?.Title),
-    normalizeIdentifier(field?.InternalName),
-    normalizeIdentifier(field?.Description),
+    normalizeIdentifier(field?.Title || field?.title),
+    normalizeIdentifier(field?.InternalName || field?.internalName),
+    normalizeIdentifier(field?.Description || field?.description),
   ].filter(Boolean);
   return candidates.some((candidate) => ADDED_BY_FIELD_HINTS.some((hint) => candidate.includes(hint)));
 }
@@ -513,6 +512,7 @@ async function loadListInfo() {
       type: field?.TypeAsString || "",
       description: field?.Description || "",
       isAddedBy: isAddedByField(field),
+      isSupported: isSupportedField(field),
       hidden: field?.Hidden === true,
       readOnly: field?.ReadOnlyField === true,
     })),
