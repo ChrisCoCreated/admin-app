@@ -129,7 +129,7 @@ const PAGE_META = {
   suppliers: { href: "./suppliers.html", label: "Suppliers & Experiences" },
   consultant: { href: "./consultant.html", label: "Consultant" },
   marketing: { href: "./marketing.html", label: "Marketing" },
-  mastercontacts: { href: "./master-contacts.html", label: "Add Contact", shortcutLabel: "Contact" },
+  mastercontacts: { href: "./master-contacts.html", label: "Master Contacts", shortcutLabel: "Contacts" },
   marketingreports: { href: "./marketing-reports.html", label: "Marketing Reports", shortcutLabel: "Reports" },
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
   qrgenerator: { href: "./qr-generator.html", label: "QR Generator", shortcutLabel: "QR" },

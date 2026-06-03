@@ -2,15 +2,16 @@ import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260603";
-import { createSharePointApi } from "./sharepoint-list-utils.js";
+import { buildFieldMaps, createSharePointApi, fieldByTitle } from "./sharepoint-list-utils.js";
 
 const MARKETING_SITE_URL =
   FRONTEND_CONFIG.sharePoint?.marketingSiteUrl || "https://planwithcare.sharepoint.com/sites/Marketing";
 const MASTER_CONTACTS_LIST_PATH =
   FRONTEND_CONFIG.sharePoint?.masterContactsListPath || "/sites/Marketing/Lists/Master Contacts";
 const SHAREPOINT_LIST_URL =
-  "https://planwithcare.sharepoint.com/sites/Marketing/Lists/Master%20Contacts/AllItems.aspx?viewid=d24bd223%2D977a%2D4584%2Da766%2Df5852044b758&env=WebViewList";
+  "https://planwithcare.sharepoint.com/sites/Marketing/Lists/Master%20Contacts/AllItems.aspx?env=WebViewList";
 const SUPPORTED_FIELD_TYPES = new Set(["Text", "Note", "Choice", "MultiChoice", "Boolean", "DateTime", "Number", "Currency", "URL"]);
+const LINKEDIN_BATCH_SIZE = 10;
 const SKIPPED_INTERNAL_NAMES = new Set([
   "id",
   "contenttype",
@@ -39,6 +40,11 @@ const formMeta = document.getElementById("formMeta");
 const saveBtn = document.getElementById("saveBtn");
 const resetDraftBtn = document.getElementById("resetDraftBtn");
 const saveStatus = document.getElementById("saveStatus");
+const linkedinMeta = document.getElementById("linkedinMeta");
+const linkedinStatus = document.getElementById("linkedinStatus");
+const openLinkedInBatchBtn = document.getElementById("openLinkedInBatchBtn");
+const nextLinkedInBatchBtn = document.getElementById("nextLinkedInBatchBtn");
+const resetLinkedInBatchBtn = document.getElementById("resetLinkedInBatchBtn");
 
 const authController = createAuthController({
   tenantId: FRONTEND_CONFIG.tenantId,
@@ -52,6 +58,9 @@ let supportedFields = [];
 let spApi = null;
 let saving = false;
 let currentUserEmail = "";
+let loadingLinkedInLinks = false;
+let linkedinLinks = [];
+let linkedinBatchIndex = 0;
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -61,6 +70,11 @@ function setStatus(message, isError = false) {
 function setSaveStatus(message, isError = false) {
   saveStatus.textContent = message;
   saveStatus.classList.toggle("error", isError);
+}
+
+function setLinkedInStatus(message, isError = false) {
+  linkedinStatus.textContent = message;
+  linkedinStatus.classList.toggle("error", isError);
 }
 
 function redirectToUnauthorized(pageKey) {
@@ -147,6 +161,67 @@ function sortFields(fields) {
     }
     return normalizeText(left?.Title).localeCompare(normalizeText(right?.Title), undefined, { sensitivity: "base" });
   });
+}
+
+function getContactLabel(item) {
+  const parts = [
+    normalizeText(item?.FirstName || item?.First_x0020_Name),
+    normalizeText(item?.Title || item?.Surname || item?.LastName || item?.Last_x0020_Name),
+    normalizeText(item?.Organisation || item?.Organization || item?.Company),
+  ].filter(Boolean);
+  return parts.length ? parts.join(" ") : `SharePoint item #${item?.Id || ""}`.trim();
+}
+
+function normalizeUrlValue(value) {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    const trimmed = normalizeText(value);
+    if (!trimmed) {
+      return "";
+    }
+    const [maybeUrl] = trimmed.split(/,\s*/);
+    return maybeUrl || trimmed;
+  }
+
+  return normalizeText(value.Url || value.url || value.Description || value.description);
+}
+
+function normalizeExternalUrl(value) {
+  const url = normalizeUrlValue(value);
+  if (!url) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  if (/^www\./i.test(url) || /^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(url)) {
+    return `https://${url}`;
+  }
+  return "";
+}
+
+function getLinkedInLinkSummary() {
+  const total = linkedinLinks.length;
+  if (!total) {
+    return "No LinkedIn links were found in the live list.";
+  }
+  const opened = Math.min(linkedinBatchIndex, total);
+  const remaining = Math.max(total - opened, 0);
+  return `${total} LinkedIn link${total === 1 ? "" : "s"} loaded. ${opened} opened, ${remaining} remaining.`;
+}
+
+function setLinkedInBusyState() {
+  const hasLinks = linkedinLinks.length > 0;
+  const canOpenNext = hasLinks && linkedinBatchIndex < linkedinLinks.length && !loadingLinkedInLinks;
+  const canReset = hasLinks && linkedinBatchIndex > 0 && !loadingLinkedInLinks;
+  openLinkedInBatchBtn.disabled = !canOpenNext;
+  nextLinkedInBatchBtn.disabled = !canOpenNext;
+  resetLinkedInBatchBtn.disabled = !canReset;
+  openLinkedInBatchBtn.textContent = linkedinBatchIndex > 0 ? "Open next 10" : "Open first 10";
+  linkedinMeta.textContent = loadingLinkedInLinks ? "Loading LinkedIn links from the live list..." : getLinkedInLinkSummary();
 }
 
 function toFieldDefinition(field) {
@@ -370,6 +445,7 @@ function setBusyState() {
   saveBtn.disabled = saving || !supportedFields.length;
   resetDraftBtn.disabled = saving || !supportedFields.length;
   saveBtn.textContent = saving ? "Saving..." : "Save to SharePoint";
+  setLinkedInBusyState();
 }
 
 async function loadListInfo() {
@@ -378,6 +454,105 @@ async function loadListInfo() {
   const fields = await api.getListFields(listInfo.Id);
   supportedFields = sortFields(fields.filter(isSupportedField)).map(toFieldDefinition);
   renderContactForm();
+  await loadLinkedInLinks(fields);
+}
+
+async function fetchAllListItems(path) {
+  const api = getSpApi();
+  const items = [];
+  let nextPath = path;
+
+  while (nextPath) {
+    const data = await api.request(nextPath);
+    if (Array.isArray(data?.d?.results)) {
+      items.push(...data.d.results);
+    }
+    nextPath = data?.d?.__next || "";
+  }
+
+  return items;
+}
+
+async function loadLinkedInLinks(fields) {
+  loadingLinkedInLinks = true;
+  linkedinLinks = [];
+  linkedinBatchIndex = 0;
+  setLinkedInStatus("Loading LinkedIn links from SharePoint...");
+  setLinkedInBusyState();
+
+  try {
+    const fieldMap = buildFieldMaps(fields);
+    const linkedInField = fieldByTitle(fieldMap, ["LinkedIn", "Linked In", "LinkedIn URL", "LinkedIn Profile"]);
+    if (!linkedInField?.InternalName) {
+      throw new Error("Could not find a LinkedIn column in Master Contacts.");
+    }
+
+    const selectFields = Array.from(new Set(["Id", "Title", linkedInField.InternalName]));
+    const query = selectFields.join(",");
+    const items = await fetchAllListItems(
+      `/_api/web/lists(guid'${listInfo.Id}')/items?$top=5000&$orderby=Id asc&$select=${encodeURIComponent(query)}`
+    );
+    const seenUrls = new Set();
+
+    linkedinLinks = items
+      .map((item) => {
+        const url = normalizeExternalUrl(item?.[linkedInField.InternalName]);
+        return {
+          id: Number(item?.Id || 0),
+          label: getContactLabel(item),
+          url,
+        };
+      })
+      .filter((entry) => {
+        if (!entry.url || seenUrls.has(entry.url)) {
+          return false;
+        }
+        seenUrls.add(entry.url);
+        return true;
+      });
+
+    setLinkedInStatus(linkedinLinks.length ? "Ready to open LinkedIn links in batches of 10." : "No LinkedIn links were found.");
+  } catch (error) {
+    console.error(error);
+    setLinkedInStatus(error?.message || "Could not load LinkedIn links.", true);
+  } finally {
+    loadingLinkedInLinks = false;
+    setLinkedInBusyState();
+  }
+}
+
+function openLinkedInBatch() {
+  if (!linkedinLinks.length || linkedinBatchIndex >= linkedinLinks.length) {
+    setLinkedInStatus("All LinkedIn links have been opened.");
+    setLinkedInBusyState();
+    return;
+  }
+
+  const startIndex = linkedinBatchIndex;
+  const batch = linkedinLinks.slice(startIndex, startIndex + LINKEDIN_BATCH_SIZE);
+  let openedCount = 0;
+
+  for (const entry of batch) {
+    const openedWindow = window.open(entry.url, "_blank");
+    if (openedWindow) {
+      openedWindow.opener = null;
+      openedCount += 1;
+    }
+  }
+
+  linkedinBatchIndex = startIndex + batch.length;
+  const firstNumber = startIndex + 1;
+  const lastNumber = startIndex + batch.length;
+  const blockedCount = batch.length - openedCount;
+  const blockedNote = blockedCount ? ` ${blockedCount} tab${blockedCount === 1 ? "" : "s"} may have been blocked by the browser.` : "";
+  setLinkedInStatus(`Opened LinkedIn links ${firstNumber}-${lastNumber} of ${linkedinLinks.length}.${blockedNote}`, Boolean(blockedCount));
+  setLinkedInBusyState();
+}
+
+function resetLinkedInBatch() {
+  linkedinBatchIndex = 0;
+  setLinkedInStatus("Reset to the first LinkedIn batch.");
+  setLinkedInBusyState();
 }
 
 async function handleSave() {
@@ -444,6 +619,18 @@ saveBtn?.addEventListener("click", () => {
 
 resetDraftBtn?.addEventListener("click", () => {
   resetForm();
+});
+
+openLinkedInBatchBtn?.addEventListener("click", () => {
+  openLinkedInBatch();
+});
+
+nextLinkedInBatchBtn?.addEventListener("click", () => {
+  openLinkedInBatch();
+});
+
+resetLinkedInBatchBtn?.addEventListener("click", () => {
+  resetLinkedInBatch();
 });
 
 signOutBtn?.addEventListener("click", () => {
