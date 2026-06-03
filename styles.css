@@ -4569,6 +4569,11 @@ tbody tr:hover .profitability-sticky-column {
   margin-top: 6px;
 }
 
+.master-contacts-readonly-field {
+  background: #f4f7fb;
+  color: #536078;
+}
+
 .wellbeing-intake-unsupported {
   margin-top: 18px;
   padding-top: 14px;

@@ -91,7 +91,9 @@ function normalizeKey(value) {
 }
 
 function normalizeIdentifier(value) {
-  return normalizeKey(value).replace(/[^a-z0-9]/g, "");
+  return normalizeKey(value)
+    .replace(/_x[0-9a-f]{4}_/gi, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function getAccountUsername(account) {
@@ -129,7 +131,7 @@ function isSkippedField(field) {
 }
 
 function isAddedByField(field) {
-  return normalizeKey(field?.Title) === "added by" || normalizeIdentifier(field?.InternalName) === "addedby";
+  return normalizeIdentifier(field?.Title) === "addedby" || normalizeIdentifier(field?.InternalName) === "addedby";
 }
 
 function isSupportedField(field) {
@@ -257,10 +259,11 @@ function buildInputId(field) {
 }
 
 function buildFieldHelpText(field) {
-  const parts = [];
   if (isAddedByField(field)) {
-    parts.push("Set automatically");
+    return "";
   }
+
+  const parts = [];
   if (field.required) {
     parts.push("Required");
   }
@@ -329,6 +332,11 @@ function createFieldControl(field) {
   control.dataset.fieldType = field.type;
   control.required = field.required;
   if (isAddedByField(field)) {
+    console.info("[Add Contact] Added by field detected", {
+      title: field.title,
+      internalName: field.internalName,
+      expectedUsername: currentUserEmail,
+    });
     if (control.tagName === "SELECT" && currentUserEmail && !field.choices.includes(currentUserEmail)) {
       const userOption = document.createElement("option");
       userOption.value = currentUserEmail;
@@ -337,10 +345,15 @@ function createFieldControl(field) {
     }
     control.value = currentUserEmail;
     control.readOnly = true;
+    control.classList.add("master-contacts-readonly-field");
     if (control.tagName === "SELECT") {
       control.disabled = true;
     }
     control.setAttribute("aria-readonly", "true");
+    console.info("[Add Contact] Added by control populated", {
+      internalName: field.internalName,
+      value: control.value,
+    });
   }
   control.classList.add("wellbeing-field-control");
   return control;
@@ -386,6 +399,11 @@ function setAddedByValue() {
     const control = getFieldControl(field.internalName);
     if (control) {
       control.value = currentUserEmail;
+      console.info("[Add Contact] Added by value reset", {
+        internalName: field.internalName,
+        expectedUsername: currentUserEmail,
+        controlValue: control.value,
+      });
     }
   }
 }
@@ -436,6 +454,14 @@ function collectPayload() {
   for (const field of supportedFields) {
     const control = getFieldControl(field.internalName);
     const rawValue = isAddedByField(field) ? currentUserEmail : control?.value;
+    if (isAddedByField(field)) {
+      console.info("[Add Contact] Added by payload value", {
+        internalName: field.internalName,
+        expectedUsername: currentUserEmail,
+        controlValue: control?.value || "",
+        payloadValue: rawValue,
+      });
+    }
     if (field.required && !normalizeText(rawValue)) {
       throw new Error(`${field.displayTitle || field.title} is required.`);
     }
@@ -611,6 +637,11 @@ async function init() {
     if (!currentUserEmail) {
       currentUserEmail = email;
     }
+    console.info("[Add Contact] Current user resolved", {
+      accountUsername: getAccountUsername(account),
+      profileEmail: email,
+      expectedAddedBy: currentUserEmail,
+    });
     setStatus(email ? `Signed in as ${email}. Loading live SharePoint fields...` : "Loading live SharePoint fields...");
     await loadListInfo();
     setStatus(`Ready to add a contact to ${normalizeText(listInfo?.Title) || "Master Contacts"}.`);
