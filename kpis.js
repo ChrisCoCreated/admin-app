@@ -585,7 +585,7 @@ function buildActiveEnquiriesList(activeEnquiries) {
   `;
 }
 
-function openActiveEnquiriesModal(activeEnquiries = {}) {
+function openActiveEnquiriesModal(activeEnquiries = {}, fallbackCount = null) {
   const modal = ensureTrendModal();
   const titleNode = modal.querySelector("#kpiTrendModalTitle");
   const statsNode = modal.querySelector("#kpiTrendModalStats");
@@ -596,8 +596,9 @@ function openActiveEnquiriesModal(activeEnquiries = {}) {
     titleNode.textContent = "Current Active Enquiries";
   }
   if (statsNode) {
+    const count = Number(activeEnquiries?.count || 0) || parseNumber(fallbackCount) || 0;
     statsNode.innerHTML = `
-      <div><span>Current Active</span><strong>${escapeHtml(formatNumber(activeEnquiries?.count ?? 0))}</strong><small>From Enquiries Log</small></div>
+      <div><span>Current Active</span><strong>${escapeHtml(formatNumber(count))}</strong><small>From Enquiries Log</small></div>
     `;
   }
   if (chartNode) {
@@ -897,7 +898,7 @@ function renderEnquiries(payload) {
       value: formatNumber(metricValue(payload, "activeEnquiries")?.value),
       metric: metricValue(payload, "activeEnquiries"),
       latestWeekLabelText: latestLabel,
-      onClick: () => openActiveEnquiriesModal(payload?.activeEnquiries),
+      onClick: () => openActiveEnquiriesModal(payload?.activeEnquiries, metricValue(payload, "activeEnquiries")?.value),
     }),
     createKpiMetricCard({
       title: "Enquiries Total /wk",

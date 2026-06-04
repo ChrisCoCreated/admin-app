@@ -650,7 +650,26 @@ function isOnHoldEnquiryStatus(status) {
 
 function isActiveEnquiryStatus(status) {
   const normalized = normalizeEnquiryStatus(status);
-  return normalized === "active" || normalized.includes("active enquiry") || normalized.includes("current active");
+  if (!normalized) {
+    return false;
+  }
+  if (normalized === "active" || normalized.includes("active enquiry") || normalized.includes("current active")) {
+    return true;
+  }
+  const terminalTokens = [
+    "won",
+    "lost",
+    "on hold",
+    "closed",
+    "complete",
+    "completed",
+    "cancelled",
+    "canceled",
+    "duplicate",
+    "not proceeding",
+    "archived",
+  ];
+  return !terminalTokens.some((token) => normalized.includes(token));
 }
 
 function normalizeEnquiryDetailItem(item, fieldMap) {
