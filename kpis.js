@@ -414,7 +414,7 @@ function buildSparkline(points) {
   `;
 }
 
-export function createKpiTrendCard({ title, series, field, formatter = formatNumber }) {
+export function createKpiTrendCard({ title, series, field, formatter = formatNumber, onClick = null }) {
   const points = getTrendValues(series, field);
   const latest = points.length ? points[points.length - 1] : null;
   const summary = summarizeTrend(points);
@@ -450,6 +450,10 @@ export function createKpiTrendCard({ title, series, field, formatter = formatNum
     </div>
   `;
   card.addEventListener("click", () => {
+    if (typeof onClick === "function") {
+      onClick({ title, points, formatter, summary });
+      return;
+    }
     openTrendModal({ title, points, formatter, summary });
   });
   return card;
@@ -547,6 +551,79 @@ function openTrendModal({ title, points, formatter, summary }) {
   }
   if (rowsNode) {
     rowsNode.innerHTML = buildModalBars(points, formatter);
+  }
+
+  modal.hidden = false;
+  document.body.classList.add("kpi-modal-open");
+  modal.querySelector(".kpi-modal-close")?.focus();
+}
+
+function buildActiveEnquiriesList(activeEnquiries) {
+  if (activeEnquiries?.unavailable) {
+    return `<p class="muted">${escapeHtml(activeEnquiries.warning || "Could not load active enquiries.")}</p>`;
+  }
+  const items = Array.isArray(activeEnquiries?.items) ? activeEnquiries.items : [];
+  if (!items.length) {
+    return '<p class="muted">No active enquiries found in Enquiries Log.</p>';
+  }
+  return `
+    <div class="kpi-modal-detail-list">
+      ${items
+        .map(
+          (item) => `
+            <div class="kpi-modal-detail-row">
+              <div>
+                <strong>${escapeHtml(item.title || "Untitled enquiry")}</strong>
+                <span>${escapeHtml(item.status || "Active")}</span>
+              </div>
+              <small>${escapeHtml(item.modifiedLabel ? `Modified ${item.modifiedLabel}` : "")}</small>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function openActiveEnquiriesTrendModal(payload, trendDetail) {
+  const title = trendDetail?.title || "Active Enquiries Trend";
+  const points = trendDetail?.points || getTrendValues(payload?.trendSeries, "activeEnquiries");
+  const formatter = trendDetail?.formatter || formatNumber;
+  const summary = trendDetail?.summary || summarizeTrend(points);
+  const activeEnquiries = payload?.activeEnquiries || {};
+  const modal = ensureTrendModal();
+  const titleNode = modal.querySelector("#kpiTrendModalTitle");
+  const statsNode = modal.querySelector("#kpiTrendModalStats");
+  const chartNode = modal.querySelector("#kpiTrendModalChart");
+  const rowsNode = modal.querySelector("#kpiTrendModalRows");
+
+  if (titleNode) {
+    titleNode.textContent = title;
+  }
+  if (statsNode) {
+    statsNode.innerHTML = `
+      <div><span>Current Active</span><strong>${escapeHtml(formatNumber(activeEnquiries.count ?? 0))}</strong><small>From Enquiries Log</small></div>
+      <div><span>Latest KPI</span><strong>${points.length ? escapeHtml(formatter(points[points.length - 1].value)) : "-"}</strong></div>
+      <div><span>Max</span><strong>${summary.max === null ? "-" : escapeHtml(formatter(summary.max))}</strong><small>${escapeHtml(
+        summary.maxPoint?.weekLabel || ""
+      )}</small></div>
+      <div><span>Average</span><strong>${summary.average === null ? "-" : escapeHtml(formatter(summary.average))}</strong></div>
+    `;
+  }
+  if (chartNode) {
+    chartNode.innerHTML = buildSparkline(points);
+  }
+  if (rowsNode) {
+    rowsNode.innerHTML = `
+      <section class="kpi-modal-detail-section">
+        <h3>Current Active Enquiries</h3>
+        ${buildActiveEnquiriesList(activeEnquiries)}
+      </section>
+      <section class="kpi-modal-detail-section">
+        <h3>Trend Detail</h3>
+        ${buildModalBars(points, formatter)}
+      </section>
+    `;
   }
 
   modal.hidden = false;
@@ -836,6 +913,7 @@ function renderEnquiries(payload) {
       metric: metricValue(payload, "activeEnquiries"),
       latestWeekLabelText: latestLabel,
       trendCompanion: true,
+      onClick: () => openActiveEnquiriesTrendModal(payload),
     }),
     createKpiMetricCard({
       title: "Enquiries Total /wk",
@@ -873,6 +951,7 @@ function renderEnquiries(payload) {
       series: payload?.trendSeries,
       field: "activeEnquiries",
       formatter: formatNumber,
+      onClick: (trendDetail) => openActiveEnquiriesTrendModal(payload, trendDetail),
     }),
     createKpiTrendCard({
       title: "Total Enquiries Trend",

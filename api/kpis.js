@@ -648,6 +648,25 @@ function isOnHoldEnquiryStatus(status) {
   return normalizeEnquiryStatus(status).includes("on hold");
 }
 
+function isActiveEnquiryStatus(status) {
+  const normalized = normalizeEnquiryStatus(status);
+  return normalized === "active" || normalized.includes("active enquiry") || normalized.includes("current active");
+}
+
+function normalizeEnquiryDetailItem(item, fieldMap) {
+  const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
+  const row = { fields, fieldMap };
+  const modifiedDate = getValidDate(fields.Modified || item?.lastModifiedDateTime || getFieldValue(row, "modified"));
+  const status = getFieldValue(row, "status") || getFieldValue(row, "currentStatus");
+  return {
+    title: cleanText(getFieldValue(row, "title") || fields.Title || `Item ${item?.id || ""}`),
+    status: cleanText(status),
+    modified: modifiedDate ? modifiedDate.toISOString() : "",
+    modifiedLabel: modifiedDate ? formatWeek(modifiedDate.toISOString()) : "",
+    webUrl: cleanText(item?.webUrl),
+  };
+}
+
 async function fetchAcceptedOnboarding(graphClient) {
   const config = parseRecruitmentConfig();
   const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
@@ -674,7 +693,7 @@ async function fetchAcceptedOnboarding(graphClient) {
   };
 }
 
-async function fetchEnquiryAssessmentOutcome(graphClient) {
+async function fetchEnquiryLogItems(graphClient) {
   const config = parseEnquiriesConfig();
   const siteId = await resolveSiteId(graphClient, config.hostName, config.sitePath);
   const list = await resolveList(graphClient, siteId, config.listName, { listPath: config.listPath });
@@ -687,7 +706,47 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
     $expand: expand,
   });
   const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${list.id}/items?${params.toString()}`;
-  const items = await graphClient.fetchAllPages(url);
+  return {
+    items: await graphClient.fetchAllPages(url),
+    fieldMap,
+    listUrl: list.webUrl || config.listWebUrl,
+  };
+}
+
+async function fetchActiveEnquiries(graphClient) {
+  const { items, fieldMap, listUrl } = await fetchEnquiryLogItems(graphClient);
+  const activeItems = items
+    .map((item) => normalizeEnquiryDetailItem(item, fieldMap))
+    .filter((item) => isActiveEnquiryStatus(item.status))
+    .sort((a, b) => a.title.localeCompare(b.title));
+  return {
+    count: activeItems.length,
+    items: activeItems,
+    listUrl,
+  };
+}
+
+async function fetchActiveEnquiriesSafe(graphClient) {
+  try {
+    return await fetchActiveEnquiries(graphClient);
+  } catch (error) {
+    console.warn("[kpis] Active enquiries unavailable", {
+      message: error?.message || String(error),
+      code: error?.code || "",
+      status: error?.status || "",
+    });
+    return {
+      count: 0,
+      items: [],
+      listUrl: "",
+      unavailable: true,
+      warning: error?.message || "Could not load active enquiries.",
+    };
+  }
+}
+
+async function fetchEnquiryAssessmentOutcome(graphClient) {
+  const { items, fieldMap, listUrl } = await fetchEnquiryLogItems(graphClient);
   const startDate = subtractMonths(new Date(), ASSESSMENT_OUTCOME_MONTHS);
   startDate.setHours(0, 0, 0, 0);
 
@@ -708,13 +767,7 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
     }
 
     const status = getFieldValue(row, "status") || getFieldValue(row, "currentStatus");
-    const detailItem = {
-      title: cleanText(getFieldValue(row, "title") || fields.Title || `Item ${item?.id || ""}`),
-      status: cleanText(status),
-      modified: modifiedDate.toISOString(),
-      modifiedLabel: formatWeek(modifiedDate.toISOString()),
-      webUrl: cleanText(item?.webUrl),
-    };
+    const detailItem = normalizeEnquiryDetailItem(item, fieldMap);
     if (isWonAfterAssessmentStatus(status)) {
       won += 1;
       detail.won.push(detailItem);
@@ -741,7 +794,7 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
     months: ASSESSMENT_OUTCOME_MONTHS,
     startDate: startDate.toISOString(),
     startDateLabel: formatWeek(startDate.toISOString()),
-    listUrl: list.webUrl || config.listWebUrl,
+    listUrl,
     detail,
   };
 }
@@ -810,6 +863,7 @@ module.exports = async (req, res) => {
     const metrics = resolveMetrics(rows);
     const onboarding = await fetchAcceptedOnboarding(graphClient);
     const enquiryAssessmentOutcome = await fetchEnquiryAssessmentOutcomeSafe(graphClient);
+    const activeEnquiries = await fetchActiveEnquiriesSafe(graphClient);
 
     res.setHeader("Cache-Control", "private, max-age=60");
     res.status(200).json({
@@ -821,6 +875,7 @@ module.exports = async (req, res) => {
       trendSeries: buildTrendSeries(rows),
       onboarding,
       enquiryAssessmentOutcome,
+      activeEnquiries,
       rowCount: rows.length,
       refreshedAt: new Date().toISOString(),
     });
