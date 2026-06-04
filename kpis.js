@@ -596,9 +596,9 @@ function openActiveEnquiriesModal(activeEnquiries = {}, fallbackCount = null) {
     titleNode.textContent = "Current Active Enquiries";
   }
   if (statsNode) {
-    const count = Number(activeEnquiries?.count || 0) || parseNumber(fallbackCount) || 0;
+    const count = parseNumber(fallbackCount) ?? parseNumber(activeEnquiries?.count) ?? 0;
     statsNode.innerHTML = `
-      <div><span>Current Active</span><strong>${escapeHtml(formatNumber(count))}</strong><small>From Enquiries Log</small></div>
+      <div><span>Current Active</span><strong>${escapeHtml(formatNumber(count))}</strong><small>From latest KPI row</small></div>
     `;
   }
   if (chartNode) {

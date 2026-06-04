@@ -56,6 +56,7 @@ const ENQUIRY_FIELD_DEFINITIONS = {
   title: ["Title", "Name", "Client Name", "Enquirer Name"],
   status: ["Status"],
   currentStatus: ["Current Status"],
+  active: ["Active", "Active Enquiry", "Active Enquiries", "Currently Active", "Is Active"],
   modified: ["Modified"],
 };
 
@@ -653,23 +654,7 @@ function isActiveEnquiryStatus(status) {
   if (!normalized) {
     return false;
   }
-  if (normalized === "active" || normalized.includes("active enquiry") || normalized.includes("current active")) {
-    return true;
-  }
-  const terminalTokens = [
-    "won",
-    "lost",
-    "on hold",
-    "closed",
-    "complete",
-    "completed",
-    "cancelled",
-    "canceled",
-    "duplicate",
-    "not proceeding",
-    "archived",
-  ];
-  return !terminalTokens.some((token) => normalized.includes(token));
+  return normalized === "active" || normalized.includes("active enquiry") || normalized.includes("current active");
 }
 
 function normalizeEnquiryDetailItem(item, fieldMap) {
@@ -680,10 +665,18 @@ function normalizeEnquiryDetailItem(item, fieldMap) {
   return {
     title: cleanText(getFieldValue(row, "title") || fields.Title || `Item ${item?.id || ""}`),
     status: cleanText(status),
+    active: getFieldValue(row, "active"),
     modified: modifiedDate ? modifiedDate.toISOString() : "",
     modifiedLabel: modifiedDate ? formatWeek(modifiedDate.toISOString()) : "",
     webUrl: cleanText(item?.webUrl),
   };
+}
+
+function isActiveEnquiryItem(item) {
+  if (hasValue(item?.active)) {
+    return toBoolean(item.active);
+  }
+  return isActiveEnquiryStatus(item?.status);
 }
 
 async function fetchAcceptedOnboarding(graphClient) {
@@ -736,7 +729,7 @@ async function fetchActiveEnquiries(graphClient) {
   const { items, fieldMap, listUrl } = await fetchEnquiryLogItems(graphClient);
   const activeItems = items
     .map((item) => normalizeEnquiryDetailItem(item, fieldMap))
-    .filter((item) => isActiveEnquiryStatus(item.status))
+    .filter((item) => isActiveEnquiryItem(item))
     .sort((a, b) => a.title.localeCompare(b.title));
   return {
     count: activeItems.length,
