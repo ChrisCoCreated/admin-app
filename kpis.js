@@ -912,7 +912,6 @@ function renderEnquiries(payload) {
       value: formatNumber(metricValue(payload, "activeEnquiries")?.value),
       metric: metricValue(payload, "activeEnquiries"),
       latestWeekLabelText: latestLabel,
-      trendCompanion: true,
       onClick: () => openActiveEnquiriesTrendModal(payload),
     }),
     createKpiMetricCard({
