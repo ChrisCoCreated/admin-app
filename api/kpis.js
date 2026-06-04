@@ -651,10 +651,11 @@ function isOnHoldEnquiryStatus(status) {
 
 function isActiveEnquiryStatus(status) {
   const normalized = normalizeEnquiryStatus(status);
-  if (!normalized) {
-    return false;
-  }
-  return normalized === "active" || normalized.includes("active enquiry") || normalized.includes("current active");
+  return /^[1-6]\s*\./.test(normalized);
+}
+
+function isInitialEnquiryStatus(status) {
+  return /^7\s*\./.test(normalizeEnquiryStatus(status));
 }
 
 function normalizeEnquiryDetailItem(item, fieldMap) {
@@ -670,13 +671,6 @@ function normalizeEnquiryDetailItem(item, fieldMap) {
     modifiedLabel: modifiedDate ? formatWeek(modifiedDate.toISOString()) : "",
     webUrl: cleanText(item?.webUrl),
   };
-}
-
-function isActiveEnquiryItem(item) {
-  if (hasValue(item?.active)) {
-    return toBoolean(item.active);
-  }
-  return isActiveEnquiryStatus(item?.status);
 }
 
 async function fetchAcceptedOnboarding(graphClient) {
@@ -727,13 +721,14 @@ async function fetchEnquiryLogItems(graphClient) {
 
 async function fetchActiveEnquiries(graphClient) {
   const { items, fieldMap, listUrl } = await fetchEnquiryLogItems(graphClient);
-  const activeItems = items
-    .map((item) => normalizeEnquiryDetailItem(item, fieldMap))
-    .filter((item) => isActiveEnquiryItem(item))
-    .sort((a, b) => a.title.localeCompare(b.title));
+  const enquiryItems = items.map((item) => normalizeEnquiryDetailItem(item, fieldMap));
+  const activeItems = enquiryItems.filter((item) => isActiveEnquiryStatus(item.status)).sort((a, b) => a.title.localeCompare(b.title));
+  const initialItems = enquiryItems.filter((item) => isInitialEnquiryStatus(item.status)).sort((a, b) => a.title.localeCompare(b.title));
   return {
     count: activeItems.length,
+    initialCount: initialItems.length,
     items: activeItems,
+    initialItems,
     listUrl,
   };
 }
@@ -749,7 +744,9 @@ async function fetchActiveEnquiriesSafe(graphClient) {
     });
     return {
       count: 0,
+      initialCount: 0,
       items: [],
+      initialItems: [],
       listUrl: "",
       unavailable: true,
       warning: error?.message || "Could not load active enquiries.",

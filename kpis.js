@@ -563,9 +563,30 @@ function buildActiveEnquiriesList(activeEnquiries) {
     return `<p class="muted">${escapeHtml(activeEnquiries.warning || "Could not load active enquiries.")}</p>`;
   }
   const items = Array.isArray(activeEnquiries?.items) ? activeEnquiries.items : [];
+  const initialItems = Array.isArray(activeEnquiries?.initialItems) ? activeEnquiries.initialItems : [];
   if (!items.length) {
-    return '<p class="muted">No active enquiries found in Enquiries Log.</p>';
+    return `
+      <p class="muted">No active enquiries found in Enquiries Log.</p>
+      ${
+        initialItems.length
+          ? `<section class="kpi-modal-detail-section"><h3>Initial Enquiries</h3>${buildActiveEnquiryRows(initialItems)}</section>`
+          : ""
+      }
+    `;
   }
+  return `
+    <section class="kpi-modal-detail-section">
+      <h3>Active Enquiries</h3>
+      ${buildActiveEnquiryRows(items)}
+    </section>
+    <section class="kpi-modal-detail-section">
+      <h3>Initial Enquiries</h3>
+      ${initialItems.length ? buildActiveEnquiryRows(initialItems) : '<p class="muted">No initial enquiries found.</p>'}
+    </section>
+  `;
+}
+
+function buildActiveEnquiryRows(items) {
   return `
     <div class="kpi-modal-detail-list">
       ${items
@@ -585,7 +606,7 @@ function buildActiveEnquiriesList(activeEnquiries) {
   `;
 }
 
-function openActiveEnquiriesModal(activeEnquiries = {}, fallbackCount = null) {
+function openActiveEnquiriesModal(activeEnquiries = {}) {
   const modal = ensureTrendModal();
   const titleNode = modal.querySelector("#kpiTrendModalTitle");
   const statsNode = modal.querySelector("#kpiTrendModalStats");
@@ -596,9 +617,9 @@ function openActiveEnquiriesModal(activeEnquiries = {}, fallbackCount = null) {
     titleNode.textContent = "Current Active Enquiries";
   }
   if (statsNode) {
-    const count = parseNumber(fallbackCount) ?? parseNumber(activeEnquiries?.count) ?? 0;
     statsNode.innerHTML = `
-      <div><span>Current Active</span><strong>${escapeHtml(formatNumber(count))}</strong><small>From latest KPI row</small></div>
+      <div><span>Current Active</span><strong>${escapeHtml(formatNumber(activeEnquiries?.count ?? 0))}</strong><small>Status 1-6</small></div>
+      <div><span>Initial Enquiries</span><strong>${escapeHtml(formatNumber(activeEnquiries?.initialCount ?? 0))}</strong><small>Status 7</small></div>
     `;
   }
   if (chartNode) {
@@ -895,10 +916,13 @@ function renderEnquiries(payload) {
     }),
     createKpiMetricCard({
       title: "Active Enquiries",
-      value: formatNumber(metricValue(payload, "activeEnquiries")?.value),
+      value: `${formatNumber(payload?.activeEnquiries?.count ?? 0)} active / ${formatNumber(
+        payload?.activeEnquiries?.initialCount ?? 0
+      )} initial`,
+      detail: "Active statuses 1-6; Initial Enquiry status 7",
       metric: metricValue(payload, "activeEnquiries"),
       latestWeekLabelText: latestLabel,
-      onClick: () => openActiveEnquiriesModal(payload?.activeEnquiries, metricValue(payload, "activeEnquiries")?.value),
+      onClick: () => openActiveEnquiriesModal(payload?.activeEnquiries),
     }),
     createKpiMetricCard({
       title: "Enquiries Total /wk",
