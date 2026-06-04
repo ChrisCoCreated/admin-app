@@ -589,20 +589,24 @@ function buildActiveEnquiriesList(activeEnquiries) {
 function buildActiveEnquiryRows(items) {
   return `
     <div class="kpi-modal-detail-list">
-      ${items
-        .map(
-          (item) => `
-            <div class="kpi-modal-detail-row">
-              <div>
-                <strong>${escapeHtml(item.title || "Untitled enquiry")}</strong>
-                <span>${escapeHtml(item.status || "Active")}</span>
-              </div>
-              <small>${escapeHtml(item.modifiedLabel ? `Modified ${item.modifiedLabel}` : "")}</small>
-            </div>
-          `
-        )
-        .join("")}
+      ${items.map((item) => buildEnquiryDetailRow(item, "Active")).join("")}
     </div>
+  `;
+}
+
+function buildEnquiryDetailRow(item, fallbackStatus = "No status") {
+  const tagName = item?.webUrl ? "a" : "div";
+  const linkAttrs = item?.webUrl
+    ? ` href="${escapeHtml(item.webUrl)}" target="_blank" rel="noopener noreferrer"`
+    : "";
+  return `
+    <${tagName} class="kpi-modal-detail-row"${linkAttrs}>
+      <div>
+        <strong>${escapeHtml(item.title || "Untitled enquiry")}</strong>
+        <span>${escapeHtml(item.status || fallbackStatus)}</span>
+      </div>
+      <small>${escapeHtml(item.modifiedLabel ? `Modified ${item.modifiedLabel}` : "")}</small>
+    </${tagName}>
   `;
 }
 
@@ -644,19 +648,7 @@ function buildOutcomeDetailRows(items) {
   }
   return `
     <div class="kpi-modal-detail-list">
-      ${items
-        .map(
-          (item) => `
-            <div class="kpi-modal-detail-row">
-              <div>
-                <strong>${escapeHtml(item.title || "Untitled enquiry")}</strong>
-                <span>${escapeHtml(item.status || "No status")}</span>
-              </div>
-              <small>${escapeHtml(item.modifiedLabel || "")}</small>
-            </div>
-          `
-        )
-        .join("")}
+      ${items.map((item) => buildEnquiryDetailRow(item, "No status")).join("")}
     </div>
   `;
 }

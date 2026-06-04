@@ -692,6 +692,16 @@ input.kpi-edit-input {
   background: #f8fafc;
 }
 
+a.kpi-modal-detail-row {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.kpi-modal-detail-row:hover {
+  border-color: rgba(49, 183, 200, 0.48);
+  background: #ffffff;
+}
+
 .kpi-modal-detail-row div {
   display: grid;
   gap: 3px;

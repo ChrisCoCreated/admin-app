@@ -658,18 +658,46 @@ function isInitialEnquiryStatus(status) {
   return /^7\s*\./.test(normalizeEnquiryStatus(status));
 }
 
-function normalizeEnquiryDetailItem(item, fieldMap) {
+function enquiryStatusOrder(status) {
+  const match = normalizeEnquiryStatus(status).match(/^([1-7])\s*\./);
+  return match ? Number(match[1]) : 99;
+}
+
+function sortEnquiriesByStatusThenTitle(a, b) {
+  return enquiryStatusOrder(a.status) - enquiryStatusOrder(b.status) || a.title.localeCompare(b.title);
+}
+
+function buildSharePointItemUrl(listUrl, itemId) {
+  const id = cleanText(itemId);
+  if (!listUrl || !id) {
+    return "";
+  }
+  try {
+    const url = new URL(listUrl);
+    const path = url.pathname.replace(/\/[^/]*$/, "/DispForm.aspx");
+    url.pathname = path;
+    url.search = "";
+    url.hash = "";
+    url.searchParams.set("ID", id);
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+function normalizeEnquiryDetailItem(item, fieldMap, listUrl = "") {
   const fields = item?.fields && typeof item.fields === "object" ? item.fields : {};
   const row = { fields, fieldMap };
   const modifiedDate = getValidDate(fields.Modified || item?.lastModifiedDateTime || getFieldValue(row, "modified"));
   const status = getFieldValue(row, "status") || getFieldValue(row, "currentStatus");
   return {
+    id: cleanText(item?.id),
     title: cleanText(getFieldValue(row, "title") || fields.Title || `Item ${item?.id || ""}`),
     status: cleanText(status),
     active: getFieldValue(row, "active"),
     modified: modifiedDate ? modifiedDate.toISOString() : "",
     modifiedLabel: modifiedDate ? formatWeek(modifiedDate.toISOString()) : "",
-    webUrl: cleanText(item?.webUrl),
+    webUrl: buildSharePointItemUrl(listUrl, item?.id) || cleanText(item?.webUrl),
   };
 }
 
@@ -721,9 +749,9 @@ async function fetchEnquiryLogItems(graphClient) {
 
 async function fetchActiveEnquiries(graphClient) {
   const { items, fieldMap, listUrl } = await fetchEnquiryLogItems(graphClient);
-  const enquiryItems = items.map((item) => normalizeEnquiryDetailItem(item, fieldMap));
-  const activeItems = enquiryItems.filter((item) => isActiveEnquiryStatus(item.status)).sort((a, b) => a.title.localeCompare(b.title));
-  const initialItems = enquiryItems.filter((item) => isInitialEnquiryStatus(item.status)).sort((a, b) => a.title.localeCompare(b.title));
+  const enquiryItems = items.map((item) => normalizeEnquiryDetailItem(item, fieldMap, listUrl));
+  const activeItems = enquiryItems.filter((item) => isActiveEnquiryStatus(item.status)).sort(sortEnquiriesByStatusThenTitle);
+  const initialItems = enquiryItems.filter((item) => isInitialEnquiryStatus(item.status)).sort(sortEnquiriesByStatusThenTitle);
   return {
     count: activeItems.length,
     initialCount: initialItems.length,
@@ -776,7 +804,7 @@ async function fetchEnquiryAssessmentOutcome(graphClient) {
     }
 
     const status = getFieldValue(row, "status") || getFieldValue(row, "currentStatus");
-    const detailItem = normalizeEnquiryDetailItem(item, fieldMap);
+    const detailItem = normalizeEnquiryDetailItem(item, fieldMap, listUrl);
     if (isWonAfterAssessmentStatus(status)) {
       won += 1;
       detail.won.push(detailItem);
