@@ -674,8 +674,8 @@ function buildSharePointItemUrl(listUrl, itemId) {
   }
   try {
     const url = new URL(listUrl);
-    const path = url.pathname.replace(/\/[^/]*$/, "/DispForm.aspx");
-    url.pathname = path;
+    const path = url.pathname.replace(/\/$/, "");
+    url.pathname = /\.[a-z0-9]+$/i.test(path) ? path.replace(/\/[^/]*$/, "/DispForm.aspx") : `${path}/DispForm.aspx`;
     url.search = "";
     url.hash = "";
     url.searchParams.set("ID", id);
