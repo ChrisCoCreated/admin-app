@@ -105,7 +105,7 @@ const ACCESS_PAGE_EXPANSIONS = {
 
 const PAGE_META = {
   clients: { href: "./clients.html", label: "Clients" },
-  clientdata: { href: "./client-data.html", label: "Client Data" },
+  clientdata: { href: "./client-data.html", label: "Client Report Generator" },
   carers: { href: "./carers.html", label: "Carers" },
   timesheets: { href: "./timesheets.html", label: "Timesheets" },
   recruitment: { href: "./recruitment.html", label: "Recruitment" },

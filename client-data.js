@@ -53,8 +53,8 @@ const REPORT_MODES = {
   wellbeing_assurance_visit: {
     label: "Wellbeing Assurance Visit Summary",
     reportType: "wellbeing_assurance_visit",
-    defaultProvider: "azure_openai",
-    defaultModel: "primary",
+    defaultProvider: "deepseek",
+    defaultModel: "deepseek-v4-pro",
     modelLocked: true,
   },
   simple_summary: {
