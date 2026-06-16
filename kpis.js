@@ -451,6 +451,18 @@ function buildSparkline(points) {
   `;
 }
 
+function buildTrendGraph(points, formatter, summary) {
+  return `
+    <div class="kpi-trend-graph">
+      <div class="kpi-trend-scale-labels" aria-hidden="true">
+        <span>${summary.max === null ? "" : escapeHtml(`Max ${formatter(summary.max)}`)}</span>
+        <span>${summary.min === null ? "" : escapeHtml(`Min ${formatter(summary.min)}`)}</span>
+      </div>
+      ${buildSparkline(points)}
+    </div>
+  `;
+}
+
 export function createKpiTrendCard({ title, series, field, formatter = formatNumber, onClick = null, compact = false }) {
   const points = getTrendValues(series, field);
   const latest = points.length ? points[points.length - 1] : null;
@@ -465,25 +477,9 @@ export function createKpiTrendCard({ title, series, field, formatter = formatNum
       <p class="kpi-trend-value">${latest ? escapeHtml(formatter(latest.value)) : "-"}</p>
       <p class="kpi-card-source">${escapeHtml(latest?.weekLabel || "No trend data")}</p>
     </div>
-    <dl class="kpi-trend-stats">
-      <div>
-        <dt>Max</dt>
-        <dd>${summary.max === null ? "-" : escapeHtml(formatter(summary.max))}</dd>
-      </div>
-      <div>
-        <dt>Avg</dt>
-        <dd>${summary.average === null ? "-" : escapeHtml(formatter(summary.average))}</dd>
-      </div>
-      <div>
-        <dt>Min</dt>
-        <dd>${summary.min === null ? "-" : escapeHtml(formatter(summary.min))}</dd>
-      </div>
-    </dl>
     <div class="kpi-trend-visual">
-      ${buildSparkline(points)}
-      <span>${escapeHtml(trendDeltaLabel(points, formatter))}${
-        summary.maxPoint ? ` | Max ${escapeHtml(formatter(summary.max))} on ${escapeHtml(summary.maxPoint.weekLabel)}` : ""
-      }</span>
+      ${buildTrendGraph(points, formatter, summary)}
+      <span>${escapeHtml(trendDeltaLabel(points, formatter))}</span>
     </div>
   `;
   card.addEventListener("click", () => {
@@ -928,27 +924,6 @@ function renderEnquiries(payload) {
       latestWeekLabelText: latestLabel,
       trendCompanion: true,
     }),
-    createKpiMiniTileStack(
-      [
-        {
-          title: "Consumer Enquiries",
-          value: formatNumber(metricValue(payload, "enquiriesConsumer")?.value),
-          metric: metricValue(payload, "enquiriesConsumer"),
-          series: payload?.trendSeries,
-          field: "enquiriesConsumer",
-          formatter: formatNumber,
-        },
-        {
-          title: "Solicitor Enquiries",
-          value: formatNumber(metricValue(payload, "enquiriesSolicitor")?.value),
-          metric: metricValue(payload, "enquiriesSolicitor"),
-          series: payload?.trendSeries,
-          field: "enquiriesSolicitor",
-          formatter: formatNumber,
-        },
-      ],
-      latestLabel
-    ),
     createKpiMetricCard({
       title: "Enquiry Conversion",
       value: formatPercent(metricValue(payload, "enquiryConversion")?.value),
@@ -971,6 +946,27 @@ function renderEnquiries(payload) {
       field: "enquiriesTotal",
       formatter: formatNumber,
     }),
+    createKpiMiniTileStack(
+      [
+        {
+          title: "Consumer Enquiries",
+          value: formatNumber(metricValue(payload, "enquiriesConsumer")?.value),
+          metric: metricValue(payload, "enquiriesConsumer"),
+          series: payload?.trendSeries,
+          field: "enquiriesConsumer",
+          formatter: formatNumber,
+        },
+        {
+          title: "Solicitor Enquiries",
+          value: formatNumber(metricValue(payload, "enquiriesSolicitor")?.value),
+          metric: metricValue(payload, "enquiriesSolicitor"),
+          series: payload?.trendSeries,
+          field: "enquiriesSolicitor",
+          formatter: formatNumber,
+        },
+      ],
+      latestLabel
+    ),
     createKpiTrendCard({
       title: "Enquiry Conversion Trend",
       series: payload?.trendSeries,

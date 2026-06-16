@@ -221,7 +221,8 @@
 }
 
 body.kpi-hide-details .kpi-detail-tile,
-body.kpi-hide-trends .kpi-trend-card {
+body.kpi-hide-trends .kpi-trend-card,
+body.kpi-hide-trends .kpi-trend-grid .kpi-mini-tile-stack {
   display: none;
 }
 
@@ -313,10 +314,6 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
   grid-column: span 2;
   min-height: 128px;
   gap: 8px;
-}
-
-.kpi-trend-card-compact .kpi-trend-stats {
-  display: none;
 }
 
 .kpi-trend-card-compact .kpi-trend-value {
@@ -598,41 +595,28 @@ input.kpi-edit-input {
   outline-offset: 3px;
 }
 
-.kpi-trend-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-
-.kpi-trend-stats div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid #dde4ef;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.kpi-trend-stats dt {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.kpi-trend-stats dd {
-  margin: 0;
-  color: #1a2232;
-  font-size: 0.9rem;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
 .kpi-trend-visual {
   display: grid;
   gap: 6px;
   align-self: end;
+}
+
+.kpi-trend-graph {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+}
+
+.kpi-trend-scale-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 54px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .kpi-sparkline {
