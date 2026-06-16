@@ -414,13 +414,13 @@ function buildSparkline(points) {
   `;
 }
 
-export function createKpiTrendCard({ title, series, field, formatter = formatNumber, onClick = null }) {
+export function createKpiTrendCard({ title, series, field, formatter = formatNumber, onClick = null, compact = false }) {
   const points = getTrendValues(series, field);
   const latest = points.length ? points[points.length - 1] : null;
   const summary = summarizeTrend(points);
   const card = document.createElement("button");
   card.type = "button";
-  card.className = "kpi-trend-card";
+  card.className = `kpi-trend-card${compact ? " kpi-trend-card-compact" : ""}`;
   card.setAttribute("aria-label", `Open detailed ${title}`);
   card.innerHTML = `
     <div>
@@ -958,6 +958,20 @@ function renderEnquiries(payload) {
       series: payload?.trendSeries,
       field: "enquiriesTotal",
       formatter: formatNumber,
+    }),
+    createKpiTrendCard({
+      title: "Solicitor Enquiries Trend",
+      series: payload?.trendSeries,
+      field: "enquiriesSolicitor",
+      formatter: formatNumber,
+      compact: true,
+    }),
+    createKpiTrendCard({
+      title: "Consumer Enquiries Trend",
+      series: payload?.trendSeries,
+      field: "enquiriesConsumer",
+      formatter: formatNumber,
+      compact: true,
     }),
     createKpiTrendCard({
       title: "Enquiry Conversion Trend",

@@ -298,6 +298,24 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
   grid-column: span 2;
 }
 
+.kpi-trend-card-compact {
+  grid-column: span 2;
+  min-height: 128px;
+  gap: 8px;
+}
+
+.kpi-trend-card-compact .kpi-trend-stats {
+  display: none;
+}
+
+.kpi-trend-card-compact .kpi-trend-value {
+  font-size: 1.55rem;
+}
+
+.kpi-trend-card-compact .kpi-sparkline {
+  height: 36px;
+}
+
 .kpi-note-card {
   align-content: start;
 }
@@ -748,6 +766,10 @@ a.kpi-modal-detail-row:hover {
   }
 
   .kpi-card-wide {
+    grid-column: auto;
+  }
+
+  .kpi-trend-card-compact {
     grid-column: auto;
   }
 
