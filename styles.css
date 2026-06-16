@@ -320,6 +320,46 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
   align-content: start;
 }
 
+.kpi-mini-tile-stack {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 178px;
+  min-width: 0;
+}
+
+.kpi-mini-tile {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8deea;
+  border-radius: 8px;
+  background: #fbfcff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+.kpi-mini-tile h3 {
+  margin: 0;
+  color: #293244;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.kpi-mini-tile-value {
+  color: #11141a;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.kpi-mini-tile .kpi-card-source {
+  font-size: 0.72rem;
+}
+
 .kpi-card-clickable {
   cursor: pointer;
   transition:

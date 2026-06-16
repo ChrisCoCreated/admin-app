@@ -253,6 +253,28 @@ export function createKpiNoteCard({ title, metric, emptyLabel = "No detail recor
   return card;
 }
 
+function createKpiMiniTileStack(items = [], latestWeekLabelText = "") {
+  const stack = document.createElement("article");
+  stack.className = "kpi-mini-tile-stack";
+  stack.innerHTML = items
+    .map((item) => {
+      const metric = item.metric || null;
+      const stale = staleLabel(metric);
+      return `
+        <div class="kpi-mini-tile">
+          <div class="kpi-card-topline">
+            <h3>${escapeHtml(item.title || "")}</h3>
+            ${stale ? `<span class="kpi-stale-pill">${escapeHtml(stale)}</span>` : ""}
+          </div>
+          <div class="kpi-mini-tile-value">${escapeHtml(item.value || "-")}</div>
+          <p class="kpi-card-source">${escapeHtml(sourceLabel(metric, latestWeekLabelText))}</p>
+        </div>
+      `;
+    })
+    .join("");
+  return stack;
+}
+
 function editableInitialValue(metric) {
   return cleanText(metric?.value);
 }
@@ -923,20 +945,21 @@ function renderEnquiries(payload) {
       latestWeekLabelText: latestLabel,
       trendCompanion: true,
     }),
-    createKpiMetricCard({
-      title: "Solicitor Enquiries",
-      value: formatNumber(metricValue(payload, "enquiriesSolicitor")?.value),
-      metric: metricValue(payload, "enquiriesSolicitor"),
-      latestWeekLabelText: latestLabel,
-      trendCompanion: true,
-    }),
-    createKpiMetricCard({
-      title: "Consumer Enquiries",
-      value: formatNumber(metricValue(payload, "enquiriesConsumer")?.value),
-      metric: metricValue(payload, "enquiriesConsumer"),
-      latestWeekLabelText: latestLabel,
-      trendCompanion: true,
-    }),
+    createKpiMiniTileStack(
+      [
+        {
+          title: "Consumer Enquiries",
+          value: formatNumber(metricValue(payload, "enquiriesConsumer")?.value),
+          metric: metricValue(payload, "enquiriesConsumer"),
+        },
+        {
+          title: "Solicitor Enquiries",
+          value: formatNumber(metricValue(payload, "enquiriesSolicitor")?.value),
+          metric: metricValue(payload, "enquiriesSolicitor"),
+        },
+      ],
+      latestLabel
+    ),
     createKpiMetricCard({
       title: "Enquiry Conversion",
       value: formatPercent(metricValue(payload, "enquiryConversion")?.value),
