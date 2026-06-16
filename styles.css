@@ -271,6 +271,17 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.kpi-subsection-head {
+  margin-top: 22px;
+}
+
+.kpi-subsection-head h3 {
+  margin: 0;
+  color: #293244;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
 .kpi-trend-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -340,12 +351,37 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
 }
 
+button.kpi-mini-tile {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.kpi-mini-tile:hover {
+  border-color: rgba(49, 183, 200, 0.48);
+  background: #ffffff;
+}
+
+button.kpi-mini-tile:focus-visible {
+  outline: 3px solid rgba(49, 183, 200, 0.35);
+  outline-offset: 3px;
+}
+
 .kpi-mini-tile h3 {
   margin: 0;
   color: #293244;
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.2;
+}
+
+.kpi-mini-tile-body {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(48px, 1fr);
+  align-items: end;
+  gap: 8px;
 }
 
 .kpi-mini-tile-value {
@@ -358,6 +394,15 @@ body:not(.kpi-hide-trends) .kpi-trend-companion-tile {
 
 .kpi-mini-tile .kpi-card-source {
   font-size: 0.72rem;
+}
+
+.kpi-mini-sparkline {
+  min-width: 0;
+  color: #227b88;
+}
+
+.kpi-mini-sparkline .kpi-sparkline {
+  height: 28px;
 }
 
 .kpi-card-clickable {

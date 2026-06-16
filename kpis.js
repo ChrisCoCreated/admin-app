@@ -19,6 +19,7 @@ const businessKpis = document.getElementById("businessKpis");
 const businessTrendKpis = document.getElementById("businessTrendKpis");
 const enquiriesKpis = document.getElementById("enquiriesKpis");
 const enquiriesTrendKpis = document.getElementById("enquiriesTrendKpis");
+const enquiriesThreeMonthKpis = document.getElementById("enquiriesThreeMonthKpis");
 const marketingKpis = document.getElementById("marketingKpis");
 const marketingTrendKpis = document.getElementById("marketingTrendKpis");
 const recruitmentKpis = document.getElementById("recruitmentKpis");
@@ -256,22 +257,36 @@ export function createKpiNoteCard({ title, metric, emptyLabel = "No detail recor
 function createKpiMiniTileStack(items = [], latestWeekLabelText = "") {
   const stack = document.createElement("article");
   stack.className = "kpi-mini-tile-stack";
-  stack.innerHTML = items
-    .map((item) => {
-      const metric = item.metric || null;
-      const stale = staleLabel(metric);
-      return `
-        <div class="kpi-mini-tile">
-          <div class="kpi-card-topline">
-            <h3>${escapeHtml(item.title || "")}</h3>
-            ${stale ? `<span class="kpi-stale-pill">${escapeHtml(stale)}</span>` : ""}
-          </div>
+  for (const item of items) {
+    const metric = item.metric || null;
+    const stale = staleLabel(metric);
+    const points = item.series && item.field ? getTrendValues(item.series, item.field) : [];
+    const formatter = item.formatter || formatNumber;
+    const tile = document.createElement(points.length ? "button" : "div");
+    tile.className = "kpi-mini-tile";
+    if (points.length) {
+      const summary = summarizeTrend(points);
+      tile.type = "button";
+      tile.setAttribute("aria-label", `Open detailed ${item.title}`);
+      tile.addEventListener("click", () => {
+        openTrendModal({ title: item.title, points, formatter, summary });
+      });
+    }
+    tile.innerHTML = `
+      <div class="kpi-card-topline">
+        <h3>${escapeHtml(item.title || "")}</h3>
+        ${stale ? `<span class="kpi-stale-pill">${escapeHtml(stale)}</span>` : ""}
+      </div>
+      <div class="kpi-mini-tile-body">
+        <div>
           <div class="kpi-mini-tile-value">${escapeHtml(item.value || "-")}</div>
           <p class="kpi-card-source">${escapeHtml(sourceLabel(metric, latestWeekLabelText))}</p>
         </div>
-      `;
-    })
-    .join("");
+        ${points.length ? `<div class="kpi-mini-sparkline">${buildSparkline(points)}</div>` : ""}
+      </div>
+    `;
+    stack.appendChild(tile);
+  }
   return stack;
 }
 
@@ -907,38 +922,6 @@ function renderEnquiries(payload) {
     : "From Enquiries Log";
   appendChildren(enquiriesKpis, [
     createKpiMetricCard({
-      title: "Won vs Lost After Assessment",
-      value: outcomeUnavailable
-        ? "Unavailable"
-        : `${formatNumber(wonCount)} won / ${formatNumber(lostCount)} lost`,
-      detail: outcomeUnavailable
-        ? assessmentOutcome.warning || "Could not load Enquiries Log."
-        : assessedOutcomes
-        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(assessedOutcomes)} won/lost outcomes in the past 3 months`
-        : "No won/lost outcomes modified in the past 3 months",
-      metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
-      tone: "positive",
-      onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
-    }),
-    createKpiMetricCard({
-      title: "On Hold After Assessment",
-      value: outcomeUnavailable ? "Unavailable" : `${formatNumber(onHoldCount)} on hold`,
-      detail: outcomeUnavailable ? assessmentOutcome.warning || "Could not load Enquiries Log." : wonOnHoldRatio,
-      metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
-      tone: "positive",
-      onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
-    }),
-    createKpiMetricCard({
-      title: "Active Enquiries",
-      value: `${formatNumber(payload?.activeEnquiries?.count ?? 0)} active / ${formatNumber(
-        payload?.activeEnquiries?.initialCount ?? 0
-      )} initial`,
-      detail: "Active statuses 1-6; Initial Enquiry status 7",
-      metric: metricValue(payload, "activeEnquiries"),
-      latestWeekLabelText: latestLabel,
-      onClick: () => openActiveEnquiriesModal(payload?.activeEnquiries),
-    }),
-    createKpiMetricCard({
       title: "Enquiries Total /wk",
       value: formatNumber(metricValue(payload, "enquiriesTotal")?.value),
       metric: metricValue(payload, "enquiriesTotal"),
@@ -951,11 +934,17 @@ function renderEnquiries(payload) {
           title: "Consumer Enquiries",
           value: formatNumber(metricValue(payload, "enquiriesConsumer")?.value),
           metric: metricValue(payload, "enquiriesConsumer"),
+          series: payload?.trendSeries,
+          field: "enquiriesConsumer",
+          formatter: formatNumber,
         },
         {
           title: "Solicitor Enquiries",
           value: formatNumber(metricValue(payload, "enquiriesSolicitor")?.value),
           metric: metricValue(payload, "enquiriesSolicitor"),
+          series: payload?.trendSeries,
+          field: "enquiriesSolicitor",
+          formatter: formatNumber,
         },
       ],
       latestLabel
@@ -983,24 +972,43 @@ function renderEnquiries(payload) {
       formatter: formatNumber,
     }),
     createKpiTrendCard({
-      title: "Solicitor Enquiries Trend",
-      series: payload?.trendSeries,
-      field: "enquiriesSolicitor",
-      formatter: formatNumber,
-      compact: true,
-    }),
-    createKpiTrendCard({
-      title: "Consumer Enquiries Trend",
-      series: payload?.trendSeries,
-      field: "enquiriesConsumer",
-      formatter: formatNumber,
-      compact: true,
-    }),
-    createKpiTrendCard({
       title: "Enquiry Conversion Trend",
       series: payload?.trendSeries,
       field: "enquiryConversion",
       formatter: formatPercent,
+    }),
+  ]);
+
+  appendChildren(enquiriesThreeMonthKpis, [
+    createKpiMetricCard({
+      title: "Won vs Lost After Assessment",
+      value: outcomeUnavailable ? "Unavailable" : `${formatNumber(wonCount)} won / ${formatNumber(lostCount)} lost`,
+      detail: outcomeUnavailable
+        ? assessmentOutcome.warning || "Could not load Enquiries Log."
+        : assessedOutcomes
+        ? `${formatPercent(assessmentOutcome.winPercent)} won from ${formatNumber(assessedOutcomes)} won/lost outcomes in the past 3 months`
+        : "No won/lost outcomes modified in the past 3 months",
+      metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
+      tone: "positive",
+      onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
+    }),
+    createKpiMetricCard({
+      title: "On Hold After Assessment",
+      value: outcomeUnavailable ? "Unavailable" : `${formatNumber(onHoldCount)} on hold`,
+      detail: outcomeUnavailable ? assessmentOutcome.warning || "Could not load Enquiries Log." : wonOnHoldRatio,
+      metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
+      tone: "positive",
+      onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
+    }),
+    createKpiMetricCard({
+      title: "Active Enquiries",
+      value: `${formatNumber(payload?.activeEnquiries?.count ?? 0)} active / ${formatNumber(
+        payload?.activeEnquiries?.initialCount ?? 0
+      )} initial`,
+      detail: "Active statuses 1-6; Initial Enquiry status 7",
+      metric: metricValue(payload, "activeEnquiries"),
+      latestWeekLabelText: latestLabel,
+      onClick: () => openActiveEnquiriesModal(payload?.activeEnquiries),
     }),
   ]);
 }
