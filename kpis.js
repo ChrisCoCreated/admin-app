@@ -948,27 +948,15 @@ function renderEnquiries(payload) {
 
   appendChildren(enquiriesTrendKpis, [
     createKpiTrendCard({
-      title: "Active Enquiries Trend",
+      title: "Active Enquiries by Week",
       series: payload?.trendSeries,
       field: "activeEnquiries",
       formatter: formatNumber,
     }),
     createKpiTrendCard({
-      title: "Total Enquiries Trend",
+      title: "New Enquiries by Week",
       series: payload?.trendSeries,
       field: "enquiriesTotal",
-      formatter: formatNumber,
-    }),
-    createKpiTrendCard({
-      title: "Solicitor Enquiries Trend",
-      series: payload?.trendSeries,
-      field: "enquiriesSolicitor",
-      formatter: formatNumber,
-    }),
-    createKpiTrendCard({
-      title: "Consumer Enquiries Trend",
-      series: payload?.trendSeries,
-      field: "enquiriesConsumer",
       formatter: formatNumber,
     }),
     createKpiTrendCard({
