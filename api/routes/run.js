@@ -1,6 +1,6 @@
 const { requireApiAuth } = require("../_lib/require-api-auth");
+const { buildGeocodeUrl, describeGeocodeFailure, normalizeRegion } = require("../_lib/google-geocode");
 
-const GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 const GOOGLE_ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
 
 function normalizePostcode(value) {
@@ -63,10 +63,7 @@ function parseThreshold(value) {
 }
 
 async function geocodeLocation(query, apiKey, region) {
-  const url = new URL(GOOGLE_GEOCODE_URL);
-  url.searchParams.set("address", query);
-  url.searchParams.set("region", region);
-  url.searchParams.set("key", apiKey);
+  const url = buildGeocodeUrl(query, apiKey, region);
 
   const response = await fetch(url, {
     headers: {
@@ -80,7 +77,7 @@ async function geocodeLocation(query, apiKey, region) {
 
   const data = await response.json();
   if (data.status !== "OK" || !Array.isArray(data.results) || !data.results.length) {
-    throw new Error(`Could not geocode location: ${query}`);
+    throw new Error(describeGeocodeFailure(data, query));
   }
 
   const result = data.results[0];
@@ -369,7 +366,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const region = String(process.env.GOOGLE_MAPS_REGION || "gb").trim().toLowerCase() || "gb";
+  const region = normalizeRegion(process.env.GOOGLE_MAPS_REGION);
   const staffLocation = normalizeLocationQuery(req.body?.staffLocation || req.body?.staffPostcode);
   const startsFromHomeRequested = req.body?.startsFromHome !== false;
   const departureTime = String(req.body?.departureTime || "").trim();
