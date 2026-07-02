@@ -2,13 +2,18 @@ import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260702";
-import { getRecruitmentWhatsAppMessage, getRecruitmentWhatsAppUrl } from "./recruitment-whatsapp.js?v=20260702";
+import {
+  getIntroWhatsAppMessage,
+  getRecruitmentWhatsAppMessage,
+  getWhatsAppUrlForMessage,
+} from "./recruitment-whatsapp.js?v=20260702";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
 const recruitmentWhatsappForm = document.getElementById("recruitmentWhatsappForm");
 const candidateNameInput = document.getElementById("candidateNameInput");
 const phoneNumberInput = document.getElementById("phoneNumberInput");
+const introServiceField = document.getElementById("introServiceField");
 const copyRecruitmentMessageBtn = document.getElementById("copyRecruitmentMessageBtn");
 const actionStatus = document.getElementById("actionStatus");
 
@@ -37,12 +42,30 @@ function getFormValues() {
   return {
     candidateName: String(candidateNameInput?.value || "").trim(),
     phoneNumber: String(phoneNumberInput?.value || "").trim(),
+    messageType: document.querySelector('input[name="whatsappMessageType"]:checked')?.value || "recruitment",
+    introService: document.querySelector('input[name="introService"]:checked')?.value || "thrive",
   };
 }
 
+function getSelectedWhatsAppMessage() {
+  const { candidateName, messageType, introService } = getFormValues();
+  if (messageType === "intro") {
+    return getIntroWhatsAppMessage(candidateName, introService);
+  }
+  return getRecruitmentWhatsAppMessage(candidateName);
+}
+
+function updateMessageOptions() {
+  const { messageType } = getFormValues();
+  if (introServiceField) {
+    introServiceField.hidden = messageType !== "intro";
+  }
+  setActionStatus("");
+}
+
 function openRecruitmentWhatsapp() {
-  const { candidateName, phoneNumber } = getFormValues();
-  const url = getRecruitmentWhatsAppUrl(phoneNumber, candidateName);
+  const { phoneNumber } = getFormValues();
+  const url = getWhatsAppUrlForMessage(phoneNumber, getSelectedWhatsAppMessage());
   if (!url) {
     setActionStatus("Enter a phone number first.", true);
     phoneNumberInput?.focus();
@@ -53,8 +76,7 @@ function openRecruitmentWhatsapp() {
 }
 
 async function copyRecruitmentMessage() {
-  const { candidateName } = getFormValues();
-  const message = getRecruitmentWhatsAppMessage(candidateName);
+  const message = getSelectedWhatsAppMessage();
   try {
     await navigator.clipboard.writeText(message);
     setActionStatus("Copied message.");
@@ -104,6 +126,10 @@ copyRecruitmentMessageBtn?.addEventListener("click", () => {
   void copyRecruitmentMessage();
 });
 
+document.querySelectorAll('input[name="whatsappMessageType"], input[name="introService"]').forEach((input) => {
+  input.addEventListener("change", updateMessageOptions);
+});
+
 signOutBtn?.addEventListener("click", async () => {
   try {
     signOutBtn.disabled = true;
@@ -114,3 +140,4 @@ signOutBtn?.addEventListener("click", async () => {
 });
 
 void init();
+updateMessageOptions();

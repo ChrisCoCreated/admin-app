@@ -41,15 +41,43 @@
       <section class="panel">
         <div class="panel-head">
           <div>
-            <h2>Recruitment WhatsApp</h2>
-            <p class="muted">Send the standard recruitment follow-up to a phone number.</p>
+            <h2>WhatsApp Text</h2>
+            <p class="muted">Open a pre-filled WhatsApp message to a phone number.</p>
           </div>
         </div>
 
         <form id="recruitmentWhatsappForm" class="functions-form">
+          <fieldset class="functions-segmented-field">
+            <legend>Message</legend>
+            <div class="functions-segmented-control">
+              <label>
+                <input type="radio" name="whatsappMessageType" value="recruitment" checked />
+                <span>Recruitment</span>
+              </label>
+              <label>
+                <input type="radio" name="whatsappMessageType" value="intro" />
+                <span>Intro</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset id="introServiceField" class="functions-segmented-field" hidden>
+            <legend>Service</legend>
+            <div class="functions-segmented-control functions-segmented-control-wide">
+              <label>
+                <input type="radio" name="introService" value="thrive" checked />
+                <span>Thrive Homecare</span>
+              </label>
+              <label>
+                <input type="radio" name="introService" value="mentalCapacity" />
+                <span>Plan with Care / Mental Capacity</span>
+              </label>
+            </div>
+          </fieldset>
+
           <div class="functions-form-grid">
             <label class="field" for="candidateNameInput">
-              Candidate name
+              Name
               <input id="candidateNameInput" type="text" placeholder="Optional" autocomplete="name" />
             </label>
             <label class="field" for="phoneNumberInput">

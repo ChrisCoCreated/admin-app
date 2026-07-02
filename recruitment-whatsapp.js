@@ -2,6 +2,17 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+export const INTRO_WHATSAPP_SERVICES = {
+  thrive: {
+    label: "Thrive Homecare",
+    url: "https://www.thrivehomecare.co.uk/",
+  },
+  mentalCapacity: {
+    label: "Plan with Care / Mental Capacity",
+    url: "https://www.planwithcare.co.uk/mental-capacity",
+  },
+};
+
 export function normalizeRecruitmentPhoneForActions(phoneNumber) {
   const raw = cleanText(phoneNumber);
   if (!raw) {
@@ -29,13 +40,26 @@ export function getRecruitmentWhatsAppMessage(candidateName) {
   return `Hi ${firstName}, thanks for applying to Thrive Homecare. Are you available today for a quick initial chat? Chris`;
 }
 
-export function getRecruitmentWhatsAppUrl(phoneNumber, candidateName) {
+export function getIntroWhatsAppMessage(contactName, serviceKey = "thrive") {
+  const firstName = cleanText(contactName).split(/\s+/)[0] || "there";
+  const service = INTRO_WHATSAPP_SERVICES[serviceKey] || INTRO_WHATSAPP_SERVICES.thrive;
+  if (service === INTRO_WHATSAPP_SERVICES.mentalCapacity) {
+    return `Hi ${firstName}, it was good to meet you earlier. As mentioned, Plan with Care supports families and professionals with mental capacity assessments and related planning. Here's the link in case useful: ${service.url}`;
+  }
+  return `Hi ${firstName}, it was good to meet you earlier. As mentioned, Thrive Homecare provides companionship and care at home, focused on helping people stay independent, connected and living well. Here's the link in case useful: ${service.url}`;
+}
+
+export function getWhatsAppUrlForMessage(phoneNumber, message) {
   const normalized = normalizeRecruitmentPhoneForActions(phoneNumber).replace(/\D/g, "");
   if (!normalized) {
     return "";
   }
   const url = new URL("https://web.whatsapp.com/send");
   url.searchParams.set("phone", normalized);
-  url.searchParams.set("text", getRecruitmentWhatsAppMessage(candidateName));
+  url.searchParams.set("text", cleanText(message));
   return url.toString();
+}
+
+export function getRecruitmentWhatsAppUrl(phoneNumber, candidateName) {
+  return getWhatsAppUrlForMessage(phoneNumber, getRecruitmentWhatsAppMessage(candidateName));
 }

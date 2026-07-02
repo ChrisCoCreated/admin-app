@@ -4689,6 +4689,72 @@ tbody tr:hover .profitability-sticky-column {
   margin-top: 14px;
 }
 
+.functions-segmented-field {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.functions-segmented-field legend {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.functions-segmented-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid #c8d3e6;
+  border-radius: 12px;
+  background: #f7f8fb;
+}
+
+.functions-segmented-control-wide {
+  display: flex;
+}
+
+.functions-segmented-control label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.functions-segmented-control input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.functions-segmented-control span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  color: #1d2a42;
+  font-weight: 700;
+  line-height: 1.2;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease;
+}
+
+.functions-segmented-control input:checked + span {
+  background: #ffffff;
+  color: #0b6f7f;
+  box-shadow: 0 6px 14px rgba(17, 20, 26, 0.08);
+}
+
+.functions-segmented-control input:focus-visible + span {
+  outline: 3px solid rgba(49, 183, 200, 0.28);
+  outline-offset: 2px;
+}
+
 .functions-form-grid {
   display: grid;
   gap: 12px;
