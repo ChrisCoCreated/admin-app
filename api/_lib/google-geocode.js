@@ -1,3 +1,5 @@
+const crypto = require("node:crypto");
+
 const GOOGLE_GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
 
 function normalizeText(value) {
@@ -48,16 +50,39 @@ function buildGeocodeUrl(query, apiKey, region) {
   return url;
 }
 
-function describeGeocodeFailure(data, query) {
+function getApiKeyFingerprint(apiKey) {
+  const normalized = normalizeText(apiKey);
+  if (!normalized) {
+    return "missing";
+  }
+  return crypto.createHash("sha256").update(normalized).digest("hex").slice(0, 12);
+}
+
+function getSafeGeocodeDiagnostics(query, apiKey, region) {
+  const normalizedRegion = normalizeRegion(region);
+  return {
+    address: normalizeGeocodeAddress(query, normalizedRegion),
+    region: normalizedRegion,
+    components: countryComponentForRegion(normalizedRegion) || "",
+    keyFingerprint: getApiKeyFingerprint(apiKey),
+  };
+}
+
+function describeGeocodeFailure(data, query, diagnostics = null) {
   const status = normalizeText(data?.status) || "UNKNOWN";
   const apiMessage = normalizeText(data?.error_message);
   const suffix = apiMessage ? `: ${apiMessage}` : "";
-  return `Could not geocode location: ${query} (${status}${suffix})`;
+  const diagnosticText = diagnostics
+    ? `; address=${diagnostics.address || "unknown"}; region=${diagnostics.region || "unknown"}; components=${diagnostics.components || "none"}; key=${diagnostics.keyFingerprint || "unknown"}`
+    : "";
+  return `Could not geocode location: ${query} (${status}${suffix}${diagnosticText})`;
 }
 
 module.exports = {
   buildGeocodeUrl,
   describeGeocodeFailure,
+  getApiKeyFingerprint,
+  getSafeGeocodeDiagnostics,
   normalizeGeocodeAddress,
   normalizeRegion,
 };

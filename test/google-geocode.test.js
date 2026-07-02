@@ -4,6 +4,8 @@ const test = require("node:test");
 const {
   buildGeocodeUrl,
   describeGeocodeFailure,
+  getApiKeyFingerprint,
+  getSafeGeocodeDiagnostics,
   normalizeGeocodeAddress,
 } = require("../api/_lib/google-geocode");
 
@@ -31,4 +33,16 @@ test("includes Google geocode status in failure details", () => {
   );
 
   assert.equal(message, "Could not geocode location: CT1 1QX (REQUEST_DENIED: API key not valid.)");
+});
+
+test("adds safe diagnostics without exposing the Google API key", () => {
+  const apiKey = "secret-google-key";
+  const diagnostics = getSafeGeocodeDiagnostics("CT11QX", apiKey, "gb");
+  const message = describeGeocodeFailure({ status: "REQUEST_DENIED" }, "CT11QX", diagnostics);
+
+  assert.equal(diagnostics.keyFingerprint, getApiKeyFingerprint(apiKey));
+  assert.match(message, /address=CT1 1QX/);
+  assert.match(message, /components=country:GB/);
+  assert.match(message, /key=[a-f0-9]{12}/);
+  assert.doesNotMatch(message, /secret-google-key/);
 });

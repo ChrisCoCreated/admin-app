@@ -1,5 +1,10 @@
 const { readCarersDirectoryData, readDirectoryData } = require("../_lib/directory-source");
-const { buildGeocodeUrl, describeGeocodeFailure, normalizeRegion } = require("../_lib/google-geocode");
+const {
+  buildGeocodeUrl,
+  describeGeocodeFailure,
+  getSafeGeocodeDiagnostics,
+  normalizeRegion,
+} = require("../_lib/google-geocode");
 const { requireApiAuth } = require("../_lib/require-api-auth");
 
 const GOOGLE_ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes";
@@ -187,7 +192,7 @@ async function geocodeLocation(query, apiKey, region) {
 
   const data = await response.json();
   if (data.status !== "OK" || !Array.isArray(data.results) || !data.results.length) {
-    throw new Error(describeGeocodeFailure(data, query));
+    throw new Error(describeGeocodeFailure(data, query, getSafeGeocodeDiagnostics(query, apiKey, region)));
   }
 
   const result = data.results[0];
