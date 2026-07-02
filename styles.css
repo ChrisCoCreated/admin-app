@@ -4681,6 +4681,27 @@ tbody tr:hover .profitability-sticky-column {
   margin: 0;
 }
 
+.functions-main {
+  padding-bottom: 36px;
+}
+
+.functions-form {
+  margin-top: 14px;
+}
+
+.functions-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.functions-link-grid {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .consultant-main {
   padding-bottom: 36px;
 }

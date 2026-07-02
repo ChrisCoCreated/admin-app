@@ -19,6 +19,7 @@ const ROLE_PAGES = {
     "drivetime",
     "reports",
     "finance",
+    "functions",
     "emailtemplates",
     "suppliers",
     "consultant",
@@ -29,7 +30,7 @@ const ROLE_PAGES = {
   finance: ["finance"],
   consultant: ["consultant", "agendas"],
   director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
-  marketing: ["marketing", "marketingreports", "photolayout", "emailtemplates", "agendas"],
+  marketing: ["marketing", "marketingreports", "photolayout", "functions", "emailtemplates", "agendas"],
   operations: [
     "clients",
     "carers",
@@ -45,6 +46,7 @@ const ROLE_PAGES = {
     "mapping",
     "drivetime",
     "reports",
+    "functions",
     "emailtemplates",
     "suppliers",
   ],
@@ -60,7 +62,7 @@ const ROLE_PAGES = {
   logged_in: ["drivetime"],
 };
 const ACCESS_PAGE_EXPANSIONS = {
-  marketing: ["marketing", "marketingreports", "photolayout", "emailtemplates", "agendas"],
+  marketing: ["marketing", "marketingreports", "photolayout", "functions", "emailtemplates", "agendas"],
   photolayout: ["photolayout", "agendas"],
   finance: ["finance"],
   mapping: ["timesheets", "mapping", "drivetime", "agendas"],

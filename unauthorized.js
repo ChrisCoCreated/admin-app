@@ -28,6 +28,7 @@ const PAGE_LABELS = {
   marketingreports: "Marketing Reports",
   photolayout: "Photo Layout",
   qrgenerator: "QR Generator",
+  functions: "Functions",
   emailtemplates: "Email Templates",
   reports: "Reports",
 };

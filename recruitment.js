@@ -2,6 +2,7 @@ import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260601";
+import { getRecruitmentWhatsAppUrl, normalizeRecruitmentPhoneForActions } from "./recruitment-whatsapp.js?v=20260702";
 
 const searchInput = document.getElementById("searchInput");
 const locationFilterSelect = document.getElementById("locationFilterSelect");
@@ -997,46 +998,8 @@ function setDetailFormEnabled(enabled) {
   }
 }
 
-function normalizePhoneForActions(phoneNumber) {
-  const raw = cleanText(phoneNumber);
-  if (!raw) {
-    return "";
-  }
-  let digits = raw.replace(/[^\d+]/g, "");
-  if (digits.startsWith("00")) {
-    digits = `+${digits.slice(2)}`;
-  }
-  if (!digits.startsWith("+")) {
-    const numeric = digits.replace(/\D/g, "");
-    if (numeric.startsWith("0")) {
-      digits = `+44${numeric.slice(1)}`;
-    } else if (numeric.startsWith("44")) {
-      digits = `+${numeric}`;
-    } else {
-      digits = `+${numeric}`;
-    }
-  }
-  return digits.replace(/(?!^\+)\D/g, "");
-}
-
-function getWhatsAppMessage(candidateName) {
-  const firstName = cleanText(candidateName).split(/\s+/)[0] || "there";
-  return `Hi ${firstName}, thanks for applying to Thrive Homecare. Are you available today for a quick initial chat? Chris`;
-}
-
-function getWhatsAppUrl(phoneNumber, candidateName) {
-  const normalized = normalizePhoneForActions(phoneNumber).replace(/\D/g, "");
-  if (!normalized) {
-    return "";
-  }
-  const url = new URL("https://web.whatsapp.com/send");
-  url.searchParams.set("phone", normalized);
-  url.searchParams.set("text", getWhatsAppMessage(candidateName));
-  return url.toString();
-}
-
 function getTeamsCallUrl(phoneNumber) {
-  const normalized = normalizePhoneForActions(phoneNumber);
+  const normalized = normalizeRecruitmentPhoneForActions(phoneNumber);
   if (!normalized) {
     return "";
   }
@@ -1951,7 +1914,7 @@ function renderCandidates() {
   for (const candidate of filtered) {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", candidate.id === selectedCandidateId);
-    const whatsappUrl = getWhatsAppUrl(candidate.phoneNumber, candidate.candidateName);
+    const whatsappUrl = getRecruitmentWhatsAppUrl(candidate.phoneNumber, candidate.candidateName);
     const teamsCallUrl = getTeamsCallUrl(candidate.phoneNumber);
     const indeedUrl = getIndeedProfileUrl(candidate);
     const showInactiveReview = isInactiveReviewPending(candidate);

@@ -27,6 +27,7 @@ const ROLE_PAGES = {
     "drivetime",
     "reports",
     "finance",
+    "functions",
     "emailtemplates",
     "suppliers",
     "consultant",
@@ -53,6 +54,7 @@ const ROLE_PAGES = {
     "mapping",
     "drivetime",
     "reports",
+    "functions",
     "emailtemplates",
     "suppliers",
   ],
@@ -72,13 +74,14 @@ const ROLE_PAGES = {
     "mapping",
     "drivetime",
     "reports",
+    "functions",
     "emailtemplates",
     "suppliers",
   ],
   finance: ["finance"],
   consultant: ["consultant", "agendas"],
   director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
-  marketing: ["marketing", "marketingstories", "mastercontacts", "marketingreports", "photolayout", "qrgenerator", "emailtemplates", "agendas"],
+  marketing: ["marketing", "marketingstories", "mastercontacts", "marketingreports", "photolayout", "qrgenerator", "functions", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
   hr_only: ["carers", "timesheets", "recruitment", "agendas"],
@@ -92,7 +95,7 @@ const ROLE_PAGES = {
 };
 
 const ACCESS_PAGE_EXPANSIONS = {
-  marketing: ["marketing", "marketingstories", "mastercontacts", "marketingreports", "photolayout", "qrgenerator", "emailtemplates", "agendas"],
+  marketing: ["marketing", "marketingstories", "mastercontacts", "marketingreports", "photolayout", "qrgenerator", "functions", "emailtemplates", "agendas"],
   photolayout: ["photolayout", "agendas"],
   finance: ["finance"],
   mapping: ["timesheets", "mapping", "drivetime", "agendas"],
@@ -126,6 +129,7 @@ const PAGE_META = {
   drivetime: { href: "./drive-time-map.html", label: "Our Geography" },
   reports: { href: "./reports.html", label: "Reports" },
   finance: { href: "./finance.html", label: "Finance" },
+  functions: { href: "./functions.html", label: "Functions" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates", shortcutLabel: "Email" },
   suppliers: { href: "./suppliers.html", label: "Suppliers & Experiences" },
   consultant: { href: "./consultant.html", label: "Consultant" },
@@ -137,7 +141,7 @@ const PAGE_META = {
   qrgenerator: { href: "./qr-generator.html", label: "QR Generator", shortcutLabel: "QR" },
 };
 
-const ADMIN_HOME_PAGES = ["kpis", "finance", "reports", "agendas", "recruitment", "emailtemplates", "mapping"];
+const ADMIN_HOME_PAGES = ["kpis", "finance", "reports", "agendas", "recruitment", "functions", "mapping"];
 const MAX_STANDARD_ROLE_HOME_PAGES = 8;
 const MENU_GROUPS = [
   {
@@ -154,7 +158,7 @@ const MENU_GROUPS = [
   },
   {
     title: "Performance",
-    pages: ["kpis", "reports", "finance", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
+    pages: ["kpis", "reports", "finance", "functions", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
   },
   {
     title: "Marketing & Content",
@@ -217,14 +221,21 @@ export function getPageMeta(pageKey) {
   return PAGE_META[String(pageKey || "").trim().toLowerCase()] || null;
 }
 
+function getShortcutDisplayPages(pageKeys) {
+  const pages = Array.isArray(pageKeys) ? pageKeys : [];
+  const hasFunctionsPage = pages.includes("functions");
+  return pages.filter((pageKey) => !(hasFunctionsPage && pageKey === "emailtemplates"));
+}
+
 export function getHomePageTiles(role) {
   const normalizedRole = normalizeRole(role);
   const accessiblePages = getAccessiblePages(normalizedRole);
   if (normalizedRole === "admin") {
-    return ADMIN_HOME_PAGES.filter((pageKey) => accessiblePages.includes(pageKey));
+    return getShortcutDisplayPages(ADMIN_HOME_PAGES.filter((pageKey) => accessiblePages.includes(pageKey)));
   }
-  if (normalizedRole.startsWith("pages:") || accessiblePages.length <= MAX_STANDARD_ROLE_HOME_PAGES) {
-    return accessiblePages;
+  const shortcutPages = getShortcutDisplayPages(accessiblePages);
+  if (normalizedRole.startsWith("pages:") || shortcutPages.length <= MAX_STANDARD_ROLE_HOME_PAGES) {
+    return shortcutPages;
   }
   return [];
 }
