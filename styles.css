@@ -5384,6 +5384,21 @@ body.lightbox-open {
   padding-bottom: 40px;
 }
 
+.mapping-run-workspace {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #d7deeb;
+}
+
+.mapping-section-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.mapping-section-heading h2 {
+  margin: 0;
+}
+
 .drive-time-main {
   padding-bottom: 40px;
 }
@@ -6006,6 +6021,54 @@ body.lightbox-open {
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.journey-time-action-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.journey-audience-toggle {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid #cad5ea;
+  border-radius: 999px;
+  background: #f6f8fd;
+}
+
+.journey-audience-toggle label {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.journey-audience-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.journey-audience-toggle span {
+  border-radius: 999px;
+  padding: 8px 14px;
+  color: #53607a;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.journey-audience-toggle input:checked + span {
+  background: #1f3c88;
+  color: #fff;
+}
+
+.journey-audience-toggle input:focus-visible + span {
+  outline: 3px solid rgba(49, 183, 200, 0.34);
+  outline-offset: 2px;
 }
 
 .drive-time-controls {
@@ -6749,6 +6812,10 @@ body.lightbox-open {
 
   .mapping-grid {
     grid-template-columns: 1fr;
+  }
+
+  .journey-time-action-row {
+    align-items: stretch;
   }
 
   .drive-time-controls {

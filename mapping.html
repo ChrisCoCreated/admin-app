@@ -40,6 +40,7 @@
 
       <section class="panel" aria-labelledby="journeyTimesHeading">
         <h2 id="journeyTimesHeading">Journey Time to Location</h2>
+        <p class="muted">See distance to clients or associates from a given location.</p>
         <div class="mapping-form-grid">
           <label class="field" for="journeyOriginInput">
             Start postcode
@@ -54,9 +55,18 @@
             </select>
           </label>
         </div>
-        <div class="row">
-          <button id="calculateClientJourneyTimesBtn" type="button">Show client travel times</button>
-          <button id="calculateAssociateJourneyTimesBtn" class="secondary" type="button">Show associate travel times</button>
+        <div class="journey-time-action-row">
+          <fieldset class="journey-audience-toggle" aria-label="Travel time audience">
+            <label>
+              <input id="journeyAudienceClientsInput" name="journeyAudience" type="radio" value="clients" checked />
+              <span>Clients</span>
+            </label>
+            <label>
+              <input id="journeyAudienceAssociatesInput" name="journeyAudience" type="radio" value="associates" />
+              <span>Associates</span>
+            </label>
+          </fieldset>
+          <button id="calculateJourneyTimesBtn" type="button">Calculate travel times</button>
         </div>
         <p id="journeyTimesStatus" class="muted">Enter a postcode and choose an area.</p>
         <div id="journeyTimesResults" hidden>
@@ -79,153 +89,159 @@
         </div>
       </section>
 
-      <section class="mapping-grid">
-        <article class="panel staff-panel">
-          <h2>Staff Start Point</h2>
-          <label class="field" for="carerSearchInput">
-            Search associates
-            <input id="carerSearchInput" type="search" placeholder="Search by name, id, or postcode" autocomplete="off" />
-          </label>
-          <div class="mapping-form-grid">
-            <label class="field" for="associateAreaFilterSelect">
-              Area
-              <select id="associateAreaFilterSelect">
-                <option value="all">All areas</option>
-              </select>
+      <section class="mapping-run-workspace" aria-labelledby="workOutRunsHeading">
+        <div class="mapping-section-heading">
+          <h2 id="workOutRunsHeading">Work out Runs</h2>
+        </div>
+
+        <section class="mapping-grid">
+          <article class="panel staff-panel">
+            <h2>Staff Start Point</h2>
+            <label class="field" for="carerSearchInput">
+              Search associates
+              <input id="carerSearchInput" type="search" placeholder="Search by name, id, or postcode" autocomplete="off" />
             </label>
-            <label class="field" for="associateCareCompFilterSelect">
-              Care / Companionship
-              <select id="associateCareCompFilterSelect">
-                <option value="all">All tags</option>
-              </select>
-            </label>
-          </div>
-          <ul id="carerSearchResults" class="carer-search-results"></ul>
-          <p id="carerSearchStatus" class="muted">Loading associates...</p>
-
-          <label class="field" for="staffPostcodeInput">
-            Add staff start manually (postcode or address)
-            <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA or 10 Downing St, London" autocomplete="street-address" />
-          </label>
-        </article>
-
-        <article class="panel">
-          <h2>Client Stops</h2>
-          <label class="field" for="clientSearchInput">
-            Search client (name, id, location, postcode)
-            <input id="clientSearchInput" type="search" placeholder="Type to search clients" autocomplete="off" />
-          </label>
-          <div id="clientStatusFilters" class="status-filter-row"></div>
-          <div id="areaFilters" class="area-filter-row"></div>
-          <ul id="clientSearchResults" class="client-search-results"></ul>
-          <p id="clientSearchStatus" class="muted">Loading clients...</p>
-
-          <label class="field" for="clientPostcodeInput">
-            Add client stop manually (postcode or address)
-            <div class="postcode-entry-row">
-              <input id="clientPostcodeInput" type="text" placeholder="e.g. M1 1AE" autocomplete="postal-code" />
-              <button id="addClientBtn" class="secondary" type="button">Add</button>
+            <div class="mapping-form-grid">
+              <label class="field" for="associateAreaFilterSelect">
+                Area
+                <select id="associateAreaFilterSelect">
+                  <option value="all">All areas</option>
+                </select>
+              </label>
+              <label class="field" for="associateCareCompFilterSelect">
+                Care / Companionship
+                <select id="associateCareCompFilterSelect">
+                  <option value="all">All tags</option>
+                </select>
+              </label>
             </div>
-          </label>
-        </article>
-      </section>
+            <ul id="carerSearchResults" class="carer-search-results"></ul>
+            <p id="carerSearchStatus" class="muted">Loading associates...</p>
 
-      <section class="panel">
-        <section class="client-postcodes-block" aria-labelledby="clientPostcodesHeading">
-          <h2 id="clientPostcodesHeading">Selected client stops</h2>
-          <p id="selectedStaffName" class="muted" hidden></p>
-          <ul id="clientPostcodesList" class="postcode-pill-list"></ul>
-          <p id="noClientsMessage" class="muted">No client stops added.</p>
+            <label class="field" for="staffPostcodeInput">
+              Add staff start manually (postcode or address)
+              <input id="staffPostcodeInput" type="text" placeholder="e.g. SW1A 1AA or 10 Downing St, London" autocomplete="street-address" />
+            </label>
+          </article>
+
+          <article class="panel">
+            <h2>Client Stops</h2>
+            <label class="field" for="clientSearchInput">
+              Search client (name, id, location, postcode)
+              <input id="clientSearchInput" type="search" placeholder="Type to search clients" autocomplete="off" />
+            </label>
+            <div id="clientStatusFilters" class="status-filter-row"></div>
+            <div id="areaFilters" class="area-filter-row"></div>
+            <ul id="clientSearchResults" class="client-search-results"></ul>
+            <p id="clientSearchStatus" class="muted">Loading clients...</p>
+
+            <label class="field" for="clientPostcodeInput">
+              Add client stop manually (postcode or address)
+              <div class="postcode-entry-row">
+                <input id="clientPostcodeInput" type="text" placeholder="e.g. M1 1AE" autocomplete="postal-code" />
+                <button id="addClientBtn" class="secondary" type="button">Add</button>
+              </div>
+            </label>
+          </article>
         </section>
 
-        <label class="field" for="runStartTimeInput">
-          Run date
-          <input id="runDateInput" type="date" />
-        </label>
+        <section class="panel">
+          <section class="client-postcodes-block" aria-labelledby="clientPostcodesHeading">
+            <h2 id="clientPostcodesHeading">Selected client stops</h2>
+            <p id="selectedStaffName" class="muted" hidden></p>
+            <ul id="clientPostcodesList" class="postcode-pill-list"></ul>
+            <p id="noClientsMessage" class="muted">No client stops added.</p>
+          </section>
 
-        <label class="field" for="runStartTimeInput">
-          Run start time
-          <input id="runStartTimeInput" type="time" step="600" value="09:00" />
-        </label>
-
-        <label class="field" for="visitDurationInput">
-          Visit length (mins)
-          <input id="visitDurationInput" type="number" min="0" step="10" value="60" />
-        </label>
-
-        <label class="checkbox-row" for="startsFromHomeInput">
-          <input id="startsFromHomeInput" type="checkbox" />
-          <span>Starting from home</span>
-        </label>
-
-        <div class="row">
-          <button id="calculateRunBtn" type="button">Calculate run</button>
-          <button id="clearRunBtn" class="secondary" type="button">Clear</button>
-        </div>
-
-        <p id="mappingStatus" class="muted">Enter a staff start and at least one client stop.</p>
-      </section>
-
-      <section id="runResults" class="panel" hidden>
-        <h2>Run Summary</h2>
-        <p id="runTotals" class="muted"></p>
-        <div id="runCostPanel" class="cost-panel">
-          <p id="runCostSummary" class="muted"></p>
-          <div id="runCostBreakdown" class="cost-breakdown-sections"></div>
-        </div>
-
-        <h2>Run Schedule</h2>
-        <p class="muted">Assumes 1 hour per client visit. Edit any time to shift all following times.</p>
-        <div id="runSchedule" class="schedule-list"></div>
-        <p>
-          <a id="mapsDirectionsLink" href="#" target="_blank" rel="noopener noreferrer">Open run in Google Maps</a>
-        </p>
-
-        <h2>Legs</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Leg</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Distance</th>
-                <th>Duration</th>
-              </tr>
-            </thead>
-            <tbody id="runLegsBody"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2>Export Runs</h2>
-        <p class="muted">Name a calculated run, add it to local export storage, then download all as CSV.</p>
-        <div class="mapping-form-grid">
-          <label class="field" for="runNameInput">
-            Run name
-            <input id="runNameInput" type="text" placeholder="e.g. Tuesday Central AM" />
+          <label class="field" for="runDateInput">
+            Run date
+            <input id="runDateInput" type="date" />
           </label>
-        </div>
-        <div class="row">
-          <button id="saveRunBtn" type="button" disabled>Add run for export</button>
-          <button id="exportRunsBtn" class="secondary" type="button" disabled>Download CSV</button>
-        </div>
-        <p id="savedRunsStatus" class="muted">No saved runs yet.</p>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Saved</th>
-                <th>Name</th>
-                <th>Start</th>
-                <th>Stops</th>
-                <th>Grand Total</th>
-              </tr>
-            </thead>
-            <tbody id="savedRunsBody"></tbody>
-          </table>
-        </div>
+
+          <label class="field" for="runStartTimeInput">
+            Run start time
+            <input id="runStartTimeInput" type="time" step="600" value="09:00" />
+          </label>
+
+          <label class="field" for="visitDurationInput">
+            Visit length (mins)
+            <input id="visitDurationInput" type="number" min="0" step="10" value="60" />
+          </label>
+
+          <label class="checkbox-row" for="startsFromHomeInput">
+            <input id="startsFromHomeInput" type="checkbox" />
+            <span>Starting from home</span>
+          </label>
+
+          <div class="row">
+            <button id="calculateRunBtn" type="button">Calculate run</button>
+            <button id="clearRunBtn" class="secondary" type="button">Clear</button>
+          </div>
+
+          <p id="mappingStatus" class="muted">Enter a staff start and at least one client stop.</p>
+        </section>
+
+        <section id="runResults" class="panel" hidden>
+          <h2>Run Summary</h2>
+          <p id="runTotals" class="muted"></p>
+          <div id="runCostPanel" class="cost-panel">
+            <p id="runCostSummary" class="muted"></p>
+            <div id="runCostBreakdown" class="cost-breakdown-sections"></div>
+          </div>
+
+          <h2>Run Schedule</h2>
+          <p class="muted">Assumes 1 hour per client visit. Edit any time to shift all following times.</p>
+          <div id="runSchedule" class="schedule-list"></div>
+          <p>
+            <a id="mapsDirectionsLink" href="#" target="_blank" rel="noopener noreferrer">Open run in Google Maps</a>
+          </p>
+
+          <h2>Legs</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Leg</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Distance</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody id="runLegsBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Export Runs</h2>
+          <p class="muted">Name a calculated run, add it to local export storage, then download all as CSV.</p>
+          <div class="mapping-form-grid">
+            <label class="field" for="runNameInput">
+              Run name
+              <input id="runNameInput" type="text" placeholder="e.g. Tuesday Central AM" />
+            </label>
+          </div>
+          <div class="row">
+            <button id="saveRunBtn" type="button" disabled>Add run for export</button>
+            <button id="exportRunsBtn" class="secondary" type="button" disabled>Download CSV</button>
+          </div>
+          <p id="savedRunsStatus" class="muted">No saved runs yet.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Saved</th>
+                  <th>Name</th>
+                  <th>Start</th>
+                  <th>Stops</th>
+                  <th>Grand Total</th>
+                </tr>
+              </thead>
+              <tbody id="savedRunsBody"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
 

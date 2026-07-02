@@ -21,8 +21,8 @@ const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
 const journeyOriginInput = document.getElementById("journeyOriginInput");
 const journeyAreaSelect = document.getElementById("journeyAreaSelect");
-const calculateClientJourneyTimesBtn = document.getElementById("calculateClientJourneyTimesBtn");
-const calculateAssociateJourneyTimesBtn = document.getElementById("calculateAssociateJourneyTimesBtn");
+const calculateJourneyTimesBtn = document.getElementById("calculateJourneyTimesBtn");
+const journeyAudienceInputs = Array.from(document.querySelectorAll('input[name="journeyAudience"]'));
 const journeyTimesStatus = document.getElementById("journeyTimesStatus");
 const journeyTimesResults = document.getElementById("journeyTimesResults");
 const journeyTimesSummary = document.getElementById("journeyTimesSummary");
@@ -134,12 +134,12 @@ function setJourneyTimesStatus(message, isError = false) {
 }
 
 function setJourneyTimesBusy(isBusy) {
-  if (calculateClientJourneyTimesBtn) {
-    calculateClientJourneyTimesBtn.disabled = isBusy;
+  if (calculateJourneyTimesBtn) {
+    calculateJourneyTimesBtn.disabled = isBusy;
   }
-  if (calculateAssociateJourneyTimesBtn) {
-    calculateAssociateJourneyTimesBtn.disabled = isBusy;
-  }
+  journeyAudienceInputs.forEach((input) => {
+    input.disabled = isBusy;
+  });
   if (journeyOriginInput) {
     journeyOriginInput.disabled = isBusy;
   }
@@ -735,6 +735,11 @@ function formatJourneyAudience(audience, plural = true) {
     return plural ? "associates" : "associate";
   }
   return plural ? "clients" : "client";
+}
+
+function getSelectedJourneyAudience() {
+  const selectedInput = journeyAudienceInputs.find((input) => input.checked);
+  return selectedInput?.value === "associates" ? "associates" : "clients";
 }
 
 function renderJourneyTimes(data) {
@@ -1484,18 +1489,14 @@ calculateRunBtn?.addEventListener("click", () => {
   void calculateRun();
 });
 
-calculateClientJourneyTimesBtn?.addEventListener("click", () => {
-  void calculateJourneyTimes("clients");
-});
-
-calculateAssociateJourneyTimesBtn?.addEventListener("click", () => {
-  void calculateJourneyTimes("associates");
+calculateJourneyTimesBtn?.addEventListener("click", () => {
+  void calculateJourneyTimes(getSelectedJourneyAudience());
 });
 
 journeyOriginInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
-    void calculateJourneyTimes("clients");
+    void calculateJourneyTimes(getSelectedJourneyAudience());
   }
 });
 

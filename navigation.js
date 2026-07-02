@@ -122,8 +122,8 @@ const PAGE_META = {
   tasks: { href: "./tasks.html", label: "Tasks (Advanced)" },
   taskstest: { href: "./tasks-test.html", label: "Tasks Test" },
   enquiryremindertest: { href: "./enquiry-reminder-test.html", label: "Enquiry Reminder Test", shortcutLabel: "Reminder Test" },
-  mapping: { href: "./mapping.html", label: "Time Mapping" },
-  drivetime: { href: "./drive-time-map.html", label: "Our Geography", shortcutLabel: "Map" },
+  mapping: { href: "./mapping.html", label: "Time Mapping", shortcutLabel: "Map" },
+  drivetime: { href: "./drive-time-map.html", label: "Our Geography" },
   reports: { href: "./reports.html", label: "Reports" },
   finance: { href: "./finance.html", label: "Finance" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates", shortcutLabel: "Email" },
@@ -137,7 +137,7 @@ const PAGE_META = {
   qrgenerator: { href: "./qr-generator.html", label: "QR Generator", shortcutLabel: "QR" },
 };
 
-const ADMIN_HOME_PAGES = ["kpis", "finance", "reports", "agendas", "recruitment", "emailtemplates", "drivetime"];
+const ADMIN_HOME_PAGES = ["kpis", "finance", "reports", "agendas", "recruitment", "emailtemplates", "mapping"];
 const MAX_STANDARD_ROLE_HOME_PAGES = 8;
 const MENU_GROUPS = [
   {
