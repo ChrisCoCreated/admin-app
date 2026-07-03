@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Utilisation Report</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/company_marketing_assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Admin" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260703-utilisation" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/company_marketing_assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="hero compact">
+        <p class="row-note">
+          <a class="button-link subtle-link" href="./finance.html">Back to Finance</a>
+        </p>
+        <h1>Utilisation Report</h1>
+        <p id="statusMessage" class="muted">Checking access...</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head profitability-process-head">
+          <div>
+            <h2>Build The Report</h2>
+            <p id="dateRangeMessage" class="muted">Preparing this month&apos;s OneTouch link...</p>
+          </div>
+          <a id="carerHoursReportLink" class="button-link-one-touch" href="#" target="_blank" rel="noopener noreferrer"
+            >Open Carer Hours</a
+          >
+        </div>
+
+        <div class="row wrap-row utilisation-period-row">
+          <label class="field" for="periodPresetSelect">
+            Period
+            <select id="periodPresetSelect">
+              <option value="last_month">Last month</option>
+              <option value="this_month" selected>This month</option>
+              <option value="next_month">Next month</option>
+            </select>
+          </label>
+        </div>
+
+        <ol class="profitability-steps">
+          <li>Open the carer hours report for the selected month.</li>
+          <li>
+            Show these columns before exporting:
+            <span class="column-chip-list">
+              <span>Surname</span>
+              <span>First Name</span>
+              <span>Area</span>
+              <span>Scheduled Hrs (HH:MM)</span>
+              <span>Confirmed (HH:MM)</span>
+              <span>Contracted Hrs (HH:MM)</span>
+            </span>
+          </li>
+          <li>Export CSV, then upload it below.</li>
+        </ol>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Upload &amp; Results</h2>
+            <p class="muted">Projected utilisation is scheduled divided by contracted. Actual utilisation is confirmed divided by contracted.</p>
+          </div>
+          <button id="exportReportBtn" type="button" disabled>Export Report CSV</button>
+        </div>
+
+        <div class="profitability-upload-grid">
+          <label class="field" for="utilisationCsvInput">
+            Carer hours CSV
+            <input id="utilisationCsvInput" type="file" accept=".csv,text/csv" />
+          </label>
+        </div>
+
+        <p id="uploadStatusMessage" class="muted row-note">Upload the OneTouch carer hours CSV to begin.</p>
+      </section>
+
+      <section id="reportOutputPanel" class="panel" hidden>
+        <div class="panel-head utilisation-results-head">
+          <div>
+            <h2>Report</h2>
+            <p id="reportSummaryMessage" class="muted"></p>
+          </div>
+          <div class="utilisation-filter-actions">
+            <label class="field" for="areaFilterSelect">
+              Area
+              <select id="areaFilterSelect"></select>
+            </label>
+            <button id="showAllPeopleBtn" class="secondary" type="button">Show all</button>
+            <button id="hideAllPeopleBtn" class="secondary" type="button">Hide all</button>
+          </div>
+        </div>
+
+        <div id="summaryGrid" class="profitability-kpi-grid" aria-label="Utilisation totals"></div>
+
+        <div class="table-wrap utilisation-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="profitability-sticky-column">Associate</th>
+                <th>Visible</th>
+                <th>Area</th>
+                <th>Scheduled</th>
+                <th>Confirmed</th>
+                <th>Contracted</th>
+                <th>Projected Utilisation</th>
+                <th>Actual Utilisation</th>
+              </tr>
+            </thead>
+            <tbody id="utilisationReportBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./utilisation-report.js?v=20260703"></script>
+  </body>
+</html>

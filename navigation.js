@@ -128,6 +128,7 @@ const PAGE_META = {
   mapping: { href: "./mapping.html", label: "Time Mapping", shortcutLabel: "Map" },
   drivetime: { href: "./drive-time-map.html", label: "Our Geography" },
   reports: { href: "./reports.html", label: "Reports" },
+  utilisationreport: { href: "./utilisation-report.html", label: "Utilisation Report", shortcutLabel: "Utilisation" },
   finance: { href: "./finance.html", label: "Finance" },
   functions: { href: "./functions.html", label: "Functions" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates", shortcutLabel: "Email" },

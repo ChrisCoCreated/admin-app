@@ -31,6 +31,8 @@ const PAGE_LABELS = {
   functions: "Functions",
   emailtemplates: "Email Templates",
   reports: "Reports",
+  utilisationreport: "Utilisation Report",
+  finance: "Finance",
 };
 
 function getPageLabel(page) {

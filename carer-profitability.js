@@ -1141,7 +1141,7 @@ async function init() {
     const profile = await fetchCurrentUser();
     const role = String(profile?.role || "").trim().toLowerCase();
 
-    if (!canAccessPage(role, "reports")) {
+    if (!canAccessPage(role, "reports") && !canAccessPage(role, "finance")) {
       redirectToUnauthorized("reports");
       return;
     }
