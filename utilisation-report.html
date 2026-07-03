@@ -71,6 +71,7 @@
               <span>Surname</span>
               <span>First Name</span>
               <span>Area</span>
+              <span>Position</span>
               <span>Scheduled Hrs (HH:MM)</span>
               <span>Confirmed (HH:MM)</span>
               <span>Contracted Hrs (HH:MM)</span>
@@ -86,7 +87,10 @@
             <h2>Upload &amp; Results</h2>
             <p class="muted">Projected utilisation is scheduled divided by contracted. Actual utilisation is confirmed divided by contracted.</p>
           </div>
-          <button id="exportReportBtn" type="button" disabled>Export Report CSV</button>
+          <div class="utilisation-report-actions">
+            <button id="editModeBtn" class="secondary" type="button" disabled>Edit figures</button>
+            <button id="exportReportBtn" type="button" disabled>Export Report CSV</button>
+          </div>
         </div>
 
         <div class="profitability-upload-grid">
@@ -115,6 +119,16 @@
           </div>
         </div>
 
+        <div class="utilisation-role-controls" aria-label="Role visibility controls">
+          <span class="muted">Role groups</span>
+          <button class="secondary" type="button" data-role-action="show" data-role-category="associate">Show associates</button>
+          <button class="secondary" type="button" data-role-action="hide" data-role-category="associate">Hide associates</button>
+          <button class="secondary" type="button" data-role-action="show" data-role-category="companion">Show companions</button>
+          <button class="secondary" type="button" data-role-action="hide" data-role-category="companion">Hide companions</button>
+          <button class="secondary" type="button" data-role-action="show" data-role-category="other">Show other</button>
+          <button class="secondary" type="button" data-role-action="hide" data-role-category="other">Hide other</button>
+        </div>
+
         <div id="summaryGrid" class="profitability-kpi-grid" aria-label="Utilisation totals"></div>
 
         <div class="table-wrap utilisation-table-wrap">
@@ -124,6 +138,7 @@
                 <th class="profitability-sticky-column">Associate</th>
                 <th>Visible</th>
                 <th>Area</th>
+                <th>Position</th>
                 <th>Scheduled</th>
                 <th>Confirmed</th>
                 <th>Contracted</th>

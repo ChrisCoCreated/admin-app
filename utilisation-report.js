@@ -10,6 +10,7 @@ const dateRangeMessage = document.getElementById("dateRangeMessage");
 const carerHoursReportLink = document.getElementById("carerHoursReportLink");
 const utilisationCsvInput = document.getElementById("utilisationCsvInput");
 const uploadStatusMessage = document.getElementById("uploadStatusMessage");
+const editModeBtn = document.getElementById("editModeBtn");
 const exportReportBtn = document.getElementById("exportReportBtn");
 const reportOutputPanel = document.getElementById("reportOutputPanel");
 const reportSummaryMessage = document.getElementById("reportSummaryMessage");
@@ -18,6 +19,7 @@ const showAllPeopleBtn = document.getElementById("showAllPeopleBtn");
 const hideAllPeopleBtn = document.getElementById("hideAllPeopleBtn");
 const summaryGrid = document.getElementById("summaryGrid");
 const utilisationReportBody = document.getElementById("utilisationReportBody");
+const roleVisibilityButtons = document.querySelectorAll("[data-role-action][data-role-category]");
 
 const CARER_HOURS_BASE_URL = "https://care2.onetouchhealth.net/cm/in/carersHoursRpt.php";
 const DEFAULT_AREA = "East Kent";
@@ -25,6 +27,7 @@ const FIELD_ALIASES = {
   surname: ["Surname"],
   firstName: ["First Name", "Firstname"],
   area: ["Area"],
+  position: ["Position", "Role", "Job Title", "Job Position"],
   scheduledHours: ["Scheduled Hrs (HH:MM)", "Scheduled Hrs", "Scheduled Hours", "Scheduled"],
   confirmedHours: ["Confirmed (HH:MM)", "Confirmed Hrs", "Confirmed Hours", "Confirmed"],
   contractedHours: ["Contracted Hrs (HH:MM)", "Contracted Hrs", "Contracted Hours", "Contracted"],
@@ -39,6 +42,7 @@ const directoryApi = createDirectoryApi(authController);
 let latestRows = [];
 let hiddenPeople = new Set();
 let latestPeriod = getDateRangeForPreset("this_month");
+let editMode = false;
 
 function setStatus(message, isError = false) {
   statusMessage.textContent = message;
@@ -186,8 +190,25 @@ function utilisation(numerator, contractedHours) {
   return contractedHours > 0 ? (numerator / contractedHours) * 100 : null;
 }
 
+function roleCategory(position) {
+  const normalized = String(position || "").toLowerCase();
+  if (normalized.includes("associate")) {
+    return "associate";
+  }
+  if (normalized.includes("companion")) {
+    return "companion";
+  }
+  return "other";
+}
+
 function personKey(row) {
-  return [row.surname, row.firstName, row.area].map((value) => normalizeHeader(value)).join("|");
+  return [row.surname, row.firstName, row.area, row.position].map((value) => normalizeHeader(value)).join("|");
+}
+
+function recalculateRow(row) {
+  row.projectedUtilisation = utilisation(row.scheduledHours, row.contractedHours);
+  row.actualUtilisation = utilisation(row.confirmedHours, row.contractedHours);
+  return row;
 }
 
 function mapRows(parsed) {
@@ -212,19 +233,19 @@ function mapRows(parsed) {
       const surname = getField(row, headerMap, FIELD_ALIASES.surname);
       const firstName = getField(row, headerMap, FIELD_ALIASES.firstName);
       const area = getField(row, headerMap, FIELD_ALIASES.area);
+      const position = getField(row, headerMap, FIELD_ALIASES.position);
       const scheduledHours = parseHours(getField(row, headerMap, FIELD_ALIASES.scheduledHours));
       const confirmedHours = parseHours(getField(row, headerMap, FIELD_ALIASES.confirmedHours));
       const contractedHours = parseHours(getField(row, headerMap, FIELD_ALIASES.contractedHours));
-      return {
+      return recalculateRow({
         surname,
         firstName,
         area,
+        position,
         scheduledHours,
         confirmedHours,
         contractedHours,
-        projectedUtilisation: utilisation(scheduledHours, contractedHours),
-        actualUtilisation: utilisation(confirmedHours, contractedHours),
-      };
+      });
     })
     .filter((row) => row.surname || row.firstName || row.area);
 }
@@ -298,6 +319,10 @@ function visibleRows() {
   return filteredRows().filter((row) => !hiddenPeople.has(personKey(row)));
 }
 
+function rowsForRoleCategory(category) {
+  return filteredRows().filter((row) => roleCategory(row.position) === category);
+}
+
 function renderAreaOptions() {
   const areas = getAreas(latestRows);
   areaFilterSelect.innerHTML = "";
@@ -358,6 +383,29 @@ function renderSummary(rows) {
   );
 }
 
+function renderHourCell(row, fieldName, label) {
+  const cell = document.createElement("td");
+  if (!editMode) {
+    cell.textContent = formatHours(row[fieldName]);
+    return cell;
+  }
+
+  const input = document.createElement("input");
+  input.className = "utilisation-hours-input";
+  input.type = "text";
+  input.inputMode = "decimal";
+  input.value = formatHours(row[fieldName]);
+  input.setAttribute("aria-label", `${label} hours for ${row.firstName} ${row.surname}`.trim());
+  input.addEventListener("change", () => {
+    row[fieldName] = parseHours(input.value);
+    recalculateRow(row);
+    renderReport();
+    setUploadStatus("Figures updated. Utilisation recalculated from the edited values.");
+  });
+  cell.appendChild(input);
+  return cell;
+}
+
 function makeCopyButton(value) {
   const button = document.createElement("button");
   button.className = "utilisation-copy-button";
@@ -388,7 +436,7 @@ function renderRows() {
   utilisationReportBody.innerHTML = "";
 
   if (!rows.length) {
-    utilisationReportBody.innerHTML = '<tr><td colspan="8" class="muted">No rows for this area.</td></tr>';
+    utilisationReportBody.innerHTML = '<tr><td colspan="9" class="muted">No rows for this area.</td></tr>';
   } else {
     for (const row of rows) {
       const key = personKey(row);
@@ -417,16 +465,15 @@ function renderRows() {
       visibleCell.appendChild(visibleButton);
       tr.appendChild(visibleCell);
 
-      for (const value of [
-        row.area,
-        formatHours(row.scheduledHours),
-        formatHours(row.confirmedHours),
-        formatHours(row.contractedHours),
-      ]) {
+      for (const value of [row.area, row.position || "Other"]) {
         const td = document.createElement("td");
         td.textContent = value;
         tr.appendChild(td);
       }
+
+      tr.appendChild(renderHourCell(row, "scheduledHours", "Scheduled"));
+      tr.appendChild(renderHourCell(row, "confirmedHours", "Confirmed"));
+      tr.appendChild(renderHourCell(row, "contractedHours", "Contracted"));
 
       const projectedCell = document.createElement("td");
       projectedCell.appendChild(makeCopyButton(row.projectedUtilisation));
@@ -441,19 +488,32 @@ function renderRows() {
   }
 
   renderSummary(includedRows);
+  const roleCounts = ["associate", "companion", "other"]
+    .map((category) => {
+      const visibleCount = rows.filter((row) => roleCategory(row.position) === category && !hiddenPeople.has(personKey(row))).length;
+      const totalCount = rows.filter((row) => roleCategory(row.position) === category).length;
+      return `${category}: ${visibleCount}/${totalCount}`;
+    })
+    .join(", ");
   reportSummaryMessage.textContent =
     `Showing ${includedRows.length} of ${rows.length} row(s) for ${selectedArea() === "All" ? "all areas" : selectedArea()}. ` +
-    `${hiddenPeople.size} hidden across the uploaded report.`;
+    `${hiddenPeople.size} hidden across the uploaded report. Role groups shown: ${roleCounts}.`;
 }
 
 function renderReport() {
   if (!latestRows.length) {
     reportOutputPanel.hidden = true;
     exportReportBtn?.setAttribute("disabled", "disabled");
+    editModeBtn?.setAttribute("disabled", "disabled");
     return;
   }
   reportOutputPanel.hidden = false;
   exportReportBtn?.removeAttribute("disabled");
+  editModeBtn?.removeAttribute("disabled");
+  if (editModeBtn) {
+    editModeBtn.textContent = editMode ? "Done editing" : "Edit figures";
+    editModeBtn.classList.toggle("is-active", editMode);
+  }
   renderRows();
 }
 
@@ -487,6 +547,7 @@ function handleExport() {
     "Surname",
     "First Name",
     "Area",
+    "Position",
     "Scheduled Hrs (HH:MM)",
     "Confirmed (HH:MM)",
     "Contracted Hrs (HH:MM)",
@@ -500,6 +561,7 @@ function handleExport() {
         row.surname,
         row.firstName,
         row.area,
+        row.position,
         formatHours(row.scheduledHours),
         formatHours(row.confirmedHours),
         formatHours(row.contractedHours),
@@ -532,6 +594,7 @@ async function handleCsvUpload() {
         left.firstName.localeCompare(right.firstName, undefined, { sensitivity: "base" })
     );
     hiddenPeople = new Set();
+    editMode = false;
     renderAreaOptions();
     renderReport();
 
@@ -541,6 +604,7 @@ async function handleCsvUpload() {
     console.error("Utilisation CSV import failed", error);
     latestRows = [];
     hiddenPeople = new Set();
+    editMode = false;
     renderReport();
     setUploadStatus(error?.message || "Could not read the utilisation CSV.", true);
   }
@@ -593,6 +657,27 @@ periodPresetSelect?.addEventListener("change", refreshPeriodLink);
 utilisationCsvInput?.addEventListener("change", handleCsvUpload);
 areaFilterSelect?.addEventListener("change", renderReport);
 exportReportBtn?.addEventListener("click", handleExport);
+editModeBtn?.addEventListener("click", () => {
+  editMode = !editMode;
+  renderReport();
+  setUploadStatus(editMode ? "Edit mode on. Change hour values, then leave the field to recalculate." : "Edit mode off.");
+});
+roleVisibilityButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const category = button.dataset.roleCategory;
+    const action = button.dataset.roleAction;
+    const rows = rowsForRoleCategory(category);
+    for (const row of rows) {
+      if (action === "hide") {
+        hiddenPeople.add(personKey(row));
+      } else {
+        hiddenPeople.delete(personKey(row));
+      }
+    }
+    renderReport();
+    setUploadStatus(`${action === "hide" ? "Hidden" : "Shown"} ${rows.length} ${category} row(s) in the current area filter.`);
+  });
+});
 showAllPeopleBtn?.addEventListener("click", () => {
   for (const row of filteredRows()) {
     hiddenPeople.delete(personKey(row));

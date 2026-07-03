@@ -4322,6 +4322,7 @@ tbody tr:hover .profitability-sticky-column {
   align-items: flex-end;
 }
 
+.utilisation-report-actions,
 .utilisation-filter-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4330,8 +4331,36 @@ tbody tr:hover .profitability-sticky-column {
   gap: 10px;
 }
 
+.utilisation-report-actions button {
+  min-height: 40px;
+}
+
+.utilisation-report-actions button.is-active {
+  border-color: rgba(49, 183, 200, 0.74);
+  background: #e6f8fb;
+  color: #17435a;
+}
+
 .utilisation-filter-actions .field {
   min-width: 220px;
+}
+
+.utilisation-role-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #d8e0ee;
+  border-radius: 12px;
+  background: #fbfcff;
+}
+
+.utilisation-role-controls button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
 }
 
 .utilisation-table-wrap {
@@ -4350,6 +4379,14 @@ tbody tr:hover .profitability-sticky-column {
 .utilisation-visibility-button {
   min-height: 32px;
   padding: 6px 10px;
+}
+
+.utilisation-hours-input {
+  width: 86px;
+  height: 34px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
 }
 
 .utilisation-copy-button {
