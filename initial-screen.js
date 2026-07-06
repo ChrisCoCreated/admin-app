@@ -275,7 +275,7 @@ function getEmailDraftUrl(item) {
     indeedUrl || null,
   ].filter((line) => line !== null);
   const params = [
-    `cc=${encodeURIComponent("Rebecca@planwithcare.co.uk")}`,
+    `cc=${encodeURIComponent("Rebecca@planwithcare.co.uk,georgina@thrivehomecare.co.uk")}`,
     `subject=${encodeURIComponent(subject)}`,
     `body=${encodeURIComponent(bodyLines.join("\n"))}`,
   ].join("&");
