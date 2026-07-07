@@ -403,6 +403,7 @@ button.kpi-mini-tile:focus-visible {
 }
 
 .kpi-card-clickable {
+  position: relative;
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -421,6 +422,39 @@ button.kpi-mini-tile:focus-visible {
 .kpi-card-clickable:focus-visible {
   outline: 3px solid rgba(49, 183, 200, 0.35);
   outline-offset: 3px;
+}
+
+.kpi-card-view-action {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid rgba(49, 183, 200, 0.36);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #176b76;
+  font-size: 0.76rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(17, 20, 26, 0.08);
+}
+
+.kpi-card-view-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.kpi-card-has-view-action {
+  padding-bottom: 56px;
 }
 
 .kpi-card-delivery {

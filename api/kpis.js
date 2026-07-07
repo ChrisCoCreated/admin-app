@@ -56,6 +56,7 @@ const ENQUIRY_FIELD_DEFINITIONS = {
   title: ["Title", "Name", "Client Name", "Enquirer Name"],
   status: ["Status"],
   currentStatus: ["Current Status"],
+  enquiryOwner: ["Enquiry owned by", "Enquiry Owner", "Owner"],
   active: ["Active", "Active Enquiry", "Active Enquiries", "Currently Active", "Is Active"],
   modified: ["Modified"],
 };
@@ -655,6 +656,16 @@ function getValidDate(value) {
   return value && !Number.isNaN(date.getTime()) ? date : null;
 }
 
+function formatPersonFieldValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(formatPersonFieldValue).filter(Boolean).join(", ");
+  }
+  if (value && typeof value === "object") {
+    return cleanText(value.displayName || value.Title || value.LookupValue || value.email || value.EMail || value.Email);
+  }
+  return cleanText(value);
+}
+
 function normalizeEnquiryStatus(value) {
   return cleanText(value).toLowerCase();
 }
@@ -717,6 +728,7 @@ function normalizeEnquiryDetailItem(item, fieldMap, listUrl = "") {
     id: cleanText(item?.id),
     title: cleanText(getFieldValue(row, "title") || fields.Title || `Item ${item?.id || ""}`),
     status: cleanText(status),
+    owner: formatPersonFieldValue(getFieldValue(row, "enquiryOwner")) || "Unassigned",
     active: getFieldValue(row, "active"),
     modified: modifiedDate ? modifiedDate.toISOString() : "",
     modifiedLabel: modifiedDate ? formatWeek(modifiedDate.toISOString()) : "",

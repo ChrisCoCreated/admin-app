@@ -226,11 +226,15 @@ export function createKpiMetricCard({
   wide = false,
   trendCompanion = false,
   onClick = null,
+  viewAction = false,
 }) {
   const card = document.createElement("article");
   card.className = `kpi-card kpi-card-${tone}${wide ? " kpi-card-wide" : ""}`;
   if (trendCompanion) {
     card.classList.add("kpi-trend-companion-tile");
+  }
+  if (viewAction) {
+    card.classList.add("kpi-card-has-view-action");
   }
   if (typeof onClick === "function") {
     card.classList.add("kpi-card-clickable");
@@ -257,6 +261,17 @@ export function createKpiMetricCard({
     <div class="kpi-card-value">${valueMarkup}</div>
     ${detailText ? `<p class="kpi-card-detail">${escapeHtml(detailText)}</p>` : ""}
     <p class="kpi-card-source">${escapeHtml(sourceLabel(metric, latestWeekLabelText))}</p>
+    ${
+      viewAction
+        ? `<span class="kpi-card-view-action" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>View</span>
+          </span>`
+        : ""
+    }
   `;
   return card;
 }
@@ -501,9 +516,12 @@ export function createKpiTrendCard({
   onClick = null,
   compact = false,
   referenceValue = null,
+  latestValueHtml = null,
 }) {
   const points = getTrendValues(series, field);
   const latest = points.length ? points[points.length - 1] : null;
+  const latestValueMarkup =
+    latest && typeof latestValueHtml === "function" ? latestValueHtml(latest.value) : latest ? escapeHtml(formatter(latest.value)) : "-";
   const summary = summarizeTrend(points);
   const card = document.createElement("button");
   card.type = "button";
@@ -512,7 +530,7 @@ export function createKpiTrendCard({
   card.innerHTML = `
     <div>
       <h3>${escapeHtml(title)}</h3>
-      <p class="kpi-trend-value">${latest ? escapeHtml(formatter(latest.value)) : "-"}</p>
+      <p class="kpi-trend-value">${latestValueMarkup}</p>
       <p class="kpi-card-source">${escapeHtml(latest?.weekLabel || "No data")}</p>
     </div>
     <div class="kpi-trend-visual">
@@ -670,11 +688,13 @@ function buildEnquiryDetailRow(item, fallbackStatus = "No status") {
   const linkAttrs = item?.webUrl
     ? ` href="${escapeHtml(item.webUrl)}" target="_blank" rel="noopener noreferrer"`
     : "";
+  const owner = cleanText(item?.owner);
   return `
     <${tagName} class="kpi-modal-detail-row"${linkAttrs}>
       <div>
         <strong>${escapeHtml(item.title || "Untitled enquiry")}</strong>
         <span>${escapeHtml(item.status || fallbackStatus)}</span>
+        <span>${escapeHtml(`Owner: ${owner || "Unassigned"}`)}</span>
       </div>
       <small>${escapeHtml(item.modifiedLabel ? `Modified ${item.modifiedLabel}` : "")}</small>
     </${tagName}>
@@ -920,8 +940,9 @@ function renderBusiness(payload) {
       title: "Hours Won",
       series: payload?.trendSeries,
       field: "hoursWon",
-      formatter: formatHours,
+      formatter: formatHoursWord,
       referenceValue: 24,
+      latestValueHtml: formatHoursWonTargetValue,
     }),
     createKpiTrendCard({
       title: "Hours Lost",
@@ -1026,6 +1047,7 @@ function renderEnquiries(payload) {
         : "No won/lost outcomes modified in the past 3 months",
       metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
       tone: "positive",
+      viewAction: !outcomeUnavailable,
       onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
     }),
     createKpiMetricCard({
