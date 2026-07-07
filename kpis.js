@@ -1047,7 +1047,6 @@ function renderEnquiries(payload) {
         : "No won/lost outcomes modified in the past 3 months",
       metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
       tone: "positive",
-      viewAction: !outcomeUnavailable,
       onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
     }),
     createKpiMetricCard({
@@ -1056,6 +1055,7 @@ function renderEnquiries(payload) {
       detail: outcomeUnavailable ? assessmentOutcome.warning || "Could not load Enquiries Log." : wonOnHoldRatio,
       metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
       tone: "positive",
+      viewAction: !outcomeUnavailable,
       onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
     }),
     createKpiMetricCard({
@@ -1066,6 +1066,7 @@ function renderEnquiries(payload) {
       detail: "Active statuses 1-6; Initial Enquiry status 7",
       metric: metricValue(payload, "activeEnquiries"),
       latestWeekLabelText: latestLabel,
+      viewAction: true,
       onClick: () => openActiveEnquiriesModal(payload?.activeEnquiries),
     }),
   ]);
