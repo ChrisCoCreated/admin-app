@@ -479,6 +479,13 @@ button.kpi-mini-tile:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.kpi-card-value-target {
+  color: #5c687a;
+  font-size: 0.58em;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .kpi-note-card .kpi-card-value {
   font-size: 1rem;
   font-weight: 700;
@@ -624,6 +631,13 @@ input.kpi-edit-input {
   height: 48px;
   color: #227b88;
   overflow: visible;
+}
+
+.kpi-sparkline-reference {
+  stroke: rgba(17, 20, 26, 0.42);
+  stroke-width: 1.8;
+  stroke-dasharray: 3 4;
+  stroke-linecap: round;
 }
 
 .kpi-sparkline-empty {

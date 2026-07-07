@@ -138,6 +138,24 @@ function formatHours(value) {
   return `${formatNumber(number, decimals)}h`;
 }
 
+function formatHoursWord(value) {
+  const number = parseNumber(value);
+  if (number === null) {
+    return "-";
+  }
+  const decimals = Number.isInteger(number) ? 0 : 1;
+  const suffix = Math.abs(number) === 1 ? "hr" : "hrs";
+  return `${formatNumber(number, decimals)}${suffix}`;
+}
+
+function formatHoursWonTargetValue(value) {
+  const formatted = formatHoursWord(value);
+  if (formatted === "-") {
+    return escapeHtml(formatted);
+  }
+  return `${escapeHtml(formatted)} <span class="kpi-card-value-target">/ 24hrs</span>`;
+}
+
 function formatPercent(value) {
   const percent = parsePercent(value);
   if (percent === null) {
@@ -200,6 +218,7 @@ function sourceLabel(metric, latestWeekLabelText) {
 export function createKpiMetricCard({
   title,
   value,
+  valueHtml = "",
   metric,
   detail = "",
   tone = "default",
@@ -229,12 +248,13 @@ export function createKpiMetricCard({
 
   const stale = staleLabel(metric);
   const detailText = cleanText(detail);
+  const valueMarkup = valueHtml || escapeHtml(value);
   card.innerHTML = `
     <div class="kpi-card-topline">
       <h3>${escapeHtml(title)}</h3>
       ${stale ? `<span class="kpi-stale-pill">${escapeHtml(stale)}</span>` : ""}
     </div>
-    <div class="kpi-card-value">${escapeHtml(value)}</div>
+    <div class="kpi-card-value">${valueMarkup}</div>
     ${detailText ? `<p class="kpi-card-detail">${escapeHtml(detailText)}</p>` : ""}
     <p class="kpi-card-source">${escapeHtml(sourceLabel(metric, latestWeekLabelText))}</p>
   `;
@@ -428,42 +448,60 @@ function trendDeltaLabel(points, formatter) {
   return `${sign}${formatter(delta)} over quarter`;
 }
 
-function buildSparkline(points) {
+function buildSparkline(points, options = {}) {
   if (!points.length) {
-    return '<div class="kpi-sparkline-empty">No trend data</div>';
+    return '<div class="kpi-sparkline-empty">No data</div>';
   }
+  const referenceValue = parseNumber(options.referenceValue);
   const values = points.map((point) => point.value);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const scaleValues = referenceValue === null ? values : [...values, referenceValue];
+  const min = Math.min(...scaleValues);
+  const max = Math.max(...scaleValues);
   const range = max - min || 1;
   const width = 160;
   const height = 48;
+  const valueY = (value) => height - ((value - min) / range) * (height - 8) - 4;
   const step = points.length > 1 ? width / (points.length - 1) : width;
   const coords = points.map((point, index) => {
     const x = points.length > 1 ? index * step : width / 2;
-    const y = height - ((point.value - min) / range) * (height - 8) - 4;
+    const y = valueY(point.value);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
+  const referenceLine =
+    referenceValue === null
+      ? ""
+      : `<line class="kpi-sparkline-reference" x1="0" x2="${width}" y1="${valueY(referenceValue).toFixed(1)}" y2="${valueY(
+          referenceValue
+        ).toFixed(1)}"></line>`;
   return `
     <svg class="kpi-sparkline" viewBox="0 0 ${width} ${height}" role="img" aria-label="Quarter trend">
+      ${referenceLine}
       <polyline points="${coords.join(" ")}" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
     </svg>
   `;
 }
 
-function buildTrendGraph(points, formatter, summary) {
+function buildTrendGraph(points, formatter, summary, options = {}) {
   return `
     <div class="kpi-trend-graph">
       <div class="kpi-trend-scale-labels" aria-hidden="true">
         <span>${summary.max === null ? "" : escapeHtml(`Max ${formatter(summary.max)}`)}</span>
         <span>${summary.min === null ? "" : escapeHtml(`Min ${formatter(summary.min)}`)}</span>
       </div>
-      ${buildSparkline(points)}
+      ${buildSparkline(points, options)}
     </div>
   `;
 }
 
-export function createKpiTrendCard({ title, series, field, formatter = formatNumber, onClick = null, compact = false }) {
+export function createKpiTrendCard({
+  title,
+  series,
+  field,
+  formatter = formatNumber,
+  onClick = null,
+  compact = false,
+  referenceValue = null,
+}) {
   const points = getTrendValues(series, field);
   const latest = points.length ? points[points.length - 1] : null;
   const summary = summarizeTrend(points);
@@ -475,19 +513,19 @@ export function createKpiTrendCard({ title, series, field, formatter = formatNum
     <div>
       <h3>${escapeHtml(title)}</h3>
       <p class="kpi-trend-value">${latest ? escapeHtml(formatter(latest.value)) : "-"}</p>
-      <p class="kpi-card-source">${escapeHtml(latest?.weekLabel || "No trend data")}</p>
+      <p class="kpi-card-source">${escapeHtml(latest?.weekLabel || "No data")}</p>
     </div>
     <div class="kpi-trend-visual">
-      ${buildTrendGraph(points, formatter, summary)}
+      ${buildTrendGraph(points, formatter, summary, { referenceValue })}
       <span>${escapeHtml(trendDeltaLabel(points, formatter))}</span>
     </div>
   `;
   card.addEventListener("click", () => {
     if (typeof onClick === "function") {
-      onClick({ title, points, formatter, summary });
+      onClick({ title, points, formatter, summary, referenceValue });
       return;
     }
-    openTrendModal({ title, points, formatter, summary });
+    openTrendModal({ title, points, formatter, summary, referenceValue });
   });
   return card;
 }
@@ -537,7 +575,7 @@ function closeTrendModal() {
 
 function buildModalBars(points, formatter) {
   if (!points.length) {
-    return '<p class="muted">No trend data available.</p>';
+    return '<p class="muted">No data available.</p>';
   }
   const values = points.map((point) => point.value);
   const max = Math.max(...values) || 1;
@@ -557,7 +595,7 @@ function buildModalBars(points, formatter) {
     .join("");
 }
 
-function openTrendModal({ title, points, formatter, summary }) {
+function openTrendModal({ title, points, formatter, summary, referenceValue = null }) {
   const modal = ensureTrendModal();
   const titleNode = modal.querySelector("#kpiTrendModalTitle");
   const statsNode = modal.querySelector("#kpiTrendModalStats");
@@ -580,7 +618,7 @@ function openTrendModal({ title, points, formatter, summary }) {
     `;
   }
   if (chartNode) {
-    chartNode.innerHTML = buildSparkline(points);
+    chartNode.innerHTML = buildSparkline(points, { referenceValue });
   }
   if (rowsNode) {
     rowsNode.innerHTML = buildModalBars(points, formatter);
@@ -774,7 +812,7 @@ function renderDelivery(payload) {
       trendCompanion: true,
     }),
     createKpiTrendCard({
-      title: "Delivery % Trend",
+      title: "Delivery %",
       series: payload?.trendSeries,
       field: "hoursDeliveredPercent",
       formatter: formatPercent,
@@ -816,7 +854,7 @@ function renderUtilisation(payload) {
       trendCompanion: true,
     }),
     createKpiTrendCard({
-      title: "Utilisation % Trend",
+      title: "Utilisation %",
       series: payload?.trendSeries,
       field: "utilisationPercent",
       formatter: formatPercent,
@@ -847,7 +885,8 @@ function renderBusiness(payload) {
     }),
     createKpiMetricCard({
       title: "Hours Won",
-      value: formatHours(metricValue(payload, "hoursWon")?.value),
+      value: formatHoursWord(metricValue(payload, "hoursWon")?.value),
+      valueHtml: formatHoursWonTargetValue(metricValue(payload, "hoursWon")?.value),
       metric: metricValue(payload, "hoursWon"),
       tone: "positive",
       latestWeekLabelText: latestLabel,
@@ -872,25 +911,26 @@ function renderBusiness(payload) {
 
   appendChildren(businessTrendKpis, [
     createKpiTrendCard({
-      title: "Total Contracted Hours Trend",
+      title: "Total Contracted Hours",
       series: payload?.trendSeries,
       field: "totalHours",
       formatter: formatHours,
     }),
     createKpiTrendCard({
-      title: "Hours Won Trend",
+      title: "Hours Won",
       series: payload?.trendSeries,
       field: "hoursWon",
       formatter: formatHours,
+      referenceValue: 24,
     }),
     createKpiTrendCard({
-      title: "Hours Lost Trend",
+      title: "Hours Lost",
       series: payload?.trendSeries,
       field: "hoursLost",
       formatter: formatHours,
     }),
     createKpiTrendCard({
-      title: "Pending Hours Trend",
+      title: "Pending Hours",
       series: payload?.trendSeries,
       field: "pendingHours",
       formatter: formatHours,
@@ -968,7 +1008,7 @@ function renderEnquiries(payload) {
       latestLabel
     ),
     createKpiTrendCard({
-      title: "Enquiry Conversion Trend",
+      title: "Enquiry Conversion",
       series: payload?.trendSeries,
       field: "enquiryConversion",
       formatter: formatPercent,
@@ -1037,7 +1077,7 @@ function renderMarketing(payload) {
     marketingTrendKpis,
     marketingMetrics.map(([title, key]) =>
       createKpiTrendCard({
-        title: `${title} Trend`,
+        title,
         series: payload?.trendSeries,
         field: key,
         formatter: formatNumber,
