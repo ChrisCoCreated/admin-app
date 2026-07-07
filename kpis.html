@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260512" />
+    <link rel="stylesheet" href="./styles.css?v=20260707-kpis-hours-won-target" />
   </head>
   <body class="auth-pending">
     <header class="topbar">
@@ -74,6 +74,17 @@
       <section class="panel">
         <div class="panel-head">
           <div>
+            <h2>Business Development</h2>
+            <p class="muted">Current hours, won/lost movement, pending work, and the quarter trend.</p>
+          </div>
+        </div>
+        <div id="businessKpis" class="kpi-card-grid"></div>
+        <div id="businessTrendKpis" class="kpi-trend-grid" aria-label="Quarter trends"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
             <h2>Enquiries</h2>
             <p class="muted">Current enquiry volume, source split, and recent trends.</p>
           </div>
@@ -120,17 +131,6 @@
       <section class="panel">
         <div class="panel-head">
           <div>
-            <h2>Business Development</h2>
-            <p class="muted">Current hours, won/lost movement, pending work, and the quarter trend.</p>
-          </div>
-        </div>
-        <div id="businessKpis" class="kpi-card-grid"></div>
-        <div id="businessTrendKpis" class="kpi-trend-grid" aria-label="Quarter trends"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
             <h2>Recruitment</h2>
             <p class="muted">Interview volume and accepted candidates currently onboarding.</p>
           </div>
@@ -149,6 +149,6 @@
       </section>
     </main>
 
-    <script type="module" src="./kpis.js?v=20260616-6"></script>
+    <script type="module" src="./kpis.js?v=20260707-hours-won-target"></script>
   </body>
 </html>
