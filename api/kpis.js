@@ -298,6 +298,11 @@ function parseNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function isNonZeroNumber(value) {
+  const number = parseNumber(value);
+  return number !== null && number !== 0;
+}
+
 function parsePercent(value) {
   const number = parseNumber(value);
   if (number === null) {
@@ -362,6 +367,10 @@ function normalizeKpiRow(item, fieldMap) {
     weekLabel: formatWeek(weekCommencing),
     weekTime: new Date(weekCommencing).getTime() || 0,
   };
+}
+
+function hasDeliveredHours(row) {
+  return isNonZeroNumber(getFieldValue(row, "hoursDelivered"));
 }
 
 function deriveValue(rows, latestRow, key, derive) {
@@ -444,9 +453,19 @@ function deriveEnquiryConversion(row) {
   return parsePercent(stored);
 }
 
-function resolveMetrics(rows) {
+function hasUtilisationData(row) {
+  return isNonZeroNumber(deriveUtilisationPercent(row));
+}
+
+function hasPendingHoursData(row) {
+  return hasValue(getFieldValue(row, "pendingHours"));
+}
+
+function resolveMetrics(rows, latestValueRows = rows) {
   const latestRow = rows[0] || null;
   const metric = (key, derive) => deriveValue(rows, latestRow, key, derive);
+  const latestValueMetric = (key, derive) => deriveValue(latestValueRows, latestRow, key, derive);
+  const utilisationRows = latestValueRows.filter(hasUtilisationData);
   return {
     latestWeek: latestRow?.weekCommencing || "",
     latestWeekLabel: latestRow?.weekLabel || "",
@@ -458,12 +477,12 @@ function resolveMetrics(rows) {
       explanatoryNotes: metric("explanatoryNotes"),
       subscriptionHours: metric("subscriptionHours"),
       totalHours: metric("totalHours", deriveTotalHours),
-      utilisationPercent: metric("utilisationPercent", deriveUtilisationPercent),
-      utilisationNotes: metric("utilisationNotes"),
+      utilisationPercent: deriveValue(utilisationRows, latestRow, "utilisationPercent", deriveUtilisationPercent),
+      utilisationNotes: latestValueMetric("utilisationNotes"),
       hoursWon: metric("hoursWon"),
       hoursLost: metric("hoursLost"),
-      pendingHours: metric("pendingHours"),
-      pendingHoursDetail: metric("pendingHoursDetail"),
+      pendingHours: latestValueMetric("pendingHours"),
+      pendingHoursDetail: latestValueMetric("pendingHoursDetail"),
       activeEnquiries: metric("activeEnquiries"),
       enquiriesTotal: metric("enquiriesTotal", deriveEnquiriesTotal),
       enquiriesSolicitor: metric("enquiriesSolicitor"),
@@ -475,7 +494,7 @@ function resolveMetrics(rows) {
       webVisits: metric("webVisits"),
       domainAuthorityThrive: metric("domainAuthorityThrive"),
       domainAuthorityPwc: metric("domainAuthorityPwc"),
-      firstRoundInterviews: metric("firstRoundInterviews"),
+      firstRoundInterviews: latestValueMetric("firstRoundInterviews"),
       trainingCompletion: metric("trainingCompletion"),
       cqcReadiness: metric("cqcReadiness"),
     },
@@ -484,28 +503,32 @@ function resolveMetrics(rows) {
 
 function buildTrendSeries(rows) {
   return rows
+    .filter((row) => hasDeliveredHours(row) || hasUtilisationData(row) || hasPendingHoursData(row))
     .slice(0, QUARTER_WEEK_COUNT)
-    .map((row) => ({
-      weekCommencing: row.weekCommencing,
-      weekLabel: row.weekLabel,
-      hoursDeliveredPercent: parseNumber(deriveHoursDeliveredPercent(row)),
-      totalHours: parseNumber(deriveTotalHours(row)),
-      utilisationPercent: parseNumber(deriveUtilisationPercent(row)),
-      hoursWon: parseNumber(getFieldValue(row, "hoursWon")),
-      hoursLost: parseNumber(getFieldValue(row, "hoursLost")),
-      pendingHours: parseNumber(getFieldValue(row, "pendingHours")),
-      activeEnquiries: parseNumber(getFieldValue(row, "activeEnquiries")),
-      enquiriesTotal: parseNumber(deriveEnquiriesTotal(row)),
-      enquiriesSolicitor: parseNumber(getFieldValue(row, "enquiriesSolicitor")),
-      enquiriesConsumer: parseNumber(getFieldValue(row, "enquiriesConsumer")),
-      enquiryConversion: parseNumber(deriveEnquiryConversion(row)),
-      instagramFollowers: parseNumber(getFieldValue(row, "instagramFollowers")),
-      facebookFollowers: parseNumber(getFieldValue(row, "facebookFollowers")),
-      newsletterSubscribers: parseNumber(getFieldValue(row, "newsletterSubscribers")),
-      webVisits: parseNumber(getFieldValue(row, "webVisits")),
-      domainAuthorityThrive: parseNumber(getFieldValue(row, "domainAuthorityThrive")),
-      domainAuthorityPwc: parseNumber(getFieldValue(row, "domainAuthorityPwc")),
-    }))
+    .map((row) => {
+      const useDeliveryRow = hasDeliveredHours(row);
+      return {
+        weekCommencing: row.weekCommencing,
+        weekLabel: row.weekLabel,
+        hoursDeliveredPercent: useDeliveryRow ? parseNumber(deriveHoursDeliveredPercent(row)) : null,
+        totalHours: useDeliveryRow ? parseNumber(deriveTotalHours(row)) : null,
+        utilisationPercent: hasUtilisationData(row) ? parseNumber(deriveUtilisationPercent(row)) : null,
+        hoursWon: useDeliveryRow ? parseNumber(getFieldValue(row, "hoursWon")) : null,
+        hoursLost: useDeliveryRow ? parseNumber(getFieldValue(row, "hoursLost")) : null,
+        pendingHours: parseNumber(getFieldValue(row, "pendingHours")),
+        activeEnquiries: useDeliveryRow ? parseNumber(getFieldValue(row, "activeEnquiries")) : null,
+        enquiriesTotal: useDeliveryRow ? parseNumber(deriveEnquiriesTotal(row)) : null,
+        enquiriesSolicitor: useDeliveryRow ? parseNumber(getFieldValue(row, "enquiriesSolicitor")) : null,
+        enquiriesConsumer: useDeliveryRow ? parseNumber(getFieldValue(row, "enquiriesConsumer")) : null,
+        enquiryConversion: useDeliveryRow ? parseNumber(deriveEnquiryConversion(row)) : null,
+        instagramFollowers: useDeliveryRow ? parseNumber(getFieldValue(row, "instagramFollowers")) : null,
+        facebookFollowers: useDeliveryRow ? parseNumber(getFieldValue(row, "facebookFollowers")) : null,
+        newsletterSubscribers: useDeliveryRow ? parseNumber(getFieldValue(row, "newsletterSubscribers")) : null,
+        webVisits: useDeliveryRow ? parseNumber(getFieldValue(row, "webVisits")) : null,
+        domainAuthorityThrive: useDeliveryRow ? parseNumber(getFieldValue(row, "domainAuthorityThrive")) : null,
+        domainAuthorityPwc: useDeliveryRow ? parseNumber(getFieldValue(row, "domainAuthorityPwc")) : null,
+      };
+    })
     .reverse();
 }
 
@@ -897,7 +920,8 @@ module.exports = async (req, res) => {
     }
 
     const { rows, listUrl, fieldMap } = await fetchKpiRows(graphClient, kpiConfig);
-    const metrics = resolveMetrics(rows);
+    const deliveredRows = rows.filter(hasDeliveredHours);
+    const metrics = resolveMetrics(deliveredRows, rows);
     const onboarding = await fetchAcceptedOnboarding(graphClient);
     const enquiryAssessmentOutcome = await fetchEnquiryAssessmentOutcomeSafe(graphClient);
     const activeEnquiries = await fetchActiveEnquiriesSafe(graphClient);
@@ -913,7 +937,7 @@ module.exports = async (req, res) => {
       onboarding,
       enquiryAssessmentOutcome,
       activeEnquiries,
-      rowCount: rows.length,
+      rowCount: deliveredRows.length,
       refreshedAt: new Date().toISOString(),
     });
   } catch (error) {
