@@ -1047,6 +1047,7 @@ function renderEnquiries(payload) {
         : "No won/lost outcomes modified in the past 3 months",
       metric: { sourceLabel: outcomeUnavailable ? "Enquiries Log unavailable" : outcomeSource, stale: false },
       tone: "positive",
+      viewAction: !outcomeUnavailable,
       onClick: outcomeUnavailable ? null : () => openAssessmentOutcomeModal(assessmentOutcome),
     }),
     createKpiMetricCard({
@@ -1079,6 +1080,7 @@ function renderMarketing(payload) {
     ["Facebook Followers", "facebookFollowers"],
     ["Newsletter Subscribers", "newsletterSubscribers"],
     ["Web Visits", "webVisits"],
+    ["Flyers Distributed", "flyersDistributed"],
     ["Domain Authority - Thrive", "domainAuthorityThrive"],
     ["Domain Authority - PWC", "domainAuthorityPwc"],
   ];

@@ -39,6 +39,7 @@ const KPI_FIELD_DEFINITIONS = {
   facebookFollowers: ["Facebook Followers", "FacebookFollowers"],
   newsletterSubscribers: ["Thrive Newletter Subs", "Thrive Newsletter Subs", "ThriveNewletterSubs"],
   webVisits: ["Web Visits", "WebVisits"],
+  flyersDistributed: ["Flyers Distributed", "FlyersDistributed"],
   domainAuthorityThrive: ["Domain Authority - Thrive", "DomainAuthority_x002d_Thrive"],
   domainAuthorityPwc: ["Domain Authority - PWC", "DomainAuthority_x002d_PWC"],
   firstRoundInterviews: ["1st Round Interviews", "_x0031_stRoundInterviews"],
@@ -493,6 +494,7 @@ function resolveMetrics(rows, latestValueRows = rows) {
       facebookFollowers: metric("facebookFollowers"),
       newsletterSubscribers: metric("newsletterSubscribers"),
       webVisits: metric("webVisits"),
+      flyersDistributed: metric("flyersDistributed"),
       domainAuthorityThrive: metric("domainAuthorityThrive"),
       domainAuthorityPwc: metric("domainAuthorityPwc"),
       firstRoundInterviews: latestValueMetric("firstRoundInterviews"),
@@ -526,6 +528,7 @@ function buildTrendSeries(rows) {
         facebookFollowers: useDeliveryRow ? parseNumber(getFieldValue(row, "facebookFollowers")) : null,
         newsletterSubscribers: useDeliveryRow ? parseNumber(getFieldValue(row, "newsletterSubscribers")) : null,
         webVisits: useDeliveryRow ? parseNumber(getFieldValue(row, "webVisits")) : null,
+        flyersDistributed: useDeliveryRow ? parseNumber(getFieldValue(row, "flyersDistributed")) : null,
         domainAuthorityThrive: useDeliveryRow ? parseNumber(getFieldValue(row, "domainAuthorityThrive")) : null,
         domainAuthorityPwc: useDeliveryRow ? parseNumber(getFieldValue(row, "domainAuthorityPwc")) : null,
       };
