@@ -91,7 +91,7 @@ const ROLE_PAGES = {
   time_clients: ["clients", "clientdata", "timesheets", "mapping", "drivetime", "agendas"],
   time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
   time_hr_clients: ["clients", "clientdata", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
-  logged_in: ["drivetime"],
+  logged_in: ["mapping"],
 };
 
 const ACCESS_PAGE_EXPANSIONS = {
@@ -155,7 +155,7 @@ const MENU_GROUPS = [
   },
   {
     title: "Time & Geography",
-    pages: ["timesheets", "mapping", "drivetime"],
+    pages: ["timesheets", "mapping"],
   },
   {
     title: "Performance",
@@ -206,7 +206,7 @@ export function getAccessiblePages(role) {
     return [];
   }
   const accessiblePages = [...pages];
-  for (const sharedPage of ["drivetime", "kpis"]) {
+  for (const sharedPage of ["mapping", "kpis"]) {
     if (!accessiblePages.includes(sharedPage)) {
       accessiblePages.push(sharedPage);
     }

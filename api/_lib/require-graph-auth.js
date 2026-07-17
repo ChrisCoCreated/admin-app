@@ -59,7 +59,7 @@ const ROLE_PAGES = {
   time_clients: ["clients", "timesheets", "mapping", "drivetime", "agendas"],
   time_hr: ["carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
   time_hr_clients: ["clients", "carers", "timesheets", "recruitment", "mapping", "drivetime", "agendas"],
-  logged_in: ["drivetime"],
+  logged_in: ["mapping"],
 };
 const ACCESS_PAGE_EXPANSIONS = {
   marketing: ["marketing", "marketingreports", "photolayout", "functions", "emailtemplates", "agendas"],
@@ -118,7 +118,7 @@ function getAccessiblePages(role) {
     return [];
   }
   const accessiblePages = [...pages];
-  for (const sharedPage of ["drivetime", "kpis"]) {
+  for (const sharedPage of ["mapping", "kpis"]) {
     if (!accessiblePages.includes(sharedPage)) {
       accessiblePages.push(sharedPage);
     }

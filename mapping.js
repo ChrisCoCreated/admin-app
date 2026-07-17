@@ -20,6 +20,7 @@ const addClientBtn = document.getElementById("addClientBtn");
 const calculateRunBtn = document.getElementById("calculateRunBtn");
 const clearRunBtn = document.getElementById("clearRunBtn");
 const journeyOriginInput = document.getElementById("journeyOriginInput");
+const journeyOriginSuggestions = document.getElementById("journeyOriginSuggestions");
 const journeyAreaSelect = document.getElementById("journeyAreaSelect");
 const calculateJourneyTimesBtn = document.getElementById("calculateJourneyTimesBtn");
 const journeyAudienceInputs = Array.from(document.querySelectorAll('input[name="journeyAudience"]'));
@@ -467,6 +468,51 @@ function buildClientAddress(client) {
   }
 
   return normalizeLocationQuery(client.postcode || client.location || "");
+}
+
+function renderJourneyOriginSuggestions() {
+  if (!journeyOriginSuggestions) {
+    return;
+  }
+
+  journeyOriginSuggestions.innerHTML = "";
+  const people = [
+    ...allClients.map((client) => ({ name: client.name, postcode: client.postcode, type: "Client" })),
+    ...allCarers.map((carer) => ({ name: carer.name, postcode: carer.postcode, type: "Associate" })),
+  ].filter((person) => normalizeLocationQuery(person.name) && normalizePostcode(person.postcode));
+
+  for (const person of people) {
+    const option = document.createElement("option");
+    option.value = normalizeLocationQuery(person.name);
+    option.label = `${person.type} — ${normalizePostcode(person.postcode)}`;
+    journeyOriginSuggestions.appendChild(option);
+  }
+}
+
+function resolveJourneyOrigin(value) {
+  const origin = normalizeLocationQuery(value);
+  if (!origin) {
+    return { error: "Enter a postcode or select a client or associate." };
+  }
+
+  const matchingPeople = [
+    ...allClients.map((client) => ({ name: client.name, postcode: client.postcode, type: "client" })),
+    ...allCarers.map((carer) => ({ name: carer.name, postcode: carer.postcode, type: "associate" })),
+  ].filter((person) => normalizeText(person.name) === normalizeText(origin));
+
+  if (!matchingPeople.length) {
+    return { origin };
+  }
+
+  const postcodes = Array.from(new Set(matchingPeople.map((person) => normalizePostcode(person.postcode)).filter(Boolean)));
+  if (!postcodes.length) {
+    return { error: `No postcode is stored for ${origin}.` };
+  }
+  if (postcodes.length > 1) {
+    return { error: `More than one client or associate named ${origin} was found. Enter their postcode instead.` };
+  }
+
+  return { origin: postcodes[0], resolvedName: origin };
 }
 
 function getAreaOptions() {
@@ -1338,10 +1384,11 @@ async function calculateRun() {
 
 async function calculateJourneyTimes(audience) {
   const normalizedAudience = audience === "associates" ? "associates" : "clients";
-  const origin = normalizeLocationQuery(journeyOriginInput?.value || "");
+  const originResult = resolveJourneyOrigin(journeyOriginInput?.value || "");
+  const origin = originResult.origin;
   const area = normalizeLocationQuery(journeyAreaSelect?.value || "");
   if (!origin) {
-    setJourneyTimesStatus("Enter a postcode before calculating journey times.", true);
+    setJourneyTimesStatus(originResult.error || "Enter a postcode before calculating journey times.", true);
     journeyOriginInput?.focus();
     return;
   }
@@ -1358,7 +1405,7 @@ async function calculateJourneyTimes(audience) {
     journeyTimesBody.innerHTML = "";
   }
   setJourneyTimesBusy(true);
-  setJourneyTimesStatus(`Calculating ${formatJourneyAudience(normalizedAudience)} travel times...`);
+  setJourneyTimesStatus(`Calculating ${formatJourneyAudience(normalizedAudience)} travel times${originResult.resolvedName ? ` from ${originResult.resolvedName}` : ""}...`);
 
   try {
     const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
@@ -1431,6 +1478,7 @@ async function init() {
     ]);
     allClients = Array.isArray(clientsPayload?.clients) ? clientsPayload.clients : [];
     allCarers = Array.isArray(carersPayload?.carers) ? carersPayload.carers : [];
+    renderJourneyOriginSuggestions();
     renderAssociateFilters();
     renderClientStatusFilters();
     renderCarerSearchResults();

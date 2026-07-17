@@ -43,9 +43,10 @@
         <p class="muted">See distance to clients or associates from a given location.</p>
         <div class="mapping-form-grid">
           <label class="field" for="journeyOriginInput">
-            Start postcode
-            <input id="journeyOriginInput" type="text" placeholder="e.g. CT1 2AA" autocomplete="postal-code" />
+            Start postcode, client or associate
+            <input id="journeyOriginInput" type="text" placeholder="e.g. CT1 2AA or start typing a name" autocomplete="off" list="journeyOriginSuggestions" />
           </label>
+          <datalist id="journeyOriginSuggestions"></datalist>
           <label class="field" for="journeyAreaSelect">
             Area
             <select id="journeyAreaSelect">
