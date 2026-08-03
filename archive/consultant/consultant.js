@@ -1,7 +1,7 @@
-import { createAuthController } from "./auth-common.js";
-import { FRONTEND_CONFIG } from "./frontend-config.js";
-import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260601";
+import { createAuthController } from "../../auth-common.js";
+import { FRONTEND_CONFIG } from "../../frontend-config.js";
+import { createDirectoryApi } from "../../directory-api.js";
+import { canAccessPage, renderTopNavigation } from "../../navigation.js?v=20260601";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const statusMessage = document.getElementById("statusMessage");
@@ -38,7 +38,7 @@ function setActionStatus(message, isError = false) {
 
 function redirectToUnauthorized(pageKey) {
   const page = encodeURIComponent(String(pageKey || "consultant").trim().toLowerCase());
-  window.location.href = `./unauthorized.html?page=${page}`;
+  window.location.href = `../../unauthorized.html?page=${page}`;
 }
 
 function normalizeStatus(value) {
@@ -362,7 +362,7 @@ async function init() {
   try {
     const account = await authController.restoreSession();
     if (!account) {
-      window.location.href = "./index.html";
+      window.location.href = "../../index.html";
       return;
     }
 
@@ -434,7 +434,7 @@ signOutBtn?.addEventListener("click", async () => {
     signOutBtn.disabled = true;
     await authController.signOut();
   } finally {
-    window.location.href = "./index.html";
+    window.location.href = "../../index.html";
   }
 });
 

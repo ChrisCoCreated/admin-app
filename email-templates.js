@@ -196,7 +196,7 @@ function openOutlookDraft() {
     return;
   }
   if (requiresAttachmentConfirmation(selectedTemplate) && !attachmentConfirmCheckbox?.checked) {
-    setActionStatus("Please confirm the brochure has been downloaded or attached first.", true);
+    setActionStatus("Please confirm the required file(s) have been downloaded or attached first.", true);
     return;
   }
 
@@ -216,7 +216,7 @@ function openWebDraft() {
     return;
   }
   if (requiresAttachmentConfirmation(selectedTemplate) && !attachmentConfirmCheckbox?.checked) {
-    setActionStatus("Please confirm the brochure has been downloaded or attached first.", true);
+    setActionStatus("Please confirm the required file(s) have been downloaded or attached first.", true);
     return;
   }
 

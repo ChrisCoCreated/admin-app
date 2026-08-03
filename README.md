@@ -13,7 +13,6 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 - Authenticated Tasks (Advanced) page (`tasks.html`) for full unified To Do + Planner overlay editing
 - Authenticated Time Mapping page (`mapping.html`) for run planning
 - Authenticated Drive-Time Map page (`drive-time-map.html`) for 20-minute drive-time polygons
-- Authenticated Consultant page (`consultant.html`) for anonymisation and DOCX report export
 - Secure backend APIs:
   - `GET /api/sharepoint/clients` (original SharePoint/local clients list)
   - `GET /api/sharepoint/clients/:id`

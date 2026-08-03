@@ -22,6 +22,8 @@ CLIENT_DATA_ROLES = {
     "admin",
     "care_manager",
     "operations",
+    "consultant",
+    "director",
     "clients_only",
     "hr_clients",
     "time_clients",
@@ -87,7 +89,7 @@ def role_can_access_client_data(role: str) -> bool:
         return True
     if normalised.startswith("pages:"):
         pages = {page.strip().lower() for page in normalised.removeprefix("pages:").split(",")}
-        return "clientdata" in pages or "clients" in pages
+        return "clientdata" in pages or "clients" in pages or "consultant" in pages
     return False
 
 

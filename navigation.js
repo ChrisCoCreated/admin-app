@@ -30,7 +30,6 @@ const ROLE_PAGES = {
     "functions",
     "emailtemplates",
     "suppliers",
-    "consultant",
     "marketing",
     "marketingstories",
     "mastercontacts",
@@ -79,8 +78,8 @@ const ROLE_PAGES = {
     "suppliers",
   ],
   finance: ["finance"],
-  consultant: ["consultant", "agendas"],
-  director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
+  consultant: ["clientdata", "agendas"],
+  director: ["clientdata", "agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
   marketing: ["marketing", "marketingstories", "mastercontacts", "marketingreports", "photolayout", "qrgenerator", "functions", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
@@ -103,7 +102,7 @@ const ACCESS_PAGE_EXPANSIONS = {
   carers: ["carers", "timesheets", "recruitment", "agendas"],
   clients: ["clients", "clientdata", "agendas"],
   enquiries: ["enquiries", "agendas"],
-  consultant: ["consultant", "agendas"],
+  consultant: ["clientdata", "agendas"],
 };
 
 const PAGE_META = {
@@ -133,7 +132,6 @@ const PAGE_META = {
   functions: { href: "./functions.html", label: "Functions" },
   emailtemplates: { href: "./email-templates.html", label: "Email Templates", shortcutLabel: "Email" },
   suppliers: { href: "./suppliers.html", label: "Suppliers & Experiences" },
-  consultant: { href: "./consultant.html", label: "Consultant" },
   marketing: { href: "./marketing.html", label: "Marketing" },
   marketingstories: { href: "./marketing-stories.html", label: "Marketing Stories", shortcutLabel: "Stories" },
   mastercontacts: { href: "./master-contacts.html", label: "Master Contacts", shortcutLabel: "Contacts" },
@@ -147,7 +145,7 @@ const MAX_STANDARD_ROLE_HOME_PAGES = 8;
 const MENU_GROUPS = [
   {
     title: "People",
-    pages: ["clients", "clientdata", "carers", "recruitment", "wellbeingintake", "enquiries", "enquiryremindertest", "suppliers", "consultant"],
+    pages: ["clients", "clientdata", "carers", "recruitment", "wellbeingintake", "enquiries", "enquiryremindertest", "suppliers"],
   },
   {
     title: "Planning",

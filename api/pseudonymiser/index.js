@@ -90,7 +90,7 @@ module.exports = async function pseudonymiserHandler(req, res) {
     return;
   }
 
-  const claims = await requireApiAuth(req, res, { allowedRoles: ["clients_only"] });
+  const claims = await requireApiAuth(req, res, { allowedRoles: ["clients_only", "consultant", "director"] });
   if (!claims) {
     return;
   }

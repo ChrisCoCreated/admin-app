@@ -77,8 +77,8 @@ const ROLE_PAGES = {
     "suppliers",
   ],
   finance: ["finance"],
-  consultant: ["consultant", "agendas"],
-  director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
+  consultant: ["clientdata", "consultant", "agendas"],
+  director: ["clientdata", "agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
   marketing: ["marketing", "marketingreports", "photolayout", "functions", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
   time_only: ["timesheets", "mapping", "drivetime", "agendas"],
@@ -100,7 +100,7 @@ const ACCESS_PAGE_EXPANSIONS = {
   carers: ["carers", "timesheets", "recruitment", "agendas"],
   clients: ["clients", "clientdata", "agendas"],
   enquiries: ["enquiries", "agendas"],
-  consultant: ["consultant", "agendas"],
+  consultant: ["clientdata", "agendas"],
 };
 
 function logApiAuthDebug(message, details) {
