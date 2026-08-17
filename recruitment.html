@@ -259,15 +259,19 @@
             <p class="eyebrow">Current Candidate</p>
             <h3 id="candidateDetailModalTitle">Candidate Detail</h3>
           </div>
-          <button id="candidateDetailCloseBtn" type="button" class="secondary">Close</button>
-        </div>
-        <div class="recruitment-modal-section-head">
-          <div>
-            <h4>Current Snapshot</h4>
-            <p class="muted">Quick view of the saved SharePoint record.</p>
+          <div class="row wrap-row recruitment-modal-header-actions">
+            <button id="candidateDetailEditBtn" type="button" class="secondary">Edit candidate</button>
+            <button id="candidateDetailCloseBtn" type="button" class="secondary">Close</button>
           </div>
         </div>
-        <dl id="candidateDetail" class="detail-list recruitment-detail-list">
+        <section id="candidateDetailSnapshot">
+          <div class="recruitment-modal-section-head">
+            <div>
+              <h4>Current Snapshot</h4>
+              <p class="muted">Quick view of the saved SharePoint record.</p>
+            </div>
+          </div>
+          <dl id="candidateDetail" class="detail-list recruitment-detail-list">
           <div>
             <dt>Candidate</dt>
             <dd data-field="candidateName">Select a candidate</dd>
@@ -344,14 +348,16 @@
             <dt>Notes</dt>
             <dd data-field="notes">-</dd>
           </div>
-        </dl>
-        <div class="recruitment-modal-section-head recruitment-modal-section-head-spaced">
-          <div>
-            <h4>Edit Candidate Details</h4>
-            <p class="muted">Update email, phone, location, tags, Indeed URL, notes and other saved details.</p>
+          </dl>
+        </section>
+        <section id="candidateDetailEditor" hidden>
+          <div class="recruitment-modal-section-head">
+            <div>
+              <h4>Edit Candidate Details</h4>
+              <p class="muted">Update email, phone, location, tags, Indeed URL, notes and other saved details.</p>
+            </div>
           </div>
-        </div>
-        <form id="candidateDetailEditForm" class="modal-form recruitment-detail-edit-form">
+          <form id="candidateDetailEditForm" class="modal-form recruitment-detail-edit-form">
           <div class="mapping-form-grid recruitment-detail-core-grid">
             <label class="field" for="detailCandidateNameInput">
               Candidate
@@ -423,8 +429,8 @@
             Notes
             <textarea id="detailNotesInput" placeholder="Capture any relevant context, availability or follow-up notes."></textarea>
           </label>
-        </form>
-        <div class="recruitment-detail-toolbar">
+          </form>
+          <div class="recruitment-detail-toolbar">
           <div class="recruitment-detail-toolbar-card">
             <div class="recruitment-detail-toolbar-copy">
               <h4>Edit Status Only</h4>
@@ -449,7 +455,8 @@
               <button id="saveDetailBtn" type="button">Save All Details</button>
             </div>
           </div>
-        </div>
+          </div>
+        </section>
         <div class="recruitment-modal-section-head recruitment-modal-section-head-spaced">
           <div>
             <h4>External Links</h4>

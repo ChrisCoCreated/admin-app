@@ -39,8 +39,11 @@ const addRecruitmentItemBtn = document.getElementById("addRecruitmentItemBtn");
 const recruitmentToolbarContent = document.getElementById("recruitmentToolbarContent");
 const candidateDetailModal = document.getElementById("candidateDetailModal");
 const candidateDetailModalTitle = document.getElementById("candidateDetailModalTitle");
+const candidateDetailEditBtn = document.getElementById("candidateDetailEditBtn");
 const candidateDetailCloseBtn = document.getElementById("candidateDetailCloseBtn");
 const candidateDetailEditForm = document.getElementById("candidateDetailEditForm");
+const candidateDetailSnapshot = document.getElementById("candidateDetailSnapshot");
+const candidateDetailEditor = document.getElementById("candidateDetailEditor");
 const addRecruitmentModal = document.getElementById("addRecruitmentModal");
 const addRecruitmentCloseBtn = document.getElementById("addRecruitmentCloseBtn");
 const addRecruitmentForm = document.getElementById("addRecruitmentForm");
@@ -977,12 +980,27 @@ function openCandidateDetail(candidate) {
     return;
   }
   setDetail(candidate);
+  setCandidateDetailMode("view");
   candidateDetailModal.hidden = false;
 }
 
 function closeCandidateDetail() {
   if (candidateDetailModal) {
     candidateDetailModal.hidden = true;
+  }
+}
+
+function setCandidateDetailMode(mode) {
+  const isEditing = mode === "edit";
+  if (candidateDetailSnapshot) {
+    candidateDetailSnapshot.hidden = isEditing;
+  }
+  if (candidateDetailEditor) {
+    candidateDetailEditor.hidden = !isEditing;
+  }
+  if (candidateDetailEditBtn) {
+    candidateDetailEditBtn.textContent = isEditing ? "View details" : "Edit candidate";
+    candidateDetailEditBtn.setAttribute("aria-pressed", isEditing ? "true" : "false");
   }
 }
 
@@ -2002,7 +2020,10 @@ function renderCandidates() {
       </td>
     `;
 
-    tr.addEventListener("click", () => {
+    tr.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, label, details")) {
+        return;
+      }
       selectedCandidateId = candidate.id;
       setDetail(candidate);
       renderCandidates();
@@ -2794,6 +2815,13 @@ addRecruitmentForm?.addEventListener("submit", async (event) => {
 addRecruitmentCloseBtn?.addEventListener("click", closeAddRecruitmentModal);
 cancelAddRecruitmentBtn?.addEventListener("click", closeAddRecruitmentModal);
 candidateDetailCloseBtn?.addEventListener("click", closeCandidateDetail);
+candidateDetailEditBtn?.addEventListener("click", () => {
+  const isEditing = candidateDetailEditor?.hidden === false;
+  setCandidateDetailMode(isEditing ? "view" : "edit");
+  if (!isEditing) {
+    detailInputs.candidateName?.focus();
+  }
+});
 
 importDropZone?.addEventListener("click", () => {
   if (importBusy) {

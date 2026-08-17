@@ -2843,7 +2843,7 @@ dd {
 }
 
 .recruitment-modal-panel {
-  width: min(820px, 100%);
+  width: min(1100px, 100%);
   max-height: min(88vh, 920px);
   overflow: auto;
 }
@@ -2854,6 +2854,10 @@ dd {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.85rem;
+}
+
+.recruitment-modal-header-actions {
+  justify-content: flex-end;
 }
 
 .recruitment-detail-list {
