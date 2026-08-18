@@ -3360,6 +3360,54 @@ dd {
   gap: 0.55rem;
 }
 
+.recruitment-toolbar-whatsapp {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.recruitment-toolbar-whatsapp.is-open {
+  border-color: rgba(49, 183, 200, 0.5);
+  background: #edfafd;
+}
+
+.recruitment-quick-whatsapp-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #cfe6e9;
+  border-radius: 14px;
+  background: #f4fcfd;
+}
+
+.recruitment-quick-whatsapp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recruitment-quick-whatsapp-form .error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+@media (max-width: 680px) {
+  .recruitment-toolbar-header {
+    align-items: flex-start;
+  }
+
+  .recruitment-toolbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .recruitment-quick-whatsapp-form {
+    grid-template-columns: 1fr;
+  }
+}
+
 .recruitment-toolbar-toggle {
   display: inline-flex;
   align-items: center;

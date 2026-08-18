@@ -37,6 +37,12 @@ const importPreviewBody = document.getElementById("importPreviewBody");
 const toggleRecruitmentToolbarBtn = document.getElementById("toggleRecruitmentToolbarBtn");
 const addRecruitmentItemBtn = document.getElementById("addRecruitmentItemBtn");
 const recruitmentToolbarContent = document.getElementById("recruitmentToolbarContent");
+const quickWhatsAppBtn = document.getElementById("quickWhatsAppBtn");
+const quickWhatsAppForm = document.getElementById("quickWhatsAppForm");
+const quickWhatsAppPhoneInput = document.getElementById("quickWhatsAppPhoneInput");
+const quickWhatsAppNameInput = document.getElementById("quickWhatsAppNameInput");
+const quickWhatsAppCancelBtn = document.getElementById("quickWhatsAppCancelBtn");
+const quickWhatsAppError = document.getElementById("quickWhatsAppError");
 const candidateDetailModal = document.getElementById("candidateDetailModal");
 const candidateDetailModalTitle = document.getElementById("candidateDetailModalTitle");
 const candidateDetailEditBtn = document.getElementById("candidateDetailEditBtn");
@@ -725,6 +731,30 @@ function setRecruitmentToolbarVisible(visible) {
     visible ? "Hide search and import tools" : "Show search and import tools"
   );
   toggleRecruitmentToolbarBtn.classList.toggle("is-open", visible);
+}
+
+function setQuickWhatsAppVisible(visible) {
+  if (!quickWhatsAppForm || !quickWhatsAppBtn) {
+    return;
+  }
+  quickWhatsAppForm.hidden = !visible;
+  quickWhatsAppBtn.setAttribute("aria-expanded", visible ? "true" : "false");
+  quickWhatsAppBtn.classList.toggle("is-open", visible);
+  if (!visible && quickWhatsAppError) {
+    quickWhatsAppError.hidden = true;
+    quickWhatsAppError.textContent = "";
+  }
+  if (visible) {
+    quickWhatsAppPhoneInput?.focus();
+  }
+}
+
+function setQuickWhatsAppError(message) {
+  if (!quickWhatsAppError) {
+    return;
+  }
+  quickWhatsAppError.textContent = message;
+  quickWhatsAppError.hidden = !message;
 }
 
 function syncAddRecruitmentButton() {
@@ -2154,9 +2184,9 @@ function renderCandidates() {
         setStatus(error?.message || "Could not update active status.", true, { autoClear: false });
       } finally {
         activeUpdateBusy = false;
-        if (activeToggle && document.body.contains(activeToggle)) {
-          activeToggle.disabled = false;
-        }
+        // The request rerenders the table while the busy flag is set, so rebuild
+        // it once more after clearing the flag to re-enable every active toggle.
+        renderCandidates();
       }
     });
 
@@ -2764,6 +2794,23 @@ toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
 });
 addRecruitmentItemBtn?.addEventListener("click", () => {
   openAddRecruitmentModal();
+});
+quickWhatsAppBtn?.addEventListener("click", () => {
+  setQuickWhatsAppVisible(quickWhatsAppForm?.hidden);
+});
+quickWhatsAppCancelBtn?.addEventListener("click", () => {
+  setQuickWhatsAppVisible(false);
+});
+quickWhatsAppForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const whatsappUrl = getRecruitmentWhatsAppUrl(quickWhatsAppPhoneInput?.value, quickWhatsAppNameInput?.value);
+  if (!whatsappUrl) {
+    setQuickWhatsAppError("Enter a valid phone number.");
+    quickWhatsAppPhoneInput?.focus();
+    return;
+  }
+  setQuickWhatsAppError("");
+  window.open(whatsappUrl, "_blank", "noopener,noreferrer");
 });
 addRecruitmentJsonDropZone?.addEventListener("click", () => {
   if (createCandidateBusy) {

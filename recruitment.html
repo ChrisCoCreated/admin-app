@@ -46,6 +46,15 @@
           </div>
           <div class="recruitment-toolbar-actions">
             <button
+              id="quickWhatsAppBtn"
+              type="button"
+              class="secondary recruitment-toolbar-whatsapp"
+              aria-expanded="false"
+              aria-controls="quickWhatsAppForm"
+            >
+              Text in WhatsApp
+            </button>
+            <button
               id="toggleRecruitmentToolbarBtn"
               type="button"
               class="mini-btn recruitment-toolbar-toggle"
@@ -67,6 +76,21 @@
             </button>
           </div>
         </div>
+        <form id="quickWhatsAppForm" class="recruitment-quick-whatsapp-form" hidden>
+          <label class="field" for="quickWhatsAppPhoneInput">
+            Phone number
+            <input id="quickWhatsAppPhoneInput" type="tel" inputmode="tel" autocomplete="tel" required />
+          </label>
+          <label class="field" for="quickWhatsAppNameInput">
+            Candidate name
+            <input id="quickWhatsAppNameInput" type="text" autocomplete="name" placeholder="Used in the greeting" />
+          </label>
+          <div class="recruitment-quick-whatsapp-actions">
+            <button type="submit">Open WhatsApp</button>
+            <button id="quickWhatsAppCancelBtn" type="button" class="secondary">Cancel</button>
+          </div>
+          <p id="quickWhatsAppError" class="muted error" hidden></p>
+        </form>
         <div id="recruitmentToolbarContent" hidden>
           <label class="field" for="searchInput">
             Search
