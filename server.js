@@ -14,6 +14,7 @@ const carersIndexHandler = require("./api/carers/index");
 const carersSharePointHandler = require("./api/carers/sharepoint");
 const carersTagsBulkHandler = require("./api/carers/tags/bulk");
 const oneTouchClientsHandler = require("./api/onetouch/clients");
+const clientContactsHandler = require("./api/client-contacts");
 const oneTouchTagsHandler = require("./api/onetouch/tags");
 const recruitmentHandler = require("./api/recruitment");
 const recruitmentActiveHandler = require("./api/recruitment/active");
@@ -275,6 +276,11 @@ async function handleApi(req, res, reqUrl) {
 
   if (reqUrl.pathname === "/api/onetouch/clients") {
     await oneTouchClientsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (reqUrl.pathname === "/api/client-contacts") {
+    await clientContactsHandler(apiReq, apiRes);
     return true;
   }
 

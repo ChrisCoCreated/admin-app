@@ -6,6 +6,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
 
 - Entra ID sign-in/sign-out (MSAL popup with redirect fallback)
 - Authenticated Clients page (`clients.html`)
+- Permission-gated Client Contacts page (`client-contacts.html`) with names and emails for active clients
 - Authenticated Carers page (`carers.html`)
 - Authenticated Recruitment page (`recruitment.html`) from SharePoint list (active candidates only)
 - Authenticated Tasks page (`task-whiteboard.html`) with draggable pinned cards and category boxes (default)
@@ -17,6 +18,7 @@ Standalone admin app with Microsoft Entra sign-in and a secure Clients page.
   - `GET /api/sharepoint/clients` (original SharePoint/local clients list)
   - `GET /api/sharepoint/clients/:id`
   - `GET /api/onetouch/clients` (OneTouch clients list enriched with SharePoint Xero/consent fields; no carers/visits relationship lookup)
+  - `GET /api/client-contacts` (permission-gated active client names and email addresses)
   - `GET /api/clients/reconcile/preview` (admin + care_manager; OneTouch-to-SharePoint reconciliation preview)
   - `POST /api/clients/reconcile/apply` (admin + care_manager; per-record copy/add/update reconcile action)
   - `GET /api/carers`

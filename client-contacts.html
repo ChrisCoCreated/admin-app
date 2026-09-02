@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Client Contacts</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/company_marketing_assets/app-icon.svg?v=20260314" />
+    <link rel="alternate icon" href="./favicon.ico?v=20260314" sizes="any" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png?v=20260314" />
+    <link rel="manifest" href="./site.webmanifest?v=20260314" />
+    <meta name="theme-color" content="#31b7c8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260601" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/company_marketing_assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container clients-main">
+      <section class="hero compact">
+        <h1>Client Contacts</h1>
+        <p>Names and email addresses for active clients, supplied by OneTouch.</p>
+      </section>
+
+      <section class="panel">
+        <div class="clients-filter-bar">
+          <label class="field" for="searchInput">
+            Search active clients
+            <input id="searchInput" type="search" placeholder="Search by name or email" autocomplete="off" />
+          </label>
+          <p id="statusMessage" class="clients-loaded-count muted">Loading contacts...</p>
+        </div>
+        <p id="warningState" class="muted" hidden></p>
+      </section>
+
+      <section class="panel list-panel">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Email</th></tr></thead>
+            <tbody id="contactsBody"></tbody>
+          </table>
+        </div>
+        <p id="emptyState" class="empty-state" hidden>No active clients match that search.</p>
+      </section>
+    </main>
+
+    <script type="module" src="./client-contacts.js"></script>
+  </body>
+</html>

@@ -341,6 +341,14 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async listActiveClientContacts() {
+      const response = await authFetch(endpoint("/api/client-contacts"));
+      if (!response.ok) {
+        await parseError(response, "Client contacts request failed");
+      }
+      return response.json();
+    },
+
     async getOneTouchTags() {
       const response = await authFetch(endpoint("/api/onetouch/tags"));
       if (!response.ok) {

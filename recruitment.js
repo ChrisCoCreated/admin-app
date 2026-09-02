@@ -395,11 +395,16 @@ function getBaseFilteredCandidates() {
     if (dismissedInactiveReviewIds.has(candidateId)) {
       return false;
     }
-    if (selectedActive === "active" && candidate.active !== true && !pendingInactiveReviewIds.has(candidateId)) {
-      return false;
-    }
-    if (selectedActive === "inactive" && candidate.active !== false) {
-      return false;
+    // A name/text search is also used to find previously inactive candidates.
+    // Keep the Active filter for browsing, but do not let its default exclude
+    // matches while a search is in progress.
+    if (!query) {
+      if (selectedActive === "active" && candidate.active !== true && !pendingInactiveReviewIds.has(candidateId)) {
+        return false;
+      }
+      if (selectedActive === "inactive" && candidate.active !== false) {
+        return false;
+      }
     }
     if (selectedLocation !== "all" && cleanText(candidate.location) !== selectedLocation) {
       return false;
