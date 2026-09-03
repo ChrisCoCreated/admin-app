@@ -28,6 +28,10 @@ const journeyTimesStatus = document.getElementById("journeyTimesStatus");
 const journeyTimesResults = document.getElementById("journeyTimesResults");
 const journeyTimesSummary = document.getElementById("journeyTimesSummary");
 const journeyTimesBody = document.getElementById("journeyTimesBody");
+const areaTravelTimesAreaSelect = document.getElementById("areaTravelTimesAreaSelect");
+const anonymiseAreaTravelTimesInput = document.getElementById("anonymiseAreaTravelTimesInput");
+const downloadAreaTravelTimesBtn = document.getElementById("downloadAreaTravelTimesBtn");
+const areaTravelTimesStatus = document.getElementById("areaTravelTimesStatus");
 const runDateInput = document.getElementById("runDateInput");
 const runStartTimeInput = document.getElementById("runStartTimeInput");
 const visitDurationInput = document.getElementById("visitDurationInput");
@@ -146,6 +150,26 @@ function setJourneyTimesBusy(isBusy) {
   }
   if (journeyAreaSelect) {
     journeyAreaSelect.disabled = isBusy;
+  }
+}
+
+function setAreaTravelTimesStatus(message, isError = false) {
+  if (!areaTravelTimesStatus) {
+    return;
+  }
+  areaTravelTimesStatus.textContent = message;
+  areaTravelTimesStatus.classList.toggle("error", isError);
+}
+
+function setAreaTravelTimesBusy(isBusy) {
+  if (downloadAreaTravelTimesBtn) {
+    downloadAreaTravelTimesBtn.disabled = isBusy;
+  }
+  if (areaTravelTimesAreaSelect) {
+    areaTravelTimesAreaSelect.disabled = isBusy;
+  }
+  if (anonymiseAreaTravelTimesInput) {
+    anonymiseAreaTravelTimesInput.disabled = isBusy;
   }
 }
 
@@ -556,6 +580,22 @@ function renderJourneyAreaOptions() {
   } else {
     journeyAreaSelect.value = "East Kent";
   }
+}
+
+function renderAreaTravelTimesAreaOptions() {
+  if (!areaTravelTimesAreaSelect) {
+    return;
+  }
+
+  const current = String(areaTravelTimesAreaSelect.value || "East Kent");
+  areaTravelTimesAreaSelect.innerHTML = "";
+  for (const area of getJourneyAreaOptions()) {
+    const option = document.createElement("option");
+    option.value = area;
+    option.textContent = area;
+    areaTravelTimesAreaSelect.appendChild(option);
+  }
+  areaTravelTimesAreaSelect.value = getJourneyAreaOptions().includes(current) ? current : "East Kent";
 }
 
 function renderAreaFilters() {
@@ -1246,6 +1286,39 @@ function downloadCsv(filename, csvText) {
   URL.revokeObjectURL(url);
 }
 
+function getClientExportLabel(client, anonymise) {
+  const id = normalizeLocationQuery(client?.id || "");
+  if (anonymise) {
+    return id || "Client number unavailable";
+  }
+  const name = normalizeLocationQuery(client?.name || "Unnamed client");
+  return id ? `${name} (${id})` : name;
+}
+
+function downloadAreaTravelTimesCsv(data, anonymise) {
+  const results = Array.isArray(data?.results) ? data.results : [];
+  const headers = ["From client", "To client", "Area", "Journey time", "Distance (mi)", "Status"];
+  const lines = [headers.join(",")];
+  for (const item of results) {
+    const travel = item?.travel;
+    lines.push(
+      [
+        getClientExportLabel(item?.from, anonymise),
+        getClientExportLabel(item?.to, anonymise),
+        data?.area || "",
+        travel?.durationText || "",
+        travel?.distanceMiles ?? "",
+        travel ? "Available" : item?.reason || "Unavailable",
+      ]
+        .map(escapeCsvValue)
+        .join(",")
+    );
+  }
+  const areaSlug = normalizeText(data?.area || "area").replaceAll(/[^a-z0-9]+/g, "-").replaceAll(/^-|-$/g, "") || "area";
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadCsv(`client-travel-times-${areaSlug}-${stamp}${anonymise ? "-anonymised" : ""}.csv`, `\uFEFF${lines.join("\n")}`);
+}
+
 function exportSavedRunsAsCsv() {
   if (!savedRuns.length) {
     setStatus("No saved runs to export.", true);
@@ -1442,6 +1515,59 @@ async function calculateJourneyTimes(audience) {
   }
 }
 
+async function downloadAreaTravelTimes() {
+  const area = normalizeLocationQuery(areaTravelTimesAreaSelect?.value || "");
+  if (!area) {
+    setAreaTravelTimesStatus("Choose an area before downloading.", true);
+    areaTravelTimesAreaSelect?.focus();
+    return;
+  }
+
+  const anonymise = Boolean(anonymiseAreaTravelTimesInput?.checked);
+  setAreaTravelTimesBusy(true);
+  setAreaTravelTimesStatus(`Calculating travel times between all clients in ${area}...`);
+
+  try {
+    const token = await authController.acquireToken([FRONTEND_CONFIG.apiScope]);
+    const response = await fetch(JOURNEY_TIMES_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        area,
+        audience: "clients",
+        mode: "between-clients",
+        departureTime: buildDepartureTimeIso(),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 403) {
+        redirectToUnauthorized("mapping");
+        return;
+      }
+      throw new Error(data?.detail || data?.error || `Travel time request failed (${response.status}).`);
+    }
+
+    const totalPairs = Number(data?.counts?.total || 0);
+    if (!totalPairs) {
+      setAreaTravelTimesStatus(`No active or pending clients with a location were found in ${area}.`, true);
+      return;
+    }
+    downloadAreaTravelTimesCsv(data, anonymise);
+    const available = Number(data?.counts?.withTravel || 0);
+    setAreaTravelTimesStatus(`Downloaded ${totalPairs} client pair(s): ${available} with a travel time.${anonymise ? " Names were replaced with client numbers." : ""}`);
+  } catch (error) {
+    console.error(error);
+    setAreaTravelTimesStatus(error?.message || "Could not calculate area travel times.", true);
+  } finally {
+    setAreaTravelTimesBusy(false);
+  }
+}
+
 async function init() {
   try {
     const account = await authController.restoreSession();
@@ -1483,6 +1609,7 @@ async function init() {
     renderClientStatusFilters();
     renderCarerSearchResults();
     renderJourneyAreaOptions();
+    renderAreaTravelTimesAreaOptions();
     renderAreaFilters();
     renderClientSearchResults();
   } catch (error) {
@@ -1541,6 +1668,10 @@ calculateJourneyTimesBtn?.addEventListener("click", () => {
   void calculateJourneyTimes(getSelectedJourneyAudience());
 });
 
+downloadAreaTravelTimesBtn?.addEventListener("click", () => {
+  void downloadAreaTravelTimes();
+});
+
 journeyOriginInput?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
@@ -1593,11 +1724,13 @@ clearRunBtn?.addEventListener("click", () => {
   renderClientStatusFilters();
   renderCarerSearchResults();
   renderJourneyAreaOptions();
+  renderAreaTravelTimesAreaOptions();
   renderClientPostcodes();
   renderAreaFilters();
   renderClientSearchResults();
   hideRun();
   setJourneyTimesStatus("Enter a postcode and choose an area.");
+  setAreaTravelTimesStatus("Choose an area to download its client-to-client travel times.");
   setStatus("Cleared.");
 });
 

@@ -90,6 +90,33 @@
         </div>
       </section>
 
+      <section class="panel" aria-labelledby="areaTravelTimesHeading">
+        <h2 id="areaTravelTimesHeading">Travel Times Between Clients</h2>
+        <p class="muted">Download the driving time between every pair of active or pending clients in one area.</p>
+        <div class="mapping-form-grid">
+          <label class="field" for="areaTravelTimesAreaSelect">
+            Area
+            <select id="areaTravelTimesAreaSelect">
+              <option value="East Kent" selected>East Kent</option>
+            </select>
+          </label>
+          <label class="checkbox-row" for="anonymiseAreaTravelTimesInput">
+            <input id="anonymiseAreaTravelTimesInput" type="checkbox" />
+            <span>Anonymise export (use client number only)</span>
+          </label>
+        </div>
+        <div class="row">
+          <button id="downloadAreaTravelTimesBtn" type="button">Download travel times CSV</button>
+        </div>
+        <p id="areaTravelTimesStatus" class="muted">Choose an area to download its client-to-client travel times.</p>
+        <p class="muted">
+          Working lists:
+          <a href="https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Clients%20%20One%20Touch/AllItems.aspx" target="_blank" rel="noopener noreferrer">Clients SharePoint list</a>
+          ·
+          <a href="https://planwithcare.sharepoint.com/sites/SupportTeam/Lists/Colleagues/AllItems.aspx" target="_blank" rel="noopener noreferrer">Associates SharePoint list</a>
+        </p>
+      </section>
+
       <section class="mapping-run-workspace" aria-labelledby="workOutRunsHeading">
         <div class="mapping-section-heading">
           <h2 id="workOutRunsHeading">Work out Runs</h2>

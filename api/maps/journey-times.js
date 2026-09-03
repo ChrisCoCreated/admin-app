@@ -38,6 +38,10 @@ function normalizeAudience(value) {
   return "clients";
 }
 
+function normalizeMode(value) {
+  return normalizeComparable(value) === "between-clients" ? "between-clients" : "from-origin";
+}
+
 function getDefaultDepartureTimeIso() {
   const now = new Date();
   const nowMs = now.getTime();
@@ -345,6 +349,51 @@ async function attachTravelTimes(origin, rows, geocodeCache, apiKey, departureTi
   return results;
 }
 
+function buildClientPairs(rows) {
+  const pairs = [];
+  for (let fromIndex = 0; fromIndex < rows.length; fromIndex += 1) {
+    for (let toIndex = fromIndex + 1; toIndex < rows.length; toIndex += 1) {
+      pairs.push({ from: rows[fromIndex], to: rows[toIndex] });
+    }
+  }
+  return pairs;
+}
+
+async function attachClientPairTravelTimes(pairs, geocodeCache, apiKey, departureTime) {
+  const results = new Array(pairs.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < pairs.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const pair = pairs[index];
+      const fromLocation = geocodeCache.get(normalizeComparable(pair.from.query));
+      const toLocation = geocodeCache.get(normalizeComparable(pair.to.query));
+      if (!fromLocation || fromLocation.error || !toLocation || toLocation.error) {
+        results[index] = {
+          ...pair,
+          travel: null,
+          reason: fromLocation?.error || toLocation?.error || "Could not geocode one or both client locations.",
+        };
+        continue;
+      }
+      try {
+        results[index] = {
+          ...pair,
+          travel: await computeRouteTravel(fromLocation, toLocation, apiKey, departureTime),
+          reason: "",
+        };
+      } catch (error) {
+        results[index] = { ...pair, travel: null, reason: error?.message || "Could not calculate route." };
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(ROUTE_CALL_CONCURRENCY, pairs.length) }, worker));
+  return results;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method Not Allowed" });
@@ -361,15 +410,20 @@ module.exports = async (req, res) => {
     return;
   }
 
+  const mode = normalizeMode(req.body?.mode);
   const originQuery = normalizeText(req.body?.origin || req.body?.postcode);
   const selectedArea = normalizeText(req.body?.area);
   const audience = normalizeAudience(req.body?.audience || req.body?.type);
-  if (!originQuery) {
+  if (mode !== "between-clients" && !originQuery) {
     res.status(400).json({ error: "Postcode is required." });
     return;
   }
   if (!selectedArea) {
     res.status(400).json({ error: "Area is required." });
+    return;
+  }
+  if (mode === "between-clients" && audience !== "clients") {
+    res.status(400).json({ error: "Client-to-client travel times can only be calculated for clients." });
     return;
   }
 
@@ -384,13 +438,31 @@ module.exports = async (req, res) => {
   const region = normalizeRegion(process.env.GOOGLE_MAPS_REGION);
 
   try {
-    const [directory, carersDirectory, origin] = await Promise.all([
-      readDirectoryData(),
-      readCarersDirectoryData(),
-      geocodeLocation(originQuery, apiKey, region),
-    ]);
+    const directoryPromise = readDirectoryData();
+    const carersPromise = mode === "between-clients" ? Promise.resolve({ carers: [], warnings: [] }) : readCarersDirectoryData();
+    const originPromise = mode === "between-clients" ? Promise.resolve(null) : geocodeLocation(originQuery, apiKey, region);
+    const [directory, carersDirectory, origin] = await Promise.all([directoryPromise, carersPromise, originPromise]);
     const rows = buildDestinationRows(directory.clients || [], carersDirectory.carers || [], selectedArea, audience);
     const geocodeCache = await geocodeUniqueDestinations(rows, apiKey, region);
+    if (mode === "between-clients") {
+      const pairs = buildClientPairs(rows);
+      const results = await attachClientPairTravelTimes(pairs, geocodeCache, apiKey, departureTime);
+      res.setHeader("Cache-Control", "no-store");
+      res.status(200).json({
+        area: selectedArea,
+        audience: "clients",
+        mode,
+        departureTime,
+        counts: {
+          total: results.length,
+          withTravel: results.filter((item) => item.travel).length,
+          clients: rows.length,
+        },
+        results,
+        warnings: [...(directory.warnings || [])],
+      });
+      return;
+    }
     const results = await attachTravelTimes(origin, rows, geocodeCache, apiKey, departureTime);
     const sorted = results.sort((a, b) => {
       const aDuration = Number(a.travel?.durationSeconds || Number.POSITIVE_INFINITY);
