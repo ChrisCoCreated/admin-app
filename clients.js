@@ -70,7 +70,7 @@ const RECONCILIATION_AREA_OPTIONS = ["Central", "East Kent", "London Plus", "Wel
 let allClients = [];
 let selectedClientId = "";
 let selectedArea = "all";
-let selectedClientStatuses = new Set();
+let selectedClientStatuses = new Set(["active", "pending"]);
 let account = null;
 let currentRole = "";
 let reconcilePreview = null;
@@ -81,7 +81,7 @@ let copyStatusResetTimer = null;
 let selectedClientIds = new Set();
 let availableTags = [];
 let bulkTagBusy = false;
-let selectedMissingStatuses = new Set();
+let selectedMissingStatuses = new Set(["active", "pending"]);
 let selectedMissingClientIds = new Set();
 let clientSort = { key: "name", direction: "asc" };
 let clientColumnFilters = {
@@ -373,6 +373,39 @@ function formatStatusLabel(status) {
     .join(" ");
 }
 
+function formatUkDate(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "-";
+  }
+
+  const isoDate = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(raw);
+  if (isoDate) {
+    return `${isoDate[3].padStart(2, "0")}/${isoDate[2].padStart(2, "0")}/${isoDate[1]}`;
+  }
+
+  const ukDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw);
+  if (ukDate) {
+    return `${ukDate[1].padStart(2, "0")}/${ukDate[2].padStart(2, "0")}/${ukDate[3]}`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return raw;
+  }
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+function defaultVisibleStatuses(options) {
+  const preferred = options.filter((status) => status === "active" || status === "pending");
+  return new Set(preferred.length ? preferred : options);
+}
+
 function formatTags(tags) {
   if (!Array.isArray(tags) || !tags.length) {
     return "-";
@@ -426,7 +459,7 @@ function renderMissingStatusFilters(items) {
 
   const nextSelected = new Set(Array.from(selectedMissingStatuses).filter((status) => options.includes(status)));
   if (!nextSelected.size) {
-    selectedMissingStatuses = new Set(options);
+    selectedMissingStatuses = defaultVisibleStatuses(options);
   } else {
     selectedMissingStatuses = nextSelected;
   }
@@ -552,7 +585,7 @@ function renderStatusFilters() {
 
   const nextSelected = new Set(Array.from(selectedClientStatuses).filter((status) => options.includes(status)));
   if (!nextSelected.size) {
-    selectedClientStatuses = new Set(options);
+    selectedClientStatuses = defaultVisibleStatuses(options);
   } else {
     selectedClientStatuses = nextSelected;
   }
@@ -991,7 +1024,7 @@ function renderCopyCandidates(items) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(item?.sharePoint?.name || "-")}</td>
-      <td>${escapeHtml(item?.sharePoint?.dateOfBirth || "-")}</td>
+      <td>${escapeHtml(formatUkDate(item?.sharePoint?.dateOfBirth))}</td>
       <td>${escapeHtml(item?.oneTouch?.name || "-")} (${escapeHtml(item?.oneTouch?.id || "-")})${
         item?.matchType === "fuzzy" ? " [fuzzy]" : ""
       }</td>
@@ -1040,7 +1073,7 @@ function renderMissingCandidates(items) {
       <td></td>
       <td>${escapeHtml(item?.oneTouch?.id || "-")}</td>
       <td>${escapeHtml(item?.oneTouch?.name || "-")}</td>
-      <td>${escapeHtml(item?.oneTouch?.dateOfBirth || "-")}</td>
+      <td>${escapeHtml(formatUkDate(item?.oneTouch?.dateOfBirth))}</td>
       <td>${escapeHtml(formatStatusLabel(item?.oneTouch?.status || ""))}</td>
       <td></td>
       <td></td>
@@ -1162,7 +1195,7 @@ function renderAmbiguousCandidates(items) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(item?.sharePoint?.name || "-")}</td>
-      <td>${escapeHtml(item?.sharePoint?.dateOfBirth || "-")}</td>
+      <td>${escapeHtml(formatUkDate(item?.sharePoint?.dateOfBirth))}</td>
       <td></td>
       <td></td>
     `;
