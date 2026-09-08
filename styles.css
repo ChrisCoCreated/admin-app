@@ -3062,6 +3062,10 @@ dd {
 
 .recruitment-candidate-name {
   display: block;
+  color: #17243a;
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.3;
 }
 
 .recruitment-inline-flag {
@@ -3448,6 +3452,62 @@ dd {
   padding-top: 18px;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.recruitment-search-row {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
+.recruitment-search-field {
+  flex: 1 1 420px;
+  margin: 0;
+}
+
+.recruitment-search-field input {
+  min-height: 46px;
+}
+
+.recruitment-filter-toggle {
+  min-height: 46px;
+  white-space: nowrap;
+}
+
+.recruitment-actions-panel {
+  padding-block: 14px;
+}
+
+.recruitment-actions-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.recruitment-actions-label {
+  margin-right: 4px;
+  color: #657791;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recruitment-actions-bar button {
+  min-height: 40px;
+}
+
 .recruitment-toolbar-header {
   align-items: center;
 }
@@ -3492,6 +3552,27 @@ dd {
 }
 
 @media (max-width: 680px) {
+  .recruitment-search-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recruitment-filter-toggle {
+    width: 100%;
+  }
+
+  .recruitment-actions-bar {
+    align-items: stretch;
+  }
+
+  .recruitment-actions-label {
+    flex-basis: 100%;
+  }
+
+  .recruitment-actions-bar button {
+    flex: 1 1 100%;
+  }
+
   .recruitment-toolbar-header {
     align-items: flex-start;
   }
@@ -3559,6 +3640,10 @@ dd {
 }
 
 #recruitmentToolbarContent {
+  margin-top: 14px;
+}
+
+#recruitmentImportWorkspace {
   margin-top: 14px;
 }
 

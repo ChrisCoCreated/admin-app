@@ -42,63 +42,22 @@
       </section>
 
       <section class="panel recruitment-toolbar-panel">
-        <div class="card-header-row recruitment-toolbar-header">
-          <div>
-            <h2>Find candidates</h2>
-            <span class="muted">Search, filter and sort the working pipeline.</span>
-          </div>
-          <div class="recruitment-toolbar-actions">
-            <button
-              id="quickWhatsAppBtn"
-              type="button"
-              class="secondary recruitment-toolbar-whatsapp"
-              aria-expanded="false"
-              aria-controls="quickWhatsAppForm"
-            >
-              Text in WhatsApp
-            </button>
-            <button
-              id="toggleRecruitmentToolbarBtn"
-              type="button"
-              class="mini-btn recruitment-toolbar-toggle"
-              aria-expanded="true"
-              aria-controls="recruitmentToolbarContent"
-              aria-label="Hide search and import tools"
-              title="Hide search and import tools"
-            >
-              <span aria-hidden="true">⌕</span>
-            </button>
-            <button
-              id="addRecruitmentItemBtn"
-              type="button"
-              class="mini-btn recruitment-toolbar-toggle recruitment-toolbar-add"
-              aria-label="Add recruitment candidate in SharePoint"
-              title="Add recruitment candidate in SharePoint"
-            >
-              <span aria-hidden="true">+</span>
-            </button>
-          </div>
+        <div class="recruitment-search-row">
+          <label class="field recruitment-search-field" for="searchInput">
+            <span class="visually-hidden">Search candidates</span>
+            <input id="searchInput" type="search" placeholder="Search candidates, notes, phone or source…" autocomplete="off" />
+          </label>
+          <button
+            id="toggleRecruitmentToolbarBtn"
+            type="button"
+            class="secondary recruitment-filter-toggle"
+            aria-expanded="false"
+            aria-controls="recruitmentToolbarContent"
+          >
+            More filters
+          </button>
         </div>
-        <form id="quickWhatsAppForm" class="recruitment-quick-whatsapp-form" hidden>
-          <label class="field" for="quickWhatsAppPhoneInput">
-            Phone number
-            <input id="quickWhatsAppPhoneInput" type="tel" inputmode="tel" autocomplete="tel" required />
-          </label>
-          <label class="field" for="quickWhatsAppNameInput">
-            Candidate name
-            <input id="quickWhatsAppNameInput" type="text" autocomplete="name" placeholder="Used in the greeting" />
-          </label>
-          <div class="recruitment-quick-whatsapp-actions">
-            <button type="submit">Open WhatsApp</button>
-            <button id="quickWhatsAppCancelBtn" type="button" class="secondary">Cancel</button>
-          </div>
-          <p id="quickWhatsAppError" class="muted error" hidden></p>
-        </form>
-        <div id="recruitmentToolbarContent">
-          <label class="field" for="searchInput">
-            Search
-            <input id="searchInput" type="search" placeholder="Search candidate, status, source, tags, notes or phone" autocomplete="off" />
-          </label>
+        <div id="recruitmentToolbarContent" hidden>
           <div class="mapping-form-grid">
             <label class="field" for="locationFilterSelect">
               Location
@@ -149,6 +108,44 @@
             </label>
           </div>
           <p id="statusMessage" class="muted">Loading active candidates...</p>
+        </div>
+      </section>
+
+      <section class="panel recruitment-actions-panel" aria-label="Candidate actions">
+        <div class="recruitment-actions-bar">
+          <span class="recruitment-actions-label">Candidate actions</span>
+          <button
+            id="quickWhatsAppBtn"
+            type="button"
+            class="secondary recruitment-toolbar-whatsapp"
+            aria-expanded="false"
+            aria-controls="quickWhatsAppForm"
+          >
+            Text WhatsApp
+          </button>
+          <button id="addRecruitmentItemBtn" type="button" class="secondary">
+            Add candidate
+          </button>
+          <button id="importRecruitmentBtn" type="button" class="secondary">
+            Import multiple (CSV)
+          </button>
+        </div>
+        <form id="quickWhatsAppForm" class="recruitment-quick-whatsapp-form" hidden>
+          <label class="field" for="quickWhatsAppPhoneInput">
+            Phone number
+            <input id="quickWhatsAppPhoneInput" type="tel" inputmode="tel" autocomplete="tel" required />
+          </label>
+          <label class="field" for="quickWhatsAppNameInput">
+            Candidate name
+            <input id="quickWhatsAppNameInput" type="text" autocomplete="name" placeholder="Used in the greeting" />
+          </label>
+          <div class="recruitment-quick-whatsapp-actions">
+            <button type="submit">Open WhatsApp</button>
+            <button id="quickWhatsAppCancelBtn" type="button" class="secondary">Cancel</button>
+          </div>
+          <p id="quickWhatsAppError" class="muted error" hidden></p>
+        </form>
+        <div id="recruitmentImportWorkspace" hidden>
           <div class="recruitment-import-wrap">
             <h3>Import CSV</h3>
             <div id="importDropZone" class="recruitment-dropzone" tabindex="0" role="button" aria-label="Upload recruitment CSV">
@@ -289,6 +286,7 @@
             <h3 id="candidateDetailModalTitle">Candidate Detail</h3>
           </div>
           <div class="row wrap-row recruitment-modal-header-actions">
+            <button id="saveDetailBtn" type="button" hidden>Save candidate</button>
             <button id="candidateDetailEditBtn" type="button" class="secondary">Edit candidate</button>
             <button id="candidateDetailCloseBtn" type="button" class="secondary">Close</button>
           </div>
@@ -310,7 +308,7 @@
             <dd data-field="location">-</dd>
           </div>
           <div>
-            <dt>Status</dt>
+            <dt>Furthest Stage Reached</dt>
             <dd data-field="status">-</dd>
           </div>
           <div>
@@ -396,6 +394,12 @@
               Location
               <input id="detailLocationInput" type="text" autocomplete="address-level2" />
             </label>
+            <label class="field" for="statusUpdateSelect">
+              Furthest stage reached
+              <select id="statusUpdateSelect">
+                <option value="">Select status</option>
+              </select>
+            </label>
             <label class="field" for="detailSourceInput">
               Source
               <input id="detailSourceInput" type="text" />
@@ -459,32 +463,6 @@
             <textarea id="detailNotesInput" placeholder="Capture any relevant context, availability or follow-up notes."></textarea>
           </label>
           </form>
-          <div class="recruitment-detail-toolbar">
-          <div class="recruitment-detail-toolbar-card">
-            <div class="recruitment-detail-toolbar-copy">
-              <h4>Furthest stage reached</h4>
-              <p class="muted">This records the most advanced point reached in the recruitment process.</p>
-            </div>
-            <div class="row wrap-row recruitment-detail-toolbar-actions">
-              <label class="field recruitment-status-field" for="statusUpdateSelect">
-                Furthest stage reached
-                <select id="statusUpdateSelect">
-                  <option value="">Select status</option>
-                </select>
-              </label>
-              <button id="saveStatusBtn" type="button">Save stage</button>
-            </div>
-          </div>
-          <div class="recruitment-detail-toolbar-card recruitment-detail-toolbar-card-accent">
-            <div class="recruitment-detail-toolbar-copy">
-              <h4>Save candidate</h4>
-              <p class="muted">Save profile details, contact information, tags and notes.</p>
-            </div>
-            <div class="row wrap-row recruitment-detail-toolbar-actions">
-              <button id="saveDetailBtn" type="button">Save candidate</button>
-            </div>
-          </div>
-          </div>
         </section>
         <div class="recruitment-modal-section-head recruitment-modal-section-head-spaced">
           <div>

@@ -23,10 +23,11 @@ const sharePointListLink = document.getElementById("sharePointListLink");
 const openIndeedBtn = document.getElementById("openIndeedBtn");
 const openOneTouchBtn = document.getElementById("openOneTouchBtn");
 const statusUpdateSelect = document.getElementById("statusUpdateSelect");
-const saveStatusBtn = document.getElementById("saveStatusBtn");
 const saveDetailBtn = document.getElementById("saveDetailBtn");
 const importDropZone = document.getElementById("importDropZone");
 const importFileInput = document.getElementById("importFileInput");
+const importRecruitmentBtn = document.getElementById("importRecruitmentBtn");
+const recruitmentImportWorkspace = document.getElementById("recruitmentImportWorkspace");
 const importFileName = document.getElementById("importFileName");
 const importSummary = document.getElementById("importSummary");
 const importErrors = document.getElementById("importErrors");
@@ -144,6 +145,8 @@ let statusQuickMenuCandidateId = "";
 let createCandidateBusy = false;
 let activeHideRefreshTimer = 0;
 let detailSaveBusy = false;
+let candidateDetailInitialState = "";
+let candidateDetailDirty = false;
 let stageUpdateBusyKey = "";
 const inlineNoteSaveBusyIds = new Set();
 let statusFeedbackTimer = 0;
@@ -189,6 +192,7 @@ const DEFAULT_RECRUITMENT_OWNER_OPTIONS = [
   { label: "Rebecca" },
   { label: "Miska" },
   { label: "Peter" },
+  { label: "Georgina" },
 ];
 recruitmentStatusOptions = [...DEFAULT_RECRUITMENT_STATUS_OPTIONS];
 recruitmentOwnerOptions = [...DEFAULT_RECRUITMENT_OWNER_OPTIONS];
@@ -242,7 +246,9 @@ function normalizeStatusOptions(options) {
 
 function normalizeOwnerOptions(options) {
   const list = Array.isArray(options) ? options.map(cleanText).filter(Boolean) : [];
-  const labels = list.length ? Array.from(new Set(list)) : DEFAULT_RECRUITMENT_OWNER_OPTIONS.map((option) => option.label);
+  const labels = Array.from(
+    new Set([...list, ...DEFAULT_RECRUITMENT_OWNER_OPTIONS.map((option) => option.label)])
+  );
   return labels.map((label) => ({ label }));
 }
 
@@ -730,12 +736,13 @@ function setRecruitmentToolbarVisible(visible) {
   toggleRecruitmentToolbarBtn.setAttribute("aria-expanded", visible ? "true" : "false");
   toggleRecruitmentToolbarBtn.setAttribute(
     "aria-label",
-    visible ? "Hide search and import tools" : "Show search and import tools"
+    visible ? "Hide filters" : "Show more filters"
   );
   toggleRecruitmentToolbarBtn.setAttribute(
     "title",
-    visible ? "Hide search and import tools" : "Show search and import tools"
+    visible ? "Hide filters" : "Show more filters"
   );
+  toggleRecruitmentToolbarBtn.textContent = visible ? "Hide filters" : "More filters";
   toggleRecruitmentToolbarBtn.classList.toggle("is-open", visible);
 }
 
@@ -1016,17 +1023,50 @@ function openCandidateDetail(candidate) {
     return;
   }
   setDetail(candidate);
-  // The table is already the quick-read view. Opening a record should take an
-  // administrator directly to the workspace where they can make changes.
-  setCandidateDetailMode("edit");
+  setCandidateDetailMode("view");
   candidateDetailModal.hidden = false;
-  detailInputs.candidateName?.focus();
 }
 
-function closeCandidateDetail() {
+function getCandidateDetailFormState() {
+  return JSON.stringify({
+    candidateName: cleanText(detailInputs.candidateName?.value),
+    location: cleanText(detailInputs.location?.value),
+    source: cleanText(detailInputs.source?.value),
+    phoneNumber: cleanText(detailInputs.phoneNumber?.value),
+    email: cleanText(detailInputs.email?.value),
+    indeedUrl: cleanText(detailInputs.indeedUrl?.value),
+    livesIn: cleanText(detailInputs.livesIn?.value),
+    earmarkedFor: cleanText(detailInputs.earmarkedFor?.value),
+    keepInMind: detailInputs.keepInMind?.checked === true,
+    liveInMailingList: detailInputs.liveInMailingList?.checked === true,
+    tags: normalizeTagString(detailInputs.tags?.value),
+    notes: cleanText(detailInputs.notes?.value),
+    status: cleanText(statusUpdateSelect?.value),
+  });
+}
+
+function setCandidateDetailBaseline() {
+  candidateDetailInitialState = getCandidateDetailFormState();
+  candidateDetailDirty = false;
+}
+
+function syncCandidateDetailDirtyState() {
+  candidateDetailDirty = getCandidateDetailFormState() !== candidateDetailInitialState;
+}
+
+function closeCandidateDetail(options = {}) {
+  const isEditing = candidateDetailEditor?.hidden === false;
+  if (!options.force && isEditing && candidateDetailDirty) {
+    const shouldDiscard = window.confirm("Discard unsaved changes to this candidate?");
+    if (!shouldDiscard) {
+      return false;
+    }
+  }
   if (candidateDetailModal) {
     candidateDetailModal.hidden = true;
   }
+  candidateDetailDirty = false;
+  return true;
 }
 
 function setCandidateDetailMode(mode) {
@@ -1041,6 +1081,9 @@ function setCandidateDetailMode(mode) {
     candidateDetailEditBtn.textContent = isEditing ? "View details" : "Edit candidate";
     candidateDetailEditBtn.setAttribute("aria-pressed", isEditing ? "true" : "false");
   }
+  if (saveDetailBtn) {
+    saveDetailBtn.hidden = !isEditing;
+  }
 }
 
 function setDetailFormEnabled(enabled) {
@@ -1052,6 +1095,9 @@ function setDetailFormEnabled(enabled) {
   }
   if (saveDetailBtn) {
     saveDetailBtn.disabled = !enabled || detailSaveBusy;
+  }
+  if (statusUpdateSelect) {
+    statusUpdateSelect.disabled = !enabled || detailSaveBusy;
   }
 }
 
@@ -1767,9 +1813,7 @@ function setDetail(candidate) {
       statusUpdateSelect.value = "";
       statusUpdateSelect.disabled = true;
     }
-    if (saveStatusBtn) {
-      saveStatusBtn.disabled = true;
-    }
+    setCandidateDetailBaseline();
     return;
   }
 
@@ -1818,9 +1862,7 @@ function setDetail(candidate) {
     statusUpdateSelect.value = cleanText(candidate.status);
     statusUpdateSelect.disabled = false;
   }
-  if (saveStatusBtn) {
-    saveStatusBtn.disabled = statusUpdateBusy;
-  }
+  setCandidateDetailBaseline();
 }
 
 function renderFilterOptions() {
@@ -2426,6 +2468,9 @@ async function saveRecruitmentStage(itemId, stageKey, outcome, nextSteps, firstI
 }
 
 async function handleCsvFile(file) {
+  if (recruitmentImportWorkspace) {
+    recruitmentImportWorkspace.hidden = false;
+  }
   if (!file) {
     return;
   }
@@ -2719,6 +2764,7 @@ async function saveCandidateDetails() {
     tags: normalizeTagString(detailInputs.tags?.value),
     notes: cleanText(detailInputs.notes?.value),
   };
+  const selectedStatus = cleanText(statusUpdateSelect?.value);
 
   detailSaveBusy = true;
   if (detailInputs.candidateName) {
@@ -2745,6 +2791,12 @@ async function saveCandidateDetails() {
       candidate.notes = payload.notes;
       setDetail(candidate);
     }
+    if (selectedStatus && candidate && selectedStatus !== cleanText(candidate.status)) {
+      await updateCandidateStatusById(selectedCandidateId, selectedStatus);
+    }
+    if (candidate) {
+      setDetail(candidate);
+    }
     renderFilterOptions();
     renderCandidates();
     setStatus(
@@ -2758,39 +2810,6 @@ async function saveCandidateDetails() {
   } finally {
     detailSaveBusy = false;
     setDetailFormEnabled(Boolean(selectedCandidateId));
-  }
-}
-
-async function saveCandidateStatus() {
-  if (statusUpdateBusy || !statusUpdateSelect) {
-    return;
-  }
-  const selectedStatus = cleanText(statusUpdateSelect.value);
-  if (!selectedCandidateId || !selectedStatus) {
-    setStatus("Select a candidate and status first.", true);
-    return;
-  }
-
-  statusUpdateBusy = true;
-  if (saveStatusBtn) {
-    saveStatusBtn.disabled = true;
-  }
-  if (statusUpdateSelect) {
-    statusUpdateSelect.disabled = true;
-  }
-  try {
-    await updateCandidateStatusById(selectedCandidateId, selectedStatus);
-  } catch (error) {
-    console.error(error);
-    setStatus(error?.message || "Could not update status.", true);
-  } finally {
-    statusUpdateBusy = false;
-    if (saveStatusBtn) {
-      saveStatusBtn.disabled = false;
-    }
-    if (statusUpdateSelect) {
-      statusUpdateSelect.disabled = false;
-    }
   }
 }
 
@@ -2925,6 +2944,15 @@ for (const button of sortHeaderButtons) {
 toggleRecruitmentToolbarBtn?.addEventListener("click", () => {
   setRecruitmentToolbarVisible(recruitmentToolbarContent?.hidden);
 });
+importRecruitmentBtn?.addEventListener("click", () => {
+  if (importBusy) {
+    return;
+  }
+  if (recruitmentImportWorkspace) {
+    recruitmentImportWorkspace.hidden = false;
+  }
+  importFileInput?.click();
+});
 addRecruitmentItemBtn?.addEventListener("click", () => {
   openAddRecruitmentModal();
 });
@@ -2997,6 +3025,16 @@ cancelAddRecruitmentBtn?.addEventListener("click", closeAddRecruitmentModal);
 candidateDetailCloseBtn?.addEventListener("click", closeCandidateDetail);
 candidateDetailEditBtn?.addEventListener("click", () => {
   const isEditing = candidateDetailEditor?.hidden === false;
+  if (isEditing && candidateDetailDirty) {
+    const shouldDiscard = window.confirm("Discard unsaved changes to this candidate?");
+    if (!shouldDiscard) {
+      return;
+    }
+    const candidate = allCandidates.find((item) => item.id === selectedCandidateId);
+    if (candidate) {
+      setDetail(candidate);
+    }
+  }
   setCandidateDetailMode(isEditing ? "view" : "edit");
   if (!isEditing) {
     detailInputs.candidateName?.focus();
@@ -3055,12 +3093,12 @@ importFileInput?.addEventListener("change", async () => {
 runImportBtn?.addEventListener("click", async () => {
   await runCsvImport();
 });
-saveStatusBtn?.addEventListener("click", async () => {
-  await saveCandidateStatus();
-});
 saveDetailBtn?.addEventListener("click", async () => {
   await saveCandidateDetails();
 });
+candidateDetailEditForm?.addEventListener("input", syncCandidateDetailDirtyState);
+candidateDetailEditForm?.addEventListener("change", syncCandidateDetailDirtyState);
+statusUpdateSelect?.addEventListener("change", syncCandidateDetailDirtyState);
 candidateDetailEditForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   await saveCandidateDetails();
