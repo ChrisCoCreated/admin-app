@@ -53,10 +53,7 @@ function toTitleCaseName(value) {
     if (!clean) {
       return "";
     }
-    return clean
-      .split("-")
-      .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ""))
-      .join("-");
+    return clean.replace(/(^|[-'])\p{L}/gu, (letter) => letter.toUpperCase());
   }
 
   return raw

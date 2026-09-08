@@ -12,6 +12,11 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function toTitleCaseName(value) {
+  const raw = normalizeText(value).toLowerCase();
+  return raw.replace(/(^|[\s'-])\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
 function quoteODataString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -94,7 +99,7 @@ module.exports = async (req, res) => {
     const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}/fields`;
 
     patchFields = {
-      Title: normalizeText(req.body?.candidateName),
+      Title: toTitleCaseName(req.body?.candidateName),
       Location: normalizeText(req.body?.location),
       Source: normalizeText(req.body?.source),
       PhoneNumber: normalizeText(req.body?.phoneNumber),

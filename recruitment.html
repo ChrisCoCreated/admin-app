@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css?v=20260601" />
   </head>
-  <body class="auth-pending">
+  <body class="auth-pending recruitment-page">
     <header class="topbar">
       <div class="container topbar-inner">
         <a class="brand" href="./index.html" aria-label="Thrive Admin home">
@@ -32,17 +32,20 @@
       </div>
     </header>
 
-    <main class="container clients-main">
-      <section class="hero compact">
-        <h1>Recruitment</h1>
-        <p>Active candidates from SharePoint recruitment list.</p>
+    <main class="container clients-main recruitment-main">
+      <section class="hero compact recruitment-hero">
+        <div>
+          <p class="eyebrow">Candidate pipeline</p>
+          <h1>Recruitment</h1>
+          <p>Manage active candidates, ownership, progress and follow-ups in one place.</p>
+        </div>
       </section>
 
       <section class="panel recruitment-toolbar-panel">
         <div class="card-header-row recruitment-toolbar-header">
           <div>
-            <h2>Search & Import</h2>
-            <span class="muted">Open filters, search, and CSV tools when you need them.</span>
+            <h2>Find candidates</h2>
+            <span class="muted">Search, filter and sort the working pipeline.</span>
           </div>
           <div class="recruitment-toolbar-actions">
             <button
@@ -58,10 +61,10 @@
               id="toggleRecruitmentToolbarBtn"
               type="button"
               class="mini-btn recruitment-toolbar-toggle"
-              aria-expanded="false"
+              aria-expanded="true"
               aria-controls="recruitmentToolbarContent"
-              aria-label="Show search and import tools"
-              title="Show search and import tools"
+              aria-label="Hide search and import tools"
+              title="Hide search and import tools"
             >
               <span aria-hidden="true">⌕</span>
             </button>
@@ -91,7 +94,7 @@
           </div>
           <p id="quickWhatsAppError" class="muted error" hidden></p>
         </form>
-        <div id="recruitmentToolbarContent" hidden>
+        <div id="recruitmentToolbarContent">
           <label class="field" for="searchInput">
             Search
             <input id="searchInput" type="search" placeholder="Search candidate, status, source, tags, notes or phone" autocomplete="off" />
@@ -219,9 +222,10 @@
                   </th>
                   <th>
                     <button type="button" class="recruitment-sort-header" data-sort-header="status">
-                      Status
+                      Furthest stage reached
                     </button>
                   </th>
+                  <th>Notes</th>
                   <th>Stages</th>
                   <th>Action</th>
                 </tr>
@@ -235,6 +239,7 @@
     </main>
 
     <div id="statusQuickMenu" class="status-quick-menu" hidden>
+      <p class="status-quick-menu-label">Furthest stage reached</p>
       <div id="statusQuickMenuList" class="status-quick-menu-list"></div>
     </div>
 
@@ -378,7 +383,7 @@
           <div class="recruitment-modal-section-head">
             <div>
               <h4>Edit Candidate Details</h4>
-              <p class="muted">Update email, phone, location, tags, Indeed URL, notes and other saved details.</p>
+              <p class="muted">Make and save profile changes without leaving the candidate workspace.</p>
             </div>
           </div>
           <form id="candidateDetailEditForm" class="modal-form recruitment-detail-edit-form">
@@ -457,26 +462,26 @@
           <div class="recruitment-detail-toolbar">
           <div class="recruitment-detail-toolbar-card">
             <div class="recruitment-detail-toolbar-copy">
-              <h4>Edit Status Only</h4>
-              <p class="muted">Use this when you only want to move the candidate to a new stage.</p>
+              <h4>Furthest stage reached</h4>
+              <p class="muted">This records the most advanced point reached in the recruitment process.</p>
             </div>
             <div class="row wrap-row recruitment-detail-toolbar-actions">
               <label class="field recruitment-status-field" for="statusUpdateSelect">
-                Status
+                Furthest stage reached
                 <select id="statusUpdateSelect">
                   <option value="">Select status</option>
                 </select>
               </label>
-              <button id="saveStatusBtn" type="button">Save Status Only</button>
+              <button id="saveStatusBtn" type="button">Save stage</button>
             </div>
           </div>
           <div class="recruitment-detail-toolbar-card recruitment-detail-toolbar-card-accent">
             <div class="recruitment-detail-toolbar-copy">
-              <h4>Save All Details</h4>
-              <p class="muted">Save the full editable form above, including email, phone, tags and notes.</p>
+              <h4>Save candidate</h4>
+              <p class="muted">Save profile details, contact information, tags and notes.</p>
             </div>
             <div class="row wrap-row recruitment-detail-toolbar-actions">
-              <button id="saveDetailBtn" type="button">Save All Details</button>
+              <button id="saveDetailBtn" type="button">Save candidate</button>
             </div>
           </div>
           </div>

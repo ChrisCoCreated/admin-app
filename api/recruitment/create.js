@@ -18,6 +18,11 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function toTitleCaseName(value) {
+  const raw = normalizeText(value).toLowerCase();
+  return raw.replace(/(^|[\s'-])\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
 function toBoolean(value) {
   if (value === true || value === false) {
     return value;
@@ -176,7 +181,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const candidateName = normalizeText(req.body?.candidateName);
+  const candidateName = toTitleCaseName(req.body?.candidateName);
   const indeedUrl = normalizeText(req.body?.indeedUrl);
   if (!candidateName) {
     res.status(400).json({

@@ -942,6 +942,28 @@ body {
   padding: 0 20px 28px;
 }
 
+/* Recruitment is a dense operational workspace, so it uses the available desktop width. */
+.recruitment-page .container {
+  width: 100%;
+  max-width: none;
+  padding-inline: clamp(20px, 3vw, 52px);
+}
+
+.recruitment-main {
+  padding-bottom: 48px;
+}
+
+.recruitment-hero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.recruitment-hero .eyebrow {
+  margin: 0 0 4px;
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -2843,8 +2865,8 @@ dd {
 }
 
 .recruitment-modal-panel {
-  width: min(1100px, 100%);
-  max-height: min(88vh, 920px);
+  width: min(1240px, 100%);
+  max-height: min(92vh, 1040px);
   overflow: auto;
 }
 
@@ -2862,7 +2884,7 @@ dd {
 
 .recruitment-detail-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.9rem 1.1rem;
 }
 
@@ -3002,6 +3024,21 @@ dd {
   background: linear-gradient(135deg, rgba(49, 183, 200, 0.12), rgba(191, 73, 163, 0.12));
 }
 
+.recruitment-detail-toolbar-card:first-child {
+  border-color: rgba(49, 183, 200, 0.28);
+  background: linear-gradient(135deg, rgba(232, 249, 251, 0.96), rgba(248, 252, 255, 0.98));
+}
+
+.status-quick-menu-label {
+  margin: 0;
+  padding: 10px 12px 6px;
+  color: #63758d;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .recruitment-detail-toolbar-actions {
   align-items: end;
   gap: 12px;
@@ -3085,6 +3122,67 @@ dd {
   display: grid;
   gap: 8px;
   min-width: 150px;
+}
+
+.recruitment-notes-cell {
+  min-width: 260px;
+  width: min(29vw, 440px);
+}
+
+.recruitment-inline-notes {
+  display: grid;
+  gap: 7px;
+}
+
+.recruitment-inline-notes textarea {
+  min-height: 76px;
+  padding: 9px 10px;
+  resize: vertical;
+  border: 1px solid #d4ddea;
+  border-radius: 11px;
+  background: #fbfdff;
+  color: #21314d;
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.recruitment-inline-notes textarea:focus {
+  outline: none;
+  border-color: rgba(49, 183, 200, 0.7);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(49, 183, 200, 0.14);
+}
+
+.recruitment-inline-notes textarea.is-dirty {
+  border-color: rgba(196, 151, 58, 0.58);
+  background: #fffdf7;
+}
+
+.recruitment-inline-note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.recruitment-inline-note-status {
+  min-height: 1em;
+  color: #708099;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.recruitment-inline-note-status.is-error {
+  color: #b1374e;
+}
+
+.recruitment-inline-note-save {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  font-size: 0.78rem;
 }
 
 .recruitment-status-cell.is-inactive-review {
@@ -7128,6 +7226,10 @@ body.lightbox-open {
 }
 
 @media (max-width: 900px) {
+  .recruitment-detail-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .bulk-tag-controls {
     grid-template-columns: 1fr;
   }
@@ -7242,6 +7344,18 @@ body.lightbox-open {
 }
 
 @media (max-width: 600px) {
+  .recruitment-page .container {
+    padding-inline: 14px;
+  }
+
+  .recruitment-hero {
+    align-items: flex-start;
+  }
+
+  .recruitment-detail-list {
+    grid-template-columns: 1fr;
+  }
+
   .container {
     padding-inline: 14px;
   }

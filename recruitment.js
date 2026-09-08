@@ -145,6 +145,7 @@ let createCandidateBusy = false;
 let activeHideRefreshTimer = 0;
 let detailSaveBusy = false;
 let stageUpdateBusyKey = "";
+const inlineNoteSaveBusyIds = new Set();
 let statusFeedbackTimer = 0;
 let stageModeFilter = "all";
 let stageModeCountRenderToken = 0;
@@ -843,7 +844,7 @@ function extractRecruitmentJsonCandidate(payload) {
   }
 
   return {
-    candidateName: cleanText(applicant?.fullName),
+    candidateName: toTitleCaseName(applicant?.fullName),
     status: "Organise Initial Call",
     email: cleanText(applicant?.email),
     phoneNumber: cleanText(applicant?.phoneNumber),
@@ -858,7 +859,7 @@ function extractRecruitmentJsonCandidate(payload) {
 
 function applyRecruitmentJsonCandidate(prefill) {
   if (addCandidateNameInput) {
-    addCandidateNameInput.value = cleanText(prefill?.candidateName);
+    addCandidateNameInput.value = toTitleCaseName(prefill?.candidateName);
   }
   if (addCandidateStatusSelect) {
     addCandidateStatusSelect.value = cleanText(prefill?.status) || "Organise Initial Call";
@@ -1015,8 +1016,11 @@ function openCandidateDetail(candidate) {
     return;
   }
   setDetail(candidate);
-  setCandidateDetailMode("view");
+  // The table is already the quick-read view. Opening a record should take an
+  // administrator directly to the workspace where they can make changes.
+  setCandidateDetailMode("edit");
   candidateDetailModal.hidden = false;
+  detailInputs.candidateName?.focus();
 }
 
 function closeCandidateDetail() {
@@ -1293,10 +1297,7 @@ function toTitleCaseName(value) {
     if (!clean) {
       return "";
     }
-    return clean
-      .split("-")
-      .map((part) => (part ? part.charAt(0).toUpperCase() + part.slice(1) : ""))
-      .join("-");
+    return clean.replace(/(^|[-'])\p{L}/gu, (letter) => letter.toUpperCase());
   }
 
   return raw
@@ -1362,6 +1363,12 @@ function setCsvValue(row, key, value) {
     }
   }
   row[key] = cleanValue;
+}
+
+function normalizeImportCandidateNames(rows) {
+  for (const row of rows || []) {
+    setCsvValue(row, "name", toTitleCaseName(getCsvValue(row, "name")));
+  }
 }
 
 function createImportEditDraft(row) {
@@ -2018,6 +2025,17 @@ function renderCandidates() {
           }
         </div>
       </td>
+      <td class="recruitment-notes-cell">
+        <div class="recruitment-inline-notes">
+          <textarea class="recruitment-inline-notes-input" aria-label="Notes for ${escapeHtml(
+            cleanText(candidate.candidateName) || "candidate"
+          )}" placeholder="Add a follow-up note…">${escapeHtml(cleanText(candidate.notes))}</textarea>
+          <div class="recruitment-inline-note-footer">
+            <span class="recruitment-inline-note-status" aria-live="polite"></span>
+            <button type="button" class="secondary recruitment-inline-note-save">Save note</button>
+          </div>
+        </div>
+      </td>
       <td>${renderStageSummary(candidate)}</td>
       <td>
         <div class="recruitment-action-stack">
@@ -2094,6 +2112,73 @@ function renderCandidates() {
     const ownerSelect = tr.querySelector(".recruitment-owner-select");
     ownerSelect?.addEventListener("click", (event) => {
       event.stopPropagation();
+    });
+    const inlineNotesInput = tr.querySelector(".recruitment-inline-notes-input");
+    const inlineNotesSaveBtn = tr.querySelector(".recruitment-inline-note-save");
+    const inlineNotesStatus = tr.querySelector(".recruitment-inline-note-status");
+    const saveInlineNotes = async () => {
+      if (!inlineNotesInput || inlineNoteSaveBusyIds.has(candidate.id)) {
+        return;
+      }
+      const nextNotes = cleanText(inlineNotesInput.value);
+      const previousNotes = cleanText(candidate.notes);
+      if (nextNotes === previousNotes) {
+        inlineNotesInput.classList.remove("is-dirty");
+        if (inlineNotesStatus) {
+          inlineNotesStatus.textContent = "Saved";
+          inlineNotesStatus.classList.remove("is-error");
+        }
+        return;
+      }
+      inlineNoteSaveBusyIds.add(candidate.id);
+      inlineNotesInput.disabled = true;
+      if (inlineNotesSaveBtn) {
+        inlineNotesSaveBtn.disabled = true;
+      }
+      if (inlineNotesStatus) {
+        inlineNotesStatus.textContent = "Saving…";
+        inlineNotesStatus.classList.remove("is-error");
+      }
+      try {
+        await updateCandidateNotesById(candidate.id, nextNotes);
+        inlineNotesInput.classList.remove("is-dirty");
+        if (inlineNotesStatus) {
+          inlineNotesStatus.textContent = "Saved";
+        }
+        renderCandidates();
+      } catch (error) {
+        console.error(error);
+        inlineNotesInput.disabled = false;
+        if (inlineNotesSaveBtn) {
+          inlineNotesSaveBtn.disabled = false;
+        }
+        if (inlineNotesStatus) {
+          inlineNotesStatus.textContent = "Could not save";
+          inlineNotesStatus.classList.add("is-error");
+        }
+        setStatus(error?.message || "Could not save candidate notes.", true, { autoClear: false });
+      } finally {
+        inlineNoteSaveBusyIds.delete(candidate.id);
+      }
+    };
+    inlineNotesInput?.addEventListener("click", (event) => event.stopPropagation());
+    inlineNotesInput?.addEventListener("input", () => {
+      inlineNotesInput.classList.toggle("is-dirty", cleanText(inlineNotesInput.value) !== cleanText(candidate.notes));
+      if (inlineNotesStatus) {
+        inlineNotesStatus.textContent = "Unsaved changes";
+        inlineNotesStatus.classList.remove("is-error");
+      }
+    });
+    inlineNotesInput?.addEventListener("blur", saveInlineNotes);
+    inlineNotesInput?.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        void saveInlineNotes();
+      }
+    });
+    inlineNotesSaveBtn?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void saveInlineNotes();
     });
     ownerSelect?.addEventListener("change", async (event) => {
       event.stopPropagation();
@@ -2366,6 +2451,7 @@ async function handleCsvFile(file) {
     setImportErrors([]);
   }
 
+  normalizeImportCandidateNames(parsed.rows);
   renderImportPreview(parsed.rows);
   await previewImportRows(parsed.rows);
 }
@@ -2577,6 +2663,42 @@ async function updateCandidateOwnerById(candidateId, nextOwnerEmail) {
   return true;
 }
 
+async function updateCandidateNotesById(candidateId, notes) {
+  const targetId = cleanText(candidateId);
+  const candidate = allCandidates.find((item) => item.id === targetId);
+  if (!targetId || !candidate) {
+    throw new Error("Could not find this candidate to save the note.");
+  }
+
+  const nextNotes = cleanText(notes);
+  const previousNotes = cleanText(candidate.notes);
+  try {
+    await directoryApi.updateRecruitmentDetails({
+      itemId: targetId,
+      candidateName: cleanText(candidate.candidateName),
+      location: cleanText(candidate.location),
+      source: cleanText(candidate.source),
+      phoneNumber: cleanText(candidate.phoneNumber),
+      email: cleanText(candidate.email),
+      indeedUrl: cleanText(candidate.indeedProfileUrl),
+      livesIn: cleanText(candidate.livesIn),
+      earmarkedFor: cleanText(candidate.earmarkedFor),
+      keepInMind: candidate.keepInMind === true,
+      liveInMailingList: candidate.liveInMailingList === true,
+      tags: normalizeTagString(candidate.tags),
+      notes: nextNotes,
+    });
+    candidate.notes = nextNotes;
+    if (targetId === selectedCandidateId) {
+      setDetail(candidate);
+    }
+    setStatus("Candidate note saved.", false, { subtle: true });
+  } catch (error) {
+    candidate.notes = previousNotes;
+    throw error;
+  }
+}
+
 async function saveCandidateDetails() {
   if (detailSaveBusy || !selectedCandidateId) {
     return;
@@ -2584,7 +2706,7 @@ async function saveCandidateDetails() {
 
   const payload = {
     itemId: selectedCandidateId,
-    candidateName: cleanText(detailInputs.candidateName?.value),
+    candidateName: toTitleCaseName(detailInputs.candidateName?.value),
     location: cleanText(detailInputs.location?.value),
     source: cleanText(detailInputs.source?.value),
     phoneNumber: cleanText(detailInputs.phoneNumber?.value),
@@ -2599,6 +2721,9 @@ async function saveCandidateDetails() {
   };
 
   detailSaveBusy = true;
+  if (detailInputs.candidateName) {
+    detailInputs.candidateName.value = payload.candidateName;
+  }
   setDetailFormEnabled(false);
 
   try {
@@ -2696,7 +2821,7 @@ async function loadRecruitmentCandidates() {
 }
 
 async function createRecruitmentCandidate() {
-  const candidateName = cleanText(addCandidateNameInput?.value);
+  const candidateName = toTitleCaseName(addCandidateNameInput?.value);
   if (!candidateName) {
     setAddRecruitmentError("Candidate name is required.");
     addCandidateNameInput?.focus();
@@ -2704,6 +2829,9 @@ async function createRecruitmentCandidate() {
   }
 
   setCreateCandidateBusy(true);
+  if (addCandidateNameInput) {
+    addCandidateNameInput.value = candidateName;
+  }
   setAddRecruitmentError("");
   try {
     const result = await directoryApi.createRecruitmentCandidate({
@@ -3039,6 +3167,11 @@ detailInputs.indeedUrl?.addEventListener("blur", () => {
   detailInputs.indeedUrl.value = cleanText(detailInputs.indeedUrl.value);
   setIndeedButton(detailInputs.indeedUrl.value);
 });
+for (const candidateNameInput of [addCandidateNameInput, detailInputs.candidateName]) {
+  candidateNameInput?.addEventListener("blur", () => {
+    candidateNameInput.value = toTitleCaseName(candidateNameInput.value);
+  });
+}
 
 oneTouchPickerCancelBtn?.addEventListener("click", () => {
   if (addToOneTouchBusy) {
