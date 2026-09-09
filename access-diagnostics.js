@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260909";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260909.2";
 
 const DIAGNOSTICS_ADMIN_EMAIL = "chris@planwithcare.co.uk";
 const signOutBtn = document.getElementById("signOutBtn");

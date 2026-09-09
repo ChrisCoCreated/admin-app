@@ -1,11 +1,12 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { APP_VERSION } from "./app-version.js?v=20260909";
-import { renderTopNavigation } from "./navigation.js?v=20260909";
+import { APP_VERSION } from "./app-version.js?v=20260909.4";
+import { renderTopNavigation } from "./navigation.js?v=20260909.4";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const deniedMessage = document.getElementById("deniedMessage");
+const deniedReason = document.getElementById("deniedReason");
 const deniedEmail = document.getElementById("deniedEmail");
 const deniedVersion = document.getElementById("deniedVersion");
 const retrySignInBtn = document.getElementById("retrySignInBtn");
@@ -50,6 +51,11 @@ function setDeniedMessage() {
     return;
   }
   deniedMessage.textContent = `You do not have permission to view ${getPageLabel(page)}.`;
+  const reason = String(params.get("reason") || "").trim();
+  if (deniedReason) {
+    deniedReason.textContent = reason;
+    deniedReason.hidden = !reason;
+  }
 }
 
 function setDeniedEmail(email, sourceLabel = "Microsoft account") {

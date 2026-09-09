@@ -245,7 +245,12 @@ async function requireGraphAuth(req, res, options = {}) {
         graphUserId: graphProfile?.id || "",
       });
       res.status(403).json({
-        error: { code: "FORBIDDEN", message: "Forbidden." },
+        error: {
+          code: "FORBIDDEN",
+          message: emailCandidates.length
+            ? `The Microsoft Graph identity ${emailCandidates.join(" or ")} is not in the app allowlist.`
+            : "Could not determine the Microsoft Graph identity for this account.",
+        },
       });
       return null;
     }
@@ -257,7 +262,10 @@ async function requireGraphAuth(req, res, options = {}) {
         allowedRoles,
       });
       res.status(403).json({
-        error: { code: "FORBIDDEN", message: "Forbidden." },
+        error: {
+          code: "FORBIDDEN",
+          message: `The account was matched as ${email} with role ${role}, which is not permitted for this route. Allowed roles: ${allowedRoles.join(", ")}.`,
+        },
       });
       return null;
     }

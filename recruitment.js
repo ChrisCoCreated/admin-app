@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260909";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260909.4";
 import { getRecruitmentWhatsAppUrl, normalizeRecruitmentPhoneForActions } from "./recruitment-whatsapp.js?v=20260702";
 
 const searchInput = document.getElementById("searchInput");
@@ -2910,12 +2910,24 @@ async function init() {
     await loadRecruitmentCandidates();
     setStatus(`Loaded ${allCandidates.length} candidate(s).`);
   } catch (error) {
-    if (error?.status === 403) {
-      redirectToUnauthorized("recruitment");
+    // Only the application authorization layer uses FORBIDDEN. Recruitment
+    // subsequently calls SharePoint with the user's delegated Graph token;
+    // a SharePoint 403 means the user needs site/list permissions, not a
+    // change to the app's email allowlist.
+    if (error?.status === 403 && error?.code === "FORBIDDEN") {
+      const reason = String(error?.detail || error?.message || "").trim();
+      const suffix = reason && reason !== "Forbidden." ? `&reason=${encodeURIComponent(reason)}` : "";
+      window.location.href = `./unauthorized.html?page=recruitment${suffix}`;
       return;
     }
     console.error(error);
-    setStatus(error?.message || "Could not load recruitment candidates.", true);
+    const sharePointAccessError = error?.status === 403;
+    setStatus(
+      sharePointAccessError
+        ? "Your app access is confirmed, but Microsoft has not granted this account access to the Recruitment SharePoint site. Ask a site owner to add you as a member."
+        : error?.message || "Could not load recruitment candidates.",
+      true
+    );
     emptyState.hidden = false;
     setDetail(null);
   } finally {

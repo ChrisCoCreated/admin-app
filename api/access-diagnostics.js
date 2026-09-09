@@ -2,7 +2,7 @@ const { requireApiAuth } = require("./_lib/require-api-auth");
 const { getAccessConfigDiagnostics } = require("./_lib/authorized-users");
 
 const DIAGNOSTICS_ADMIN_EMAIL = "chris@planwithcare.co.uk";
-const APP_VERSION = "2026.09.09.1";
+const APP_VERSION = "2026.09.09.4";
 
 function cleanText(value) {
   return String(value || "").trim();
