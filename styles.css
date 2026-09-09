@@ -949,6 +949,92 @@ body {
   padding-inline: clamp(20px, 3vw, 52px);
 }
 
+.app-version {
+  margin: 12px 0 0;
+  color: #71819a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.access-diagnostics-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.access-diagnostics-summary > div {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.access-diagnostics-summary span {
+  color: #6c7c94;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.access-diagnostics-summary strong {
+  overflow-wrap: anywhere;
+  color: #1e2b41;
+}
+
+.access-diagnostics-section {
+  margin-top: 24px;
+}
+
+.access-diagnostics-section h2 {
+  margin-bottom: 6px;
+}
+
+.access-diagnostics-check {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin: 16px 0 10px;
+}
+
+.access-diagnostics-check .field {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
+.access-diagnostics-check button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.access-match {
+  display: inline-flex;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f2f4f8;
+  color: #5c6b80;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.access-match.is-match {
+  background: #e5f8ec;
+  color: #197046;
+}
+
+@media (max-width: 720px) {
+  .access-diagnostics-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .access-diagnostics-check {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .recruitment-main {
   padding-bottom: 48px;
 }

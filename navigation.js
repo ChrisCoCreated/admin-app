@@ -37,6 +37,7 @@ const ROLE_PAGES = {
     "marketingreports",
     "photolayout",
     "qrgenerator",
+    "accessdiagnostics",
   ],
   care_manager: [
     "clients",
@@ -142,6 +143,7 @@ const PAGE_META = {
   marketingreports: { href: "./marketing-reports.html", label: "Marketing Reports", shortcutLabel: "Reports" },
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
   qrgenerator: { href: "./qr-generator.html", label: "QR Generator", shortcutLabel: "QR" },
+  accessdiagnostics: { href: "./access-diagnostics.html", label: "Access Diagnostics" },
 };
 
 const ADMIN_HOME_PAGES = ["kpis", "finance", "reports", "agendas", "recruitment", "functions", "mapping"];
@@ -161,7 +163,7 @@ const MENU_GROUPS = [
   },
   {
     title: "Performance",
-    pages: ["kpis", "reports", "finance", "functions", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals"],
+    pages: ["kpis", "reports", "finance", "functions", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals", "accessdiagnostics"],
   },
   {
     title: "Marketing & Content",

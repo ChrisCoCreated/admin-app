@@ -1,11 +1,13 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { renderTopNavigation } from "./navigation.js?v=20260601";
+import { APP_VERSION } from "./app-version.js?v=20260909";
+import { renderTopNavigation } from "./navigation.js?v=20260909";
 
 const signOutBtn = document.getElementById("signOutBtn");
 const deniedMessage = document.getElementById("deniedMessage");
 const deniedEmail = document.getElementById("deniedEmail");
+const deniedVersion = document.getElementById("deniedVersion");
 const retrySignInBtn = document.getElementById("retrySignInBtn");
 const differentAccountBtn = document.getElementById("differentAccountBtn");
 
@@ -28,6 +30,7 @@ const PAGE_LABELS = {
   marketingreports: "Marketing Reports",
   photolayout: "Photo Layout",
   qrgenerator: "QR Generator",
+  accessdiagnostics: "Access Diagnostics",
   functions: "Functions",
   emailtemplates: "Email Templates",
   reports: "Reports",
@@ -56,6 +59,14 @@ function setDeniedEmail(email, sourceLabel = "Microsoft account") {
   const normalizedEmail = String(email || "").trim();
   deniedEmail.textContent = normalizedEmail ? `${sourceLabel}: ${normalizedEmail}` : "";
   deniedEmail.hidden = !normalizedEmail;
+}
+
+function setDeniedVersion() {
+  if (!deniedVersion) {
+    return;
+  }
+  deniedVersion.textContent = `App version: ${APP_VERSION}`;
+  deniedVersion.hidden = false;
 }
 
 async function init() {
@@ -115,4 +126,5 @@ differentAccountBtn?.addEventListener("click", () => {
 });
 
 setDeniedMessage();
+setDeniedVersion();
 void init();

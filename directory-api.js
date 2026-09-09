@@ -101,6 +101,14 @@ export function createDirectoryApi(authController) {
       return applyRolePreview(profile);
     },
 
+    async getAccessDiagnostics(email = "") {
+      const response = await authFetch(buildUrl("/api/access-diagnostics", { email }));
+      if (!response.ok) {
+        await parseError(response, "Access diagnostics request failed");
+      }
+      return response.json();
+    },
+
     async getPerformanceScorecard(query = {}) {
       const response = await authFetch(buildUrl("/api/scorecard", query));
       if (!response.ok) {

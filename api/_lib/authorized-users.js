@@ -153,6 +153,20 @@ function getAuthorizedUsersMap() {
   return buildAuthorizedUsersFromEnv();
 }
 
+function getAccessConfigDiagnostics(email) {
+  const normalizedEmail = canonicalizeEmail(email);
+  return ACCESS_ENV_KEYS.map((key) => {
+    const emails = parseEmailList(process.env[key]);
+    return {
+      key,
+      configured: emails.length > 0,
+      emailCount: emails.length,
+      matchesSignedInEmail: Boolean(normalizedEmail && emails.includes(normalizedEmail)),
+    };
+  });
+}
+
 module.exports = {
   getAuthorizedUsersMap,
+  getAccessConfigDiagnostics,
 };

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Access Diagnostics</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/company_marketing_assets/app-icon.svg?v=20260314" />
+    <link rel="stylesheet" href="./styles.css?v=20260909" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/company_marketing_assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container clients-main">
+      <section class="hero compact">
+        <p class="eyebrow">Admin only</p>
+        <h1>Access Diagnostics</h1>
+        <p>Check the deployed build, authenticated identity and access-list matches.</p>
+      </section>
+
+      <section class="panel">
+        <p id="accessDiagnosticsStatus" class="muted">Checking access configuration...</p>
+        <div id="accessDiagnosticsContent" hidden>
+          <div class="access-diagnostics-summary">
+            <div><span>App version</span><strong id="diagnosticsVersion">-</strong></div>
+            <div><span>Deployment</span><strong id="diagnosticsEnvironment">-</strong></div>
+            <div><span>Signed in as</span><strong id="diagnosticsEmail">-</strong></div>
+            <div><span>Resolved role</span><strong id="diagnosticsRole">-</strong></div>
+          </div>
+
+          <section class="access-diagnostics-section">
+            <h2>Verified identity claims</h2>
+            <p id="diagnosticsClaims" class="muted">-</p>
+          </section>
+
+          <section class="access-diagnostics-section">
+            <h2>Environment access lists</h2>
+            <div class="access-diagnostics-check">
+              <label class="field" for="diagnosticsCheckEmail">
+                Check email address
+                <input id="diagnosticsCheckEmail" type="email" autocomplete="email" />
+              </label>
+              <button id="diagnosticsCheckBtn" type="button">Check configuration</button>
+            </div>
+            <p id="diagnosticsCheckSummary" class="muted">A match means the checked email is present in that deployed environment variable. Email addresses are not displayed.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Variable</th><th>Configured</th><th>Entries</th><th>Signed-in email</th></tr></thead>
+                <tbody id="accessDiagnosticsTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./access-diagnostics.js?v=20260909"></script>
+  </body>
+</html>
