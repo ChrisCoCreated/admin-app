@@ -193,6 +193,7 @@ const DEFAULT_RECRUITMENT_OWNER_OPTIONS = [
   { label: "Miska" },
   { label: "Peter" },
   { label: "Georgina" },
+  { label: "Claire" },
 ];
 recruitmentStatusOptions = [...DEFAULT_RECRUITMENT_STATUS_OPTIONS];
 recruitmentOwnerOptions = [...DEFAULT_RECRUITMENT_OWNER_OPTIONS];
