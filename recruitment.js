@@ -1,7 +1,7 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
 import { createDirectoryApi } from "./directory-api.js";
-import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260601";
+import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260909";
 import { getRecruitmentWhatsAppUrl, normalizeRecruitmentPhoneForActions } from "./recruitment-whatsapp.js?v=20260702";
 
 const searchInput = document.getElementById("searchInput");
