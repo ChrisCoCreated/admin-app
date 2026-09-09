@@ -189,19 +189,20 @@ async function fetchGraphMe(token) {
   return data;
 }
 
-function resolveUserEmail({ graphProfile, tokenPayload }) {
-  const fromGraph = String(graphProfile?.userPrincipalName || graphProfile?.mail || "")
-    .trim()
-    .toLowerCase();
-  if (fromGraph) {
-    return fromGraph;
-  }
-
-  return String(
-    tokenPayload?.preferred_username || tokenPayload?.email || tokenPayload?.upn || ""
-  )
-    .trim()
-    .toLowerCase();
+function getUserEmailCandidates({ graphProfile, tokenPayload }) {
+  return Array.from(
+    new Set(
+      [
+        graphProfile?.userPrincipalName,
+        graphProfile?.mail,
+        tokenPayload?.preferred_username,
+        tokenPayload?.email,
+        tokenPayload?.upn,
+      ]
+        .map((value) => String(value || "").trim().toLowerCase())
+        .filter(Boolean)
+    )
+  );
 }
 
 async function requireGraphAuth(req, res, options = {}) {
@@ -231,7 +232,11 @@ async function requireGraphAuth(req, res, options = {}) {
 
   try {
     const graphProfile = await fetchGraphMe(token);
-    const email = resolveUserEmail({ graphProfile, tokenPayload });
+    const emailCandidates = getUserEmailCandidates({ graphProfile, tokenPayload });
+    // A Microsoft account can use a different UPN, mailbox address, or sign-in
+    // alias. All values here come from the validated token or Graph /me; choose
+    // the first identity explicitly present in the application allowlist.
+    const email = emailCandidates.find((candidate) => authorizedUsers.has(candidate)) || emailCandidates[0] || "";
     const role = authorizedUsers.get(email);
 
     if (!email || !role) {
