@@ -12,6 +12,10 @@ const ACCESS_ENV_KEYS = [
   "ACCESS_CONSULTANT_EMAILS",
 ];
 
+// Temporary direct grant while Claire's production access is being resolved.
+// Keep this scoped to the minimum role required for Recruitment.
+const TEMPORARY_HR_ACCESS_EMAILS = ["claire@planwithcare.co.uk"];
+
 const ROLE_BY_PAGE_KEY = new Map(
   [
     ["clients,carers,whiteboard,simpletasks,tasks,mapping,drivetime,reports,marketing,marketingreports,photolayout", "admin"],
@@ -134,6 +138,7 @@ function buildAuthorizedUsersFromEnv() {
   mark(parseEmailList(process.env.ACCESS_CLIENTS_EMAILS), "clients");
   mark(parseEmailList(process.env.ACCESS_ENQUIRIES_EMAILS), "enquiries");
   mark(parseEmailList(process.env.ACCESS_CONSULTANT_EMAILS), "consultant");
+  mark(TEMPORARY_HR_ACCESS_EMAILS, "hr");
 
   const map = new Map();
   for (const [email, flags] of flagsByEmail.entries()) {
@@ -147,7 +152,7 @@ function buildAuthorizedUsersFromEnv() {
   return map;
 }
 function getAuthorizedUsersMap() {
-  if (!hasAccessEnvConfig()) {
+  if (!hasAccessEnvConfig() && TEMPORARY_HR_ACCESS_EMAILS.length === 0) {
     return new Map();
   }
   return buildAuthorizedUsersFromEnv();
