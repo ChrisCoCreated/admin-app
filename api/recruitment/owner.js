@@ -112,7 +112,7 @@ module.exports = async (req, res) => {
       res.status(400).json({
         error: {
           code: "BAD_REQUEST",
-          message: "Invalid current owner.",
+          message: `${currentOwner} has not been added to the Current owner choices in the Recruitment SharePoint list. Add the name to that column and try again.`,
         },
       });
       return;
@@ -129,11 +129,26 @@ module.exports = async (req, res) => {
       }),
     });
 
+    // Read the field back before reporting success. This avoids showing a
+    // temporary browser-only owner when SharePoint rejects or normalises it.
+    const savedItem = await graphClient.fetchJson(
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${encodeURIComponent(itemId)}?$expand=fields($select=Current_x0020_Owner)`
+    );
+    const savedOwner = normalizeText(savedItem?.fields?.Current_x0020_Owner);
+    if (savedOwner !== currentOwner) {
+      const verificationError = new Error(
+        `SharePoint did not save the Current owner as ${currentOwner || "Unassigned"}. It is still ${savedOwner || "Unassigned"}.`
+      );
+      verificationError.status = 409;
+      verificationError.code = "OWNER_UPDATE_NOT_PERSISTED";
+      throw verificationError;
+    }
+
     res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
       success: true,
       itemId,
-      currentOwner,
+      currentOwner: savedOwner,
     });
   } catch (error) {
     res.status(Number(error?.status) || 502).json({

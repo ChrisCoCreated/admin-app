@@ -588,7 +588,9 @@ module.exports = async (req, res) => {
     const items = await fetchRecruitmentItems(graphClient, siteId, list.id);
     const choiceOptions = await resolveChoiceColumnOptions(graphClient, siteId, list.id);
 
-    res.setHeader("Cache-Control", "private, max-age=30");
+    // Recruitment changes (including owner assignment) should be visible on
+    // the next refresh, rather than serving a previous 30-second list copy.
+    res.setHeader("Cache-Control", "no-store");
     res.status(200).json({
       listUrl: list.webUrl || config.listWebUrl,
       count: items.length,
