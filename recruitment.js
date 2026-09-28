@@ -10,6 +10,8 @@ const statusFilterSelect = document.getElementById("statusFilterSelect");
 const sourceFilterSelect = document.getElementById("sourceFilterSelect");
 const ownerFilterSelect = document.getElementById("ownerFilterSelect");
 const activeFilterSelect = document.getElementById("activeFilterSelect");
+const toggleArchivedCandidatesBtn = document.getElementById("toggleArchivedCandidatesBtn");
+const recruitmentListTitle = document.getElementById("recruitmentListTitle");
 const sortFilterSelect = document.getElementById("sortFilterSelect");
 const mineOnlyFilterInput = document.getElementById("mineOnlyFilterInput");
 const stageModeFilterButtons = Array.from(document.querySelectorAll("[data-stage-mode-filter]"));
@@ -1933,6 +1935,7 @@ function renderFilterOptions() {
   if (activeFilterSelect) {
     activeFilterSelect.value = ["active", "inactive", "all"].includes(selectedActive) ? selectedActive : "active";
   }
+  syncArchivedCandidatesButton();
   if (sortFilterSelect) {
     sortFilterSelect.value = [
       "updated_desc",
@@ -1950,6 +1953,17 @@ function renderFilterOptions() {
       : "updated_desc";
   }
   syncSortHeaderButtons();
+}
+
+function syncArchivedCandidatesButton() {
+  const showingArchived = cleanText(activeFilterSelect?.value || "active") === "all";
+  if (toggleArchivedCandidatesBtn) {
+    toggleArchivedCandidatesBtn.textContent = showingArchived ? "Hide archived" : "Show archived";
+    toggleArchivedCandidatesBtn.setAttribute("aria-pressed", showingArchived ? "true" : "false");
+  }
+  if (recruitmentListTitle) {
+    recruitmentListTitle.textContent = showingArchived ? "All Candidates" : "Active Candidates";
+  }
 }
 
 function getFilteredCandidates() {
@@ -2947,7 +2961,18 @@ for (const button of stageModeFilterButtons) {
   });
 }
 sourceFilterSelect?.addEventListener("change", renderCandidates);
-activeFilterSelect?.addEventListener("change", renderCandidates);
+activeFilterSelect?.addEventListener("change", () => {
+  syncArchivedCandidatesButton();
+  renderCandidates();
+});
+toggleArchivedCandidatesBtn?.addEventListener("click", () => {
+  if (!activeFilterSelect) {
+    return;
+  }
+  activeFilterSelect.value = cleanText(activeFilterSelect.value || "active") === "all" ? "active" : "all";
+  syncArchivedCandidatesButton();
+  renderCandidates();
+});
 sortFilterSelect?.addEventListener("change", renderCandidates);
 for (const button of sortHeaderButtons) {
   button.addEventListener("click", () => {

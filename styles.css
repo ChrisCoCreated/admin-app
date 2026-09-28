@@ -2680,6 +2680,19 @@ dd {
   font-weight: 700;
 }
 
+.recruitment-archive-toggle {
+  min-height: 36px;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-weight: 700;
+}
+
+.recruitment-archive-toggle[aria-pressed="true"] {
+  border-color: #aab8ce;
+  background: #edf2fa;
+  color: #243650;
+}
+
 .recruitment-sort-header {
   display: inline-flex;
   align-items: center;

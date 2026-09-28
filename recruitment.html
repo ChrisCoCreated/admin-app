@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260601" />
+    <link rel="stylesheet" href="./styles.css?v=20260928.1" />
   </head>
   <body class="auth-pending recruitment-page">
     <header class="topbar">
@@ -187,8 +187,11 @@
       <section class="clients-grid">
         <article class="panel list-panel">
           <div class="card-header-row recruitment-list-header">
-            <h2>Active Candidates</h2>
+            <h2 id="recruitmentListTitle">Active Candidates</h2>
             <div class="recruitment-list-header-controls">
+              <button id="toggleArchivedCandidatesBtn" class="secondary recruitment-archive-toggle" type="button" aria-pressed="false">
+                Show archived
+              </button>
               <label class="checkbox-field recruitment-mine-only-toggle" for="mineOnlyFilterInput">
                 <input id="mineOnlyFilterInput" type="checkbox" />
                 Mine only
@@ -574,6 +577,6 @@
       </div>
     </div>
 
-  <script type="module" src="./recruitment.js?v=20260915.1"></script>
+  <script type="module" src="./recruitment.js?v=20260928.1"></script>
   </body>
 </html>
