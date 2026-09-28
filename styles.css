@@ -3159,6 +3159,10 @@ dd {
   align-content: start;
 }
 
+.recruitment-mobile-more-toggle {
+  display: none;
+}
+
 .recruitment-candidate-name {
   display: block;
   color: #17243a;
@@ -7771,6 +7775,21 @@ body.lightbox-open {
     line-height: 1.25;
   }
 
+  .recruitment-page .recruitment-mobile-more-toggle {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    margin-top: 5px;
+    padding: 3px 10px;
+    border: 1px solid #d6dfed;
+    border-radius: 999px;
+    background: #f6f8fc;
+    color: #425674;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 800;
+  }
+
   .recruitment-page .recruitment-status-cell {
     min-width: 0;
     justify-items: end;
@@ -7807,6 +7826,56 @@ body.lightbox-open {
   .recruitment-page .recruitment-inline-note-footer {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded td:nth-child(2),
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded td:nth-child(5),
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded td:nth-child(6) {
+    display: block;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded td:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    padding-top: 12px;
+    color: #4c5c74;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded td:nth-child(3) {
+    justify-items: stretch;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded .recruitment-status-cell {
+    justify-items: end;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded .recruitment-owner-field,
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded .recruitment-active-toggle {
+    display: grid;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded .recruitment-active-toggle {
+    display: inline-flex;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded .recruitment-inactive-review {
+    display: flex;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded td:nth-child(5) {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    padding-top: 10px;
+  }
+
+  .recruitment-page #recruitmentTableBody tr.is-mobile-expanded td:nth-child(6) {
+    grid-column: 1 / -1;
+    grid-row: 5;
+    padding-top: 10px;
+  }
+
+  .recruitment-page .recruitment-action-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

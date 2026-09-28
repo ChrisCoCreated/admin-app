@@ -161,6 +161,7 @@ let currentUserOwnerChoice = "";
 const pendingInactiveReviewIds = new Set();
 const dismissedInactiveReviewIds = new Set();
 const openStageKeys = new Set();
+const expandedMobileCandidateIds = new Set();
 const ONE_TOUCH_DEFAULT_AREA = "East Kent";
 const ONE_TOUCH_DEFAULT_POSITION = "Health & Wellbeing Associate";
 const ONE_TOUCH_DEFAULT_STATUS = "Pending";
@@ -2031,6 +2032,7 @@ function renderCandidates() {
   for (const candidate of filtered) {
     const tr = document.createElement("tr");
     tr.classList.toggle("selected", candidate.id === selectedCandidateId);
+    tr.classList.toggle("is-mobile-expanded", expandedMobileCandidateIds.has(cleanText(candidate.id)));
     const whatsappUrl = getRecruitmentWhatsAppUrl(candidate.phoneNumber, candidate.candidateName);
     const teamsCallUrl = getTeamsCallUrl(candidate.phoneNumber);
     const indeedUrl = getIndeedProfileUrl(candidate);
@@ -2040,6 +2042,7 @@ function renderCandidates() {
         <div class="recruitment-candidate-cell">
           <span class="recruitment-candidate-name">${escapeHtml(cleanText(candidate.candidateName) || "-")}</span>
           ${candidate.liveInMailingList ? '<span class="recruitment-inline-flag">Live-in list</span>' : ""}
+          <button type="button" class="recruitment-mobile-more-toggle" aria-expanded="${expandedMobileCandidateIds.has(cleanText(candidate.id)) ? "true" : "false"}">${expandedMobileCandidateIds.has(cleanText(candidate.id)) ? "Less" : "More"}</button>
         </div>
       </td>
       <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
@@ -2138,6 +2141,21 @@ function renderCandidates() {
       setDetail(candidate);
       renderCandidates();
       openCandidateDetail(candidate);
+    });
+
+    tr.querySelector(".recruitment-mobile-more-toggle")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const candidateId = cleanText(candidate.id);
+      const isExpanded = expandedMobileCandidateIds.has(candidateId);
+      if (isExpanded) {
+        expandedMobileCandidateIds.delete(candidateId);
+      } else {
+        expandedMobileCandidateIds.add(candidateId);
+      }
+      tr.classList.toggle("is-mobile-expanded", !isExpanded);
+      const moreButton = event.currentTarget;
+      moreButton.textContent = isExpanded ? "More" : "Less";
+      moreButton.setAttribute("aria-expanded", isExpanded ? "false" : "true");
     });
 
     const detailBtn = tr.querySelector(".recruitment-detail-trigger");
