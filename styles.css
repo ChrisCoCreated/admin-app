@@ -7672,7 +7672,12 @@ body.lightbox-open {
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 900px) {
+  .recruitment-search-field {
+    flex: 0 1 auto;
+    width: 100%;
+  }
+
   .recruitment-page .recruitment-list-header {
     align-items: flex-start;
   }
@@ -7691,11 +7696,19 @@ body.lightbox-open {
   }
 
   .recruitment-page .table-wrap {
-    overflow: visible;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .recruitment-page .table-wrap table {
     display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .recruitment-page #recruitmentTableBody {
     width: 100%;
     min-width: 0;
   }
@@ -7712,7 +7725,12 @@ body.lightbox-open {
   .recruitment-page #recruitmentTableBody tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-auto-rows: min-content;
     gap: 0 10px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    align-content: start;
     padding: 12px;
     border: 1px solid #dfe6f0;
     border-radius: 14px;
@@ -7738,7 +7756,14 @@ body.lightbox-open {
   }
 
   .recruitment-page #recruitmentTableBody td:first-child {
+    grid-column: 1;
+    grid-row: 1;
     align-self: center;
+  }
+
+  .recruitment-page #recruitmentTableBody td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .recruitment-page .recruitment-candidate-name {
@@ -7752,7 +7777,9 @@ body.lightbox-open {
   }
 
   .recruitment-page .recruitment-status-cell .status-pill-trigger {
-    max-width: 46vw;
+    width: auto;
+    max-width: min(46vw, 220px);
+    min-width: 0;
     white-space: normal;
     text-align: right;
   }
@@ -7765,6 +7792,7 @@ body.lightbox-open {
 
   .recruitment-page #recruitmentTableBody td.recruitment-notes-cell {
     grid-column: 1 / -1;
+    grid-row: 2;
     width: 100%;
     min-width: 0;
     padding-top: 8px;
@@ -7773,6 +7801,7 @@ body.lightbox-open {
   .recruitment-page .recruitment-inline-notes textarea {
     min-height: 60px;
     width: 100%;
+    max-width: 100%;
   }
 
   .recruitment-page .recruitment-inline-note-footer {
