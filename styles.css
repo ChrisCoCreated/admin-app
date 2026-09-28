@@ -7672,6 +7672,115 @@ body.lightbox-open {
   }
 }
 
+@media (max-width: 600px) {
+  .recruitment-page .recruitment-list-header {
+    align-items: flex-start;
+  }
+
+  .recruitment-page .recruitment-list-header-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .recruitment-page .recruitment-lane-filters {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .recruitment-page .table-wrap {
+    overflow: visible;
+  }
+
+  .recruitment-page .table-wrap table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .recruitment-page .table-wrap thead {
+    display: none;
+  }
+
+  .recruitment-page #recruitmentTableBody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .recruitment-page #recruitmentTableBody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0 10px;
+    padding: 12px;
+    border: 1px solid #dfe6f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(37, 54, 83, 0.045);
+  }
+
+  .recruitment-page #recruitmentTableBody tr.selected {
+    border-color: #9bcbd7;
+    background: #f5fcfd;
+  }
+
+  .recruitment-page #recruitmentTableBody td {
+    min-width: 0;
+    padding: 5px 0;
+    border: 0;
+  }
+
+  .recruitment-page #recruitmentTableBody td:nth-child(2),
+  .recruitment-page #recruitmentTableBody td:nth-child(5),
+  .recruitment-page #recruitmentTableBody td:nth-child(6) {
+    display: none;
+  }
+
+  .recruitment-page #recruitmentTableBody td:first-child {
+    align-self: center;
+  }
+
+  .recruitment-page .recruitment-candidate-name {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  .recruitment-page .recruitment-status-cell {
+    min-width: 0;
+    justify-items: end;
+  }
+
+  .recruitment-page .recruitment-status-cell .status-pill-trigger {
+    max-width: 46vw;
+    white-space: normal;
+    text-align: right;
+  }
+
+  .recruitment-page .recruitment-owner-field,
+  .recruitment-page .recruitment-active-toggle,
+  .recruitment-page .recruitment-inactive-review {
+    display: none;
+  }
+
+  .recruitment-page #recruitmentTableBody td.recruitment-notes-cell {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    padding-top: 8px;
+  }
+
+  .recruitment-page .recruitment-inline-notes textarea {
+    min-height: 60px;
+    width: 100%;
+  }
+
+  .recruitment-page .recruitment-inline-note-footer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+}
+
 .agendas-main {
   display: grid;
   gap: 1rem;
