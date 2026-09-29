@@ -879,6 +879,26 @@ function renderUtilisation(payload) {
       field: "utilisationPercent",
       formatter: formatPercent,
     }),
+    ...[
+      ["agencyHoursUsed", "Agency Hours Used", "Care hours supplied by agency staff"],
+      ["associateContractedHours", "Associate Contracted Hours", "Staffing hours contracted with associates"],
+      ["companionContractedHours", "Companion Contracted Hours", "Staffing hours contracted with companions"],
+      ["coreTeamCareHours", "Core Team Care Hours", "Care hours provided by the support team"],
+      ["staffingCapacity", "Contracted Staffing Capacity", "Associate + companion contracted hours"],
+      ["staffingHeadroom", "Contracted Capacity Headroom", "Staff-contracted minus client-contracted hours; negative means a shortfall. Before leave and rota constraints."],
+      ["agencyCareShare", "Agency Share of Care", "Agency hours as a share of delivered hours", true],
+      ["coreTeamCareShare", "Core Team Share of Care", "Support-team care hours as a share of delivered hours", true],
+    ].map(([key, title, detail, percent]) => {
+      const metric = metricValue(payload, key);
+      const value = parseNumber(metric?.value);
+      return createKpiMetricCard({
+        title,
+        value: value === null ? "-" : percent ? `${formatNumber(value, 1)}%` : formatHours(value),
+        metric,
+        detail,
+        latestWeekLabelText: latestLabel,
+      });
+    }),
     createEditableKpiCard({
       title: "Utilisation Notes",
       fieldKey: "utilisationNotes",

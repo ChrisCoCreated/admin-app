@@ -26,6 +26,10 @@ const KPI_FIELD_DEFINITIONS = {
   totalHours: ["Total Hours", "TotalHours"],
   utilisationPercent: ["Utilisation%", "Utilisation %", "Utilisation", "Utilization%", "Utilization %", "Utilization"],
   utilisationNotes: ["Utilisation Notes", "Utilisation Note", "Utilization Notes", "Utilization Note"],
+  agencyHoursUsed: ["Agency Hours Used", "AgencyHoursUsed"],
+  associateContractedHours: ["Associate Contracted Hours", "AssociateContractedHours"],
+  companionContractedHours: ["Companion Contracted Hours", "CompanionContractedHours"],
+  coreTeamCareHours: ["Core Team Care Hours", "CoreTeamCareHours"],
   hoursWon: ["Hours won (mth)", "Hours Won", "Newweeklyhourswon"],
   hoursLost: ["Hours cancelled  (mth)", "Hours cancelled (mth)", "Hours lost", "Hourscancelled"],
   pendingHours: ["Pending Hours / wk", "Pending Hours", "PendingHours"],
@@ -463,6 +467,25 @@ function hasPendingHoursData(row) {
   return hasValue(getFieldValue(row, "pendingHours"));
 }
 
+function deriveStaffingMeasures(row) {
+  const number = (key) => parseNumber(getFieldValue(row, key));
+  const associates = number("associateContractedHours");
+  const companions = number("companionContractedHours");
+  const agency = number("agencyHoursUsed");
+  const core = number("coreTeamCareHours");
+  const delivered = number("hoursDelivered");
+  const demand = number("activeContractedHours");
+  const capacity = associates !== null && companions !== null && associates >= 0 && companions >= 0
+    ? associates + companions : null;
+  // Derive comparisons within one row so different reporting weeks are never combined.
+  return {
+    staffingCapacity: capacity ?? "",
+    staffingHeadroom: capacity !== null && demand !== null && demand >= 0 ? capacity - demand : "",
+    agencyCareShare: delivered > 0 && agency !== null && agency >= 0 ? agency / delivered * 100 : "",
+    coreTeamCareShare: delivered > 0 && core !== null && core >= 0 ? core / delivered * 100 : "",
+  };
+}
+
 function resolveMetrics(rows, latestValueRows = rows) {
   const latestRow = rows[0] || null;
   const metric = (key, derive) => deriveValue(rows, latestRow, key, derive);
@@ -481,6 +504,15 @@ function resolveMetrics(rows, latestValueRows = rows) {
       totalHours: metric("totalHours", deriveTotalHours),
       utilisationPercent: deriveValue(utilisationRows, latestRow, "utilisationPercent", deriveUtilisationPercent),
       utilisationNotes: latestValueMetric("utilisationNotes"),
+      agencyHoursUsed: metric("agencyHoursUsed"),
+      associateContractedHours: metric("associateContractedHours"),
+      companionContractedHours: metric("companionContractedHours"),
+      coreTeamCareHours: metric("coreTeamCareHours"),
+      ...Object.fromEntries(
+        ["staffingCapacity", "staffingHeadroom", "agencyCareShare", "coreTeamCareShare"].map((key) => [
+          key, metric(key, (row) => deriveStaffingMeasures(row)[key]),
+        ])
+      ),
       hoursWon: metric("hoursWon"),
       hoursLost: metric("hoursLost"),
       pendingHours: latestValueMetric("pendingHours"),
