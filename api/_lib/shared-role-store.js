@@ -12,7 +12,10 @@ async function request(table, query = {}, options = {}) {
       headers: { Accept: "application/json", apikey: key, Authorization: `Bearer ${key}`, ...options.headers },
     });
     if (!response.ok) throw failure("Shared role storage is temporarily unavailable.");
-    return response.status === 204 ? null : await response.json();
+    if (response.status === 204) return null;
+    // PostgREST can return an empty 201 for Prefer: return=minimal.
+    const payload = await response.text();
+    return payload ? JSON.parse(payload) : null;
   } catch (error) { throw error.status ? error : failure("Shared role storage is temporarily unavailable."); }
 }
 async function loadSnapshot({ requireActive = true } = {}) {

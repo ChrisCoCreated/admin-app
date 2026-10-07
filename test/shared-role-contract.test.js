@@ -52,3 +52,17 @@ test('validation rejects obsolete roles and retains explicit empty assignments',
   assert.deepEqual(validateAssignment({email:'x@example.com',roles:[]},'root@example.com'),{email:'x@example.com',roles:[]});
   assert.throws(()=>validateAssignment({email:'self@example.com',roles:['manager']},'root@example.com','self@example.com'),{status:409});
 });
+
+test('minimal insert success accepts an empty 201 response', async () => {
+  const previousFetch = global.fetch;
+  const previousUrl = process.env.SUPABASE_URL, previousKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_URL = 'https://roles.example.com';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'test';
+  global.fetch = async () => new Response(null, { status: 201 });
+  try { assert.equal(await require('../api/_lib/shared-role-store').request('app_role_assignments', {}, { method: 'POST' }), null); }
+  finally {
+    global.fetch = previousFetch;
+    if (previousUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = previousKey;
+  }
+});
