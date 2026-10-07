@@ -101,6 +101,21 @@ export function createDirectoryApi(authController) {
       return applyRolePreview(profile);
     },
 
+    async getRoleAssignments() {
+      const response = await authFetch(endpoint("/api/roles"));
+      if (!response.ok) await parseError(response, "Role assignments request failed");
+      return response.json();
+    },
+
+    async saveRoleAssignment(email, roles) {
+      const response = await authFetch(endpoint("/api/roles"), {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, roles }),
+      });
+      if (!response.ok) await parseError(response, "Role assignment failed");
+      return response.json();
+    },
+
     async getAccessDiagnostics(email = "") {
       const response = await authFetch(buildUrl("/api/access-diagnostics", { email }));
       if (!response.ok) {

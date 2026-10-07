@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thrive Admin - Role Management</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/company_marketing_assets/app-icon.svg?v=20260314" />
+    <link rel="stylesheet" href="./styles.css?v=20260909" />
+  </head>
+  <body class="auth-pending">
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Thrive Admin home">
+          <img class="brand-mark" src="./assets/company_marketing_assets/thrive-mascot-RGB.svg" alt="Thrive mascot logo" />
+          <span class="brand-text">Thrive Admin</span>
+        </a>
+        <div class="topbar-actions">
+          <nav id="primaryNav" class="topnav" aria-label="Primary"></nav>
+          <button id="signOutBtn" class="secondary" type="button">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container clients-main">
+      <section class="hero compact">
+        <p class="eyebrow">Superadmins only</p>
+        <h1>Role Management</h1>
+        <p>Manage shared access to Admin and Associates.</p>
+      </section>
+
+      <section class="panel">
+        <p id="roleStatus" class="muted" role="status" aria-live="polite">Checking superadmin access...</p>
+        <div id="roleContent" hidden>
+          <h2>Assign a role</h2>
+          <form id="assignRoleForm" class="role-assignment-form">
+            <label class="field" for="roleEmail">Email address<input id="roleEmail" type="email" autocomplete="email" required maxlength="254" /></label>
+            <fieldset><legend>Shared roles</legend><div id="roleOptions" class="shared-role-options"></div></fieldset>
+            <button id="assignRoleBtn" type="submit">Save roles</button>
+            <button id="resetRoleBtn" type="button" class="secondary">New assignment</button>
+          </form>
+          <p class="muted">Select all applicable roles. Clearing every role removes access to both apps.</p>
+          <h2>Current assignments</h2>
+          <label class="field" for="roleSearch">Search by email<input id="roleSearch" type="search" placeholder="Filter assignments" /></label>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Email address</th><th>Roles</th><th>Action</th></tr></thead>
+              <tbody id="roleUsers"></tbody>
+            </table>
+          </div>
+          <p class="muted">The configured bootstrap superadmin must keep Superadmin.</p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./role-management.js?v=20261007"></script>
+  </body>
+</html>

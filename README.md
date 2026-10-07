@@ -156,7 +156,13 @@ When Azure OpenAI is enabled, the server can map the existing app model choices 
 
 ## App access roles
 
-Access is environment-driven only. `data/authorized-users.json` is not used for runtime authorization.
+Both apps use shared assignments from Supabase, with eight roles: Superadmin, Manager, Finance Manager, Consultant, Care Coordinator, Care, Marketing and HR. Empty assignments remove access to both apps. Consultant includes Photo Layout and Enquiries in Admin; Marketing and HR retain their existing Admin permissions. Roles combine permissions.
+
+`GET/PUT /api/roles` requires explicit Superadmin access; `/api/role-management` remains an alias. Both editors update the same array assignment. `GET /api/auth/me` returns the authenticated user's shared roles plus the legacy role projection used by existing Admin pages. Confirmed aliases in `app_role_aliases` resolve to one canonical assignment.
+
+Use the same `SUPER_USER_EMAIL` in both apps, defaulting to `chris@planwithcare.co.uk`. Historical email lists below are migration inputs only; they no longer grant runtime roles. `data/authorized-users.json` is not used for authorization.
+
+Follow `database/SHARED_ROLES_ROLLOUT.md` and complete the per-user migration review before activation. The canonical migration must match Associates' `supabase/role_management_schema.sql`. Both projects require `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Role storage errors return a temporary service error and never restore environment permissions. `app_role_management_state` keeps access and editing disabled until the rollout is verified. Run `node scripts/check-shared-role-integration.cjs "../Associates App"` to check both actual API handlers against an isolated mocked database.
 
 Set comma-separated email lists with these env vars:
 

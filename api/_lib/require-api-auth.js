@@ -1,9 +1,8 @@
 const crypto = require("crypto");
-const { getAuthorizedUsersMap } = require("./authorized-users");
+const { getRuntimeAuthorizedUsersMap } = require("./role-assignments");
 
 const openIdConfigCache = new Map();
 const jwksCache = new Map();
-const authorizedUsers = getAuthorizedUsersMap();
 const API_AUTH_DEBUG = process.env.API_AUTH_DEBUG === "1";
 const ROLE_PAGES = {
   admin: [
@@ -80,7 +79,7 @@ const ROLE_PAGES = {
     "suppliers",
   ],
   finance: ["finance"],
-  consultant: ["clientdata", "consultant", "agendas"],
+  consultant: ["clientdata", "consultant", "agendas", "photolayout", "enquiries"],
   director: ["clientdata", "agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
   marketing: ["marketing", "marketingreports", "photolayout", "functions", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
@@ -146,6 +145,10 @@ function getDynamicAccessiblePages(role) {
 
 function getAccessiblePages(role) {
   const normalizedRole = normalizeRole(role);
+  if (normalizedRole.startsWith("shared:")) {
+    const legacy = { superadmin: "admin", manager: "admin", financemanager: "finance", consultant: "consultant", carecoordinator: "operations", care: "logged_in", marketing: "marketing", hr: "hr_only" };
+    return [...new Set(normalizedRole.slice(7).split(",").flatMap(value => legacy[value] ? getAccessiblePages(legacy[value]) : []))];
+  }
   const pages = ROLE_PAGES[normalizedRole] || getDynamicAccessiblePages(normalizedRole);
   if (!Array.isArray(pages)) {
     return [];
@@ -349,6 +352,7 @@ async function requireApiAuth(req, res, options = {}) {
 
   try {
     const claims = await validateBearerToken(match[1]);
+    const authorizedUsers = await getRuntimeAuthorizedUsersMap();
     const email = resolveUserEmail(claims);
     const role = authorizedUsers.get(email);
     logApiAuthDebug("Validated bearer token.", {
@@ -376,8 +380,11 @@ async function requireApiAuth(req, res, options = {}) {
       return null;
     }
     req.authUser = {
-      email,
+      email: authorizedUsers.canonicalByEmail.get(email) || email,
+      identityEmail: email,
       role,
+      roles: authorizedUsers.rolesByEmail.get(email),
+      isSuperadmin: authorizedUsers.superadminEmails.has(email),
       claims,
     };
     return claims;
@@ -386,7 +393,7 @@ async function requireApiAuth(req, res, options = {}) {
       reason: error?.message || String(error),
       routeMethod: req?.method || "",
     });
-    res.status(401).json({ error: "Unauthorized." });
+    res.status(error.status === 503 ? 503 : 401).json({ error: error.status === 503 ? error.message : "Unauthorized." });
     return null;
   }
 }

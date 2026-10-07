@@ -15,5 +15,7 @@ module.exports = async (req, res) => {
   res.status(200).json({
     email: req.authUser?.email || "",
     role: req.authUser?.role || "",
+    roles: req.authUser?.roles || [],
+    isSuperadmin: req.authUser?.isSuperadmin === true,
   });
 };

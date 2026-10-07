@@ -1,7 +1,6 @@
-const { getAuthorizedUsersMap } = require("./authorized-users");
+const { getRuntimeAuthorizedUsersMap } = require("./role-assignments");
 
 const GRAPH_AUTH_DEBUG = process.env.GRAPH_AUTH_DEBUG === "1";
-const authorizedUsers = getAuthorizedUsersMap();
 const ROLE_PAGES = {
   admin: [
     "clients",
@@ -28,7 +27,7 @@ const ROLE_PAGES = {
     "photolayout",
   ],
   finance: ["finance"],
-  consultant: ["consultant", "agendas"],
+  consultant: ["consultant", "agendas", "photolayout", "enquiries"],
   director: ["agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
   marketing: ["marketing", "marketingreports", "photolayout", "functions", "emailtemplates", "agendas"],
   operations: [
@@ -113,7 +112,11 @@ function getDynamicAccessiblePages(role) {
 
 function getAccessiblePages(role) {
   const normalizedRole = normalizeRole(role);
-  const pages = ROLE_PAGES[normalizedRole] || getDynamicAccessiblePages(normalizedRole);
+  if (normalizedRole.startsWith("shared:")) {
+    const legacy = { superadmin: "admin", manager: "admin", financemanager: "finance", consultant: "consultant", carecoordinator: "operations", care: "logged_in", marketing: "marketing", hr: "hr_only" };
+    return [...new Set(normalizedRole.slice(7).split(",").flatMap(value => legacy[value] ? getAccessiblePages(legacy[value]) : []))];
+  }
+  const pages = ROLE_PAGES[normalizedRole] || (normalizedRole === "care_manager" ? ROLE_PAGES.operations : getDynamicAccessiblePages(normalizedRole));
   if (!Array.isArray(pages)) {
     return [];
   }
@@ -232,6 +235,7 @@ async function requireGraphAuth(req, res, options = {}) {
 
   try {
     const graphProfile = await fetchGraphMe(token);
+    const authorizedUsers = await getRuntimeAuthorizedUsersMap();
     const emailCandidates = getUserEmailCandidates({ graphProfile, tokenPayload });
     // A Microsoft account can use a different UPN, mailbox address, or sign-in
     // alias. All values here come from the validated token or Graph /me; choose
@@ -271,8 +275,11 @@ async function requireGraphAuth(req, res, options = {}) {
     }
 
     req.authUser = {
-      email,
+      email: authorizedUsers.canonicalByEmail.get(email) || email,
+      identityEmail: email,
       role,
+      roles: authorizedUsers.rolesByEmail.get(email),
+      isSuperadmin: authorizedUsers.superadminEmails.has(email),
       claims: tokenPayload || {},
       graphProfile,
       graphAccessToken: token,
@@ -287,10 +294,10 @@ async function requireGraphAuth(req, res, options = {}) {
       routeMethod: req?.method || "",
     });
 
-    res.status(401).json({
+    res.status(error.status === 503 ? 503 : 401).json({
       error: {
-        code: "TOKEN_EXPIRED_OR_INVALID",
-        message: GRAPH_AUTH_DEBUG
+        code: error.status === 503 ? "ROLE_STORAGE_UNAVAILABLE" : "TOKEN_EXPIRED_OR_INVALID",
+        message: error.status === 503 ? error.message : GRAPH_AUTH_DEBUG
           ? `Unauthorized: ${error?.message || "Graph token rejected."}`
           : "Unauthorized.",
       },

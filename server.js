@@ -27,6 +27,7 @@ const recruitmentStatusHandler = require("./api/recruitment/status");
 const recruitmentOwnerHandler = require("./api/recruitment/owner");
 const recruitmentKeepInMindHandler = require("./api/recruitment/keep-in-mind");
 const recruitmentDetailsHandler = require("./api/recruitment/details");
+const roleManagementHandler = require("./api/role-management");
 const authMeHandler = require("./api/auth/me");
 const routesRunHandler = require("./api/routes/run");
 const marketingPhotosHandler = require("./api/marketing/photos");
@@ -132,6 +133,11 @@ function getStaticFilePath(pathname) {
 
 async function serveStatic(pathname, res) {
   const absolutePath = getStaticFilePath(pathname);
+  const relative = path.relative(ROOT_DIR, absolutePath);
+  if (relative.split(path.sep).some(segment => segment.startsWith("."))) {
+    sendText(res, 404, "Not Found");
+    return;
+  }
   if (!absolutePath.startsWith(ROOT_DIR)) {
     sendText(res, 403, "Forbidden");
     return;
@@ -371,6 +377,12 @@ async function handleApi(req, res, reqUrl) {
       apiReq.body = await readJsonBody(req);
     }
     await recruitmentDetailsHandler(apiReq, apiRes);
+    return true;
+  }
+
+  if (["/api/roles", "/api/role-management"].includes(reqUrl.pathname)) {
+    if (req.method === "PUT") apiReq.body = await readJsonBody(req);
+    await roleManagementHandler(apiReq, apiRes);
     return true;
   }
 

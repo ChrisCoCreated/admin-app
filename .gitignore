@@ -2,3 +2,6 @@
 .env.*
 !.env.example
 node_modules/
+
+# Private production inventories and migration backups
+.role-migration/

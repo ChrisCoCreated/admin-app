@@ -54,6 +54,9 @@ export function applyRolePreview(profile = {}) {
 
   const previewingLoggedInUser = actualRole === "admin" && isLoggedInUserPreviewEnabled();
   const effectiveRole = previewingLoggedInUser ? "logged_in" : actualRole;
+  if (canUseSessionStorage()) {
+    window.sessionStorage.setItem("thrive.access.superadmin", String(profile.isSuperadmin === true && !previewingLoggedInUser));
+  }
 
   return {
     ...profile,

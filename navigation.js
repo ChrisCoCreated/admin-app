@@ -82,7 +82,7 @@ const ROLE_PAGES = {
     "suppliers",
   ],
   finance: ["finance"],
-  consultant: ["clientdata", "agendas"],
+  consultant: ["clientdata", "agendas", "photolayout", "enquiries"],
   director: ["clientdata", "agendas", "finance", "scorecard", "scorecarddefinitions", "scorecardgoals", "suppliers", "wellbeingintake"],
   marketing: ["marketing", "marketingstories", "mastercontacts", "marketingreports", "photolayout", "qrgenerator", "functions", "emailtemplates", "agendas"],
   photo_layout: ["photolayout", "agendas"],
@@ -143,6 +143,7 @@ const PAGE_META = {
   marketingreports: { href: "./marketing-reports.html", label: "Marketing Reports", shortcutLabel: "Reports" },
   photolayout: { href: "./photo-layout.html", label: "Photo Layout" },
   qrgenerator: { href: "./qr-generator.html", label: "QR Generator", shortcutLabel: "QR" },
+  rolemanagement: { href: "./role-management.html", label: "Role Management" },
   accessdiagnostics: { href: "./access-diagnostics.html", label: "Access Diagnostics" },
 };
 
@@ -163,7 +164,7 @@ const MENU_GROUPS = [
   },
   {
     title: "Performance",
-    pages: ["kpis", "reports", "finance", "functions", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals", "accessdiagnostics"],
+    pages: ["kpis", "reports", "finance", "functions", "problems", "scorecard", "scorecarddefinitions", "scorecardgoals", "accessdiagnostics", "rolemanagement"],
   },
   {
     title: "Marketing & Content",
@@ -205,15 +206,22 @@ function normalizePath(pathname) {
 
 export function getAccessiblePages(role) {
   const normalizedRole = normalizeRole(role);
+  if (normalizedRole.startsWith("shared:")) {
+    const legacy = { superadmin: "admin", manager: "admin", financemanager: "finance", consultant: "consultant", carecoordinator: "operations", care: "logged_in", marketing: "marketing", hr: "hr_only" };
+    return [...new Set(normalizedRole.slice(7).split(",").flatMap(value => legacy[value] ? getAccessiblePages(legacy[value]) : []))];
+  }
   const pages = ROLE_PAGES[normalizedRole] || getDynamicAccessiblePages(normalizedRole);
   if (!Array.isArray(pages)) {
     return [];
   }
-  const accessiblePages = [...pages];
+  const accessiblePages = pages.filter((page) => page !== "rolemanagement");
   for (const sharedPage of ["mapping", "kpis"]) {
     if (!accessiblePages.includes(sharedPage)) {
       accessiblePages.push(sharedPage);
     }
+  }
+  if (normalizedRole === "admin" && window.sessionStorage.getItem("thrive.access.superadmin") === "true") {
+    accessiblePages.push("rolemanagement");
   }
   return accessiblePages;
 }
