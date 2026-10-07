@@ -19,14 +19,17 @@ function token(email){const header=Buffer.from(JSON.stringify({alg:'RS256',kid:'
 async function call(handler,email,method='GET',body={}){const output={code:200,setHeader(){},status(code){this.code=code;return this;},json(data){this.data=data;return this;}};await handler({method,headers:{authorization:`Bearer ${token(email)}`},body},output);return output;}
 (async()=>{
  assert.equal((await call(adminRoles,'root@example.com','PUT',{email:'person@example.com',roles:['financeManager','hr']})).code,200);
- assert.deepEqual((await call(assocMe,'person@example.com')).data.roles,['financeManager','hr']);
+ assert.deepEqual((await call(assocMe,'person@example.com')).data.roles,['financeManager','care','hr']);
  assert.equal((await call(assocRoles,'root@example.com','PUT',{email:'person@example.com',roles:['consultant','marketing']})).code,200);
  assert.deepEqual((await call(adminMe,'person@example.com')).data.roles,['consultant','marketing']);
  assert.equal((await call(adminRoles,'root@example.com','PUT',{email:'rebecca@planwithcare.co.uk',roles:['hr']})).code,200);
- assert.deepEqual((await call(assocMe,'rebecca@thrivehomecare.co.uk')).data.roles,['hr']);
- assert.deepEqual((await call(assocMe,'rebecca@planwithcare.co.uk')).data.roles,['hr']);
+ assert.deepEqual((await call(assocMe,'rebecca@thrivehomecare.co.uk')).data.roles,['care','hr']);
+ assert.deepEqual((await call(assocMe,'rebecca@planwithcare.co.uk')).data.roles,['care','hr']);
  assert.equal((await call(assocRoles,'root@example.com','PUT',{email:'rebecca@planwithcare.co.uk',roles:[]})).code,200);
  assert.equal((await call(adminMe,'rebecca@planwithcare.co.uk')).code,403);
- assert.equal((await call(assocMe,'rebecca@thrivehomecare.co.uk')).code,403);
- console.log('Passed: edits from either app apply in the other, linked identities share assignments, and revocation blocks both identities in both apps.');
+ assert.deepEqual((await call(assocMe,'rebecca@thrivehomecare.co.uk')).data.roles,['care']);
+ assert.deepEqual((await call(assocMe,'unassigned@example.com')).data.roles,['care']);
+ assert.equal((await call(adminMe,'unassigned@example.com')).code,403);
+ assert.equal((await call(assocRoles,'unassigned@example.com')).code,403);
+ console.log('Passed: edits from either app apply in the other, linked identities share assignments, and cleared roles block Admin while Associates retains only baseline Care.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -42,7 +42,7 @@ export function createRoleEditor({ request, ids }) {
         aliases.style.display = "block";
         email.appendChild(aliases);
       }
-      summary.textContent = user.roles.map(role => roles[role]).join(" / ") || "No access";
+      summary.textContent = user.roles.map(role => roles[role]).join(" / ") || "No assigned roles — Admin blocked; Associates Care access";
       const action = document.createElement(table ? "td" : "div");
       const button = document.createElement("button");
       button.type = "button";

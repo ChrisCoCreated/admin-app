@@ -18,7 +18,7 @@ Production project: `zfdogbvgahmkjtstaklu`, confirmed from both Vercel configura
 3. With Supabase server settings configured, run `node scripts/seed-shared-roles.cjs REVIEWED_REPORT_JSON`. The script rejects incomplete reviews and changed database inventories. Do not seed while access is active.
 4. Deploy both compatible app versions. They use `GET/PUT /api/roles`; Admin retains `/api/role-management` as an alias. Associates also serves authenticated `GET /api/auth/me`. Public configuration must contain no assignment directory or finance recipient list.
 5. Verify schema permissions and both deployments' code versions, then set `access_enabled = true` on state row `id = 'shared'`, leaving `writes_enabled = false`.
-6. Smoke-test both apps with Superadmin, Manager, Finance Manager, Care Coordinator, Consultant, Care, Marketing, HR and revoked accounts. Verify no role-management access for ordinary roles, no general management access for Finance Manager, and no access for an empty assignment.
+6. Smoke-test both apps with Superadmin, Manager, Finance Manager, Care Coordinator, Consultant, Care, Marketing, HR and revoked accounts. Verify no role-management access for ordinary roles, no general management access for Finance Manager, and Admin denial plus baseline Associates Care access for an empty assignment.
 7. Set `writes_enabled = true` only after both production checks pass. Edit a designated test account from each app and verify the next authenticated request in the other app reflects the change. Restore its reviewed roles afterward. Do not send test notification emails.
 
 ## Rollback
