@@ -156,7 +156,7 @@ When Azure OpenAI is enabled, the server can map the existing app model choices 
 
 ## App access roles
 
-Both apps use shared assignments from Supabase, with eight roles: Superadmin, Manager, Finance Manager, Consultant, Care Coordinator, Care, Marketing and HR. Empty assignments remove access to both apps. Consultant includes Photo Layout and Enquiries in Admin; Marketing and HR retain their existing Admin permissions. Roles combine permissions.
+Both apps use shared assignments from Supabase, with nine roles: Superadmin, Manager, Finance Manager, Consultant, Care Coordinator, Care, Marketing, HR and Care Admin. Empty assignments remove access to both apps. Consultant includes Photo Layout and Enquiries in Admin; Marketing and HR retain their existing Admin permissions. Roles combine permissions.
 
 `GET/PUT /api/roles` requires explicit Superadmin access; `/api/role-management` remains an alias. Both editors update the same array assignment. `GET /api/auth/me` returns the authenticated user's shared roles plus the legacy role projection used by existing Admin pages. Confirmed aliases in `app_role_aliases` resolve to one canonical assignment.
 

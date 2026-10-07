@@ -113,7 +113,7 @@ function getDynamicAccessiblePages(role) {
 function getAccessiblePages(role) {
   const normalizedRole = normalizeRole(role);
   if (normalizedRole.startsWith("shared:")) {
-    const legacy = { superadmin: "admin", manager: "admin", financemanager: "finance", consultant: "consultant", carecoordinator: "operations", care: "logged_in", marketing: "marketing", hr: "hr_only" };
+    const legacy = { superadmin: "admin", manager: "admin", financemanager: "finance", consultant: "consultant", carecoordinator: "operations", care: "logged_in", marketing: "marketing", hr: "hr_only", careadmin: "logged_in" };
     return [...new Set(normalizedRole.slice(7).split(",").flatMap(value => legacy[value] ? getAccessiblePages(legacy[value]) : []))];
   }
   const pages = ROLE_PAGES[normalizedRole] || (normalizedRole === "care_manager" ? ROLE_PAGES.operations : getDynamicAccessiblePages(normalizedRole));

@@ -13,7 +13,7 @@ test("verified roles enforce finance boundaries, combinations, live edits and Gr
   Object.assign(process.env,{SUPABASE_URL:"https://roles.example.com",SUPABASE_SERVICE_ROLE_KEY:"test",SUPER_USER_EMAIL:"root@example.com",AZURE_TENANT_ID:"test-tenant",AZURE_API_AUDIENCE:"test-api",AZURE_REQUIRED_SCOPE:"client.read",ACCESS_FULL_EMAILS:"unassigned@example.com"});
   t.after(()=>{global.fetch=priorFetch;for(const key of Object.keys(process.env))if(!(key in prior))delete process.env[key];Object.assign(process.env,prior);});
   const {privateKey,publicKey}=crypto.generateKeyPairSync("rsa",{modulusLength:2048});
-  let rows=[{email:"manager@example.com",roles:["manager"]},{email:"finance@example.com",roles:["financeManager"]},{email:"care@example.com",roles:["care"]},{email:"combo@example.com",roles:["consultant","financeManager"]}];
+  let rows=[{email:"care-admin@example.com",roles:["careAdmin"]},{email:"manager@example.com",roles:["manager"]},{email:"finance@example.com",roles:["financeManager"]},{email:"care@example.com",roles:["care"]},{email:"combo@example.com",roles:["consultant","financeManager"]}];
   let outage=false,graphEmail="finance@example.com",writes=0;
   global.fetch=async(url,options={})=>{
     const target=String(url);
@@ -31,11 +31,14 @@ test("verified roles enforce finance boundaries, combinations, live edits and Gr
   const res=()=>({statusCode:200,setHeader(){},status(code){this.statusCode=code;return this;},json(data){this.data=data;return this;}});
   const req=(email,method='GET',body={})=>({method,headers:{authorization:`Bearer ${token(email)}`},body});
   async function call(email,method='GET',body={},route=handler){const output=res();await route(req(email,method,body),output);return output;}
-  for(const email of ['manager@example.com','finance@example.com','care@example.com','unassigned@example.com'])assert.equal((await call(email)).statusCode,403);
+  for(const email of ['manager@example.com','finance@example.com','care@example.com','care-admin@example.com','unassigned@example.com'])assert.equal((await call(email)).statusCode,403);
   assert.equal(writes,0);
   assert.equal((await call('root@example.com')).statusCode,200);
   assert.equal((await call('root@example.com','PUT',{email:'root@example.com',roles:[]})).statusCode,409);
   async function allowed(email,allowedRoles){const output=res();const input=req(email);const claims=await requireApiAuth(input,output,{allowedRoles});return {claims,output,input};}
+  assert.ok((await allowed('care-admin@example.com',['logged_in'])).claims);
+  assert.equal((await allowed('care-admin@example.com',['admin'])).output.statusCode,403);
+  assert.equal((await allowed('care-admin@example.com',['finance'])).output.statusCode,403);
   assert.ok((await allowed('finance@example.com',['finance'])).claims);
   assert.equal((await allowed('finance@example.com',['admin'])).output.statusCode,403);
   assert.equal((await allowed('care@example.com',['finance'])).output.statusCode,403);

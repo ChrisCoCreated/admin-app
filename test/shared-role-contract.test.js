@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { ROLES, validateAssignment } = require('../api/_lib/shared-roles');
 const { loadSnapshot, profileFor, saveAssignment, listAssignments } = require('../api/_lib/shared-role-store');
 
-test('shared storage enforces eight roles, explicit revocation, pagination and rollout controls', async t => {
+test('shared storage enforces nine roles, explicit revocation, pagination and rollout controls', async t => {
   const prior = {...process.env}, priorFetch=global.fetch;
   Object.assign(process.env,{SUPABASE_URL:'https://roles.example.com',SUPABASE_SERVICE_ROLE_KEY:'test',SUPER_USER_EMAIL:'root@example.com'});
   t.after(()=>{global.fetch=priorFetch;for(const key of Object.keys(process.env))if(!(key in prior))delete process.env[key];Object.assign(process.env,prior);});
@@ -21,7 +21,7 @@ test('shared storage enforces eight roles, explicit revocation, pagination and r
     // Simulate a REST row cap smaller than the requested page size.
     return new Response(JSON.stringify(rows.slice(offset,offset+200)));
   };
-  assert.deepEqual(Object.keys(ROLES),['superadmin','manager','financeManager','consultant','careCoordinator','care','marketing','hr']);
+  assert.deepEqual(Object.keys(ROLES),['superadmin','manager','financeManager','consultant','careCoordinator','care','marketing','hr','careAdmin']);
   const snapshot=await loadSnapshot();
   assert.equal(Object.keys(snapshot.assignments).length,1004);
   assert.deepEqual(profileFor('revoked@example.com',snapshot).roles,[]);

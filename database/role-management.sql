@@ -42,7 +42,7 @@ begin
   loop execute format('alter table public.app_role_assignments drop constraint %I', item.conname); end loop;
 end $$;
 alter table public.app_role_assignments add constraint app_role_assignments_shared_roles_check
-  check (roles <@ array['superadmin','manager','financeManager','consultant','careCoordinator','care','marketing','hr']::text[]
+  check (roles <@ array['superadmin','manager','financeManager','consultant','careCoordinator','care','marketing','hr','careAdmin']::text[]
     and array_position(roles, null) is null);
 
 create table if not exists public.app_role_management_state (

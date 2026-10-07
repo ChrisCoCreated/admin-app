@@ -1,17 +1,18 @@
 // Shared contract: keep this file identical in Admin and Associates.
 const ROLES = Object.freeze({
   superadmin: "Superadmin", manager: "Manager", financeManager: "Finance Manager",
-  consultant: "Consultant", careCoordinator: "Care Coordinator", care: "Care", marketing: "Marketing", hr: "HR",
+  consultant: "Consultant", careCoordinator: "Care Coordinator", care: "Care", marketing: "Marketing", hr: "HR", careAdmin: "Care Admin",
 });
 const ROLE_DESCRIPTIONS = Object.freeze({
   superadmin: "All features and role management in both apps.",
   manager: "Full Admin access except role management; Manager features in Associates.",
-  financeManager: "Finance in Admin; finance expense controls and PPE notifications in Associates.",
+  financeManager: "Finance in Admin; finance expense controls in Associates.",
   consultant: "Consultant features in both apps; Photo Layout and Enquiries in Admin.",
   careCoordinator: "Operations in Admin; Care Coordinator features in Associates.",
   care: "Mapping and KPIs in Admin; Care and standard features in Associates.",
   marketing: "Marketing features in Admin; standard signed-in features in Associates.",
   hr: "Carers, Recruitment and Timesheets in Admin; standard signed-in features in Associates.",
+  careAdmin: "Mapping and KPIs in Admin; PPE submissions, actions and notification emails in Associates.",
 });
 function normalizeEmail(value) { return String(value || "").trim().toLowerCase(); }
 function getProtectedEmail() { return normalizeEmail(process.env.SUPER_USER_EMAIL || "chris@planwithcare.co.uk"); }

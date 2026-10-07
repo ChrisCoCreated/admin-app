@@ -1,6 +1,6 @@
 const { loadSnapshot, profileFor, listAssignments, saveAssignment } = require('./shared-role-store');
 const { ROLES } = require('./shared-roles');
-const LEGACY_ROLE = { superadmin:'admin', manager:'admin', financeManager:'finance', consultant:'consultant', careCoordinator:'operations', care:'logged_in', marketing:'marketing', hr:'hr_only' };
+const LEGACY_ROLE = { superadmin:'admin', manager:'admin', financeManager:'finance', consultant:'consultant', careCoordinator:'operations', care:'logged_in', marketing:'marketing', hr:'hr_only', careAdmin:'logged_in' };
 function adminRole(roles) {
   if (roles.includes('superadmin') || roles.includes('manager')) return 'admin';
   return roles.length === 1 ? LEGACY_ROLE[roles[0]] : roles.length ? `shared:${roles.join(',')}` : '';
