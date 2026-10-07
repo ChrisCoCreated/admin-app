@@ -1,11 +1,11 @@
 # Shared roles rollout
 
-Status: implementation is prepared, but per-user review and production inventory confirmation are required. No shared-role migration or deployment has been executed.
+Production project: `zfdogbvgahmkjtstaklu`, confirmed from both Vercel configurations and approved by the user on 7 October 2026. Both compatible versions are deployed and the reviewed assignments are migrated. The initially prepared tables in `jvloxlvgbtrgzmpqlhdi` remain inactive. The steps below are the rollout and recovery runbook.
 
 ## Review and preserve existing access
 
-1. Export existing `app_role_assignments` rows and record both deployed Git revisions before any database changes. The last inspection of project `jvloxlvgbtrgzmpqlhdi` found no role tables; recheck immediately before execution.
-2. Obtain the current production Admin access lists securely. The generated `private .role-migration/role-migration-review.json` currently uses local Admin configuration and production Associates configuration; it is not approved production seed data.
+1. Export existing `app_role_assignments` rows and record both deployed Git revisions before any database changes. The pre-migration inspection of production project `zfdogbvgahmkjtstaklu` found no role tables; recheck before any future migration.
+2. Obtain the current production Admin access lists securely. The generated `private .role-migration/role-migration-review.json` currently uses local Admin configuration and production Associates configuration; the production inventory and assignments were approved by the user on 7 October 2026.
 3. Regenerate the report with `node scripts/role-migration-report.cjs ADMIN_ENV ASSOCIATES_CONFIG_JSON EXISTING_ROWS_JSON OUTPUT_JSON ALIASES_JSON`. Never commit environment exports or service-role keys.
 4. Review every user's `roles`. Marketing and HR are shared roles, and Consultant includes Photo Layout and Enquiries. Review restricted combinations explicitly. The user confirmed that both Rebecca addresses belong to one person; .role-migration/role-aliases-review.json links the Plan With Care address to the Thrive address.
 5. Mark each reviewed row `reviewed: true`, and set `sourcesVerified: true` only after both production inventories have been confirmed. Keep explicit revoked users as `roles: []`.
