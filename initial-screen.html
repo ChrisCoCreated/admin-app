@@ -79,6 +79,11 @@
             <p>Does that sound okay?</p>
           </section>
 
+          <label class="field" for="jobTitleInput">
+            Job Title
+            <input id="jobTitleInput" type="text" placeholder="Enter the role the candidate applied for" />
+          </label>
+
           <section class="screen-print-summary" aria-label="Initial screen summary">
             <div class="screen-print-summary-header">
               <div>
@@ -287,6 +292,25 @@
                 <textarea id="q7NotesWellbeing" placeholder="Capture how they support wellbeing, reduce loneliness, and maintain their own resilience."></textarea>
               </label>
             </article>
+
+            <article class="screen-question-card">
+              <div class="screen-question-top">
+                <h3>8. Please tell me about your experience in care.</h3>
+                <div class="field compact-field">
+                  <span>Score</span>
+                  <div class="score-chip-group" data-score-field="q8Score">
+                    <button type="button" class="score-chip score-green" data-score-value="Green">G</button>
+                    <button type="button" class="score-chip score-amber" data-score-value="Amber">A</button>
+                    <button type="button" class="score-chip score-red" data-score-value="Red">R</button>
+                  </div>
+                  <input id="q8Score" type="hidden" value="" />
+                </div>
+              </div>
+              <label class="field" for="q8NotesCareExperience">
+                Notes
+                <textarea id="q8NotesCareExperience" placeholder="Capture previous care roles, the people they supported, responsibilities, and relevant training or experience."></textarea>
+              </label>
+            </article>
           </section>
 
           <section class="screen-section">
@@ -294,6 +318,14 @@
               <p class="eyebrow">Close</p>
               <h2>Summary and next steps</h2>
             </div>
+
+            <article class="screen-question-card">
+              <h3>9. Do you have any questions for us at this stage?</h3>
+              <label class="field" for="q9NotesCandidateQuestions">
+                Notes
+                <textarea id="q9NotesCandidateQuestions" placeholder="Capture any questions the candidate asks and how you respond."></textarea>
+              </label>
+            </article>
 
             <label class="field" for="initialCallSummary">
               Initial Call Summary
@@ -362,6 +394,6 @@
       </section>
     </main>
 
-    <script type="module" src="./initial-screen.js"></script>
+    <script type="module" src="./initial-screen.js?v=20261105.2"></script>
   </body>
 </html>

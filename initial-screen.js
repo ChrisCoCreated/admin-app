@@ -34,6 +34,7 @@ const screenFirstInterviewDateField = document.getElementById("screenFirstInterv
 const scoreChipGroups = Array.from(document.querySelectorAll(".score-chip-group"));
 
 const fieldRefs = {
+  jobTitle: document.getElementById("jobTitleInput"),
   q1NotesAvailability: document.getElementById("q1NotesAvailability"),
   q1Score: document.getElementById("q1Score"),
   q2NotesShortNotice: document.getElementById("q2NotesShortNotice"),
@@ -48,6 +49,9 @@ const fieldRefs = {
   q6Score: document.getElementById("q6Score"),
   q7NotesWellbeing: document.getElementById("q7NotesWellbeing"),
   q7Score: document.getElementById("q7Score"),
+  q8NotesCareExperience: document.getElementById("q8NotesCareExperience"),
+  q8Score: document.getElementById("q8Score"),
+  q9NotesCandidateQuestions: document.getElementById("q9NotesCandidateQuestions"),
   initialCallSummary: document.getElementById("initialCallSummary"),
   screenOutcome: document.getElementById("screenOutcome"),
   firstInterviewDate: document.getElementById("firstInterviewDateInput"),
@@ -71,7 +75,7 @@ let availableTagChoices = [];
 let saveBusy = false;
 let copyFeedbackTimer = 0;
 let restoreDocumentTitle = document.title;
-const SCORE_FIELD_KEYS = ["q1Score", "q2Score", "q3Score", "q4Score", "q5Score", "q6Score", "q7Score"];
+const SCORE_FIELD_KEYS = ["q1Score", "q2Score", "q3Score", "q4Score", "q5Score", "q6Score", "q7Score", "q8Score"];
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -435,6 +439,7 @@ function syncFirstInterviewDateVisibility() {
 }
 
 function fillForm(responses = {}) {
+  fieldRefs.jobTitle.value = cleanText(responses.jobTitle);
   fieldRefs.q1NotesAvailability.value = cleanText(responses.q1NotesAvailability);
   fieldRefs.q1Score.value = cleanText(responses.q1Score);
   fieldRefs.q2NotesShortNotice.value = cleanText(responses.q2NotesShortNotice);
@@ -449,6 +454,9 @@ function fillForm(responses = {}) {
   fieldRefs.q6Score.value = cleanText(responses.q6Score);
   fieldRefs.q7NotesWellbeing.value = cleanText(responses.q7NotesWellbeing);
   fieldRefs.q7Score.value = cleanText(responses.q7Score);
+  fieldRefs.q8NotesCareExperience.value = cleanText(responses.q8NotesCareExperience);
+  fieldRefs.q8Score.value = cleanText(responses.q8Score);
+  fieldRefs.q9NotesCandidateQuestions.value = cleanText(responses.q9NotesCandidateQuestions);
   fieldRefs.initialCallSummary.value = cleanText(responses.initialCallSummary);
   fieldRefs.screenOutcome.value = cleanText(responses.screenOutcome);
   fieldRefs.firstInterviewDate.value = cleanText(responses.firstInterviewDate);
@@ -464,12 +472,14 @@ function fillForm(responses = {}) {
   syncScoreChipGroup("q5Score", fieldRefs.q5Score.value);
   syncScoreChipGroup("q6Score", fieldRefs.q6Score.value);
   syncScoreChipGroup("q7Score", fieldRefs.q7Score.value);
+  syncScoreChipGroup("q8Score", fieldRefs.q8Score.value);
   syncFirstInterviewDateVisibility();
   renderScoreSummary();
 }
 
 function readForm() {
   return {
+    jobTitle: fieldRefs.jobTitle.value,
     q1NotesAvailability: fieldRefs.q1NotesAvailability.value,
     q1Score: fieldRefs.q1Score.value,
     q2NotesShortNotice: fieldRefs.q2NotesShortNotice.value,
@@ -484,6 +494,9 @@ function readForm() {
     q6Score: fieldRefs.q6Score.value,
     q7NotesWellbeing: fieldRefs.q7NotesWellbeing.value,
     q7Score: fieldRefs.q7Score.value,
+    q8NotesCareExperience: fieldRefs.q8NotesCareExperience.value,
+    q8Score: fieldRefs.q8Score.value,
+    q9NotesCandidateQuestions: fieldRefs.q9NotesCandidateQuestions.value,
     initialCallSummary: fieldRefs.initialCallSummary.value,
     screenOutcome: fieldRefs.screenOutcome.value,
     firstInterviewDate: cleanText(fieldRefs.firstInterviewDate.value),
@@ -558,6 +571,9 @@ function buildCopySummaryText() {
     form.tags ? `Tags: ${cleanText(form.tags)}` : "",
     form.screenNextSteps ? `Next steps: ${cleanText(form.screenNextSteps)}` : "",
     form.initialCallSummary ? `Initial screen summary: ${cleanText(form.initialCallSummary)}` : "",
+    form.jobTitle ? `Job Title: ${cleanText(form.jobTitle)}` : "",
+    form.q8NotesCareExperience ? `Care experience: ${cleanText(form.q8NotesCareExperience)}` : "",
+    form.q9NotesCandidateQuestions ? `Candidate questions: ${cleanText(form.q9NotesCandidateQuestions)}` : "",
     `Initial Screen: ${candidateName}`,
     `Initial Screen URL: ${window.location.href}`,
   ];
@@ -570,6 +586,7 @@ function buildCopySummaryHtml() {
   const candidateName = getCandidateName();
   const candidateMeta = cleanText(screenCandidateMeta?.textContent);
   const candidateContact = cleanText(screenSummaryContact?.textContent);
+  const jobTitle = cleanText(form.jobTitle);
   const summaryText = cleanText(form.initialCallSummary);
   const screenOutcome = cleanText(form.screenOutcome);
   const screenNextSteps = cleanText(form.screenNextSteps);
@@ -581,6 +598,7 @@ function buildCopySummaryHtml() {
       <h2 style="margin: 0 0 8px; font-size: 20px;">Intital Screen Summary: ${escapeHtml(candidateName)}</h2>
       ${candidateMeta ? `<p style="margin: 0 0 12px; color: #5b6576;">${escapeHtml(candidateMeta)}</p>` : ""}
       ${candidateContact ? `<p style="margin: 0 0 12px; color: #5b6576;">${escapeHtml(candidateContact)}</p>` : ""}
+      ${jobTitle ? `<p style="margin: 0 0 12px; color: #5b6576;"><strong>Job Title:</strong> ${escapeHtml(jobTitle)}</p>` : ""}
       <table style="border-collapse: collapse; margin: 0 0 14px;">
         <tr>
           <td style="padding: 6px 10px; border-radius: 999px; background: #ecfaf2; color: #0f6a3b; font-weight: 700;">Green: ${counts.Green}</td>
@@ -624,6 +642,16 @@ function buildCopySummaryHtml() {
               <div style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #1b5467; font-weight: 800;">Intital Screen Summary</div>
               <div style="padding: 12px 14px; border: 1px solid #d8e1ed; border-radius: 12px; background: #fbfdff; white-space: pre-wrap;">${escapeHtml(summaryText)}</div>
             </div>`
+          : ""
+      }
+      ${
+        cleanText(form.q8NotesCareExperience)
+          ? `<div style="margin: 0 0 14px;"><strong>Care experience:</strong><div style="padding: 12px 14px; border: 1px solid #d8e1ed; border-radius: 12px; background: #fbfdff; white-space: pre-wrap;">${escapeHtml(form.q8NotesCareExperience)}</div></div>`
+          : ""
+      }
+      ${
+        cleanText(form.q9NotesCandidateQuestions)
+          ? `<div style="margin: 0 0 14px;"><strong>Candidate questions:</strong><div style="padding: 12px 14px; border: 1px solid #d8e1ed; border-radius: 12px; background: #fbfdff; white-space: pre-wrap;">${escapeHtml(form.q9NotesCandidateQuestions)}</div></div>`
           : ""
       }
       <p style="margin: 0;"><a href="${escapeHtml(pageUrl)}" style="color: #1f3f89; font-weight: 700;">${escapeHtml(
