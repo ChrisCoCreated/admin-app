@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260928.7" />
+    <link rel="stylesheet" href="./styles.css?v=20261109.1" />
   </head>
   <body class="auth-pending recruitment-page">
     <header class="topbar">
@@ -94,6 +94,8 @@
             <label class="field" for="sortFilterSelect">
               Sort
               <select id="sortFilterSelect">
+                <option value="jobtitle_location" selected>Job title, then location A-Z</option>
+                <option value="jobtitle_location_desc">Job title, then location Z-A</option>
                 <option value="updated_desc">Recently updated</option>
                 <option value="updated_asc">Oldest updated</option>
                 <option value="created_desc">Recently created</option>
@@ -216,8 +218,8 @@
                     </button>
                   </th>
                   <th>
-                    <button type="button" class="recruitment-sort-header" data-sort-header="location">
-                      Location
+                    <button type="button" class="recruitment-sort-header" data-sort-header="jobtitle">
+                      Job Title / Location
                     </button>
                   </th>
                   <th>
@@ -489,6 +491,27 @@
       </div>
     </div>
 
+    <div id="recruitmentAttachmentHelpModal" class="modal-backdrop" hidden>
+      <section class="modal-panel recruitment-attachment-help" role="dialog" aria-modal="true" aria-labelledby="recruitmentAttachmentHelpTitle">
+        <div class="recruitment-modal-header">
+          <div>
+            <p class="eyebrow">SharePoint attachment</p>
+            <h3 id="recruitmentAttachmentHelpTitle">No attachment yet</h3>
+          </div>
+          <button id="recruitmentAttachmentHelpCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+        <p id="recruitmentAttachmentHelpText" class="muted"></p>
+        <ol>
+          <li>Open the candidate's SharePoint record.</li>
+          <li>Choose <strong>Edit all</strong> or <strong>Edit</strong>.</li>
+          <li>Use <strong>Add attachments</strong> to upload a file, then save the record.</li>
+        </ol>
+        <div class="modal-actions">
+          <a id="recruitmentAttachmentEditLink" class="button-link" href="#" target="_blank" rel="noopener noreferrer">Open SharePoint record</a>
+        </div>
+      </section>
+    </div>
+
     <div id="addRecruitmentModal" class="modal-backdrop" hidden>
       <div class="modal-panel recruitment-modal-panel">
         <div class="recruitment-modal-header">
@@ -577,6 +600,6 @@
       </div>
     </div>
 
-  <script type="module" src="./recruitment.js?v=20260928.2"></script>
+  <script type="module" src="./recruitment.js?v=20261109.1"></script>
   </body>
 </html>

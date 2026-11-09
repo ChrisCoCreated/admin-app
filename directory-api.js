@@ -543,6 +543,19 @@ export function createDirectoryApi(authController) {
       return response.json();
     },
 
+    async backfillRecruitmentJobTitles() {
+      const response = await authFetch(endpoint("/api/recruitment/backfill-job-titles"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        scopes: FRONTEND_CONFIG.graphTaskScopes,
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) {
+        await parseError(response, "Recruitment Job Title backfill failed");
+      }
+      return response.json();
+    },
+
     async addRecruitmentCandidateToOneTouch(payload = {}) {
       const response = await authFetch(endpoint("/api/recruitment"), {
         method: "POST",

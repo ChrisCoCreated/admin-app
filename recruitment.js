@@ -1,6 +1,6 @@
 import { createAuthController } from "./auth-common.js";
 import { FRONTEND_CONFIG } from "./frontend-config.js";
-import { createDirectoryApi } from "./directory-api.js";
+import { createDirectoryApi } from "./directory-api.js?v=20261105.1";
 import { canAccessPage, renderTopNavigation } from "./navigation.js?v=20260915.1";
 import { getRecruitmentWhatsAppUrl, normalizeRecruitmentPhoneForActions } from "./recruitment-whatsapp.js?v=20260702";
 
@@ -16,6 +16,7 @@ const sortFilterSelect = document.getElementById("sortFilterSelect");
 const mineOnlyFilterInput = document.getElementById("mineOnlyFilterInput");
 const stageModeFilterButtons = Array.from(document.querySelectorAll("[data-stage-mode-filter]"));
 const sortHeaderButtons = Array.from(document.querySelectorAll("[data-sort-header]"));
+const RECRUITMENT_JOB_TITLE_BACKFILL_KEY = "recruitment-job-title-backfill-v1";
 const recruitmentTableBody = document.getElementById("recruitmentTableBody");
 const emptyState = document.getElementById("emptyState");
 const statusMessage = document.getElementById("statusMessage");
@@ -53,6 +54,11 @@ const candidateDetailCloseBtn = document.getElementById("candidateDetailCloseBtn
 const candidateDetailEditForm = document.getElementById("candidateDetailEditForm");
 const candidateDetailSnapshot = document.getElementById("candidateDetailSnapshot");
 const candidateDetailEditor = document.getElementById("candidateDetailEditor");
+const recruitmentAttachmentHelpModal = document.getElementById("recruitmentAttachmentHelpModal");
+const recruitmentAttachmentHelpTitle = document.getElementById("recruitmentAttachmentHelpTitle");
+const recruitmentAttachmentHelpText = document.getElementById("recruitmentAttachmentHelpText");
+const recruitmentAttachmentHelpEditLink = document.getElementById("recruitmentAttachmentEditLink");
+const recruitmentAttachmentHelpCloseBtn = document.getElementById("recruitmentAttachmentHelpCloseBtn");
 const addRecruitmentModal = document.getElementById("addRecruitmentModal");
 const addRecruitmentCloseBtn = document.getElementById("addRecruitmentCloseBtn");
 const addRecruitmentForm = document.getElementById("addRecruitmentForm");
@@ -257,12 +263,14 @@ function normalizeOwnerOptions(options) {
 }
 
 function syncSortHeaderButtons() {
-  const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
+  const selectedSort = cleanText(sortFilterSelect?.value || "jobtitle_location");
   for (const button of sortHeaderButtons) {
     const headerKey = cleanText(button?.dataset?.sortHeader);
     let direction = "";
     if (headerKey === "candidate") {
       direction = selectedSort === "name_asc" ? "asc" : selectedSort === "name_desc" ? "desc" : "";
+    } else if (headerKey === "jobtitle") {
+      direction = selectedSort === "jobtitle_location" ? "asc" : selectedSort === "jobtitle_location_desc" ? "desc" : "";
     } else if (headerKey === "location") {
       direction = selectedSort === "location_asc" ? "asc" : selectedSort === "location_desc" ? "desc" : "";
     } else if (headerKey === "status") {
@@ -277,10 +285,12 @@ function toggleHeaderSort(headerKey) {
   if (!sortFilterSelect) {
     return;
   }
-  const selectedSort = cleanText(sortFilterSelect.value || "updated_desc");
-  let nextSort = "updated_desc";
+  const selectedSort = cleanText(sortFilterSelect.value || "jobtitle_location");
+  let nextSort = "jobtitle_location";
   if (headerKey === "candidate") {
     nextSort = selectedSort === "name_asc" ? "name_desc" : "name_asc";
+  } else if (headerKey === "jobtitle") {
+    nextSort = selectedSort === "jobtitle_location" ? "jobtitle_location_desc" : "jobtitle_location";
   } else if (headerKey === "location") {
     nextSort = selectedSort === "location_asc" ? "location_desc" : "location_asc";
   } else if (headerKey === "status") {
@@ -444,6 +454,7 @@ function getBaseFilteredCandidates() {
     }
     return (
       normalizeText(candidate.candidateName).includes(query) ||
+      normalizeText(candidate.jobTitle).includes(query) ||
       normalizeText(candidate.location).includes(query) ||
       normalizeText(candidate.status).includes(query) ||
       normalizeText(candidate.source).includes(query) ||
@@ -793,6 +804,42 @@ function getInitialScreenUrl(candidateId) {
   const url = new URL("./initial-screen.html", window.location.href);
   url.searchParams.set("itemId", cleanText(candidateId));
   return url.toString();
+}
+
+function getRecruitmentItemUrl(candidateId, formName = "DispForm.aspx") {
+  const listUrl = cleanText(sharePointListLink?.href);
+  if (!listUrl || listUrl === "#") return "#";
+
+  try {
+    const url = new URL(listUrl, window.location.href);
+    const listPath = url.pathname
+      .replace(/\/(?:Active|AllItems|DispForm|EditForm)\.aspx$/i, "")
+      .replace(/\/$/, "");
+    url.pathname = `${listPath}/${formName}`;
+    url.search = "";
+    url.searchParams.set("ID", cleanText(candidateId));
+    return url.toString();
+  } catch {
+    return "#";
+  }
+}
+
+function openRecruitmentAttachmentHelp(candidate) {
+  if (!recruitmentAttachmentHelpModal) return;
+  const name = cleanText(candidate?.candidateName) || "this candidate";
+  if (recruitmentAttachmentHelpTitle) recruitmentAttachmentHelpTitle.textContent = `Add an attachment for ${name}`;
+  if (recruitmentAttachmentHelpText) {
+    recruitmentAttachmentHelpText.textContent = `There are no attachments saved for ${name}. Add the file to their SharePoint record using these steps:`;
+  }
+  if (recruitmentAttachmentHelpEditLink) {
+    recruitmentAttachmentHelpEditLink.href = getRecruitmentItemUrl(candidate?.id, "EditForm.aspx");
+  }
+  recruitmentAttachmentHelpModal.hidden = false;
+  recruitmentAttachmentHelpCloseBtn?.focus();
+}
+
+function closeRecruitmentAttachmentHelp() {
+  if (recruitmentAttachmentHelpModal) recruitmentAttachmentHelpModal.hidden = true;
 }
 
 function formatAppliedOnDate(value) {
@@ -1891,7 +1938,7 @@ function renderFilterOptions() {
   const selectedSource = cleanText(sourceFilterSelect.value || "all");
   const selectedOwner = cleanText(ownerFilterSelect?.value || "all");
   const selectedActive = cleanText(activeFilterSelect?.value || "active");
-  const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
+  const selectedSort = cleanText(sortFilterSelect?.value || "jobtitle_location");
 
   locationFilterSelect.innerHTML = '<option value="all">All locations</option>';
   statusFilterSelect.innerHTML =
@@ -1939,6 +1986,8 @@ function renderFilterOptions() {
   syncArchivedCandidatesButton();
   if (sortFilterSelect) {
     sortFilterSelect.value = [
+      "jobtitle_location",
+      "jobtitle_location_desc",
       "updated_desc",
       "updated_asc",
       "created_desc",
@@ -1951,7 +2000,7 @@ function renderFilterOptions() {
       "status_desc",
     ].includes(selectedSort)
       ? selectedSort
-      : "updated_desc";
+      : "jobtitle_location";
   }
   syncSortHeaderButtons();
 }
@@ -1968,11 +2017,21 @@ function syncArchivedCandidatesButton() {
 }
 
 function getFilteredCandidates() {
-  const selectedSort = cleanText(sortFilterSelect?.value || "updated_desc");
+  const selectedSort = cleanText(sortFilterSelect?.value || "jobtitle_location");
   const baseFiltered = getBaseFilteredCandidates();
   const filtered = baseFiltered.filter((candidate) => candidateMatchesStageMode(candidate));
 
   filtered.sort((left, right) => {
+    if (selectedSort === "jobtitle_location" || selectedSort === "jobtitle_location_desc") {
+      const direction = selectedSort === "jobtitle_location" ? 1 : -1;
+      const leftTitle = cleanText(left.jobTitle);
+      const rightTitle = cleanText(right.jobTitle);
+      if (Boolean(leftTitle) !== Boolean(rightTitle)) {
+        return leftTitle ? -1 : 1;
+      }
+      const titleOrder = leftTitle.localeCompare(rightTitle, "en", { sensitivity: "base" });
+      return direction * (titleOrder || cleanText(left.location).localeCompare(cleanText(right.location), "en", { sensitivity: "base" }));
+    }
     if (selectedSort === "updated_asc") {
       return toSortTimestamp(left.updated) - toSortTimestamp(right.updated);
     }
@@ -2040,12 +2099,20 @@ function renderCandidates() {
     tr.innerHTML = `
       <td>
         <div class="recruitment-candidate-cell">
-          <span class="recruitment-candidate-name">${escapeHtml(cleanText(candidate.candidateName) || "-")}</span>
+          <div class="recruitment-candidate-name-line">
+            <span class="recruitment-candidate-name">${escapeHtml(cleanText(candidate.candidateName) || "-")}</span>
+            <button type="button" class="recruitment-attachment-trigger${candidate.hasAttachments ? " has-attachments" : ""}" aria-label="${candidate.hasAttachments ? "Open SharePoint attachments" : "Instructions for adding a SharePoint attachment"} for ${escapeHtml(cleanText(candidate.candidateName) || "candidate")}" title="${candidate.hasAttachments ? "Open attachments in SharePoint" : "No attachment: click for instructions"}">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m8.5 12.5 6.8-6.8a3.5 3.5 0 0 1 5 5l-9.2 9.2a5 5 0 0 1-7.1-7.1l9.2-9.2" /></svg>
+            </button>
+          </div>
           ${candidate.liveInMailingList ? '<span class="recruitment-inline-flag">Live-in list</span>' : ""}
           <button type="button" class="recruitment-mobile-more-toggle" aria-expanded="${expandedMobileCandidateIds.has(cleanText(candidate.id)) ? "true" : "false"}">${expandedMobileCandidateIds.has(cleanText(candidate.id)) ? "Less" : "More"}</button>
         </div>
       </td>
-      <td>${escapeHtml(cleanText(candidate.location) || "-")}</td>
+      <td class="recruitment-role-location-cell">
+        <strong class="recruitment-job-title">${escapeHtml(cleanText(candidate.jobTitle) || "Job title not set")}</strong>
+        <span class="recruitment-location">${escapeHtml(cleanText(candidate.location) || "Location not set")}</span>
+      </td>
       <td>
         <div class="recruitment-status-cell${showInactiveReview ? " is-inactive-review" : ""}">
           <button type="button" class="status-pill-trigger">${escapeHtml(cleanText(candidate.status) || "-")}</button>
@@ -2165,6 +2232,15 @@ function renderCandidates() {
       setDetail(candidate);
       renderCandidates();
       openCandidateDetail(candidate);
+    });
+    tr.querySelector(".recruitment-attachment-trigger")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (candidate.hasAttachments) {
+        const url = getRecruitmentItemUrl(candidate.id, "DispForm.aspx");
+        if (url !== "#") window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        openRecruitmentAttachmentHelp(candidate);
+      }
     });
     const addBtn = tr.querySelector(".recruitment-add-btn");
     addBtn?.addEventListener("click", async (event) => {
@@ -2872,6 +2948,22 @@ async function loadRecruitmentCandidates() {
   renderCandidates();
 }
 
+async function runRecruitmentJobTitleBackfillOnce() {
+  if (currentUserEmail !== "chris@planwithcare.co.uk") return null;
+
+  try {
+    if (window.localStorage.getItem(RECRUITMENT_JOB_TITLE_BACKFILL_KEY) === "complete") return null;
+    const result = await directoryApi.backfillRecruitmentJobTitles();
+    if (!Number(result?.failed)) {
+      window.localStorage.setItem(RECRUITMENT_JOB_TITLE_BACKFILL_KEY, "complete");
+    }
+    return result;
+  } catch (error) {
+    console.warn("[recruitment-job-title-backfill] One-time backfill did not complete", error);
+    return { error: error?.message || "Could not backfill missing job titles." };
+  }
+}
+
 async function createRecruitmentCandidate() {
   const candidateName = toTitleCaseName(addCandidateNameInput?.value);
   if (!candidateName) {
@@ -2939,8 +3031,17 @@ async function init() {
 
     renderTopNavigation({ role });
     setStatus("Loading recruitment candidates...");
+    const jobTitleBackfill = await runRecruitmentJobTitleBackfillOnce();
     await loadRecruitmentCandidates();
-    setStatus(`Loaded ${allCandidates.length} candidate(s).`);
+    if (jobTitleBackfill?.error) {
+      setStatus(`Loaded ${allCandidates.length} candidate(s). Job Title backfill did not run: ${jobTitleBackfill.error}`, true);
+    } else if (jobTitleBackfill) {
+      setStatus(
+        `Loaded ${allCandidates.length} candidate(s). Filled Job Title for ${Number(jobTitleBackfill.updated) || 0} candidate(s) from Notes (checked ${Number(jobTitleBackfill.scanned) || 0}).`
+      );
+    } else {
+      setStatus(`Loaded ${allCandidates.length} candidate(s).`);
+    }
   } catch (error) {
     // Only the application authorization layer uses FORBIDDEN. Recruitment
     // subsequently calls SharePoint with the user's delegated Graph token;
@@ -3293,6 +3394,10 @@ candidateDetailModal?.addEventListener("click", (event) => {
   }
   closeCandidateDetail();
 });
+recruitmentAttachmentHelpCloseBtn?.addEventListener("click", closeRecruitmentAttachmentHelp);
+recruitmentAttachmentHelpModal?.addEventListener("click", (event) => {
+  if (event.target === recruitmentAttachmentHelpModal) closeRecruitmentAttachmentHelp();
+});
 addRecruitmentModal?.addEventListener("click", (event) => {
   if (event.target !== addRecruitmentModal || createCandidateBusy) {
     return;
@@ -3306,6 +3411,7 @@ document.addEventListener("keydown", (event) => {
   }
   closeStatusQuickMenu();
   closeCandidateDetail();
+  closeRecruitmentAttachmentHelp();
   if (!oneTouchPickerModal?.hidden) {
     closeOneTouchPicker();
   }

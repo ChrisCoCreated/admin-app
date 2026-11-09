@@ -263,7 +263,9 @@ function normalizeRecruitmentItem(item) {
   return {
     id: normalizeText(item?.id),
     candidateName: normalizeText(fields.Title),
+    jobTitle: normalizeText(fields.JobTitle),
     location: normalizeText(fields.Location),
+    hasAttachments: toBoolean(fields.Attachments),
     email: normalizeText(fields.Email),
     phoneNumber: normalizeText(fields.PhoneNumber),
     interviewBooked: toBoolean(fields.InterviewBooked),
@@ -295,7 +297,9 @@ function normalizeRecruitmentItem(item) {
 async function fetchRecruitmentItems(graphClient, siteId, listId) {
   const selectFields = [
     "Title",
+    "JobTitle",
     "Location",
+    "Attachments",
     "Email",
     "PhoneNumber",
     "InterviewBooked",
@@ -337,7 +341,9 @@ async function fetchRecruitmentItems(graphClient, siteId, listId) {
 async function fetchRecruitmentItem(graphClient, siteId, listId, itemId) {
   const selectFields = [
     "Title",
+    "JobTitle",
     "Location",
+    "Attachments",
     "Email",
     "PhoneNumber",
     "InterviewBooked",
